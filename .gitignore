@@ -1,5 +1,9 @@
+# Global file ignore
+
 *.db
 *.log
+**/*.json
+
 # Virtual environments
 venv/
 

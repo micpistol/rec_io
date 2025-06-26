@@ -45,30 +45,28 @@ app.mount(
 # Serve the tabs/ folder as static files under /tabs
 app.mount(
     "/tabs",
-    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "tabs")),
+    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend", "tabs")),
     name="tabs"
 )
-
 
 # Serve the images/ folder as static files under /images
 app.mount(
     "/images",
-    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "images")),
+    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend", "images")),
     name="images"
 )
-
 
 # Serve the audio/ folder as static files under /audio
 app.mount(
     "/audio",
-    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "audio")),
+    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend", "audio")),
     name="audio"
 )
 
 # Serve the styles/ folder as static files under /styles
 app.mount(
     "/styles",
-    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "styles")),
+    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend", "styles")),
     name="styles"
 )
 
