@@ -5,10 +5,10 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import json
 from datetime import datetime, timedelta
 import pytz
 import requests
-import json
 from dateutil import parser
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "api", "coinbase-api", "coinbase-btc", "data", "btc_price_history.db")
@@ -559,18 +559,34 @@ async def set_auto_stop(request: Request):
 async def get_auto_stop():
     return {"enabled": auto_stop_state["enabled"]}
 
+@app.get("/api/account/balance")
+def get_balance():
+    with open("backend/accounts/kalshi/account_balance.json") as f:
+        raw = json.load(f)
+        try:
+            cents = int(raw["balance"])
+            dollars = cents / 100
+            return {"balance": f"{dollars:.2f}"}
+        except Exception:
+            return {"balance": "Error"}
+
+@app.get("/api/account/fills")
+def get_fills():
+    with open("backend/accounts/kalshi/fills.json") as f:
+        return json.load(f)
+
+@app.get("/api/account/positions")
+def get_positions():
+    with open("backend/accounts/kalshi/positions.json") as f:
+        return json.load(f)
+
+@app.get("/api/account/settlements")
+def get_settlements():
+    with open("backend/accounts/kalshi/settlements.json") as f:
+        return json.load(f)
+
 if __name__ == "__main__":
     import threading
     threading.Thread(target=start_websocket, daemon=True).start()
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-@app.get("/account/balance")
-def get_account_balance():
-    import json
-    import os
-    try:
-        with open(os.path.join(os.path.dirname(__file__), "accounts", "kalshi", "account_balance.json"), "r") as f:
-            data = json.load(f)
-        return {"balance": data.get("balance")}
-    except Exception:
-        return {"balance": None}

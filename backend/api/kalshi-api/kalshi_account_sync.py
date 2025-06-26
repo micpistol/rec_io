@@ -223,11 +223,187 @@ def sync_balance():
         print(f"[{datetime.now()}] ❌ Failed to fetch balance: {e}")
 
 
+# --- New sync functions for positions, fills, settlements ---
+def sync_positions():
+    print("⏱ Syncing all positions...")
+    method = "GET"
+    path = "/portfolio/positions"
+    all_positions = []
+    cursor = ""
+
+    while True:
+        print(f"➡️ Cursor: {cursor}")
+        timestamp = str(int(time.time() * 1000))
+        query = f"?limit=100"
+        if cursor:
+            query += f"&cursor={cursor}"
+        url = f"{BASE_URL}{path}{query}"
+        print(f"🔗 Requesting: {url}")
+
+        full_path_for_signature = f"/trade-api/v2{path}"
+        signature = generate_kalshi_signature(method, full_path_for_signature, timestamp, str(KEY_PATH))
+
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": "KalshiWatcher/1.0",
+            "KALSHI-ACCESS-KEY": KEY_ID,
+            "KALSHI-ACCESS-TIMESTAMP": timestamp,
+            "KALSHI-ACCESS-SIGNATURE": signature,
+        }
+
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            print("Response keys:", data.keys())
+            if "error" in data:
+                print("⚠️ API error:", data["error"])
+            all_positions.extend(data.get("positions", []))
+            cursor = data.get("cursor")
+            if not cursor:
+                break
+        except Exception as e:
+            print(f"❌ Failed to fetch positions: {e}")
+            break
+
+    output_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", "positions.json")
+    with open(output_path, "w") as f:
+        json.dump({"positions": all_positions}, f, indent=2)
+    print(f"💾 All positions written to {output_path}")
+
+
+def sync_fills():
+    print("⏱ Syncing all fills...")
+    method = "GET"
+    path = "/portfolio/fills"
+    all_fills = []
+    cursor = ""
+
+    while True:
+        print(f"➡️ Cursor: {cursor}")
+        timestamp = str(int(time.time() * 1000))
+        query = f"?limit=100"
+        if cursor:
+            query += f"&cursor={cursor}"
+        url = f"{BASE_URL}{path}{query}"
+        print(f"🔗 Requesting: {url}")
+
+        full_path_for_signature = f"/trade-api/v2{path}"
+        signature = generate_kalshi_signature(method, full_path_for_signature, timestamp, str(KEY_PATH))
+
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": "KalshiWatcher/1.0",
+            "KALSHI-ACCESS-KEY": KEY_ID,
+            "KALSHI-ACCESS-TIMESTAMP": timestamp,
+            "KALSHI-ACCESS-SIGNATURE": signature,
+        }
+
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            print("Response keys:", data.keys())
+            if "error" in data:
+                print("⚠️ API error:", data["error"])
+            all_fills.extend(data.get("fills", []))
+            cursor = data.get("cursor")
+            if not cursor:
+                break
+        except Exception as e:
+            print(f"❌ Failed to fetch fills: {e}")
+            break
+
+    output_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", "fills.json")
+
+    # Check if existing file has identical content
+    existing_fills = []
+    if os.path.exists(output_path):
+        try:
+            with open(output_path, "r") as f:
+                existing_data = json.load(f)
+                existing_fills = existing_data.get("fills", [])
+        except Exception:
+            pass  # ignore parse errors; we'll overwrite
+
+    if existing_fills != all_fills:
+        with open(output_path, "w") as f:
+            json.dump({"fills": all_fills}, f, indent=2)
+        print(f"💾 All fills written to {output_path}")
+    else:
+        print("🟢 No new fills — file unchanged.")
+
+
+def sync_settlements():
+    print("⏱ Syncing all settlements...")
+    method = "GET"
+    path = "/portfolio/settlements"
+    all_settlements = []
+    cursor = ""
+
+    while True:
+        print(f"➡️ Cursor: {cursor}")
+        timestamp = str(int(time.time() * 1000))
+        query = f"?limit=100"
+        if cursor:
+            query += f"&cursor={cursor}"
+        url = f"{BASE_URL}{path}{query}"
+        print(f"🔗 Requesting: {url}")
+
+        full_path_for_signature = f"/trade-api/v2{path}"
+        signature = generate_kalshi_signature(method, full_path_for_signature, timestamp, str(KEY_PATH))
+
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": "KalshiWatcher/1.0",
+            "KALSHI-ACCESS-KEY": KEY_ID,
+            "KALSHI-ACCESS-TIMESTAMP": timestamp,
+            "KALSHI-ACCESS-SIGNATURE": signature,
+        }
+
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            print("Response keys:", data.keys())
+            if "error" in data:
+                print("⚠️ API error:", data["error"])
+            all_settlements.extend(data.get("settlements", []))
+            cursor = data.get("cursor")
+            if not cursor:
+                break
+        except Exception as e:
+            print(f"❌ Failed to fetch settlements: {e}")
+            break
+
+    output_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", "settlements.json")
+    with open(output_path, "w") as f:
+        json.dump({"settlements": all_settlements}, f, indent=2)
+    print(f"💾 All settlements written to {output_path}")
+
+
 def main():
     print("🔁 Kalshi Account Supervisor Starting...")
+    last_balance_time = 0
+    last_settlement_time = 0
     while True:
-        sync_balance()
-        time.sleep(5)
+        now = time.time()
+        
+        # Always poll fills and positions
+        sync_positions()
+        sync_fills()
+
+        # Poll balance every 5 seconds
+        if now - last_balance_time >= 5:
+            sync_balance()
+            last_balance_time = now
+
+        # Poll settlements every 3600 seconds (1 hour)
+        if now - last_settlement_time >= 3600:
+            sync_settlements()
+            last_settlement_time = now
+
+        time.sleep(1)
 
 if __name__ == "__main__":
     main()

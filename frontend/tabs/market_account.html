@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Account Overview</title>
+  <link rel="stylesheet" href="/styles/global.css" />
+</head>
+<body>
+  <div class="panel-container">
+    <div class="panel">
+      <div class="panel-header">Balance</div>
+      <div class="panel-body">
+        <span id="account-balance">Loading...</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-container">
+    <div class="panel">
+      <div class="panel-header">Open Positions</div>
+      <div class="panel-body">
+        <table id="positions-table" class="data-table" style="width: 100%;">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Yes Count</th>
+              <th>No Count</th>
+              <th>Total Cost</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-container">
+    <div class="panel">
+      <div class="panel-header">Recent Fills</div>
+      <div class="panel-body">
+        <table id="fills-table" class="data-table" style="width: 100%;">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Side</th>
+              <th>Action</th>
+              <th>Count</th>
+              <th>Yes Price</th>
+              <th>No Price</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-container">
+    <div class="panel">
+      <div class="panel-header">Settlements</div>
+      <div class="panel-body">
+        <table id="settlements-table" class="data-table" style="width: 100%;">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Result</th>
+              <th>Yes Count</th>
+              <th>No Count</th>
+              <th>Revenue</th>
+              <th>Settled</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function loadAccountData() {
+      const [balanceRes, fillsRes, positionsRes, settlementsRes] = await Promise.all([
+        fetch("/api/account/balance"),
+        fetch("/api/account/fills"),
+        fetch("/api/account/positions"),
+        fetch("/api/account/settlements"),
+      ]);
+
+      const balance = await balanceRes.json();
+      const fills = await fillsRes.json();
+      const positions = await positionsRes.json();
+      const settlements = await settlementsRes.json();
+
+      document.getElementById("account-balance").textContent = `$${(balance.balance || 0).toLocaleString()}`;
+
+      const fillsBody = document.querySelector("#fills-table tbody");
+      fillsBody.innerHTML = fills.fills.map(f =>
+        `<tr>
+          <td style="text-align: center;">${f.ticker}</td>
+          <td style="text-align: center;">${f.side}</td>
+          <td style="text-align: center;">${f.action}</td>
+          <td style="text-align: center;">${f.count}</td>
+          <td style="text-align: center;">${(f.yes_price / 100).toFixed(2)}</td>
+          <td style="text-align: center;">${(f.no_price / 100).toFixed(2)}</td>
+          <td style="text-align: center;">${new Date(f.created_time).toLocaleString()}</td>
+        </tr>`
+      ).join("");
+
+      const positionsBody = document.querySelector("#positions-table tbody");
+      const markets = positions.market_positions || [];
+      positionsBody.innerHTML = markets.map(p =>
+        `<tr>
+          <td style="text-align: center;">${p.ticker}</td>
+          <td style="text-align: center;">${p.yes_quantity || 0}</td>
+          <td style="text-align: center;">${p.no_quantity || 0}</td>
+          <td style="text-align: center;">${((p.yes_total_cost || 0) + (p.no_total_cost || 0)).toFixed(2)}</td>
+        </tr>`
+      ).join("");
+
+      const settlementsBody = document.querySelector("#settlements-table tbody");
+      settlementsBody.innerHTML = settlements.settlements.map(s =>
+        `<tr>
+          <td style="text-align: center;">${s.ticker}</td>
+          <td style="text-align: center;">${s.market_result}</td>
+          <td style="text-align: center;">${s.yes_count}</td>
+          <td style="text-align: center;">${s.no_count}</td>
+          <td style="text-align: center;">${(s.revenue / 100).toFixed(2)}</td>
+          <td style="text-align: center;">${new Date(s.settled_time).toLocaleString()}</td>
+        </tr>`
+      ).join("");
+    }
+
+    loadAccountData();
+    setInterval(loadAccountData, 5000);
+  </script>
+</body>
+</html>
