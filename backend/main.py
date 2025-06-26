@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 import pytz
 import requests
 from dateutil import parser
+import sqlite3
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "api", "coinbase-api", "coinbase-btc", "data", "btc_price_history.db")
 
@@ -580,10 +581,64 @@ def get_positions():
     with open("backend/accounts/kalshi/positions.json") as f:
         return json.load(f)
 
+
 @app.get("/api/account/settlements")
 def get_settlements():
     with open("backend/accounts/kalshi/settlements.json") as f:
         return json.load(f)
+
+
+# New route: /api/db/settlements
+@app.get("/api/db/settlements")
+def get_settlements_db():
+    try:
+        conn = sqlite3.connect("backend/accounts/kalshi/settlements.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT ticker, market_result, yes_count, no_count, revenue, settled_time FROM settlements ORDER BY settled_time DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        results = [
+            {
+                "ticker": row[0],
+                "market_result": row[1],
+                "yes_count": row[2],
+                "no_count": row[3],
+                "revenue": row[4],
+                "settled_time": row[5]
+            }
+            for row in rows
+        ]
+        return {"settlements": results}
+    except Exception as e:
+        return {"error": str(e), "settlements": []}
+
+# New route: /api/db/fills
+@app.get("/api/db/fills")
+def get_fills_db():
+    try:
+        conn = sqlite3.connect("backend/accounts/kalshi/fills.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time FROM fills ORDER BY created_time DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        results = [
+            {
+                "trade_id": row[0],
+                "ticker": row[1],
+                "order_id": row[2],
+                "side": row[3],
+                "action": row[4],
+                "count": row[5],
+                "yes_price": row[6],
+                "no_price": row[7],
+                "is_taker": row[8],
+                "created_time": row[9]
+            }
+            for row in rows
+        ]
+        return {"fills": results}
+    except Exception as e:
+        return {"error": str(e), "fills": []}
 
 if __name__ == "__main__":
     import threading

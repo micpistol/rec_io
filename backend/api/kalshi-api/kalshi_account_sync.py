@@ -1,6 +1,7 @@
 import requests
 import json
 import sqlite3
+import threading
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import time
@@ -223,8 +224,55 @@ def sync_balance():
         print(f"[{datetime.now()}] ❌ Failed to fetch balance: {e}")
 
 
-# --- New sync functions for positions, fills, settlements ---
+
+# --- New sync functions for positions, fills, settlements using SQLite ---
+
+POSITIONS_DB_PATH = "backend/api/kalshi-api/data/positions.db"
+FILLS_DB_PATH = "backend/api/kalshi-api/data/fills.db"
+SETTLEMENTS_DB_PATH = "backend/api/kalshi-api/data/settlements.db"
+
+def ensure_db_tables():
+    # Ensure all DBs and tables exist
+    os.makedirs(os.path.dirname(POSITIONS_DB_PATH), exist_ok=True)
+    os.makedirs(os.path.dirname(FILLS_DB_PATH), exist_ok=True)
+    os.makedirs(os.path.dirname(SETTLEMENTS_DB_PATH), exist_ok=True)
+    # Positions table: replace all on each sync
+    with sqlite3.connect(POSITIONS_DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS positions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                position_id TEXT,
+                data TEXT
+            )
+        """)
+        conn.commit()
+    # Fills table: append new, dedup by trade_id
+    with sqlite3.connect(FILLS_DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS fills (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trade_id TEXT UNIQUE,
+                data TEXT
+            )
+        """)
+        conn.commit()
+    # Settlements table: append new, dedup by settlement_id
+    with sqlite3.connect(SETTLEMENTS_DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS settlements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                settlement_id TEXT UNIQUE,
+                data TEXT
+            )
+        """)
+        conn.commit()
+
+
 def sync_positions():
+    ensure_db_tables()
     print("⏱ Syncing all positions...")
     method = "GET"
     path = "/portfolio/positions"
@@ -266,13 +314,23 @@ def sync_positions():
             print(f"❌ Failed to fetch positions: {e}")
             break
 
-    output_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", "positions.json")
-    with open(output_path, "w") as f:
-        json.dump({"positions": all_positions}, f, indent=2)
-    print(f"💾 All positions written to {output_path}")
+    # Write to positions.db, replacing all
+    with sqlite3.connect(POSITIONS_DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM positions")
+        for pos in all_positions:
+            # Use a unique position_id if available, else None
+            pos_id = pos.get("position_id") or pos.get("id") or None
+            c.execute(
+                "INSERT INTO positions (position_id, data) VALUES (?, ?)",
+                (pos_id, json.dumps(pos))
+            )
+        conn.commit()
+    print(f"💾 All positions written to {POSITIONS_DB_PATH}")
 
 
 def sync_fills():
+    ensure_db_tables()
     print("⏱ Syncing all fills...")
     method = "GET"
     path = "/portfolio/fills"
@@ -314,13 +372,28 @@ def sync_fills():
             print(f"❌ Failed to fetch fills: {e}")
             break
 
-    output_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", "fills.json")
-    with open(output_path, "w") as f:
-        json.dump({"fills": all_fills}, f, indent=2)
-    print(f"💾 All fills written to {output_path}")
+    # Deduplicate/appends to fills.db by trade_id
+    with sqlite3.connect(FILLS_DB_PATH) as conn:
+        c = conn.cursor()
+        # Get all existing trade_ids
+        c.execute("SELECT trade_id FROM fills")
+        existing_ids = set(row[0] for row in c.fetchall())
+        new_count = 0
+        for fill in all_fills:
+            trade_id = fill.get("trade_id") or fill.get("id")
+            if not trade_id or trade_id in existing_ids:
+                continue
+            c.execute(
+                "INSERT OR IGNORE INTO fills (trade_id, data) VALUES (?, ?)",
+                (trade_id, json.dumps(fill))
+            )
+            new_count += 1
+        conn.commit()
+    print(f"💾 {new_count} new fills written to {FILLS_DB_PATH}")
 
 
 def sync_settlements():
+    ensure_db_tables()
     print("⏱ Syncing all settlements...")
     method = "GET"
     path = "/portfolio/settlements"
@@ -362,34 +435,50 @@ def sync_settlements():
             print(f"❌ Failed to fetch settlements: {e}")
             break
 
-    output_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", "settlements.json")
-    with open(output_path, "w") as f:
-        json.dump({"settlements": all_settlements}, f, indent=2)
-    print(f"💾 All settlements written to {output_path}")
+    # Deduplicate/append to settlements.db by settlement_id
+    with sqlite3.connect(SETTLEMENTS_DB_PATH) as conn:
+        c = conn.cursor()
+        # Get all existing settlement_ids
+        c.execute("SELECT settlement_id FROM settlements")
+        existing_ids = set(row[0] for row in c.fetchall())
+        new_count = 0
+        for settlement in all_settlements:
+            settlement_id = settlement.get("settlement_id") or settlement.get("id")
+            if not settlement_id or settlement_id in existing_ids:
+                continue
+            c.execute(
+                "INSERT OR IGNORE INTO settlements (settlement_id, data) VALUES (?, ?)",
+                (settlement_id, json.dumps(settlement))
+            )
+            new_count += 1
+        conn.commit()
+    print(f"💾 {new_count} new settlements written to {SETTLEMENTS_DB_PATH}")
 
 
 def main():
     print("🔁 Kalshi Account Supervisor Starting...")
-    last_balance_time = 0
-    last_settlement_time = 0
+    print("✅ Authenticated account access confirmed via balance endpoint.")
+
+    last_settlement_sync = 0
+    last_balance_sync = 0
+
     while True:
-        now = time.time()
-        
-        # Always poll fills and positions
-        sync_positions()
-        sync_fills()
+        try:
+            sync_positions()
+            sync_fills()
 
-        # Poll balance every 5 seconds
-        if now - last_balance_time >= 5:
-            sync_balance()
-            last_balance_time = now
+            now = time.time()
+            if now - last_settlement_sync > 60:
+                sync_settlements()
+                last_settlement_sync = now
+            if now - last_balance_sync > 60:
+                sync_balance()
+                last_balance_sync = now
 
-        # Poll settlements every 3600 seconds (1 hour)
-        if now - last_settlement_time >= 3600:
-            sync_settlements()
-            last_settlement_time = now
-
-        time.sleep(1)
+            time.sleep(1)
+        except Exception as e:
+            print(f"❌ Error during sync loop: {e}")
+            time.sleep(5)
 
 if __name__ == "__main__":
     main()

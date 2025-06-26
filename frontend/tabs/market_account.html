@@ -4,134 +4,204 @@
   <meta charset="UTF-8" />
   <title>Account Overview</title>
   <link rel="stylesheet" href="/styles/global.css" />
+  <style>
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 6px 10px;
+      text-align: center;
+    }
+    th {
+      background-color: #1f2530;
+      font-weight: bold;
+    }
+    tbody tr:hover {
+      background-color: #4d586f !important;
+      cursor: pointer;
+    }
+    .group-odd {
+      background-color: #394559;
+    }
+    .group-even {
+      background-color: #1f2633;
+    }
+  </style>
 </head>
 <body>
   <div class="panel-container">
     <div class="panel">
-      <div class="panel-header">Balance</div>
+      <div class="panel-header">Account Information</div>
+      <select id="account-selector" style="margin-top: 8px; margin-bottom: 30px;">
+        <option value="live">eric@ewedit.com</option>
+        <option value="demo">eric@ewedit.com DEMO</option>
+      </select>
+      <span id="account-status" style="font-weight: bold; color: #00ff00; margin-left: 10px;"></span>
       <div class="panel-body">
+        <div style="font-weight: bold; margin-bottom: 4px;">Balance</div>
         <span id="account-balance">Loading...</span>
       </div>
     </div>
   </div>
 
+  <!-- Open Positions panel -->
   <div class="panel-container">
     <div class="panel">
       <div class="panel-header">Open Positions</div>
-      <div class="panel-body">
-        <table id="positions-table" class="data-table" style="width: 100%;">
-          <thead>
-            <tr>
-              <th>Ticker</th>
-              <th>Yes Count</th>
-              <th>No Count</th>
-              <th>Total Cost</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+      <div class="panel-body" style="height: 150px; overflow-y: auto;">
+        <!-- Table or content will go here in the future -->
       </div>
     </div>
   </div>
 
+  <!-- Fills panel -->
   <div class="panel-container">
     <div class="panel">
-      <div class="panel-header">Recent Fills</div>
-      <div class="panel-body">
-        <table id="fills-table" class="data-table" style="width: 100%;">
+      <div class="panel-header">Fills</div>
+      <button id="download-csv-btn" style="margin: 12px 0;">Download Fills CSV</button>
+      <div class="panel-body" style="height: 300px; overflow-y: auto;">
+        <table class="data-table" style="width: 100%; text-align: center;">
           <thead>
             <tr>
               <th>Ticker</th>
               <th>Side</th>
               <th>Action</th>
               <th>Count</th>
-              <th>Yes Price</th>
-              <th>No Price</th>
+              <th>Price</th>
               <th>Time</th>
             </tr>
           </thead>
-          <tbody></tbody>
+          <tbody id="fills-body">
+            <tr><td colspan="6">Loading...</td></tr>
+          </tbody>
         </table>
       </div>
     </div>
   </div>
 
+  <!-- Settlements panel -->
   <div class="panel-container">
     <div class="panel">
       <div class="panel-header">Settlements</div>
-      <div class="panel-body">
-        <table id="settlements-table" class="data-table" style="width: 100%;">
+      <div class="panel-body" style="height: 300px; overflow-y: auto;">
+        <table class="data-table" style="width: 100%; text-align: center;">
           <thead>
             <tr>
               <th>Ticker</th>
               <th>Result</th>
-              <th>Yes Count</th>
-              <th>No Count</th>
+              <th>Yes</th>
+              <th>No</th>
               <th>Revenue</th>
-              <th>Settled</th>
+              <th>Settled At</th>
             </tr>
           </thead>
-          <tbody></tbody>
+          <tbody id="settlements-body">
+            <tr><td colspan="6">Loading...</td></tr>
+          </tbody>
         </table>
       </div>
     </div>
   </div>
 
+
   <script>
+    let GLOBAL_ACCOUNT_MODE = "prod";  // Default to prod
+
     async function loadAccountData() {
-      const [balanceRes, fillsRes, positionsRes, settlementsRes] = await Promise.all([
+      const [balanceRes, settlementsRes, fillsRes] = await Promise.all([
         fetch("/api/account/balance"),
-        fetch("/api/account/fills"),
-        fetch("/api/account/positions"),
-        fetch("/api/account/settlements"),
+        fetch("/api/db/settlements"),
+        fetch("/api/db/fills"),
       ]);
 
       const balance = await balanceRes.json();
-      const fills = await fillsRes.json();
-      const positions = await positionsRes.json();
-      const settlements = await settlementsRes.json();
+      const settlementsJson = await settlementsRes.json();
+      const fillsJson = await fillsRes.json();
+
+      const settlements = settlementsJson.settlements;
+      const fills = fillsJson.fills;
+
+      window.fills = fills;
 
       document.getElementById("account-balance").textContent = `$${(balance.balance || 0).toLocaleString()}`;
 
-      const fillsBody = document.querySelector("#fills-table tbody");
-      fillsBody.innerHTML = fills.fills.map(f =>
-        `<tr>
-          <td style="text-align: center;">${f.ticker}</td>
-          <td style="text-align: center;">${f.side}</td>
-          <td style="text-align: center;">${f.action}</td>
-          <td style="text-align: center;">${f.count}</td>
-          <td style="text-align: center;">${(f.yes_price / 100).toFixed(2)}</td>
-          <td style="text-align: center;">${(f.no_price / 100).toFixed(2)}</td>
-          <td style="text-align: center;">${new Date(f.created_time).toLocaleString()}</td>
-        </tr>`
-      ).join("");
+      const settlementsBody = document.getElementById("settlements-body");
+      settlementsBody.innerHTML = settlements.map(s => `
+        <tr>
+          <td>${s.ticker}</td>
+          <td>${s.market_result === "yes" ? "Y" : "N"}</td>
+          <td>${s.yes_count}</td>
+          <td>${s.no_count}</td>
+          <td>${'$' + s.revenue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+          <td>${new Date(s.settled_time).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
+        </tr>
+      `).join("");
 
-      const positionsBody = document.querySelector("#positions-table tbody");
-      const markets = positions.market_positions || [];
-      positionsBody.innerHTML = markets.map(p =>
-        `<tr>
-          <td style="text-align: center;">${p.ticker}</td>
-          <td style="text-align: center;">${p.yes_quantity || 0}</td>
-          <td style="text-align: center;">${p.no_quantity || 0}</td>
-          <td style="text-align: center;">${((p.yes_total_cost || 0) + (p.no_total_cost || 0)).toFixed(2)}</td>
-        </tr>`
-      ).join("");
-
-      const settlementsBody = document.querySelector("#settlements-table tbody");
-      settlementsBody.innerHTML = settlements.settlements.map(s =>
-        `<tr>
-          <td style="text-align: center;">${s.ticker}</td>
-          <td style="text-align: center;">${s.market_result}</td>
-          <td style="text-align: center;">${s.yes_count}</td>
-          <td style="text-align: center;">${s.no_count}</td>
-          <td style="text-align: center;">${(s.revenue / 100).toFixed(2)}</td>
-          <td style="text-align: center;">${new Date(s.settled_time).toLocaleString()}</td>
-        </tr>`
-      ).join("");
+      const fillsBody = document.getElementById("fills-body");
+      fillsBody.innerHTML = fills.map(f => `
+        <tr>
+          <td>${f.ticker}</td>
+          <td>${f.side === "yes" ? "Y" : "N"}</td>
+          <td>${f.action.toUpperCase()}</td>
+          <td>${f.count}</td>
+          <td>${f.side === "yes" ? f.yes_price : f.no_price}</td>
+          <td>${new Date(f.created_time).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
+        </tr>
+      `).join("");
     }
+
+    document.getElementById("account-selector").addEventListener("change", () => {
+      const selected = document.getElementById("account-selector").value;
+      const statusEl = document.getElementById("account-status");
+      if (selected === "live") {
+        statusEl.textContent = "*** LIVE TRADING ***";
+        statusEl.style.color = "#00ff00";
+        statusEl.style.fontWeight = "bold";
+        GLOBAL_ACCOUNT_MODE = "prod";
+      } else {
+        statusEl.textContent = "Paper Trading";
+        statusEl.style.color = "orange";
+        statusEl.style.fontWeight = "normal";
+        GLOBAL_ACCOUNT_MODE = "demo";
+      }
+    });
+
+    // Trigger on initial load
+    document.getElementById("account-selector").dispatchEvent(new Event("change"));
 
     loadAccountData();
     setInterval(loadAccountData, 5000);
+
+    function arrayToCSV(rows, headerOrder) {
+      const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const header = headerOrder.map(escape).join(',');
+      const body = rows.map(r => headerOrder.map(k => escape(r[k])).join(',')).join('\n');
+      return `${header}\n${body}`;
+    }
+
+    function downloadCSV() {
+      if (!Array.isArray(window.fills) || !window.fills.length) {
+        alert('No fills loaded yet.');
+        return;
+      }
+
+      const columns = ['ticker','side','action','count','yes_price','no_price','created_time'];
+      const csv = arrayToCSV(window.fills, columns);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `fills_${new Date().toISOString().slice(0,10)}.csv`;
+      link.click();
+
+      URL.revokeObjectURL(url);
+    }
+
+    document.getElementById('download-csv-btn').addEventListener('click', downloadCSV);
   </script>
 </body>
 </html>
