@@ -1,3 +1,4 @@
+import sys
 import requests
 import json
 import time
@@ -9,12 +10,14 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
 
-# Load API credentials from local .env file in kalshi-credentials folder
-CREDENTIALS_DIR = Path(__file__).resolve().parent / "kalshi-credentials"
+# Usage: python kalshi_historical_ingest.py [prod|demo]
+
+mode = sys.argv[1] if len(sys.argv) > 1 else "prod"
+CREDENTIALS_DIR = Path(__file__).resolve().parent / "kalshi-credentials" / mode
 ENV_VARS = dotenv_values(CREDENTIALS_DIR / ".env")
 
 KEY_ID = ENV_VARS.get("KALSHI_API_KEY_ID")
-KEY_PATH = CREDENTIALS_DIR / "kalshi.pem"
+KEY_PATH = CREDENTIALS_DIR / Path(ENV_VARS.get("KALSHI_PRIVATE_KEY_PATH")).name
 
 def generate_kalshi_signature(method, full_path, timestamp, key_path):
     from cryptography.hazmat.primitives import serialization, hashes
@@ -87,7 +90,7 @@ def sync_settlements():
             print(f"❌ Failed to fetch settlements: {e}")
             break
 
-    output_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", "settlements.json")
+    output_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "settlements.json")
     with open(output_path, "w") as f:
         json.dump({"settlements": all_settlements}, f, indent=2)
     print(f"💾 All settlements written to {output_path}")
@@ -134,7 +137,7 @@ def sync_fills():
             print(f"❌ Failed to fetch fills: {e}")
             break
 
-    output_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", "fills.json")
+    output_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "fills.json")
     if all_fills:
         with open(output_path, "w") as f:
             json.dump({"fills": all_fills}, f, indent=2)
@@ -145,9 +148,10 @@ def sync_fills():
 import sqlite3
 
 def write_settlements_to_db():
+    global mode
     print("💾 Writing settlements to SQLite database...")
-    settlements_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", "settlements.json")
-    db_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", "settlements.db")
+    settlements_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "settlements.json")
+    db_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "settlements.db")
 
     # Ensure data directory exists
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -208,9 +212,10 @@ def write_settlements_to_db():
     print(f"✅ Settlements written to database at {db_path}")
 
 def write_fills_to_db():
+    global mode
     print("💾 Writing fills to SQLite database...")
-    fills_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", "fills.json")
-    db_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", "fills.db")
+    fills_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "fills.json")
+    db_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "fills.db")
 
     # Ensure data directory exists
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
