@@ -459,6 +459,57 @@
 
 <!-- === STRIKE TABLES JS (inserted as per instructions) === -->
 <script>
+// === Trade Open/Close Master Functions (Symmetric) ===
+function openTrade(strike, side, event) {
+  const btn = event?.target;
+  if (btn?.disabled) return;
+  if (btn) {
+    btn.disabled = true;
+    setTimeout(() => (btn.disabled = false), 1000);
+  }
+
+  // 🎧 Sound confirmation
+  setTimeout(() => playSound('open'), 0);
+
+  // ✅ TODO: Add UI popup
+  // showTradeOpenedPopup();
+
+  // 📤 TODO: Send trade order (API placeholder)
+  // sendTradeOrder({ strike, side });
+
+  // 🧾 TODO: Write to DB via fetch (disabled for now)
+  // fetch('/api/open_trade', { method: 'POST', body: JSON.stringify({ strike, side }) });
+
+  // 🔁 TODO: Trigger UI refresh (trades panel)
+  // updateActiveTradesPanel();
+}
+
+function closeTrade(tradeId, sellPrice, event) {
+  // TEMPORARILY DISABLED — all actions except sound
+
+  // 🎧 Sound confirmation
+  setTimeout(() => playSound('close'), 0);
+  // (All logic below is intentionally disabled for now, structure and comments preserved.)
+  // const btn = event?.target;
+  // if (btn?.disabled) return;
+  // if (btn) {
+  //   btn.disabled = true;
+  //   setTimeout(() => (btn.disabled = false), 1000);
+  // }
+
+  // ✅ TODO: Add UI popup
+  // showTradeClosedPopup();
+
+  // 📤 TODO: Send close order (API placeholder)
+  // sendCloseTrade({ tradeId, sellPrice });
+
+  // 🧾 TODO: Write to DB via fetch (disabled for now)
+  // fetch(`/api/close_trade`, { method: 'POST', body: JSON.stringify({ tradeId, sellPrice }) });
+
+  // 🔁 TODO: Trigger UI refresh (trades panel)
+  // updateActiveTradesPanel();
+}
+
 // === Track last Yes/No button states ===
 const lastButtonStates = new Map();
 
@@ -493,7 +544,9 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, marketId = 
   }
 
   if (isActive) {
-    spanEl.onclick = debounce(() => showPopup(`$${strike.toLocaleString()}`, side.charAt(0).toUpperCase() + side.slice(1), askPrice), 300);
+    spanEl.onclick = debounce(function(event) {
+      openTrade(strike, side, event);
+    }, 300);
   } else {
     spanEl.onclick = null;
   }
@@ -1607,111 +1660,45 @@ function getCurrentMomentumScore() {
   return "";
 }
 
+// Play a sound by type, allowing overlapping playback
+function playSound(type) {
+  const soundId = type === 'open' ? 'openTradeSound' : 'closeTradeSound';
+  const original = document.getElementById(soundId);
+  if (!original) return;
+
+  const clone = original.cloneNode(true); // Allow overlapping playback
+  clone.volume = type === 'open' ? 0.1 : 0.2; // Set volume inline
+  clone.play().catch(err => console.error(`Failed to play sound clone:`, err));
+}
+
 async function showPopup(strike, side, price) {
-  // Play open trade sound at the top
-  const openSound = document.getElementById('openTradeSound');
-  if (openSound) {
-    openSound.volume = 0.1;
-    openSound.play().catch(e => console.warn("Sound play blocked:", e));
-  }
-  showTradeOpenedPopup();
-  const now = new Date();
-  // Compose tradeData as per spec
-  // Extract selectedStrike, selectedSide, selectedAskPrice, selectedPosition, currentBTCTickerPrice, currentMomentumScore
-  const selectedStrike = strike;
-  const selectedSide = side;
-  const selectedAskPrice = price;
-  // Read position size from UI controls
-  const basePosition = parseInt(document.getElementById('position-size').value, 10);
-  const multiplierBtn = document.querySelector('.multiplier-btn.active');
-  const multiplier = multiplierBtn ? parseInt(multiplierBtn.dataset.multiplier, 10) : 1;
-  const selectedPosition = (basePosition > 0 ? basePosition : 100) * (multiplier > 0 ? multiplier : 1);
-  const currentBTCTickerPrice = getCurrentBTCTickerPrice();
-  const currentMomentumScore = getCurrentMomentumScore();
+  // Play open trade sound using overlapping playback
+  playSound('open');
+  // showTradeOpenedPopup();   // popup disabled for test
+  // --- All other logic temporarily disabled ---
+  /*
+  // === Backend: Send trade open request ===
+  // const res = await fetch('/trades', {
+  //   method: 'POST',
+  //   headers: { 'Content-Type': 'application/json' },
+  //   body: JSON.stringify({
+  //     strike,
+  //     side,
+  //     price,
+  //     // Add other required fields here
+  //   })
+  // });
+  // if (!res.ok) throw new Error('Failed to open trade');
+  // const trade = await res.json();
 
-  // Find market_id (ticker) as before
-  let marketId = "";
-  try {
-    // Find the strike table row matching the strike value
-    const strikeTableRows = document.querySelectorAll('#strike-table tbody tr');
-    for (const row of strikeTableRows) {
-      const tds = row.querySelectorAll('td');
-      if (tds.length < 7) continue;
-      // Strike cell
-      const strikeCell = tds[0];
-      // Remove $ and commas for numeric comparison
-      const strikeCellVal = parseFloat(String(strikeCell.textContent).replace(/\$|,/g, ''));
-      if (strikeCellVal !== parseFloat(selectedStrike)) continue;
-      // YES = 6th cell (td[5]), NO = 7th cell (td[6])
-      let cellIdx = selectedSide.toLowerCase() === 'yes' ? 5 : 6;
-      const marketCell = tds[cellIdx];
-      // get data-market-id attribute (set in updateYesNoButton)
-      if (marketCell && marketCell.hasAttribute('data-market-id')) {
-        marketId = marketCell.getAttribute('data-market-id');
-        break;
-      }
-    }
-  } catch (e) {
-    marketId = "";
-  }
+  // === DB: Add to local trades state ===
+  // window.trades = window.trades || [];
+  // window.trades.push(trade);
 
-  // Ensure all required fields are present in the payload
-  // {
-  //   status, date, time, symbol, market, trade_strategy, contract,
-  //   strike, side, market_id, buy_price, position,
-  //   symbol_open, momentum, momentum_delta, volatility, volatility_delta
-  // }
-  // Use sensible defaults for missing values
-  const payload = {
-    status: "open",
-    date: now.toISOString().split("T")[0],
-    time: now.toTimeString().split(" ")[0],
-    symbol: getSelectedSymbol(),
-    market: "Kalshi",
-    trade_strategy: "Hourly HTC",
-    contract: getTruncatedMarketTitle(),
-    strike: selectedStrike,
-    side: selectedSide,
-    market_id: marketId || "",
-    // Ensure buy_price is sent as decimal (e.g., 0.98 for 98)
-    buy_price: Number(selectedAskPrice) / 100,
-    position: selectedPosition,
-    symbol_open: currentBTCTickerPrice,
-    momentum: currentMomentumScore,
-    momentum_delta: null,
-    volatility: coreData?.volatility_score != null ? parseFloat(coreData.volatility_score.toFixed(2)) : null,
-    volatility_delta: null
-  };
-
-  // Debug: log the open trade payload
-  console.log("Open trade payload:", payload);
-
-  // Fire‑and‑forget request so the UI thread remains responsive
-  fetch('/trades', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  })
-    .then(res => {
-      if (!res.ok) throw new Error('Failed to add trade');
-      // Refresh panels once the server confirms the insert
-      fetchAndRenderTrades();
-    })
-    .catch(err => {
-      alert('Error adding trade: ' + err.message);
-    });
-
-  // Poll until the new trade appears in the table
-  const pollForNewTrade = setInterval(() => {
-    fetch('/trades?status=open', { cache: 'no-store' })
-      .then(res => res.json())
-      .then(trades => {
-        if (trades.some(t => t.contract === payload.contract)) {
-          fetchAndRenderTrades(); // Confirm final redraw
-          clearInterval(pollForNewTrade);
-        }
-      });
-  }, 250);
+  // === UI: Update active trades table ===
+  // await fetchAndRenderTrades();
+  // showTradeOpenedPopup();
+  */
 }
 
 
@@ -1932,79 +1919,36 @@ async function fetchAndRenderTrades() {
 
 // New async function to close trade by id with current time and BTC price, using sellPrice
 async function closeTradeById(tradeId, sellPrice) {
-  // Play close trade sound at the top
-  const closeSound = document.getElementById('closeTradeSound');
-  if (closeSound) {
-    closeSound.volume = 0.5;
-    closeSound.play().catch(e => console.warn("Sound play blocked:", e));
-  }
-  showTradeClosedPopup();
-  // Get current BTC ticker price from the UI
-  const btcPriceEl = document.getElementById('btc-price-value');
-  let currentSymbolPrice = null;
-  if (btcPriceEl && btcPriceEl.textContent) {
-    currentSymbolPrice = parseFloat(btcPriceEl.textContent.replace(/\$|,/g, ''));
-  }
-  // If not found in DOM, fallback to /core
-  if (currentSymbolPrice === null || isNaN(currentSymbolPrice)) {
-    try {
-      const coreRes = await fetch('/core');
-      const coreData = await coreRes.json();
-      currentSymbolPrice = coreData.btc_price;
-    } catch {}
-  }
+  // Play close trade sound using overlapping playback
+  playSound('close');
+  // showTradeClosedPopup();   // popup disabled for test
+  // --- All other logic temporarily disabled ---
+  /*
+  // === Backend: Send trade close request ===
+  // const payload = {
+  //   status: "closed",
+  //   closed_at: new Date().toLocaleTimeString('en-US', {
+  //     timeZone: 'America/New_York',
+  //     hour12: false,
+  //     hour: '2-digit',
+  //     minute: '2-digit',
+  //     second: '2-digit'
+  //   }),
+  //   symbol_close: getCurrentBTCTickerPrice(),
+  //   sell_price: sellPrice
+  // };
+  // const res = await fetch(`/trades/${tradeId}`, {
+  //   method: 'PUT',
+  //   headers: { 'Content-Type': 'application/json' },
+  //   body: JSON.stringify(payload)
+  // });
+  // if (!res.ok) throw new Error('Failed to close trade');
 
-  // Format closed_at as "HH:mm:ss" in US Eastern Time
-  const closedAt = new Date();
-  const closedAtTime = closedAt.toLocaleTimeString('en-US', {
-    timeZone: 'America/New_York',
-    hour12: false,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  });
-
-  // Compose payload for /trades/{id} endpoint, include status: "closed"
-  const payload = {
-    status: "closed",
-    sell_price: sellPrice,
-    symbol_close: currentSymbolPrice,
-    closed_at: closedAtTime
-  };
-
-  // Non‑blocking close – keep UI responsive
-  fetch(`/trades/${tradeId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  })
-    .then(res => {
-      if (!res.ok) throw new Error('Failed to close trade');
-      fetchAndRenderTrades();
-      fetchAndRenderRecentTrades();
-    })
-    .catch(err => {
-      alert('Error closing trade: ' + err.message);
-    });
-
-  // Poll until the trade disappears from the table
-  const pollForClose = setInterval(() => {
-    fetch('/trades?status=open', { cache: 'no-store' })
-      .then(res => res.json())
-      .then(trades => {
-        if (!trades.some(t => t.id === tradeId)) {
-          fetchAndRenderTrades(); // Confirm redraw
-          clearInterval(pollForClose);
-        }
-      });
-  }, 250);
-
-  // --- Retry fetching open trades until the closed one disappears ---
-  let retries = 0;
-  const retryRender = setInterval(() => {
-    if (retries++ > 10) return clearInterval(retryRender);
-    fetchAndRenderTrades();
-  }, 250);
+  // === DB/UI: Refresh tables ===
+  // await fetchAndRenderTrades();
+  // await fetchAndRenderRecentTrades();
+  // showTradeClosedPopup();
+  */
 }
 
 // === Recent Trades Panel ===
@@ -2094,6 +2038,11 @@ async function closeExpiredTrades() {
 }
 
 async function closeTrade(tradeId) {
+  // Play close‑trade confirmation sound
+  playSound('close');
+
+  // --- All other functionality (DB writes, UI updates, API calls) is temporarily disabled ---
+  /*
   try {
     const res = await fetch(`/trades/${tradeId}`, {
       method: 'PUT',
@@ -2105,6 +2054,7 @@ async function closeTrade(tradeId) {
   } catch (err) {
     alert("Error closing trade: " + err.message);
   }
+  */
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2151,7 +2101,8 @@ activeTradesTableBody.addEventListener('click', (event) => {
       alert('Invalid ASK price for closing trade');
       return;
     }
-    closeTradeById(tradeId, calculatedSellPrice);
+    // Use new master closeTrade function instead of closeTradeById
+    closeTrade(tradeId, calculatedSellPrice, event);
   }
 });
 
@@ -2248,16 +2199,15 @@ activeTradesTableBody.addEventListener('click', (event) => {
   <!-- Trade Open/Closed Popups -->
   <div id="tradePopup" class="trade-popup">Trade Opened</div>
   <div id="tradeClosedPopup" class="trade-closed-popup">Trade Closed</div>
-</html>
 
-<!-- Preload audio for trade open/close confirmations -->
-<audio id="openTradeSound" preload="auto">
-  <source src="/audio/sfx/open_trade_confirmation.wav" type="audio/wav">
-</audio>
-<audio id="closeTradeSound" preload="auto">
-  <source src="/audio/sfx/close_trade_confirmation.wav" type="audio/wav">
-</audio>
-</style>
+  <!-- Preload audio for trade open/close confirmations -->
+  <audio id="openTradeSound" preload="auto">
+    <source src="/audio/sfx/open_trade_confirmation.wav" type="audio/wav">
+  </audio>
+  <audio id="closeTradeSound" preload="auto">
+    <source src="/audio/sfx/close_trade_confirmation.wav" type="audio/wav">
+  </audio>
+</html>
 <style>
 @keyframes pulseGlow {
   0%   { box-shadow: 0 0 4px #00cc00; }
