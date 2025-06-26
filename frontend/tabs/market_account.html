@@ -161,13 +161,46 @@
         statusEl.style.color = "#00ff00";
         statusEl.style.fontWeight = "bold";
         GLOBAL_ACCOUNT_MODE = "prod";
+        window.GLOBAL_ACCOUNT_MODE = GLOBAL_ACCOUNT_MODE;
+        localStorage.setItem('account_mode', 'prod');
       } else {
         statusEl.textContent = "Paper Trading";
         statusEl.style.color = "orange";
         statusEl.style.fontWeight = "normal";
         GLOBAL_ACCOUNT_MODE = "demo";
+        window.GLOBAL_ACCOUNT_MODE = GLOBAL_ACCOUNT_MODE;
+        localStorage.setItem('account_mode', 'demo');
       }
+      fetch('/api/set_account_mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: GLOBAL_ACCOUNT_MODE })
+      })
+      .then(() => loadAccountData())
+      .catch(console.error);
     });
+
+    // On page load, restore mode from localStorage and update selector
+    const savedMode = localStorage.getItem('account_mode') || 'prod';
+    const selector = document.getElementById("account-selector");
+    selector.value = savedMode === 'prod' ? 'live' : 'demo';
+    window.GLOBAL_ACCOUNT_MODE = savedMode;
+    const statusEl = document.getElementById("account-status");
+    if (savedMode === 'prod') {
+      statusEl.textContent = "*** LIVE TRADING ***";
+      statusEl.style.color = "#00ff00";
+      statusEl.style.fontWeight = "bold";
+    } else {
+      statusEl.textContent = "Paper Trading";
+      statusEl.style.color = "orange";
+      statusEl.style.fontWeight = "normal";
+    }
+    fetch('/api/set_account_mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: savedMode })
+    }).then(() => loadAccountData())
+      .catch(console.error);
 
     // Trigger on initial load
     document.getElementById("account-selector").dispatchEvent(new Event("change"));

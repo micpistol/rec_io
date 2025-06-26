@@ -1,3 +1,4 @@
+from backend.account_mode import account_mode_state
 import requests
 import json
 import sqlite3
@@ -212,7 +213,7 @@ def sync_balance():
         data = response.json()
         print(f"[{datetime.now()}] ✅ Balance: {data.get('balance')}")
         # Save balance to JSON
-        output_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", "account_balance.json")
+        output_path = os.path.join("backend", "accounts", "kalshi", account_mode_state["mode"], "account_balance.json")
         print(f"🧭 Attempting to write to: {os.path.abspath(output_path)}")
         try:
             with open(output_path, "w") as f:
@@ -227,16 +228,12 @@ def sync_balance():
 
 # --- New sync functions for positions, fills, settlements using SQLite ---
 
-POSITIONS_DB_PATH = "backend/api/kalshi-api/data/positions.db"
-FILLS_DB_PATH = "backend/api/kalshi-api/data/fills.db"
-SETTLEMENTS_DB_PATH = "backend/api/kalshi-api/data/settlements.db"
 
-def ensure_db_tables():
-    # Ensure all DBs and tables exist
+
+def sync_positions():
+    POSITIONS_DB_PATH = f"backend/accounts/kalshi/{account_mode_state['mode']}/positions.db"
     os.makedirs(os.path.dirname(POSITIONS_DB_PATH), exist_ok=True)
-    os.makedirs(os.path.dirname(FILLS_DB_PATH), exist_ok=True)
-    os.makedirs(os.path.dirname(SETTLEMENTS_DB_PATH), exist_ok=True)
-    # Positions table: replace all on each sync
+    # Ensure positions table exists
     with sqlite3.connect(POSITIONS_DB_PATH) as conn:
         c = conn.cursor()
         c.execute("""
@@ -247,32 +244,6 @@ def ensure_db_tables():
             )
         """)
         conn.commit()
-    # Fills table: append new, dedup by trade_id
-    with sqlite3.connect(FILLS_DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS fills (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                trade_id TEXT UNIQUE,
-                data TEXT
-            )
-        """)
-        conn.commit()
-    # Settlements table: append new, dedup by settlement_id
-    with sqlite3.connect(SETTLEMENTS_DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS settlements (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                settlement_id TEXT UNIQUE,
-                data TEXT
-            )
-        """)
-        conn.commit()
-
-
-def sync_positions():
-    ensure_db_tables()
     print("⏱ Syncing all positions...")
     method = "GET"
     path = "/portfolio/positions"
@@ -330,7 +301,19 @@ def sync_positions():
 
 
 def sync_fills():
-    ensure_db_tables()
+    FILLS_DB_PATH = f"backend/accounts/kalshi/{account_mode_state['mode']}/fills.db"
+    os.makedirs(os.path.dirname(FILLS_DB_PATH), exist_ok=True)
+    # Ensure fills table exists
+    with sqlite3.connect(FILLS_DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS fills (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trade_id TEXT UNIQUE,
+                data TEXT
+            )
+        """)
+        conn.commit()
     print("⏱ Syncing all fills...")
     method = "GET"
     path = "/portfolio/fills"
@@ -393,7 +376,18 @@ def sync_fills():
 
 
 def sync_settlements():
-    ensure_db_tables()
+    SETTLEMENTS_DB_PATH = f"backend/accounts/kalshi/{account_mode_state['mode']}/settlements.db"
+    os.makedirs(os.path.dirname(SETTLEMENTS_DB_PATH), exist_ok=True)
+    # Ensure settlements table exists
+    with sqlite3.connect(SETTLEMENTS_DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS settlements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                data TEXT
+            )
+        """)
+        conn.commit()
     print("⏱ Syncing all settlements...")
     method = "GET"
     path = "/portfolio/settlements"
@@ -435,20 +429,14 @@ def sync_settlements():
             print(f"❌ Failed to fetch settlements: {e}")
             break
 
-    # Deduplicate/append to settlements.db by settlement_id
+    # Insert all settlements (no deduplication, no settlement_id column)
     with sqlite3.connect(SETTLEMENTS_DB_PATH) as conn:
         c = conn.cursor()
-        # Get all existing settlement_ids
-        c.execute("SELECT settlement_id FROM settlements")
-        existing_ids = set(row[0] for row in c.fetchall())
         new_count = 0
         for settlement in all_settlements:
-            settlement_id = settlement.get("settlement_id") or settlement.get("id")
-            if not settlement_id or settlement_id in existing_ids:
-                continue
             c.execute(
-                "INSERT OR IGNORE INTO settlements (settlement_id, data) VALUES (?, ?)",
-                (settlement_id, json.dumps(settlement))
+                "INSERT INTO settlements (data) VALUES (?)",
+                (json.dumps(settlement),)
             )
             new_count += 1
         conn.commit()

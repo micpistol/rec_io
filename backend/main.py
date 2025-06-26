@@ -12,6 +12,9 @@ import requests
 from dateutil import parser
 import sqlite3
 
+
+from backend.account_mode import account_mode_state
+
 DB_PATH = os.path.join(os.path.dirname(__file__), "api", "coinbase-api", "coinbase-btc", "data", "btc_price_history.db")
 
 
@@ -549,6 +552,19 @@ app.include_router(trade_router)
 async def startup_event():
     start_trade_monitor()
 
+
+# Set account mode endpoint
+from fastapi import Request
+
+@app.post("/api/set_account_mode")
+async def set_account_mode(request: Request):
+    data = await request.json()
+    mode = data.get("mode")
+    if mode not in ("prod", "demo"):
+        return {"status": "error", "message": "Invalid mode"}
+    account_mode_state["mode"] = mode
+    return {"status": "ok", "mode": mode}
+
 # Register the auto_stop endpoints so they are always included when the app is loaded
 @app.post("/api/set_auto_stop")
 async def set_auto_stop(request: Request):
@@ -562,29 +578,32 @@ async def get_auto_stop():
 
 @app.get("/api/account/balance")
 def get_balance():
-    with open("backend/accounts/kalshi/account_balance.json") as f:
-        raw = json.load(f)
-        try:
-            cents = int(raw["balance"])
-            dollars = cents / 100
-            return {"balance": f"{dollars:.2f}"}
-        except Exception:
-            return {"balance": "Error"}
+    try:
+        with open(f"backend/accounts/kalshi/{account_mode_state['mode']}/account_balance.json") as f:
+            raw = json.load(f)
+            try:
+                cents = int(raw["balance"])
+                dollars = cents / 100
+                return {"balance": f"{dollars:.2f}"}
+            except Exception:
+                return {"balance": "Error"}
+    except Exception as e:
+        return {"balance": "0.00", "error": str(e)}
 
 @app.get("/api/account/fills")
 def get_fills():
-    with open("backend/accounts/kalshi/fills.json") as f:
+    with open(f"backend/accounts/kalshi/{account_mode_state['mode']}/fills.json") as f:
         return json.load(f)
 
 @app.get("/api/account/positions")
 def get_positions():
-    with open("backend/accounts/kalshi/positions.json") as f:
+    with open(f"backend/accounts/kalshi/{account_mode_state['mode']}/positions.json") as f:
         return json.load(f)
 
 
 @app.get("/api/account/settlements")
 def get_settlements():
-    with open("backend/accounts/kalshi/settlements.json") as f:
+    with open(f"backend/accounts/kalshi/{account_mode_state['mode']}/settlements.json") as f:
         return json.load(f)
 
 
@@ -592,7 +611,8 @@ def get_settlements():
 @app.get("/api/db/settlements")
 def get_settlements_db():
     try:
-        conn = sqlite3.connect("backend/accounts/kalshi/settlements.db")
+        db_path = os.path.join("backend", "accounts", "kalshi", account_mode_state["mode"], "settlements.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT ticker, market_result, yes_count, no_count, revenue, settled_time FROM settlements ORDER BY settled_time DESC")
         rows = cursor.fetchall()
@@ -616,7 +636,8 @@ def get_settlements_db():
 @app.get("/api/db/fills")
 def get_fills_db():
     try:
-        conn = sqlite3.connect("backend/accounts/kalshi/fills.db")
+        db_path = os.path.join("backend", "accounts", "kalshi", account_mode_state["mode"], "fills.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time FROM fills ORDER BY created_time DESC")
         rows = cursor.fetchall()
