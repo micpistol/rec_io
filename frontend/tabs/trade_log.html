@@ -18,8 +18,16 @@
       text-align: center;
     }
     th {
-      background-color: #323c4e;
+      background-color: #1f2530;
       font-weight: bold;
+      cursor: pointer;
+      position: relative;
+    }
+    th .sort-indicator {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
     }
     tbody tr:nth-child(even) {
       //background-color: #323c4e;
@@ -29,32 +37,67 @@
       margin-bottom: 10px;
       font-weight: bold;
     }
+    .group-odd {
+      background-color: #394559;
+    }
+    .group-even {
+      background-color: #1f2633;
+    }
+    tbody tr:hover {
+      background-color: #4d586f !important;
+      cursor: pointer;
+    }
+
+    th.sortable::after {
+      content: '';
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      margin-left: 5px;
+      border: 4px solid transparent;
+      border-top-color: #ccc;
+      vertical-align: middle;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    th.sortable:hover::after {
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
+
   <div class="panel-container">
-    <div class="panel-header">All Trades</div>
+
+    <div class="panel-header">Search</div>
+
+  </div>
+
+  <div class="panel-container">
+    <div class="panel-header">Results</div>
     <table id="trade-log-table" aria-label="Trade Log Table">
       <thead>
-        <tr>
-          <th>ID</th>
-          <th>Status</th>
-          <th>Date</th>
-          <th>Time</th>
-          <th>Symbol</th>
-          <th>Strategy</th>
-          <th>Contract</th>
-          <th>Strike</th>
-          <th>Side</th>
-          <th>Buy</th>
-          <th>Sell</th>
-          <th>Position</th>
-          <th>Closed At</th>
-          <th>Symbol Open</th>
-          <th>Symbol Close</th>
-          <th>Momentum</th>
-          <th>Volatility</th>
-          <th>W/L</th>
+        <tr class="th">
+          <th data-key="id">ID</th>
+          <th data-key="status">Status</th>
+          <th data-key="date">Date</th>
+          <th data-key="time">Time</th>
+          <th data-key="symbol">Symbol</th>
+          <th data-key="trade_strategy">Strategy</th>
+          <th data-key="contract">Contract</th>
+          <th data-key="strike">Strike</th>
+          <th data-key="side">Side</th>
+          <th data-key="buy_price">Buy</th>
+          <th data-key="sell_price">Sell</th>
+          <th data-key="position">Position</th>
+          <th data-key="closed_at">Closed At</th>
+          <th data-key="symbol_open">Symbol Open</th>
+          <th data-key="symbol_close">Symbol Close</th>
+          <th data-key="momentum">Momentum</th>
+          <th data-key="volatility">Volatility</th>
+          <th data-key="win_loss">W/L</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -62,17 +105,74 @@
   </div>
 
   <script>
+    let currentSort = { key: null, asc: true };
+    let trades = [];
+
     async function fetchAllTrades() {
       console.log('Fetching trades at', new Date().toLocaleTimeString());
       try {
         const res = await fetch('/trades', { cache: 'no-store' });
         if (!res.ok) throw new Error('Network response was not ok');
-        const trades = await res.json();
+        trades = await res.json();
+        if (currentSort.key !== null) {
+          applyCurrentSort();
+        }
         renderTrades(trades);
       } catch (error) {
         const tbody = document.querySelector('#trade-log-table tbody');
         tbody.innerHTML = `<tr><td colspan="19" style="color:red;">Failed to load trades: ${error.message}</td></tr>`;
       }
+    }
+
+    function applyCurrentSort() {
+      if (currentSort.key === null) return;
+
+      trades.sort((a, b) => {
+        let valA = a[currentSort.key];
+        let valB = b[currentSort.key];
+
+        // Normalize side values for sorting
+        if (currentSort.key === 'side') {
+          const mapSide = v => (v === 'Yes' || v === 'Y' ? 'Y' : v === 'No' || v === 'N' ? 'N' : '');
+          valA = mapSide(valA);
+          valB = mapSide(valB);
+        }
+
+        // Normalize null/undefined to empty string
+        if (valA === null || valA === undefined) valA = '';
+        if (valB === null || valB === undefined) valB = '';
+
+        // Try to parse as numbers for numeric fields
+        const numericKeys = ['id', 'strike', 'buy_price', 'sell_price', 'position', 'symbol_open', 'symbol_close', 'momentum', 'volatility', 'win_loss'];
+        if (numericKeys.includes(currentSort.key)) {
+          valA = Number(valA);
+          valB = Number(valB);
+          if (isNaN(valA)) valA = -Infinity;
+          if (isNaN(valB)) valB = -Infinity;
+        }
+
+        // For date and time, compare as strings (assuming ISO or consistent format)
+        // For other strings, localeCompare
+        if (typeof valA === 'string' && typeof valB === 'string') {
+          const cmp = valA.localeCompare(valB);
+          return currentSort.asc ? cmp : -cmp;
+        } else {
+          if (valA < valB) return currentSort.asc ? -1 : 1;
+          if (valA > valB) return currentSort.asc ? 1 : -1;
+          return 0;
+        }
+      });
+    }
+
+    function sortTrades(key) {
+      if (currentSort.key === key) {
+        currentSort.asc = !currentSort.asc;
+      } else {
+        currentSort.key = key;
+        currentSort.asc = true;
+      }
+      applyCurrentSort();
+      renderTrades(trades);
     }
 
     function renderTrades(trades) {
@@ -84,11 +184,17 @@
       }
 
       let lastContract = null;
+      let groupIndex = 0;
       for (const trade of trades) {
         const isNewGroup = trade.contract !== lastContract;
+        if (isNewGroup) {
+          groupIndex++;
+        }
         lastContract = trade.contract;
         const tr = document.createElement('tr');
         tr.style.borderTop = isNewGroup ? '2px solid #666' : '';
+        // Assign group-odd or group-even class based on groupIndex
+        tr.classList.add(groupIndex % 2 === 1 ? 'group-odd' : 'group-even');
         tr.innerHTML = `
           <td>${trade.id !== null ? trade.id : ''}</td>
           <td>${trade.status !== null ? trade.status : ''}</td>
@@ -116,6 +222,17 @@
     window.addEventListener('DOMContentLoaded', () => {
       fetchAllTrades();
       setInterval(fetchAllTrades, 1000);
+
+      const headers = document.querySelectorAll('#trade-log-table thead th');
+      headers.forEach(th => {
+        th.classList.add('sortable');
+        th.addEventListener('click', () => {
+          const key = th.getAttribute('data-key');
+          if (key) {
+            sortTrades(key);
+          }
+        });
+      });
     });
   </script>
 </body>
