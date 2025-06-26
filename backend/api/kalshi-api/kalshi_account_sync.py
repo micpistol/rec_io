@@ -315,23 +315,9 @@ def sync_fills():
             break
 
     output_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", "fills.json")
-
-    # Check if existing file has identical content
-    existing_fills = []
-    if os.path.exists(output_path):
-        try:
-            with open(output_path, "r") as f:
-                existing_data = json.load(f)
-                existing_fills = existing_data.get("fills", [])
-        except Exception:
-            pass  # ignore parse errors; we'll overwrite
-
-    if existing_fills != all_fills:
-        with open(output_path, "w") as f:
-            json.dump({"fills": all_fills}, f, indent=2)
-        print(f"💾 All fills written to {output_path}")
-    else:
-        print("🟢 No new fills — file unchanged.")
+    with open(output_path, "w") as f:
+        json.dump({"fills": all_fills}, f, indent=2)
+    print(f"💾 All fills written to {output_path}")
 
 
 def sync_settlements():
