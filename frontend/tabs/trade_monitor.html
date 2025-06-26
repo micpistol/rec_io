@@ -1686,18 +1686,32 @@ async function showPopup(strike, side, price) {
   // Debug: log the open trade payload
   console.log("Open trade payload:", payload);
 
-  try {
-    const res = await fetch('/trades', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+  // Fire‑and‑forget request so the UI thread remains responsive
+  fetch('/trades', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+    .then(res => {
+      if (!res.ok) throw new Error('Failed to add trade');
+      // Refresh panels once the server confirms the insert
+      fetchAndRenderTrades();
+    })
+    .catch(err => {
+      alert('Error adding trade: ' + err.message);
     });
-    if (!res.ok) throw new Error('Failed to add trade');
-    await fetchAndRenderTrades();
-    // (Sound already played at top)
-  } catch (err) {
-    alert('Error adding trade: ' + err.message);
-  }
+
+  // Poll until the new trade appears in the table
+  const pollForNewTrade = setInterval(() => {
+    fetch('/trades?status=open', { cache: 'no-store' })
+      .then(res => res.json())
+      .then(trades => {
+        if (trades.some(t => t.contract === payload.contract)) {
+          fetchAndRenderTrades(); // Confirm final redraw
+          clearInterval(pollForNewTrade);
+        }
+      });
+  }, 250);
 }
 
 
@@ -1706,9 +1720,12 @@ const activeTradesRowsMap = new Map();
 const previousClosePrices = {}; // Keyed by trade.id
 
 async function fetchAndRenderTrades() {
+
+  console.log(`[DEBUG] fetchAndRenderTrades at ${new Date().toLocaleTimeString()}`);
+
   try {
     // Fetch open trades
-    const tradesRes = await fetch('/trades?status=open');
+    const tradesRes = await fetch('/trades?status=open', { cache: 'no-store' });
     if (!tradesRes.ok) throw new Error("Failed to fetch trades");
     const trades = await tradesRes.json();
     // Sort trades by strike ascending before rendering
@@ -1922,59 +1939,79 @@ async function closeTradeById(tradeId, sellPrice) {
     closeSound.play().catch(e => console.warn("Sound play blocked:", e));
   }
   showTradeClosedPopup();
-  try {
-    // Get current BTC ticker price from the UI
-    const btcPriceEl = document.getElementById('btc-price-value');
-    let currentSymbolPrice = null;
-    if (btcPriceEl && btcPriceEl.textContent) {
-      currentSymbolPrice = parseFloat(btcPriceEl.textContent.replace(/\$|,/g, ''));
-    }
-    // If not found in DOM, fallback to /core
-    if (currentSymbolPrice === null || isNaN(currentSymbolPrice)) {
-      try {
-        const coreRes = await fetch('/core');
-        const coreData = await coreRes.json();
-        currentSymbolPrice = coreData.btc_price;
-      } catch {}
-    }
-
-    // Format closed_at as "HH:mm:ss" in US Eastern Time
-    const closedAt = new Date();
-    const closedAtTime = closedAt.toLocaleTimeString('en-US', {
-      timeZone: 'America/New_York',
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-
-    // Compose payload for /trades/{id} endpoint, include status: "closed"
-    const payload = {
-      status: "closed",
-      sell_price: sellPrice,
-      symbol_close: currentSymbolPrice,
-      closed_at: closedAtTime
-    };
-
-    const res = await fetch(`/trades/${tradeId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) throw new Error('Failed to close trade');
-    await fetchAndRenderTrades();
-    await fetchAndRenderRecentTrades();
-    // (Sound already played at top)
-  } catch (err) {
-    alert('Error closing trade: ' + err.message);
+  // Get current BTC ticker price from the UI
+  const btcPriceEl = document.getElementById('btc-price-value');
+  let currentSymbolPrice = null;
+  if (btcPriceEl && btcPriceEl.textContent) {
+    currentSymbolPrice = parseFloat(btcPriceEl.textContent.replace(/\$|,/g, ''));
   }
+  // If not found in DOM, fallback to /core
+  if (currentSymbolPrice === null || isNaN(currentSymbolPrice)) {
+    try {
+      const coreRes = await fetch('/core');
+      const coreData = await coreRes.json();
+      currentSymbolPrice = coreData.btc_price;
+    } catch {}
+  }
+
+  // Format closed_at as "HH:mm:ss" in US Eastern Time
+  const closedAt = new Date();
+  const closedAtTime = closedAt.toLocaleTimeString('en-US', {
+    timeZone: 'America/New_York',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+
+  // Compose payload for /trades/{id} endpoint, include status: "closed"
+  const payload = {
+    status: "closed",
+    sell_price: sellPrice,
+    symbol_close: currentSymbolPrice,
+    closed_at: closedAtTime
+  };
+
+  // Non‑blocking close – keep UI responsive
+  fetch(`/trades/${tradeId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+    .then(res => {
+      if (!res.ok) throw new Error('Failed to close trade');
+      fetchAndRenderTrades();
+      fetchAndRenderRecentTrades();
+    })
+    .catch(err => {
+      alert('Error closing trade: ' + err.message);
+    });
+
+  // Poll until the trade disappears from the table
+  const pollForClose = setInterval(() => {
+    fetch('/trades?status=open', { cache: 'no-store' })
+      .then(res => res.json())
+      .then(trades => {
+        if (!trades.some(t => t.id === tradeId)) {
+          fetchAndRenderTrades(); // Confirm redraw
+          clearInterval(pollForClose);
+        }
+      });
+  }, 250);
+
+  // --- Retry fetching open trades until the closed one disappears ---
+  let retries = 0;
+  const retryRender = setInterval(() => {
+    if (retries++ > 10) return clearInterval(retryRender);
+    fetchAndRenderTrades();
+  }, 250);
 }
 
 // === Recent Trades Panel ===
 async function fetchAndRenderRecentTrades() {
   try {
     // Fetch all closed trades
-    const res = await fetch('/trades?status=closed');
+    const res = await fetch('/trades?status=closed', { cache: 'no-store' });
     if (!res.ok) throw new Error("Failed to fetch recent trades");
     const trades = await res.json();
     console.log("Recent trades response:", trades);
@@ -2011,7 +2048,7 @@ async function fetchAndRenderRecentTrades() {
 async function closeExpiredTrades() {
   try {
     // Fetch all open trades
-    const res = await fetch('/trades?status=open');
+    const res = await fetch('/trades?status=open', { cache: 'no-store' });
     if (!res.ok) throw new Error("Failed to fetch open trades");
     const openTrades = await res.json();
 
@@ -2075,7 +2112,15 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(fetchAndRenderTrades, 1000);
   fetchAndRenderRecentTrades();
   setInterval(fetchAndRenderRecentTrades, 1000);
+  // Ensure Active Trades panel is refreshed in sync with main loop
+  updateActiveTrades();
+  setInterval(updateActiveTrades, 1000);
 });
+
+// Function to refresh the Active Trades panel using up-to-date API data
+async function updateActiveTrades() {
+  await fetchAndRenderTrades();
+}
 
 // --- Debounce mechanism for close trade clicks ---
 const lastCloseClickTimes = {};

@@ -77,9 +77,20 @@ def init_trades_db():
 
 init_trades_db()
 
-# Database helper functions
+# Short timeout so UI requests don't hang if the DB is locked.
 def get_db_connection():
-    return sqlite3.connect(DB_TRADES_PATH)
+    # check_same_thread=False lets each thread safely open its *own* connection.
+    return sqlite3.connect(DB_TRADES_PATH, timeout=0.25, check_same_thread=False)
+
+# Very small, read‑only query used by the background monitor so it
+# doesn't contend with the UI's full SELECT call.
+def fetch_open_trades_light():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, contract FROM trades WHERE status = 'open'")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": row[0], "contract": row[1]} for row in rows]
 
 def fetch_open_trades():
     conn = get_db_connection()
@@ -175,13 +186,23 @@ def fetch_recent_closed_trades(hours=24):
 
 @router.get("/trades")
 def get_trades(status: str = None, recent_hours: int = None):
+    import time
+    start_time = time.time()
     if status == "open":
-        return fetch_open_trades()
+        result = fetch_open_trades()
+        print(f"[DEBUG] /trades?status={status} responded in {time.time() - start_time:.3f} sec")
+        return result
     elif status == "closed" and recent_hours:
-        return fetch_recent_closed_trades(recent_hours)
+        result = fetch_recent_closed_trades(recent_hours)
+        print(f"[DEBUG] /trades?status={status}&recent_hours={recent_hours} responded in {time.time() - start_time:.3f} sec")
+        return result
     elif status == "closed":
-        return [t for t in fetch_all_trades() if t["status"] == "closed"]
-    return fetch_all_trades()
+        result = [t for t in fetch_all_trades() if t["status"] == "closed"]
+        print(f"[DEBUG] /trades?status={status} responded in {time.time() - start_time:.3f} sec")
+        return result
+    result = fetch_all_trades()
+    print(f"[DEBUG] /trades?status={status} responded in {time.time() - start_time:.3f} sec")
+    return result
 
 @router.post("/trades", status_code=status.HTTP_201_CREATED)
 async def add_trade(request: Request):
@@ -238,7 +259,7 @@ def check_stop_trigger(trade):
 def trade_monitor_loop():
     while True:
         try:
-            open_trades = fetch_open_trades()
+            open_trades = fetch_open_trades_light()
             for trade in open_trades:
                 if check_stop_trigger(trade):
                     print(f"[Trade Monitor] Closing trade id={trade['id']} due to stop trigger")
