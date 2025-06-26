@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Test Monitor</title>
+</head>
+<body>
+  <h1>Test Monitor - BTC Price</h1>
+  <div id="btc-price">Loading price...</div>
+
+  <script type="module">
+    import { BtcPriceService } from './js/btcPriceService.js';
+    import appState from './js/AppState.js';
+
+    const priceDiv = document.getElementById('btc-price');
+    const btcPriceService = new BtcPriceService(5000); // poll every 5 seconds
+
+    // Update appState on new BTC price
+    btcPriceService.subscribe((price) => {
+      appState.setBtcPrice(price);
+    });
+
+    // Update UI when appState changes
+    appState.subscribe((state) => {
+      const price = state.btcPrice;
+      if (price !== null) {
+        priceDiv.textContent = `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      } else {
+        priceDiv.textContent = 'Loading price...';
+      }
+    });
+
+    btcPriceService.startPolling();
+  </script>
+</body>
+</html>

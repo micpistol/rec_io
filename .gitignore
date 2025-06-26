@@ -1,0 +1,30 @@
+*.db
+*.log
+# Virtual environments
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# VS Code settings
+.vscode/
+
+# Mac system files
+.DS_Store
+
+# Data files
+**/data/*
+
+# Kalshi credentials and private info
+backend/api/kalshi-api/kalshi-credentials/
+*.pem
+.env
+
+# Log and debug files
+*.log
+*.sqlite3
+backend/api/coinbase-api/coinbase-btc/data/btc_logger_heartbeat.txt
+backend/api/coinbase-api/coinbase-btc/data/btc_price_log.txt
+backend/api/kalshi-api/data/latest_market_snapshot.json
+backend/api/kalshi-api/data/kalshi_logger_heartbeat.txt

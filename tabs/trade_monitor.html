@@ -1,0 +1,2221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans&display=swap" rel="stylesheet" />
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Trade Monitor</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background-color: #222932; /* grey/blue tone */
+    color: white;
+    overflow: hidden;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+
+  #container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  .column {
+    width: 33.3333vw;
+    overflow-y: auto;
+    padding: 10px;
+  }
+  .column#col2 {
+    width: 33.3333vw;
+    overflow-y: auto;
+    padding: 10px;
+    padding-left: 0px;
+    padding-right: 0px;
+  }
+
+  .column:first-child {
+    border-left: none;
+  }
+
+  .panel-container {
+    width: 100%;
+    padding: 10px;
+    background-color: #323c4e;
+    box-sizing: border-box;
+    border-radius: 6px;
+    margin-bottom: 10px;
+  }
+  .panel-table {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+  }
+
+  .panel-content {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+  }
+
+  #tickerPanel {
+    /* height removed to avoid conflicts */
+    flex-shrink: 0;
+    overflow: auto;
+    border-collapse: collapse;
+    color: white;
+    padding-top: 20px;
+  }
+
+  #tickerPanel td {
+    padding: 4px;
+    text-align: left;
+    vertical-align: bottom;
+  }
+
+  #tickerPanel tr.instrument-row td {
+    padding-bottom: 0;
+  }
+
+  #tickerPanel tr.price-row td {
+    font-size: 270%;
+    padding-top: 0;
+    padding-bottom: 0;
+    vertical-align: baseline;
+  }
+  #ticker-picker {
+    background-color: #3c495e !important;
+    color: white !important;
+    border: none;
+    padding: 0px 8px;
+    border-radius: 4px;
+    text-align: left;
+  }
+
+  #tickerPanel tr.change-row td {
+    font-size: 70%;
+    padding-bottom: 10px;
+  }
+
+  #tickerPanel tr.chart-row td {
+    height: 100%;
+    vertical-align: top;
+    padding: 0;
+  }
+
+  #newPanel {
+    margin-top: 5px;
+    border-bottom: 1px solid #a0a9b8;
+    text-align: left;
+    vertical-align: top;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+
+  /* #momentumPanel styles merged into .panel-container above */
+
+  /* === STRIKE TABLE STYLES === */
+  #strike-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+   
+  }
+
+  #strike-table th {
+    font-size: 13px;
+    font-weight: bold;
+    text-align: center;
+    background-color: #222c3c;
+   
+    padding: 4px 6px;
+  }
+
+  #strike-table td {
+    font-size: 14px;
+    text-align: right;
+    border: 1px solid #888;
+    padding: 4px 6px;
+  }
+
+  #strike-table td.center {
+    text-align: center;
+  }
+
+  #strike-table td:nth-child(5) {
+    text-align: center;
+  }
+  #strike-table td:nth-child(6),
+  #strike-table td:nth-child(7) {
+    text-align: center;
+  }
+
+  .price-box {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 5px 9.6px;
+    border-radius: 8px;
+    background-color: transparent;
+    font-weight: bold;
+    min-width: 48px;
+    user-select: none;
+    border: 1px solid #ccc;
+    transition: background-color 0.2s ease;
+    cursor: default;
+  }
+
+  .price-box:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+
+  .price-box.disabled {
+    opacity: 0.1;
+    pointer-events: none;
+    cursor: default;
+  }
+
+  /* === ACTIVE TRADES TABLE STYLES === */
+  #activeTradesTable {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+  }
+  #activeTradesTable th,
+  #activeTradesTable td {
+    font-size: 14px;
+    border: 1px solid #888;
+    padding: 4px 6px;
+  }
+  /* Center all values (cells) in the Active Trades table */
+  #activeTradesTable td {
+    text-align: center;
+  }
+  #activeTradesTable thead th {
+    font-size: 13px;
+    font-weight: bold;
+    text-align: center;
+    background-color: #222c3c;
+    padding: 4px 6px;
+  }
+
+  /* Remove top, left, right, and interior borders from header row in Active Trades table */
+  #activeTradesTable thead tr th {
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+  }
+</style>
+<style>
+  .trade-popup, .trade-closed-popup {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    color: white;
+    padding: 18px 30px;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 21px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    display: none;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+  .trade-popup {
+    background-color: #28a745;
+  }
+  .trade-closed-popup {
+    background-color: #dc3545;
+  }
+  .trade-popup.show,
+  .trade-closed-popup.show {
+    display: block;
+    opacity: 1;
+    /* transition stays at default unless overridden in JS */
+  }
+</style>
+<style>
+#autoStopToggle {
+  accent-color: red;
+  background-color: transparent;
+  border: none;
+  outline: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  position: relative;
+  cursor: pointer;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px white;
+  transition: outline 0.2s ease;
+}
+
+#autoStopToggle:checked {
+  background-color: red;
+  box-shadow: none;
+}
+
+#autoStopToggle:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+#autoStopToggle:focus-visible {
+  outline: 2px solid #f00;
+  outline-offset: 2px;
+}
+</style>
+<style>
+  /* === Multiplier Button Styles === */
+  .multiplier-btn {
+    background-color: transparent;
+    border: 1px solid #ccc;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  .multiplier-btn.active {
+    background-color: #007bff; /* bright blue */
+    border-color: #0056b3;
+    color: white;
+    font-weight: bold;
+    box-shadow: 0 0 6px rgba(0, 123, 255, 0.7);
+  }
+  .multiplier-btn:hover:not(.active) {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+</style>
+<style>
+  /* === STRIKE TABLE RISK COLOR CLASSES === */
+  .ultra-safe { background-color: #58b558 !important; }
+  .safe { background-color: #7ec27e !important; }
+  .caution { background-color: #c5ab50 !important; }
+  .high-risk { background-color: #a07777 !important; }
+  .danger-stop { background-color: #ec3434 !important; }
+
+</style>
+<style>
+  /* === RECENT TRADES TABLE STYLES (match Active Trades) === */
+  #recentTradesTable {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+  }
+  #recentTradesTable th,
+  #recentTradesTable td {
+    font-size: 12px;
+    border: 0px solid #888888;
+    padding: 4px 6px;
+    text-align: center;
+  }
+  #recentTradesTable thead th {
+    font-size: 13px;
+    font-weight: bold;
+    background-color: #222c3c;
+    padding: 4px 6px;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    border-bottom: 1px solid #222c3c;
+  }
+</style>
+<style>
+  #activeTradesTable button.close-trade-btn {
+    transform: scale(0.8);
+    transform-origin: center;
+  }
+</style>
+</head>
+<body>
+  
+  <div id="container">
+    <div class="column" id="col1">
+      <div class="panel-container" style="min-height: 200px;" id="tickerPanelContainer">
+        <table id="tickerPanel" class="panel-table">
+          <tbody>
+            <tr class="instrument-row">
+              <td id="ticker-instrument-cell">
+                <select id="ticker-picker" name="ticker">
+                  <option value="BTC">BTC/USD</option>
+                  <option value="ETH">ETH/USD</option>
+                </select>
+              </td>
+            </tr>
+            <tr class="price-row">
+              <td style="position: relative;">
+                <span id="btc-price-value" style="display: inline-block;">$—</span>
+                <div id="volIndicator" style="display: inline-block; float: right; text-align: center; margin-left: 10px;">
+                  <div style="font-size: 10px; color: #ccc; letter-spacing: 0.5px;">VOL</div>
+                  <div id="volLight" style="
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    margin-top: 4px;
+                    background: radial-gradient(circle at 30% 30%, #00cc00, #006600);
+                    box-shadow: 0 0 4px #00cc00;
+                    border: 1px solid #444;
+                  "></div>
+                </div>
+              </td>
+            </tr>
+            <tr class="change-row">
+              <td id="btc-changes-cell">1h <span id="change-1h">—</span> &nbsp;&nbsp; 3h <span id="change-3h">—</span> &nbsp;&nbsp; 1d <span id="change-1d">—</span></td>
+            </tr>
+            <tr class="chart-row">
+              <td><div id="tradingview_12345"></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="panel-container" style="min-height: 00px;" id="momentumPanelContainer">
+        <div class="panel-content" id="momentumPanelContent">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 8px 8px 8px;">
+            <div style="font-size: 12px; font-weight: bold; opacity: 0.7; align: top;">Momentum</div>
+            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 6px; padding-right: 8px;">
+              <div id="momentum-score-value" style="font-size: 25px; font-weight: bold; color: white;">—</div>
+              <div id="momentum-delta-indicator" style="font-size: 22px; color: gray;">➖ 0</div>
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <div style="width: 30%; height: 180px; background-color: #1e2733; display: flex; align-items: center; justify-content: center;">
+              <canvas id="momentumBarChartCanvas" style="width: 100%; height: 100%;"></canvas>
+            </div>
+            <div style="width: 70%; background-color: #1e2733;">
+              <canvas id="rolling-momentum-chart" width="280" height="170" style="display: block; margin: auto;"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel-container" style="min-height: 150px;" id="volatilityPanel">
+        <div style="font-size: 12px; font-weight: bold; opacity: 0.7; padding-left: 8px; padding-bottom: 8px;">Volatility</div>
+        <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; gap: 6px; padding-right: 8px;">
+          <span style="text-align: right; min-width: 40px;">Score:</span>
+          <span id="volScore" style="text-align: right; display: inline-block; width: 50px;">0.00</span>
+        </div>
+        <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; gap: 6px; padding-right: 8px;">
+          <span style="text-align: right; min-width: 40px;">Vol MA:</span>
+          <span id="volMovingAvg" style="text-align: right; display: inline-block; width: 50px;">0.00</span>
+        </div>
+        <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; gap: 6px; padding-right: 8px;">
+          <span style="text-align: right; min-width: 40px;">Vol Δ:</span>
+          <span id="volDelta" style="text-align: right; display: inline-block; width: 50px;">0.00</span>
+        </div>
+        <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; margin-top: 12px; gap: 6px; padding-right: 8px;">
+          <span style="text-align: right; min-width: 40px;">Spike:</span>
+          <span id="volSpike" style="text-align: right; display: inline-block; width: 50px;">0.00</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="column" id="col2">
+      <!-- === STRIKE TABLES AND UI (inserted as per instructions) === -->
+      <div class="panel-container" style="min-height: 200px; padding-top: 0px; padding-bottom: 1px; " id="strikePanelContainer">
+        <table id="strikePanelTable" style="width: 100%; height: 100%; ">
+          <tbody>
+            <tr>
+              <td id="strikePanelMarketTitleCell" style="font-size: 16px; width: 85%; padding: 0px; text-align: top; border: none;">Loading market title...</td>
+              <td style="font-size: 35px; font-weight: bold; padding: 8px; text-align: center; border: none;">
+                <div id="strikePanelTTC">&nbsp;</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <table id="strike-table">
+          <thead>
+            <tr>
+              <th>STRIKE</th>
+              <th>BUFFER</th>
+              <th>B/M</th>
+              <th>Adj</th>
+              <th>RISK</th>
+              <th>YES</th>
+              <th>NO</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="panel-container" style="min-height: 150px;" id="watchlistPanel">
+        <div style="font-size: 12px; font-weight: bold; opacity: 0.7; padding-left: 8px; padding-bottom: 8px;">Watchlist</div>
+        <!-- Watchlist content will go here -->
+      </div>
+</script>
+
+<!-- === STRIKE TABLES JS (inserted as per instructions) === -->
+<script>
+// === Track last Yes/No button states ===
+const lastButtonStates = new Map();
+
+// Debounce helper function (moved to top-level for reuse)
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    if (timeout) return;
+    func.apply(this, args);
+    timeout = setTimeout(() => {
+      timeout = null;
+    }, wait);
+  };
+}
+
+// Helper function to update Yes/No button with conditional redraw
+function updateYesNoButton(spanEl, strike, side, askPrice, isActive, marketId = null) {
+  const key = `${strike}-${side}`;
+  const prev = lastButtonStates.get(key);
+  if (prev && prev.askPrice === askPrice && prev.isActive === isActive) {
+    // No change; skip update
+    return;
+  }
+
+  spanEl.textContent = askPrice > 0 ? askPrice : '—';
+  spanEl.className = isActive ? 'price-box' : 'price-box disabled';
+  spanEl.style.cursor = isActive ? 'pointer' : 'default';
+
+  // Patch: set data-market-id on the YES/NO cell's parent td
+  if (spanEl.parentElement && marketId) {
+    spanEl.parentElement.setAttribute('data-market-id', marketId);
+  }
+
+  if (isActive) {
+    spanEl.onclick = debounce(() => showPopup(`$${strike.toLocaleString()}`, side.charAt(0).toUpperCase() + side.slice(1), askPrice), 300);
+  } else {
+    spanEl.onclick = null;
+  }
+
+  lastButtonStates.set(key, { askPrice, isActive });
+}
+
+// === STRIKE TABLE REFACTOR: persistent rows and in-place update ===
+const strikeRowsMap = new Map();
+
+function buildStrikeTableRows(basePrice) {
+  const step = 250;
+  const rows = [];
+  for (let i = basePrice - 6 * step; i <= basePrice + 6 * step; i += step) {
+    rows.push(i);
+  }
+  return rows;
+}
+
+function initializeStrikeTable(basePrice) {
+  const strikeTableBody = document.querySelector('#strike-table tbody');
+  const strikes = buildStrikeTableRows(basePrice);
+  strikeTableBody.innerHTML = ''; // only clear once at start
+  strikeRowsMap.clear();
+
+  strikes.forEach(strike => {
+    const row = document.createElement('tr');
+
+    // Strike cell
+    const strikeTd = document.createElement('td');
+    strikeTd.textContent = '$' + strike.toLocaleString();
+    strikeTd.classList.add('center');
+    row.appendChild(strikeTd);
+
+    // Buffer cell
+    const bufferTd = document.createElement('td');
+    row.appendChild(bufferTd);
+
+    // B/M cell
+    const bmTd = document.createElement('td');
+    row.appendChild(bmTd);
+
+    // Adj B/M cell
+    const adjBmTd = document.createElement('td');
+    row.appendChild(adjBmTd);
+
+    // Risk cell
+    const riskTd = document.createElement('td');
+    row.appendChild(riskTd);
+
+    // Yes button cell and span
+    const yesTd = document.createElement('td');
+    const yesSpan = document.createElement('span');
+    yesTd.appendChild(yesSpan);
+    row.appendChild(yesTd);
+
+    // No button cell and span
+    const noTd = document.createElement('td');
+    const noSpan = document.createElement('span');
+    noTd.appendChild(noSpan);
+    row.appendChild(noTd);
+
+    strikeTableBody.appendChild(row);
+
+    strikeRowsMap.set(strike, {
+      row,
+      bufferTd,
+      bmTd,
+      adjBmTd,
+      riskTd,
+      yesSpan,
+      noSpan
+    });
+  });
+}
+
+function updateStrikeTable(coreData, latestKalshiMarkets) {
+  if (!coreData || typeof coreData.btc_price !== 'number') return;
+
+  const base = Math.round(coreData.btc_price / 250) * 250;
+  const ttcSeconds = coreData.ttc_seconds || 1;
+  const ttcMinutes = ttcSeconds / 60;
+  const centerPrice = coreData.btc_price;
+
+  strikeRowsMap.forEach((cells, strike) => {
+    const { row, bufferTd, bmTd, adjBmTd, riskTd, yesSpan, noSpan } = cells;
+
+    // Buffer
+    const buffer = centerPrice - strike;
+    bufferTd.textContent = Math.abs(buffer).toLocaleString(undefined, {maximumFractionDigits: 0});
+
+    // B/M and Adj B/M
+    const bpm = Math.abs(buffer) / ttcMinutes;
+    const adjBpm = bpm * Math.sqrt(ttcMinutes / 15);
+    bmTd.textContent = Math.round(bpm).toLocaleString();
+    adjBmTd.textContent = adjBpm.toFixed(1);
+
+    // Risk calculation
+    let risk = 1;
+    if (adjBpm >= 80) risk = 10;
+    else if (adjBpm >= 65) risk = 9;
+    else if (adjBpm >= 50) risk = 8;
+    else if (adjBpm >= 40) risk = 7;
+    else if (adjBpm >= 35) risk = 6;
+    else if (adjBpm >= 30) risk = 5;
+    else if (adjBpm >= 25) risk = 4;
+    else if (adjBpm >= 15) risk = 3;
+    else if (adjBpm >= 10) risk = 2;
+
+    riskTd.textContent = risk.toString();
+
+    // Update row classes based on risk
+    row.className = ''; // reset
+    if (risk >= 7) {
+      row.classList.add('ultra-safe');
+    } else if (risk === 5 || risk === 6) {
+      row.classList.add('safe');
+    } else if (risk === 4) {
+      row.classList.add('caution');
+    } else if (risk >= 1 && risk <= 3) {
+      row.classList.add('high-risk');
+    }
+
+    // Active row border highlight
+    const lowerBound = strike;
+    const upperBound = strike + 249.9999;
+    const isActiveRow = centerPrice >= lowerBound && centerPrice <= upperBound;
+    if (isActiveRow) {
+      [cells.row.children[0], bufferTd, bmTd, adjBmTd, riskTd, yesSpan.parentElement, noSpan.parentElement].forEach(cell => {
+        cell.style.borderTop = "3px solid #444";
+        cell.style.borderBottom = "3px solid #444";
+      });
+    } else {
+      [cells.row.children[0], bufferTd, bmTd, adjBmTd, riskTd, yesSpan.parentElement, noSpan.parentElement].forEach(cell => {
+        cell.style.borderTop = "";
+        cell.style.borderBottom = "";
+      });
+    }
+
+    // Find markets for yes/no asks
+    const matchingMarket = latestKalshiMarkets.find(m => Math.round(m.floor_strike) === strike);
+    // Immediately after this lookup, extract the corresponding ticker value from the same matchingMarket object
+    const marketId = matchingMarket ? matchingMarket.ticker : null;
+    const yesAsk = matchingMarket && typeof matchingMarket.yes_ask === "number" ? Math.round(matchingMarket.yes_ask) : 0;
+    const noAsk = matchingMarket && typeof matchingMarket.no_ask === "number" ? Math.round(matchingMarket.no_ask) : 0;
+
+    const isYesActive = yesAsk > noAsk && yesAsk < 99 && yesAsk >= 40;
+    const isNoActive = noAsk > yesAsk && noAsk < 99 && noAsk >= 40;
+
+    updateYesNoButton(yesSpan, strike, "yes", yesAsk, isYesActive, marketId);
+    updateYesNoButton(noSpan, strike, "no", noAsk, isNoActive, marketId);
+  });
+}
+
+// --- Main periodic fetcher for strike table ---
+async function fetchAndUpdate() {
+  try {
+    const [coreRes, marketsRes] = await Promise.all([fetch('/core'), fetch('/kalshi_market_snapshot')]);
+    if (!coreRes.ok || !marketsRes.ok) return;
+    const coreData = await coreRes.json();
+    const marketsData = await marketsRes.json();
+    const latestKalshiMarkets = Array.isArray(marketsData.markets) ? marketsData.markets : [];
+
+    if (!strikeRowsMap.size) {
+      const base = Math.round(coreData.btc_price / 250) * 250;
+      initializeStrikeTable(base);
+    }
+    updateStrikeTable(coreData, latestKalshiMarkets);
+
+    // Check if ATM strike has drifted more than 2 rows from center
+    const currentCenterStrike = Math.round(coreData.btc_price / 250) * 250;
+    const strikeList = Array.from(strikeRowsMap.keys()).sort((a, b) => a - b);
+    const centerIndex = Math.floor(strikeList.length / 2);
+    const currentCenter = strikeList[centerIndex];
+
+    const drift = currentCenterStrike - currentCenter;
+
+    // If drift exceeds 2 steps (±500), shift table one row in that direction
+    if (drift >= 750 || drift <= -750) {
+      const newBase = currentCenter + (drift > 0 ? 250 : -250);
+      initializeStrikeTable(newBase);
+    }
+  } catch (e) {
+    console.error("Error fetching or updating strike table:", e);
+  }
+}
+
+setInterval(fetchAndUpdate, 1000);
+document.addEventListener('DOMContentLoaded', fetchAndUpdate);
+
+// === Market Title Raw Fetch and UI Update (NEW LOGIC) ===
+// Global raw data holder for market title
+window.CurrentMarketTitleRaw = "";
+
+// Fetch the raw market title from backend
+async function fetchMarketTitleRaw() {
+  try {
+    const res = await fetch('/market_title');
+    const data = await res.json();
+    window.CurrentMarketTitleRaw = data.title || "";
+  } catch (e) {
+    window.CurrentMarketTitleRaw = "";
+    console.error("Error fetching market title:", e);
+  }
+}
+
+// Update the strike panel market title display with formatting
+function updateStrikePanelMarketTitle() {
+  const cell = document.getElementById('strikePanelMarketTitleCell');
+  if (!cell || !window.CurrentMarketTitleRaw) return;
+
+  const timeMatch = window.CurrentMarketTitleRaw.match(/at\s(.*)\?/i);
+  const timeStr = timeMatch ? timeMatch[1] : "";
+  cell.textContent = `Bitcoin price today at ${timeStr}?`;
+  cell.style.color = "white";
+}
+
+// Initial calls and interval
+fetchMarketTitleRaw();
+updateStrikePanelMarketTitle();
+setInterval(fetchMarketTitleRaw, 5000);
+setInterval(updateStrikePanelMarketTitle, 5000);
+
+// TTC clock for strike panel right cell
+async function fetchTTCSeconds() {
+  try {
+    const res = await fetch('/core');
+    const data = await res.json();
+    return data.ttc_seconds;
+  } catch {
+    return null;
+  }
+}
+
+function formatTTC(seconds) {
+  if (seconds === null || seconds === undefined || isNaN(seconds)) {
+    return '--:--';
+  }
+  const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+  const s = String(seconds % 60).padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+async function updateStrikePanelTTC() {
+  const ttcEl = document.getElementById('strikePanelTTC');
+  if (!ttcEl) return;
+
+  let seconds = await fetchTTCSeconds();
+  console.log("TTC raw seconds:", seconds);
+  if (seconds === null) {
+    // fallback: count down to next hour
+    const now = new Date();
+    const nextHour = new Date(now);
+    nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+    seconds = Math.floor((nextHour - now) / 1000);
+  }
+
+  ttcEl.textContent = formatTTC(seconds);
+
+  // Reset styles
+  ttcEl.style.backgroundColor = '';
+  ttcEl.style.color = '';
+  ttcEl.style.borderRadius = '';
+  ttcEl.style.padding = '';
+
+  if (seconds >= 0 && seconds <= 180) {
+    // Red background (0:00 to 3:00)
+    ttcEl.style.backgroundColor = '#d2372b';
+    ttcEl.style.color = '#fff';
+    ttcEl.style.borderRadius = '6px';
+    ttcEl.style.padding = '0 10px';
+  } else if (seconds > 180 && seconds <= 300) {
+    // Yellow background (3:00 to 5:00)
+    ttcEl.style.backgroundColor = '#ffc107';
+    ttcEl.style.color = '#fff';
+    ttcEl.style.borderRadius = '6px';
+    ttcEl.style.padding = '0 10px';
+  } else if (seconds > 300 && seconds <= 720) {
+    // Green background (5:00 to 12:00)
+    ttcEl.style.backgroundColor = '#45d34a';
+    ttcEl.style.color = '#fff';
+    ttcEl.style.borderRadius = '6px';
+    ttcEl.style.padding = '0 10px';
+  } else if (seconds > 720 && seconds <= 900) {
+    // Yellow background (12:00 to 15:00)
+    ttcEl.style.backgroundColor = '#ffc107';
+    ttcEl.style.color = '#fff';
+    ttcEl.style.borderRadius = '6px';
+    ttcEl.style.padding = '0 10px';
+  }
+}
+
+setInterval(updateStrikePanelTTC, 1000);
+updateStrikePanelTTC();
+
+
+</script>
+
+</div>
+
+    <div class="column" id="col3">
+      <div class="panel-container" id="buildTrade" style="min-height: 300px; padding: 10px;">
+        <div style="font-weight: bold; margin-bottom: 6px; font-size: 0.9rem;">Position Size</div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <input type="number" id="position-size" min="1" value="100" style="width: 80px; padding: 6px; font-size: 1rem; border-radius: 4px; border: 1px solid #ccc;" />
+          <div>
+            <button class="multiplier-btn active" data-multiplier="1">1x</button>
+            <button class="multiplier-btn" data-multiplier="2">2x</button>
+            <button class="multiplier-btn" data-multiplier="3">3x</button>
+          </div>
+        </div>
+        <div id="position-display" style="font-size: 0.85rem; font-weight: normal; color: #ccc;">100 contracts</div>
+      </div>
+</body>
+<script>
+// === Position Size and Multiplier Buttons ===
+(() => {
+  const positionInput = document.getElementById('position-size');
+  const positionDisplay = document.getElementById('position-display');
+  const multiplierButtons = document.querySelectorAll('.multiplier-btn');
+  let currentMultiplier = 1;
+
+  function updatePositionDisplay() {
+    const baseValue = parseInt(positionInput.value, 10) || 0;
+    const total = baseValue * currentMultiplier;
+    positionDisplay.textContent = `${total} contracts`;
+  }
+
+  positionInput.addEventListener('input', updatePositionDisplay);
+
+  multiplierButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      multiplierButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentMultiplier = parseInt(btn.dataset.multiplier, 10) || 1;
+      updatePositionDisplay();
+    });
+  });
+
+  updatePositionDisplay();
+})();
+</script>
+      <!-- Active Trades Panel (injected as per instructions) -->
+      <div class="panel-container" style="min-height: 300px;" id="activeTradesPanel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-left: 8px; padding-right: 8px;">
+          <div style="font-size: 12px; font-weight: bold; opacity: 0.7;">Active Trades</div>
+          <label style="font-size: 12px; user-select: none; color: white; display: flex; align-items: center; gap: 6px;">
+            AUTO STOP
+            <input type="checkbox" id="autoStopToggle" />
+          </label>
+        </div>
+        <table id="activeTradesTable" class="panel-table" style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th>Strike</th>
+              <th>Side</th>
+              <th>Buy</th>
+              <th>Pos</th>
+              <th>Buffer</th>
+              <th>B/M</th>
+              <th style="text-align: center;">Close</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <!-- Recent Trades Panel -->
+      <div class="panel-container" style="min-height: 100px;" id="recentTradesPanel">
+        <div style="font-size: 12px; font-weight: bold; opacity: 0.7; padding-left: 8px; padding-bottom: 8px;">Recent Trades</div>
+        <table id="recentTradesTable" class="panel-table" style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Contract</th>
+              <th>Strike</th>
+              <th>Side</th>
+              <th>Buy</th>
+              <th>Sell</th>
+              <th>Pos</th>
+              <th>Closed</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+   
+  
+  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+  <script type="text/javascript">
+    new TradingView.widget({
+      "width": "100%",
+      "height": "300",
+      "symbol": "COINBASE:BTCUSD",
+      "interval": "1",
+      "timezone": "Etc/UTC",
+      "theme": "dark",
+      "style": "1",
+      "locale": "en",
+      "toolbar_bg": "#f1f3f6",
+      "scalesProperties.textColor": "#FFFFFF",
+      "backgroundColor": "#1e2733",
+      "enable_publishing": false,
+      "hide_top_toolbar": true,
+      "hide_legend": true,
+      "save_image": false,
+      "disabled_features": ["volume_force_overlay", "create_volume_indicator_by_default"],
+      "studies": [],
+      "container_id": "tradingview_12345"
+    });
+  </script>
+
+  <script>
+    window.momentumData = {
+      deltas: {
+        '1m': null,
+        '2m': null,
+        '3m': null,
+        '4m': null,
+        '15m': null,
+        '30m': null,
+      },
+      weightedScore: null,
+    };
+
+    function formatNumber(val, addPercent) {
+      if (val === null || val === undefined || isNaN(val)) return '—';
+      const prefix = val >= 0 ? '+' : '';
+      return prefix + (val * 100).toFixed(0) + (addPercent ? '%' : '');
+    }
+
+    // Global variable to store momentum_delta for use elsewhere
+    window.momentum_delta = 0;
+
+    function updateMomentumPanel() {
+      const { deltas, weightedScore } = window.momentumData;
+
+      // Ensure rollingScores array exists
+      if (!window.momentumData.rollingScores) {
+        window.momentumData.rollingScores = [];
+      }
+
+      const momentumScoreEl = document.getElementById('momentum-score-value');
+      if (momentumScoreEl) {
+        momentumScoreEl.textContent = formatNumber(weightedScore, false);
+      }
+
+      // After updating the display, append weightedScore to rollingScores and trim to 40
+      if (typeof weightedScore === "number" && !isNaN(weightedScore)) {
+        window.momentumData.rollingScores.push(weightedScore);
+        if (window.momentumData.rollingScores.length > 40) {
+          window.momentumData.rollingScores = window.momentumData.rollingScores.slice(-40);
+        }
+      }
+
+      // --- Calculate momentum_delta using "momentum of momentum" (second derivative) method ---
+      // Maintain a longer history for delta calculation
+      if (!window.momentumData.momentumScoreHistory) {
+        window.momentumData.momentumScoreHistory = [];
+      }
+      if (typeof weightedScore === "number" && !isNaN(weightedScore)) {
+        window.momentumData.momentumScoreHistory.push(weightedScore);
+        // Keep at most 120 points
+        if (window.momentumData.momentumScoreHistory.length > 120) {
+          window.momentumData.momentumScoreHistory = window.momentumData.momentumScoreHistory.slice(-120);
+        }
+      }
+      const momentumScoreHistory = window.momentumData.momentumScoreHistory;
+      const len = momentumScoreHistory.length;
+      let momentum_delta = 0;
+      if (len >= 60) {
+        const now = momentumScoreHistory[len - 1];
+        const mid = momentumScoreHistory[len - 30];
+        const prev = momentumScoreHistory[len - 60];
+        const d1 = now - mid;
+        const d2 = mid - prev;
+        momentum_delta = d1 - d2;
+
+        // Debug logging for momentum score history and delta calculation
+        console.log("Momentum Score Debug:", {
+          now,
+          mid,
+          prev,
+          d1,
+          d2,
+          momentum_delta
+        });
+      }
+      window.momentum_delta = momentum_delta;
+      // --- End momentum_delta calculation ---
+
+      // Update the momentum delta indicator (icon + delta number)
+      const indicator = document.getElementById("momentum-delta-indicator");
+      if (indicator) {
+        let roundedDelta = momentum_delta.toFixed(5);
+        if (momentum_delta > 5) {
+          indicator.textContent = `🔺 ${roundedDelta}`;
+          indicator.style.color = "lime";
+        } else if (momentum_delta < -5) {
+          indicator.textContent = `🔻 ${roundedDelta}`;
+          indicator.style.color = "red";
+        } else {
+          indicator.textContent = `➖ ${roundedDelta}`;
+          indicator.style.color = "gray";
+        }
+      }
+
+      Object.entries(deltas).forEach(([key, val]) => {
+        const el = document.getElementById(`delta-${key}`);
+        if (el) el.textContent = formatNumber(val, false);
+      });
+
+      renderMomentumBarChart(deltas);
+      drawRollingMomentumChart();
+    }
+
+    // Chart.js-based momentum bar chart (flicker-free: update data in place)
+    let momentumBarChart = null;
+    function renderMomentumBarChart(deltas) {
+      const ctx = document.getElementById('momentumBarChartCanvas').getContext('2d');
+      const keys = ['4m', '3m', '2m', '1m'];
+      const values = keys.map(k => deltas[k] * 100);
+      const bgColors = values.map(v => v >= 0 ? 'rgba(40,167,69,0.7)' : 'rgba(220,53,69,0.7)');
+
+      if (!momentumBarChart) {
+        // Initial render
+        momentumBarChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: keys,
+            datasets: [{
+              data: values,
+              backgroundColor: bgColors,
+            }]
+          },
+          options: {
+            responsive: true,
+            animation: false,
+            scales: {
+              y: {
+                min: -50,
+                max: 50,
+                ticks: { color: '#fff' },
+                grid: { color: '#444' }
+              },
+              x: {
+                ticks: { color: '#fff' },
+                grid: { color: '#444' }
+              }
+            },
+            plugins: { legend: { display: false } }
+          }
+        });
+      } else {
+        // Just update the data
+        momentumBarChart.data.datasets[0].data = values;
+        momentumBarChart.data.datasets[0].backgroundColor = bgColors;
+        momentumBarChart.update();
+      }
+    }
+
+    function fetchCore() {
+      fetch('/core')
+        .then(response => response.json())
+        .then(data => {
+          window.momentumData.deltas['1m'] = data.delta_1m;
+          window.momentumData.deltas['2m'] = data.delta_2m;
+          window.momentumData.deltas['3m'] = data.delta_3m;
+          window.momentumData.deltas['4m'] = data.delta_4m;
+          window.momentumData.deltas['15m'] = data.delta_15m;
+          window.momentumData.deltas['30m'] = data.delta_30m;
+
+          window.momentumData.weightedScore = (
+            window.momentumData.deltas['1m'] * 0.3 +
+            window.momentumData.deltas['2m'] * 0.25 +
+            window.momentumData.deltas['3m'] * 0.2 +
+            window.momentumData.deltas['4m'] * 0.15 +
+            window.momentumData.deltas['15m'] * 0.05 +
+            window.momentumData.deltas['30m'] * 0.05
+          );
+
+          updateMomentumPanel();
+        })
+        .catch(console.error);
+    }
+
+    fetchCore();
+    setInterval(fetchCore, 1000);
+
+    // Draw rolling momentum chart in the third table
+    function drawRollingMomentumChart() {
+      const canvas = document.getElementById('rolling-momentum-chart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+
+      // Margins/layout
+      const margin = { top: 20, right: 20, bottom: 40, left: 40 };
+      const chartWidth = width - margin.left - margin.right;
+      const chartHeight = height - margin.top - margin.bottom;
+
+      // Draw vertical axis line at 40px from the left
+      ctx.strokeStyle = '#aaa';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(margin.left, margin.top);
+      ctx.lineTo(margin.left, height - margin.bottom);
+      ctx.stroke();
+
+      // Y-axis scale: -50 (bottom) to 50 (top)
+      const yMin = -50;
+      const yMax = 50;
+      function yForValue(v) {
+        // Map v in [yMin, yMax] to [chartHeight+margin.top, margin.top]
+        const y = margin.top + ((yMax - v) / (yMax - yMin)) * chartHeight;
+        return y;
+      }
+
+      // Draw tick marks and labels for -50, -25, 0, 25, 50 (vertical axis)
+      ctx.font = '11px monospace';
+      ctx.fillStyle = '#ccc';
+      ctx.textAlign = 'right';
+      const ticks = [-50, -25, 0, 25, 50];
+      ticks.forEach(tick => {
+        const y = yForValue(tick);
+        // Draw tick mark
+        ctx.strokeStyle = '#aaa';
+        ctx.beginPath();
+        ctx.moveTo(margin.left - 8, y);
+        ctx.lineTo(margin.left, y);
+        ctx.stroke();
+        // Draw label
+        ctx.fillText(tick.toString(), margin.left - 12, y + 4);
+      });
+
+      // Draw horizontal zero line
+      const zeroY = yForValue(0);
+      ctx.strokeStyle = '#888';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(margin.left, zeroY);
+      ctx.lineTo(width - margin.right, zeroY);
+      ctx.stroke();
+
+      // === Draw horizontal axis line, ticks, and labels ===
+      // Axis line near bottom margin
+      const axisY = height - margin.bottom + 5;
+      ctx.strokeStyle = '#aaa';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(margin.left, axisY);
+      ctx.lineTo(width - margin.right, axisY);
+      ctx.stroke();
+
+      // Decide number of ticks based on chart width: about 5-6
+      const approxTicks = Math.max(5, Math.min(6, Math.round(chartWidth / 60)));
+      const nTicks = approxTicks;
+      // For minute labels, use 0 to (nTicks-1)
+      ctx.font = '11px monospace';
+      ctx.fillStyle = '#ccc';
+      ctx.textAlign = 'center';
+      const tickHeight = 5;
+      const labelOffset = 15;
+      const labels = ['4m', '3m', '2m', '1m', '0m'];
+      for (let i = 0; i < nTicks; ++i) {
+        const x = margin.left + (i * chartWidth) / (nTicks - 1);
+        // Draw tick mark
+        ctx.strokeStyle = '#aaa';
+        ctx.beginPath();
+        ctx.moveTo(x, axisY);
+        ctx.lineTo(x, axisY + tickHeight);
+        ctx.stroke();
+        // Draw label with custom time labels
+        const label = labels[i] || '';
+        ctx.fillText(label, x, axisY + tickHeight + 25);
+      }
+
+      // === End horizontal axis and ticks ===
+
+      // Plot the momentum score points scaled accordingly
+      // Use history from window.momentumData.rollingScores or fallback to last 40 weightedScore values
+      let points = [];
+      if (window.momentumData.rollingScores && Array.isArray(window.momentumData.rollingScores)) {
+        points = window.momentumData.rollingScores.slice(-40);
+      } else if (typeof window.momentumData.weightedScore === 'number') {
+        points = Array(40).fill(window.momentumData.weightedScore);
+      }
+      // Multiply all points by 100 for display in -50..50 range
+      points = points.map(v => (v === null || v === undefined || isNaN(v) ? null : v * 100));
+      // Do NOT reverse the points array; keep natural order (oldest to newest, left to right).
+      // If not enough points, pad with nulls
+      if (points.length < 2) {
+        // Not enough data to plot
+        return;
+      }
+      // X scale
+      const n = points.length;
+      const xStep = n > 1 ? chartWidth / (n - 1) : 0;
+      // Helper to get point at index i (returns {x, y})
+      function getPoint(i) {
+        const v = points[i];
+        return {
+          x: margin.left + i * xStep,
+          y: yForValue(v)
+        };
+      }
+      // Smoothing factor (0.2-0.4 is typical)
+      const smooth = 0.2;
+      // Find valid indices (skip nulls/NaNs)
+      let validIndices = [];
+      for (let i = 0; i < n; ++i) {
+        const v = points[i];
+        if (v !== null && v !== undefined && !isNaN(v)) {
+          validIndices.push(i);
+        }
+      }
+      if (validIndices.length < 2) return;
+
+      // Helper: map a value in [-40, 40] to a color gradient (red for negative, green for positive)
+      function colorForValue(val) {
+        // Clamp value to [-40, 40]
+        val = Math.max(-40, Math.min(40, val));
+        // Map negative: -40 (deep red) to 0 (light red)
+        // Map positive: 0 (light green) to 40 (deep green)
+        if (val < 0) {
+          // Red: from #ffb3b3 (light) to #dc3545 (deep)
+          // Interpolate between (255,179,179) and (220,53,69)
+          const t = (val + 40) / 40; // 0 at -40, 1 at 0
+          const r = Math.round(220 * (1 - t) + 255 * t);
+          const g = Math.round(53 * (1 - t) + 179 * t);
+          const b = Math.round(69 * (1 - t) + 179 * t);
+          return `rgb(${r},${g},${b})`;
+        } else {
+          // Green: from #b3ffb3 (light) to #28a745 (deep)
+          // Interpolate between (179,255,179) and (40,167,69)
+          const t = val / 40; // 0 at 0, 1 at 40
+          const r = Math.round(179 * (1 - t) + 40 * t);
+          const g = Math.round(255 * (1 - t) + 167 * t);
+          const b = Math.round(179 * (1 - t) + 69 * t);
+          return `rgb(${r},${g},${b})`;
+        }
+      }
+
+      // Draw smooth line using cubic Bézier curves, segment by segment with color
+      for (let j = 1; j < validIndices.length; ++j) {
+        const i0 = validIndices[j - 1];
+        const i1 = validIndices[j];
+        const v0 = points[i0];
+        const v1 = points[i1];
+        // Compute average value for color mapping
+        const avgVal = (v0 + v1) / 2;
+        ctx.strokeStyle = colorForValue(avgVal);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const p0 = getPoint(i0);
+        const p1 = getPoint(i1);
+        // Previous/next indices for control points
+        const iPrev = validIndices[j - 2] !== undefined ? validIndices[j - 2] : i0;
+        const iNext = validIndices[j + 1] !== undefined ? validIndices[j + 1] : i1;
+        const pPrev = getPoint(iPrev);
+        const pNext = getPoint(iNext);
+        // Calculate control points
+        // cp1: from p0 toward pNext
+        const dx1 = (p1.x - pPrev.x) * smooth;
+        const dy1 = (p1.y - pPrev.y) * smooth;
+        const cp1x = p0.x + dx1;
+        const cp1y = p0.y + dy1;
+        // cp2: from p1 back toward pPrev
+        const dx2 = (pNext.x - p0.x) * -smooth;
+        const dy2 = (pNext.y - p0.y) * -smooth;
+        const cp2x = p1.x + dx2;
+        const cp2y = p1.y + dy2;
+        ctx.moveTo(p0.x, p0.y);
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p1.x, p1.y);
+        ctx.stroke();
+      }
+      // Optionally: draw points as small circles
+      // ctx.fillStyle = '#fff';
+      // for (let i = 0; i < n; ++i) {
+      //   const v = points[i];
+      //   if (v === null || v === undefined || isNaN(v)) continue;
+      //   const x = margin.left + i * xStep;
+      //   const y = yForValue(v);
+      //   ctx.beginPath();
+      //   ctx.arc(x, y, 2, 0, 2 * Math.PI);
+      //   ctx.fill();
+      // }
+    }
+  </script>
+  <script>
+
+    // Helper function to format numbers as $XX,XXX.XX
+    function formatUSD(val) {
+      if (typeof val !== "number" || isNaN(val)) return "—";
+      return "$" + val.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
+    // Helper: decorate change cell with color and triangle
+    function decorateChange(el, val) {
+      const num = parseFloat(val);
+      if (isNaN(num)) {
+        el.textContent = "—";
+        el.style.backgroundColor = "";
+        el.style.color = "";
+        return;
+      }
+      const triangle = num >= 0 ? " ▲" : " ▼";
+      el.textContent = `${Math.abs(num).toFixed(2)}%${triangle}`;
+      el.style.color = "#fff";
+      el.style.backgroundColor = num >= 0 ? "#28a745" : "#dc3545";
+      el.style.padding = "2px 6px";
+      el.style.borderRadius = "4px";
+      el.style.display = "inline-block";
+    }
+
+    // Fetch BTC price changes from backend API and update ticker panel
+    async function fetchBTCPriceChanges() {
+      try {
+        const res = await fetch('/btc_price_changes');
+        if (!res.ok) throw new Error('Failed to fetch BTC price changes');
+        const data = await res.json();
+        if ('change_1h' in data) {
+          const el = document.getElementById('change-1h');
+          if (el) decorateChange(el, data.change_1h);
+        }
+        if ('change_3h' in data) {
+          const el = document.getElementById('change-3h');
+          if (el) decorateChange(el, data.change_3h);
+        }
+        if ('change_1d' in data) {
+          const el = document.getElementById('change-1d');
+          if (el) decorateChange(el, data.change_1d);
+        }
+      } catch (error) {
+        console.error('Error fetching BTC price changes:', error);
+      }
+    }
+
+
+    // === Momentum Chart (Chart.js) ===
+    let momentumChart = null;
+    let momentumHistory = [];
+    function renderMomentumChart(history) {
+      const ctx = document.getElementById('rolling-momentum-chart').getContext('2d');
+      const color = history.length < 2 || history[history.length - 1] >= history[history.length - 2] ? '#00cc00' : '#cc0000';
+      if (!momentumChart) {
+        momentumChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: history.map(() => ''),
+            datasets: [{
+              label: '',
+              data: history,
+              borderColor: color,
+              borderWidth: 1,
+              pointRadius: 0,
+              tension: 0.3,
+              fill: false
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { display: false },
+              y: {
+                min: -50,
+                max: 50,
+                ticks: { stepSize: 25, color: '#ccc' },
+                grid: { color: '#444' }
+              }
+            }
+          }
+        });
+      } else {
+        momentumChart.data.labels = history.map(() => '');
+        momentumChart.data.datasets[0].data = history;
+        momentumChart.data.datasets[0].borderColor = color;
+        momentumChart.update();
+      }
+    }
+
+
+    // === Momentum Chart Duplicate (Chart.js) ===
+    let momentumChartDuplicate = null;
+    function renderMomentumChartDuplicate(history) {
+      const ctx = document.getElementById('momentumChartDuplicate').getContext('2d');
+      if (!momentumChartDuplicate) {
+        momentumChartDuplicate = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: history.map(() => ''),
+            datasets: [{
+              label: 'Momentum Duplicate',
+              data: history,
+              borderColor: '#cc0000',
+              borderWidth: 1,
+              pointRadius: 0,
+              tension: 0.3,
+              fill: false
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { display: true, ticks: { color: '#ccc' }, grid: { display: false } },
+              y: {
+                min: -50,
+                max: 50,
+                ticks: { stepSize: 25, color: '#ccc' },
+                grid: { color: '#444' }
+              }
+            }
+          }
+        });
+      } else {
+        momentumChartDuplicate.data.labels = history.map(() => '');
+        momentumChartDuplicate.data.datasets[0].data = history;
+        momentumChartDuplicate.update();
+      }
+    }
+
+    // === Volatility Score History, Moving Average, Delta Globals ===
+    window.volScoreHistory = [];
+    window.volScoreMovingAvg = 0;
+    window.volScoreDelta = 0;
+
+    function fetchOtherCoreData() {
+      fetch('/core')
+        .then(response => response.json())
+        .then(data => {
+          // BTC price
+          if ('btc_price' in data) {
+            const price = Number(data.btc_price);
+            const el = document.getElementById('btc-price-value');
+            if (el) el.textContent = formatUSD(price);
+          }
+          // Volatility Score/Spike (format to 2 decimals)
+          let prevMovingAvg = window.volScoreMovingAvg || 0;
+          if ('volScore' in data) {
+            const score = Number(data.volScore);
+            const el = document.getElementById('volScore');
+            if (el && !isNaN(score)) {
+              el.textContent = score.toFixed(2);
+              // --- Update volIndicator light color based on score, with conditional animation ---
+              const volLight = document.getElementById("volLight");
+              if (volLight) {
+                if (score < 60) {
+                  volLight.style.background = "radial-gradient(circle at 30% 30%, #00cc00, #006600)";
+                  volLight.style.boxShadow = "0 0 4px #00cc00";
+                } else if (score < 80) {
+                  volLight.style.background = "radial-gradient(circle at 30% 30%, #cccc00, #999900)";
+                  volLight.style.boxShadow = "0 0 4px #cccc00";
+                } else {
+                  volLight.style.background = "radial-gradient(circle at 30% 30%, red, #222c3c)";
+                  volLight.style.boxShadow = "0 0 10px #cc0000";
+                }
+              }
+            }
+            // --- Volatility Score History, Moving Average, Delta ---
+            window.volScoreHistory.push(score);
+            if (window.volScoreHistory.length > 30) {
+              window.volScoreHistory = window.volScoreHistory.slice(-30);
+            }
+            // Moving average over last 10 points
+            let ma = 0;
+            if (window.volScoreHistory.length > 0) {
+              const last10 = window.volScoreHistory.slice(-10);
+              ma = last10.reduce((a,b) => a + b, 0) / last10.length;
+            }
+            // Delta: current MA - previous MA
+            let prev10 = window.volScoreHistory.length > 10
+              ? window.volScoreHistory.slice(-11, -1)
+              : [];
+            let prevMa = prev10.length > 0
+              ? prev10.reduce((a,b) => a + b, 0) / prev10.length
+              : ma; // fallback to current MA if not enough history
+            let delta = ma - prevMa;
+            window.volScoreMovingAvg = ma;
+            window.volScoreDelta = delta;
+            // Update spans in UI
+            const maEl = document.getElementById('volMovingAvg');
+            if (maEl) maEl.textContent = ma.toFixed(2);
+            const deltaEl = document.getElementById('volDelta');
+            if (deltaEl) deltaEl.textContent = delta.toFixed(2);
+          }
+          // Store volatility score in coreData for other consumers
+          if (typeof window.coreData !== "object") window.coreData = {};
+          window.coreData.volatility_score = data.volScore;
+          if ('volSpike' in data) {
+            const volSpike = Number(data.volSpike);
+            const el = document.getElementById('volSpike');
+            if (el && typeof volSpike === 'number' && !isNaN(volSpike)) {
+              el.textContent = volSpike.toFixed(2);
+            }
+          }
+        })
+        .catch(error => {
+          console.error('Live core fetch error:', error);
+        });
+    }
+
+    fetchOtherCoreData();
+    setInterval(fetchOtherCoreData, 1000);
+    fetchBTCPriceChanges();
+    setInterval(fetchBTCPriceChanges, 1000);
+  </script>
+
+<script>
+  const container = document.getElementById('container');
+  const col1 = document.getElementById('col1');
+  const col2 = document.getElementById('col2');
+  const col3 = document.getElementById('col3');
+</script>
+
+</script>
+
+<script>
+  // Listen for change events on the ticker-picker select and update ticker-display cell
+  document.addEventListener('DOMContentLoaded', function() {
+    const tickerSelect = document.getElementById('ticker-picker');
+    const tickerDisplay = document.getElementById('ticker-display');
+    if (tickerSelect && tickerDisplay) {
+      // Set initial display to selected value
+      tickerDisplay.textContent = tickerSelect.value;
+      tickerSelect.addEventListener('change', function() {
+        tickerDisplay.textContent = tickerSelect.value;
+      });
+    }
+  });
+</script>
+</div>
+  <!-- Inserted checkExpiredTrades script block before closing body tag -->
+  <script>
+  function checkExpiredTrades() {
+    setInterval(() => {
+      const now = new Date();
+      const mm = now.getMinutes();
+      const ss = now.getSeconds();
+      if (mm === 59 && ss === 59) {
+        console.log("Triggering closeExpiredTrades at 59:59");
+        closeExpiredTrades();
+      } else if (mm === 0 && (ss === 0 || ss === 1)) {
+        console.log(`Triggering closeExpiredTrades backup at 00:${ss.toString().padStart(2, '0')}`);
+        closeExpiredTrades();
+      }
+    }, 1000);
+  }
+
+  window.addEventListener('load', checkExpiredTrades);
+  </script>
+</body>
+<script>
+// === Active Trades Panel and Trade Execution ===
+const activeTradesTableBody = document.querySelector('#activeTradesTable tbody');
+const recentTradesTableBody = document.querySelector('#recentTradesTable tbody');
+
+function formatDateTime(isoString) {
+  const date = new Date(isoString);
+  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return [date.toLocaleDateString(), time];
+}
+
+// Utility function to get selected symbol from ticker panel
+function getSelectedSymbol() {
+  const tickerSelect = document.getElementById('ticker-picker');
+  if (tickerSelect) {
+    return tickerSelect.value;
+  }
+  return "";
+}
+
+// Utility function to get truncated market title, e.g., "BTC 11am"
+function getTruncatedMarketTitle() {
+  if (window.CurrentMarketTitleRaw && typeof window.CurrentMarketTitleRaw === "string") {
+    const contractMatch = window.CurrentMarketTitleRaw.match(/at\s(.+?)\s*(?:EDT|EST|PDT|PST)?\?/i);
+    if (contractMatch) {
+      return `BTC ${contractMatch[1].trim()}`;
+    } else {
+      return window.CurrentMarketTitleRaw;
+    }
+  }
+  return 'BTC Unknown';
+}
+
+// Utility function to get current BTC ticker price from the UI
+function getCurrentBTCTickerPrice() {
+  const el = document.getElementById('btc-price-value');
+  if (el && el.textContent) {
+    // Remove $ and commas, parse as float
+    const val = parseFloat(el.textContent.replace(/\$|,/g, ''));
+    return isNaN(val) ? "" : val;
+  }
+  return "";
+}
+
+// Utility function to get current momentum score from the panel
+function getCurrentMomentumScore() {
+  const el = document.getElementById('momentum-score-value');
+  if (el && el.textContent) {
+    const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
+    return isNaN(val) ? "" : val;
+  }
+  return "";
+}
+
+async function showPopup(strike, side, price) {
+  // Play open trade sound at the top
+  const openSound = document.getElementById('openTradeSound');
+  if (openSound) {
+    openSound.volume = 0.1;
+    openSound.play().catch(e => console.warn("Sound play blocked:", e));
+  }
+  showTradeOpenedPopup();
+  const now = new Date();
+  // Compose tradeData as per spec
+  // Extract selectedStrike, selectedSide, selectedAskPrice, selectedPosition, currentBTCTickerPrice, currentMomentumScore
+  const selectedStrike = strike;
+  const selectedSide = side;
+  const selectedAskPrice = price;
+  // Read position size from UI controls
+  const basePosition = parseInt(document.getElementById('position-size').value, 10);
+  const multiplierBtn = document.querySelector('.multiplier-btn.active');
+  const multiplier = multiplierBtn ? parseInt(multiplierBtn.dataset.multiplier, 10) : 1;
+  const selectedPosition = (basePosition > 0 ? basePosition : 100) * (multiplier > 0 ? multiplier : 1);
+  const currentBTCTickerPrice = getCurrentBTCTickerPrice();
+  const currentMomentumScore = getCurrentMomentumScore();
+
+  // Find market_id (ticker) as before
+  let marketId = "";
+  try {
+    // Find the strike table row matching the strike value
+    const strikeTableRows = document.querySelectorAll('#strike-table tbody tr');
+    for (const row of strikeTableRows) {
+      const tds = row.querySelectorAll('td');
+      if (tds.length < 7) continue;
+      // Strike cell
+      const strikeCell = tds[0];
+      // Remove $ and commas for numeric comparison
+      const strikeCellVal = parseFloat(String(strikeCell.textContent).replace(/\$|,/g, ''));
+      if (strikeCellVal !== parseFloat(selectedStrike)) continue;
+      // YES = 6th cell (td[5]), NO = 7th cell (td[6])
+      let cellIdx = selectedSide.toLowerCase() === 'yes' ? 5 : 6;
+      const marketCell = tds[cellIdx];
+      // get data-market-id attribute (set in updateYesNoButton)
+      if (marketCell && marketCell.hasAttribute('data-market-id')) {
+        marketId = marketCell.getAttribute('data-market-id');
+        break;
+      }
+    }
+  } catch (e) {
+    marketId = "";
+  }
+
+  // Ensure all required fields are present in the payload
+  // {
+  //   status, date, time, symbol, market, trade_strategy, contract,
+  //   strike, side, market_id, buy_price, position,
+  //   symbol_open, momentum, momentum_delta, volatility, volatility_delta
+  // }
+  // Use sensible defaults for missing values
+  const payload = {
+    status: "open",
+    date: now.toISOString().split("T")[0],
+    time: now.toTimeString().split(" ")[0],
+    symbol: getSelectedSymbol(),
+    market: "Kalshi",
+    trade_strategy: "Hourly HTC",
+    contract: getTruncatedMarketTitle(),
+    strike: selectedStrike,
+    side: selectedSide,
+    market_id: marketId || "",
+    // Ensure buy_price is sent as decimal (e.g., 0.98 for 98)
+    buy_price: Number(selectedAskPrice) / 100,
+    position: selectedPosition,
+    symbol_open: currentBTCTickerPrice,
+    momentum: currentMomentumScore,
+    momentum_delta: null,
+    volatility: coreData?.volatility_score != null ? parseFloat(coreData.volatility_score.toFixed(2)) : null,
+    volatility_delta: null
+  };
+
+  // Debug: log the open trade payload
+  console.log("Open trade payload:", payload);
+
+  try {
+    const res = await fetch('/trades', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('Failed to add trade');
+    await fetchAndRenderTrades();
+    // (Sound already played at top)
+  } catch (err) {
+    alert('Error adding trade: ' + err.message);
+  }
+}
+
+
+// === Flicker-free Active Trades Table with persistent rows and in-place updates ===
+const activeTradesRowsMap = new Map();
+const previousClosePrices = {}; // Keyed by trade.id
+
+async function fetchAndRenderTrades() {
+  try {
+    // Fetch open trades
+    const tradesRes = await fetch('/trades?status=open');
+    if (!tradesRes.ok) throw new Error("Failed to fetch trades");
+    const trades = await tradesRes.json();
+    // Sort trades by strike ascending before rendering
+    trades.sort((a, b) => {
+      const strikeA = parseFloat(String(a.strike).replace(/\$|,/g, '')) || 0;
+      const strikeB = parseFloat(String(b.strike).replace(/\$|,/g, '')) || 0;
+      return strikeA - strikeB;
+    });
+
+    // Fetch core data and markets snapshot concurrently
+    const [coreRes, marketsRes] = await Promise.all([
+      fetch('/core'),
+      fetch('/kalshi_market_snapshot')
+    ]);
+    if (!coreRes.ok || !marketsRes.ok) throw new Error("Failed to fetch core or markets data");
+    const coreData = await coreRes.json();
+    const marketsData = await marketsRes.json();
+    const latestKalshiMarkets = Array.isArray(marketsData.markets) ? marketsData.markets : [];
+
+    const ttcSeconds = coreData.ttc_seconds || 1;
+    const ttcMinutes = ttcSeconds / 60;
+
+    // --- SORT active trades by strike ascending before rendering ---
+    trades.sort((a, b) => {
+      const strikeA = parseFloat(String(a.strike).replace(/\$|,/g, '')) || 0;
+      const strikeB = parseFloat(String(b.strike).replace(/\$|,/g, '')) || 0;
+      return strikeA - strikeB;
+    });
+
+    // Build a map of trade.id to trade for quick lookup
+    const tradeIdSet = new Set(trades.map(trade => trade.id));
+
+    // Remove rows for trades that no longer exist
+    for (const [tradeId, rowObj] of activeTradesRowsMap.entries()) {
+      if (!tradeIdSet.has(tradeId)) {
+        if (rowObj.tr && rowObj.tr.parentNode === activeTradesTableBody) {
+          activeTradesTableBody.removeChild(rowObj.tr);
+        }
+        activeTradesRowsMap.delete(tradeId);
+        delete previousClosePrices[tradeId];
+      }
+    }
+
+    // For each trade, either update or create row
+    trades.forEach(trade => {
+      const strikeNum = parseFloat(String(trade.strike).replace(/\$|,/g, '')) || 0;
+      // Directional buffer logic: positive = favorable, negative = at risk, based on side
+      const isYes = (trade.side || "").toLowerCase() === "yes";
+      const rawBuffer = isYes
+        ? coreData.btc_price - strikeNum
+        : strikeNum - coreData.btc_price;
+      const buffer = rawBuffer;
+      const absBuffer = Math.abs(buffer);
+      // Use absBuffer for risk coloring and display
+      const bpm = absBuffer / ttcMinutes;
+      const bufferDisplay = absBuffer.toLocaleString(undefined, {maximumFractionDigits: 0});
+      const bmDisplay = Math.round(bpm).toLocaleString();
+
+      // Assign row class based on absBuffer value (risk coloring)
+      let rowClass = '';
+      if (absBuffer >= 300) rowClass = 'ultra-safe';
+      else if (absBuffer >= 200) rowClass = 'safe';
+      else if (absBuffer >= 100) rowClass = 'caution';
+      else if (absBuffer >= 50) rowClass = 'high-risk';
+      else rowClass = 'danger-stop';
+
+      // "Close" button logic: get the current ask price for the opposite side from the strike table
+      const oppositeSide = (trade.side && trade.side.toLowerCase() === 'yes') ? 'no' : 'yes';
+      const strikeFormatted = '$' + strikeNum.toLocaleString();
+      let closeButtonSpan = null;
+      const strikeTableRows = document.querySelectorAll('#strike-table tbody tr');
+      for (const row of strikeTableRows) {
+        const firstTd = row.querySelector('td');
+        if (!firstTd) continue;
+        const firstTdText = firstTd.textContent.trim();
+        if (firstTdText === strikeFormatted) {
+          let cellIdx = oppositeSide === 'yes' ? 5 : 6;
+          const tds = row.querySelectorAll('td');
+          if (tds.length > cellIdx) {
+            const span = tds[cellIdx].querySelector('span.price-box, span.price-box.disabled');
+            if (span) closeButtonSpan = span;
+          }
+          break;
+        }
+      }
+      let askPrice = parseFloat(closeButtonSpan?.textContent || 'NaN');
+      let isActive = closeButtonSpan && !closeButtonSpan.classList.contains('disabled');
+
+      // Get or create row/cells
+      let rowObj = activeTradesRowsMap.get(trade.id);
+      if (!rowObj) {
+        // Build static row and insert in sorted strike order
+        const tr = document.createElement('tr');
+        tr.className = rowClass;
+        // Static cells
+        const strikeTd = document.createElement('td');
+        strikeTd.textContent = trade.strike;
+        const sideTd = document.createElement('td');
+        sideTd.textContent = trade.side;
+        const priceTd = document.createElement('td');
+        // Format buy_price as decimal (show as-is with 2 decimals)
+        priceTd.textContent = trade.buy_price.toFixed(2);
+        const posTd = document.createElement('td');
+        posTd.textContent = trade.position;
+        // Dynamic cells
+        const bufferTd = document.createElement('td');
+        bufferTd.textContent = bufferDisplay;
+        const bmTd = document.createElement('td');
+        bmTd.textContent = bmDisplay;
+        // "Close" cell
+        const closeTd = document.createElement('td');
+        closeTd.className = 'center';
+        // Render Close button if available
+        if (closeButtonSpan) {
+          const clonedSpan = closeButtonSpan.cloneNode(true);
+          clonedSpan.classList.remove('disabled');
+          clonedSpan.style.opacity = '';
+          clonedSpan.style.pointerEvents = '';
+          clonedSpan.style.cursor = 'pointer';
+          clonedSpan.dataset.tradeId = trade.id;
+          clonedSpan.dataset.action = 'close';
+          closeTd.appendChild(clonedSpan);
+          previousClosePrices[trade.id] = askPrice;
+        } else {
+          closeTd.textContent = 'N/A';
+          previousClosePrices[trade.id] = null;
+        }
+        // Append all cells
+        tr.appendChild(strikeTd);
+        tr.appendChild(sideTd);
+        tr.appendChild(priceTd);
+        tr.appendChild(posTd);
+        tr.appendChild(bufferTd);
+        tr.appendChild(bmTd);
+        tr.appendChild(closeTd);
+        // --- Insert in sorted strike order ---
+        const newStrike = parseFloat(String(trade.strike).replace(/\$|,/g, '')) || 0;
+        let inserted = false;
+        for (const existingRow of activeTradesTableBody.children) {
+          const existingStrike = parseFloat(existingRow.children[0].textContent.replace(/\$|,/g, '')) || 0;
+          if (newStrike < existingStrike) {
+            activeTradesTableBody.insertBefore(tr, existingRow);
+            inserted = true;
+            break;
+          }
+        }
+        if (!inserted) activeTradesTableBody.appendChild(tr);
+        // Save references for dynamic update
+        rowObj = {
+          tr, strikeTd, sideTd, priceTd, posTd, bufferTd, bmTd, closeTd
+        };
+        activeTradesRowsMap.set(trade.id, rowObj);
+      } else {
+        // Update row class if needed
+        if (rowObj.tr.className !== rowClass) rowObj.tr.className = rowClass;
+        // Only update static cells if changed (optional, but not needed)
+      }
+      // Always update Buffer and B/M dynamically
+      if (rowObj.bufferTd.textContent !== bufferDisplay) rowObj.bufferTd.textContent = bufferDisplay;
+      if (rowObj.bmTd.textContent !== bmDisplay) rowObj.bmTd.textContent = bmDisplay;
+      // Update "Close" button only if askPrice has changed
+      const prevAsk = previousClosePrices[trade.id];
+      if (closeButtonSpan) {
+        if (prevAsk !== askPrice) {
+          // Remove previous children
+          rowObj.closeTd.innerHTML = '';
+          const clonedSpan = closeButtonSpan.cloneNode(true);
+          clonedSpan.classList.remove('disabled');
+          clonedSpan.style.opacity = '';
+          clonedSpan.style.pointerEvents = '';
+          clonedSpan.style.cursor = 'pointer';
+          clonedSpan.dataset.tradeId = trade.id;
+          clonedSpan.dataset.action = 'close';
+          rowObj.closeTd.appendChild(clonedSpan);
+          previousClosePrices[trade.id] = askPrice;
+        }
+        // else: do nothing, keep button stable
+      } else {
+        if (prevAsk !== null) {
+          rowObj.closeTd.textContent = 'N/A';
+          previousClosePrices[trade.id] = null;
+        }
+      }
+      // Ensure row is in the DOM (append if not present)
+      if (!rowObj.tr.parentNode) {
+        // Insert in sorted order if not present (should be rare)
+        const newStrike = parseFloat(String(trade.strike).replace(/\$|,/g, '')) || 0;
+        let inserted = false;
+        for (const existingRow of activeTradesTableBody.children) {
+          const existingStrike = parseFloat(existingRow.children[0].textContent.replace(/\$|,/g, '')) || 0;
+          if (newStrike < existingStrike) {
+            activeTradesTableBody.insertBefore(rowObj.tr, existingRow);
+            inserted = true;
+            break;
+          }
+        }
+        if (!inserted) activeTradesTableBody.appendChild(rowObj.tr);
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching trades:', err);
+  }
+}
+
+// New async function to close trade by id with current time and BTC price, using sellPrice
+async function closeTradeById(tradeId, sellPrice) {
+  // Play close trade sound at the top
+  const closeSound = document.getElementById('closeTradeSound');
+  if (closeSound) {
+    closeSound.volume = 0.5;
+    closeSound.play().catch(e => console.warn("Sound play blocked:", e));
+  }
+  showTradeClosedPopup();
+  try {
+    // Get current BTC ticker price from the UI
+    const btcPriceEl = document.getElementById('btc-price-value');
+    let currentSymbolPrice = null;
+    if (btcPriceEl && btcPriceEl.textContent) {
+      currentSymbolPrice = parseFloat(btcPriceEl.textContent.replace(/\$|,/g, ''));
+    }
+    // If not found in DOM, fallback to /core
+    if (currentSymbolPrice === null || isNaN(currentSymbolPrice)) {
+      try {
+        const coreRes = await fetch('/core');
+        const coreData = await coreRes.json();
+        currentSymbolPrice = coreData.btc_price;
+      } catch {}
+    }
+
+    // Format closed_at as "HH:mm:ss" in US Eastern Time
+    const closedAt = new Date();
+    const closedAtTime = closedAt.toLocaleTimeString('en-US', {
+      timeZone: 'America/New_York',
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+
+    // Compose payload for /trades/{id} endpoint, include status: "closed"
+    const payload = {
+      status: "closed",
+      sell_price: sellPrice,
+      symbol_close: currentSymbolPrice,
+      closed_at: closedAtTime
+    };
+
+    const res = await fetch(`/trades/${tradeId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('Failed to close trade');
+    await fetchAndRenderTrades();
+    await fetchAndRenderRecentTrades();
+    // (Sound already played at top)
+  } catch (err) {
+    alert('Error closing trade: ' + err.message);
+  }
+}
+
+// === Recent Trades Panel ===
+async function fetchAndRenderRecentTrades() {
+  try {
+    // Fetch all closed trades
+    const res = await fetch('/trades?status=closed');
+    if (!res.ok) throw new Error("Failed to fetch recent trades");
+    const trades = await res.json();
+    console.log("Recent trades response:", trades);
+    // Show the 5 most recently closed trades in descending order by closed_at
+    const recentFive = trades
+      .filter(trade => trade.closed_at)
+      .sort((a, b) => new Date(b.closed_at) - new Date(a.closed_at))
+      .slice(0, 5);
+    recentTradesTableBody.innerHTML = '';
+    recentFive.forEach(trade => {
+      // Show raw time field from the database for Time column
+      let timeCell = trade.time || '—';
+      // Raw closed time cell display
+      let closedCell = trade.closed_at || '—';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${timeCell}</td>
+        <td>${trade.contract || ''}</td>
+        <td>${trade.strike}</td>
+        <td>${trade.side}</td>
+        <td>${trade.buy_price.toFixed(2)}</td>
+        <td>${trade.sell_price !== undefined && trade.sell_price !== null ? (trade.sell_price).toFixed(2) : '—'}</td>
+        <td>${trade.position}</td>
+        <td>${closedCell}</td>
+      `;
+      recentTradesTableBody.appendChild(tr);
+    });
+  } catch (err) {
+    console.error('Error fetching recent trades:', err);
+  }
+}
+
+// === New function: Close all expired trades (set status to closed and closed_at to current time in NY) ===
+async function closeExpiredTrades() {
+  try {
+    // Fetch all open trades
+    const res = await fetch('/trades?status=open');
+    if (!res.ok) throw new Error("Failed to fetch open trades");
+    const openTrades = await res.json();
+
+    // Get current BTC ticker price from DOM element
+    const currentPriceEl = document.getElementById('btc-price-value');
+    const currentSymbolPrice = currentPriceEl ? parseFloat(currentPriceEl.textContent.replace(/\$|,/g, '')) : null;
+
+    // Loop over each trade and send a close request
+    for (const trade of openTrades) {
+      const strike = parseFloat(String(trade.strike).replace(/\$|,/g, '')) || 0;
+      const isYes = (trade.side || "").toLowerCase() === "yes";
+      const didWin = isYes ? currentSymbolPrice > strike : currentSymbolPrice < strike;
+
+      const payload = {
+        status: "closed",
+        closed_at: new Date().toLocaleTimeString('en-US', {
+          timeZone: 'America/New_York',
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        }),
+        symbol_close: currentSymbolPrice,
+        sell_price: didWin ? 1.00 : 0.00
+      };
+
+      const updateRes = await fetch(`/trades/${trade.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!updateRes.ok) {
+        console.error(`Failed to close trade ${trade.id}`);
+      }
+    }
+
+    await fetchAndRenderTrades();
+    await fetchAndRenderRecentTrades();
+  } catch (err) {
+    console.error("Error in closeExpiredTrades:", err);
+  }
+}
+
+async function closeTrade(tradeId) {
+  try {
+    const res = await fetch(`/trades/${tradeId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'closed' })
+    });
+    if (!res.ok) throw new Error('Failed to close trade');
+    await fetchAndRenderTrades();
+  } catch (err) {
+    alert("Error closing trade: " + err.message);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  fetchAndRenderTrades();
+  setInterval(fetchAndRenderTrades, 1000);
+  fetchAndRenderRecentTrades();
+  setInterval(fetchAndRenderRecentTrades, 1000);
+});
+
+// --- Debounce mechanism for close trade clicks ---
+const lastCloseClickTimes = {};
+const DEBOUNCE_DELAY_MS = 300;
+
+// --- Delegated event handler for closing trades ---
+activeTradesTableBody.addEventListener('click', (event) => {
+  const target = event.target;
+  if (target.classList.contains('price-box') && target.dataset.action === 'close') {
+    const tradeId = target.dataset.tradeId;
+    if (!tradeId) return;
+
+    const now = Date.now();
+    if (lastCloseClickTimes[tradeId] && now - lastCloseClickTimes[tradeId] < DEBOUNCE_DELAY_MS) {
+      return;
+    }
+    lastCloseClickTimes[tradeId] = now;
+
+    // Manual close: use ask value shown on the Close button
+    const closeButton = target;
+    const askText = closeButton.textContent.trim();
+    const askNum = parseFloat(askText);
+    let calculatedSellPrice = null;
+    if (!isNaN(askNum)) {
+      calculatedSellPrice = 1.0 - (askNum / 100);
+    }
+    if (calculatedSellPrice === null) {
+      alert('Invalid ASK price for closing trade');
+      return;
+    }
+    closeTradeById(tradeId, calculatedSellPrice);
+  }
+});
+
+</script>
+<script>
+  function showTradeOpenedPopup() {
+    const popup = document.getElementById('tradePopup');
+    if (!popup) return;
+
+    popup.style.transition = 'none';
+    popup.style.display = 'block';
+    popup.style.opacity = '1';
+
+    setTimeout(() => {
+      popup.style.transition = 'opacity 0.5s ease';
+      popup.style.opacity = '0';
+      setTimeout(() => {
+        popup.style.display = 'none';
+      }, 500);
+    }, 2000);
+  }
+
+  function showTradeClosedPopup() {
+    const popup = document.getElementById('tradeClosedPopup');
+    if (!popup) return;
+
+    popup.style.transition = 'none';
+    popup.style.display = 'block';
+    popup.style.opacity = '1';
+
+    setTimeout(() => {
+      popup.style.transition = 'opacity 0.5s ease';
+      popup.style.opacity = '0';
+      setTimeout(() => {
+        popup.style.display = 'none';
+      }, 500);
+    }, 2000);
+  }
+</script>
+  <script>
+    // Load, persist, and sync AUTO STOP checkbox state with backend and localStorage
+    const autoStopToggle = document.getElementById('autoStopToggle');
+    if (autoStopToggle) {
+      // Initialize checkbox state from backend first
+      fetch(window.location.origin + '/api/get_auto_stop')
+        .then(res => res.json())
+        .then(data => {
+          if (typeof data.enabled === 'boolean') {
+            autoStopToggle.checked = data.enabled;
+            window.autoStopEnabled = data.enabled;
+            localStorage.setItem('autoStopEnabled', data.enabled);
+          }
+        })
+        .catch(() => {
+          // fallback to localStorage or default true
+          const savedState = localStorage.getItem('autoStopEnabled');
+          autoStopToggle.checked = savedState === null ? true : savedState === 'true';
+          window.autoStopEnabled = autoStopToggle.checked;
+        });
+
+      // Save state changes and update backend
+      autoStopToggle.addEventListener('change', () => {
+        const value = autoStopToggle.checked;
+        localStorage.setItem('autoStopEnabled', value);
+        window.autoStopEnabled = value;
+        fetch(window.location.origin + '/api/set_auto_stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: value })
+        });
+      });
+
+      // Poll backend for updates every second
+      setInterval(async () => {
+        try {
+          const res = await fetch(window.location.origin + '/api/get_auto_stop');
+          const data = await res.json();
+          const backendValue = data.enabled;
+          if (typeof backendValue === 'boolean' && backendValue !== window.autoStopEnabled) {
+            window.autoStopEnabled = backendValue;
+            autoStopToggle.checked = backendValue;
+            localStorage.setItem('autoStopEnabled', backendValue);
+          }
+        } catch (e) {
+          console.error("Failed to fetch auto stop state", e);
+        }
+      }, 1000);
+    } else {
+      window.autoStopEnabled = true; // default enabled if element not found
+    }
+  </script>
+</script>
+
+  <!-- Trade Open/Closed Popups -->
+  <div id="tradePopup" class="trade-popup">Trade Opened</div>
+  <div id="tradeClosedPopup" class="trade-closed-popup">Trade Closed</div>
+</html>
+
+<!-- Preload audio for trade open/close confirmations -->
+<audio id="openTradeSound" preload="auto">
+  <source src="/audio/sfx/open_trade_confirmation.wav" type="audio/wav">
+</audio>
+<audio id="closeTradeSound" preload="auto">
+  <source src="/audio/sfx/close_trade_confirmation.wav" type="audio/wav">
+</audio>
+</style>
+<style>
+@keyframes pulseGlow {
+  0%   { box-shadow: 0 0 4px #00cc00; }
+  50%  { box-shadow: 0 0 8px #00ff00; }
+  100% { box-shadow: 0 0 4px #00cc00; }
+}

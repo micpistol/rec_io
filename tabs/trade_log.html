@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trade Log</title>
+  <link rel="stylesheet" href="/styles/global.css" />
+  <style>
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 6px 10px;
+      text-align: center;
+    }
+    th {
+      background-color: #323c4e;
+      font-weight: bold;
+    }
+    tbody tr:nth-child(even) {
+      //background-color: #323c4e;
+    }
+    caption {
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="panel-container">
+    <div class="panel-header">All Trades</div>
+    <table id="trade-log-table" aria-label="Trade Log Table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Status</th>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Symbol</th>
+          <th>Strategy</th>
+          <th>Contract</th>
+          <th>Strike</th>
+          <th>Side</th>
+          <th>Buy</th>
+          <th>Sell</th>
+          <th>Position</th>
+          <th>Closed At</th>
+          <th>Symbol Open</th>
+          <th>Symbol Close</th>
+          <th>Momentum</th>
+          <th>Volatility</th>
+          <th>W/L</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    async function fetchAllTrades() {
+      console.log('Fetching trades at', new Date().toLocaleTimeString());
+      try {
+        const res = await fetch('/trades', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Network response was not ok');
+        const trades = await res.json();
+        renderTrades(trades);
+      } catch (error) {
+        const tbody = document.querySelector('#trade-log-table tbody');
+        tbody.innerHTML = `<tr><td colspan="19" style="color:red;">Failed to load trades: ${error.message}</td></tr>`;
+      }
+    }
+
+    function renderTrades(trades) {
+      const tbody = document.querySelector('#trade-log-table tbody');
+      tbody.innerHTML = '';
+      if (!Array.isArray(trades) || trades.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="19">No trades found.</td></tr>';
+        return;
+      }
+
+      let lastContract = null;
+      for (const trade of trades) {
+        const isNewGroup = trade.contract !== lastContract;
+        lastContract = trade.contract;
+        const tr = document.createElement('tr');
+        tr.style.borderTop = isNewGroup ? '2px solid #666' : '';
+        tr.innerHTML = `
+          <td>${trade.id !== null ? trade.id : ''}</td>
+          <td>${trade.status !== null ? trade.status : ''}</td>
+          <td>${trade.date !== null ? trade.date : ''}</td>
+          <td>${trade.time !== null ? trade.time : ''}</td>
+          <td>${trade.symbol !== null ? trade.symbol : ''}</td>
+          <td>${trade.trade_strategy !== null ? trade.trade_strategy : ''}</td>
+          <td>${trade.contract !== null ? trade.contract : ''}</td>
+          <td>${trade.strike !== null ? trade.strike : ''}</td>
+          <td>${trade.side === 'Yes' || trade.side === 'Y' ? 'Y' : trade.side === 'No' || trade.side === 'N' ? 'N' : ''}</td>
+          <td>${trade.buy_price !== null ? Number(trade.buy_price).toFixed(2) : ''}</td>
+          <td>${trade.sell_price !== null ? Number(trade.sell_price).toFixed(2) : ''}</td>
+          <td>${trade.position !== null ? trade.position : ''}</td>
+          <td>${trade.closed_at !== null ? trade.closed_at : ''}</td>
+          <td>${trade.symbol_open !== null ? '$' + Math.round(trade.symbol_open).toLocaleString() : ''}</td>
+          <td>${trade.symbol_close !== null ? '$' + Math.round(trade.symbol_close).toLocaleString() : ''}</td>
+          <td>${trade.momentum !== null ? trade.momentum : ''}</td>
+          <td>${trade.volatility !== null ? Number(trade.volatility).toFixed(2) : ''}</td>
+          <td>${trade.win_loss !== null ? trade.win_loss : ''}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchAllTrades();
+      setInterval(fetchAllTrades, 1000);
+    });
+  </script>
+</body>
+</html>
