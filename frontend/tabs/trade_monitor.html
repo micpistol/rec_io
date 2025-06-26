@@ -472,7 +472,7 @@ function openTrade(strike, side, event) {
   setTimeout(() => playSound('open'), 0);
 
   // ✅ TODO: Add UI popup
-  // showTradeOpenedPopup();
+  showTradeOpenedPopup();
 
   // 📤 TODO: Send trade order (API placeholder)
   // sendTradeOrder({ strike, side });
@@ -498,7 +498,7 @@ function closeTrade(tradeId, sellPrice, event) {
   // }
 
   // ✅ TODO: Add UI popup
-  // showTradeClosedPopup();
+  showTradeClosedPopup();
 
   // 📤 TODO: Send close order (API placeholder)
   // sendCloseTrade({ tradeId, sellPrice });
@@ -2037,25 +2037,6 @@ async function closeExpiredTrades() {
   }
 }
 
-async function closeTrade(tradeId) {
-  // Play close‑trade confirmation sound
-  playSound('close');
-
-  // --- All other functionality (DB writes, UI updates, API calls) is temporarily disabled ---
-  /*
-  try {
-    const res = await fetch(`/trades/${tradeId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'closed' })
-    });
-    if (!res.ok) throw new Error('Failed to close trade');
-    await fetchAndRenderTrades();
-  } catch (err) {
-    alert("Error closing trade: " + err.message);
-  }
-  */
-}
 
 document.addEventListener('DOMContentLoaded', () => {
   fetchAndRenderTrades();
