@@ -509,7 +509,7 @@ function openTrade(strike, side, event) {
         contract,
         // Format strike as currency string
         strike: `$${Number(strike).toLocaleString()}`,
-        side: side.toUpperCase().startsWith('Y') ? 'Y' : 'N',
+        side: side.toUpperCase() === 'YES' ? 'Y' : 'N',
         market_id,
         buy_price,
         position,
@@ -1828,7 +1828,7 @@ async function fetchAndRenderTrades() {
     trades.forEach(trade => {
       const strikeNum = parseFloat(String(trade.strike).replace(/\$|,/g, '')) || 0;
       // Directional buffer logic: positive = favorable, negative = at risk, based on side
-      const isYes = (trade.side || "").toLowerCase() === "yes";
+      const isYes = (trade.side || "").toUpperCase() === "Y";
       const rawBuffer = isYes
         ? coreData.btc_price - strikeNum
         : strikeNum - coreData.btc_price;
@@ -1848,7 +1848,7 @@ async function fetchAndRenderTrades() {
       else rowClass = 'danger-stop';
 
       // "Close" button logic: get the current ask price for the opposite side from the strike table
-      const oppositeSide = (trade.side && trade.side.toLowerCase() === 'yes') ? 'no' : 'yes';
+      const oppositeSide = (trade.side && trade.side.toUpperCase() === 'Y') ? 'NO' : 'YES';
       const strikeFormatted = '$' + strikeNum.toLocaleString();
       let closeButtonSpan = null;
       const strikeTableRows = document.querySelectorAll('#strike-table tbody tr');
@@ -1857,7 +1857,7 @@ async function fetchAndRenderTrades() {
         if (!firstTd) continue;
         const firstTdText = firstTd.textContent.trim();
         if (firstTdText === strikeFormatted) {
-          let cellIdx = oppositeSide === 'yes' ? 5 : 6;
+          let cellIdx = oppositeSide === 'YES' ? 5 : 6;
           const tds = row.querySelectorAll('td');
           if (tds.length > cellIdx) {
             const span = tds[cellIdx].querySelector('span.price-box, span.price-box.disabled');
@@ -2071,8 +2071,9 @@ async function closeExpiredTrades() {
     // Loop over each trade and send a close request
     for (const trade of openTrades) {
       const strike = parseFloat(String(trade.strike).replace(/\$|,/g, '')) || 0;
-      const isYes = (trade.side || "").toLowerCase() === "yes";
-      const didWin = isYes ? currentSymbolPrice > strike : currentSymbolPrice < strike;
+      const isYes = (trade.side || "").toUpperCase() === "Y";
+      // Use inclusive logic for win condition at expiration
+      const didWin = isYes ? currentSymbolPrice >= strike : currentSymbolPrice <= strike;
 
       const payload = {
         status: "closed",
