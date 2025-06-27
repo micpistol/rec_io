@@ -391,7 +391,7 @@
             <div style="font-size: 12px; font-weight: bold; opacity: 0.7; align: top;">Momentum</div>
             <div style="display: flex; justify-content: flex-end; align-items: center; gap: 6px; padding-right: 8px;">
               <div id="momentum-score-value" style="font-size: 25px; font-weight: bold; color: white;">—</div>
-              <div id="momentum-delta-indicator" style="font-size: 22px; color: gray;">➖ 0</div>
+              <!-- momentum delta indicator removed -->
             </div>
           </div>
           <div style="display: flex; gap: 10px;">
@@ -802,7 +802,7 @@ async function fetchAndUpdate() {
   }
 }
 
-setInterval(fetchAndUpdate, 1000);
+// setInterval(fetchAndUpdate, 1000); // Replaced by staggered polling below
 document.addEventListener('DOMContentLoaded', fetchAndUpdate);
 
 // === Market Title Raw Fetch and UI Update (NEW LOGIC) ===
@@ -1082,45 +1082,7 @@ updateStrikePanelTTC();
           window.momentumData.momentumScoreHistory = window.momentumData.momentumScoreHistory.slice(-120);
         }
       }
-      const momentumScoreHistory = window.momentumData.momentumScoreHistory;
-      const len = momentumScoreHistory.length;
-      let momentum_delta = 0;
-      if (len >= 60) {
-        const now = momentumScoreHistory[len - 1];
-        const mid = momentumScoreHistory[len - 30];
-        const prev = momentumScoreHistory[len - 60];
-        const d1 = now - mid;
-        const d2 = mid - prev;
-        momentum_delta = d1 - d2;
-
-        // Debug logging for momentum score history and delta calculation
-        console.log("Momentum Score Debug:", {
-          now,
-          mid,
-          prev,
-          d1,
-          d2,
-          momentum_delta
-        });
-      }
-      window.momentum_delta = momentum_delta;
-      // --- End momentum_delta calculation ---
-
-      // Update the momentum delta indicator (icon + delta number)
-      const indicator = document.getElementById("momentum-delta-indicator");
-      if (indicator) {
-        let roundedDelta = momentum_delta.toFixed(5);
-        if (momentum_delta > 5) {
-          indicator.textContent = `🔺 ${roundedDelta}`;
-          indicator.style.color = "lime";
-        } else if (momentum_delta < -5) {
-          indicator.textContent = `🔻 ${roundedDelta}`;
-          indicator.style.color = "red";
-        } else {
-          indicator.textContent = `➖ ${roundedDelta}`;
-          indicator.style.color = "gray";
-        }
-      }
+      // momentum_delta and indicator display removed from UI
 
       Object.entries(deltas).forEach(([key, val]) => {
         const el = document.getElementById(`delta-${key}`);
@@ -1202,7 +1164,7 @@ updateStrikePanelTTC();
     }
 
     fetchCore();
-    setInterval(fetchCore, 1000);
+    // setInterval(fetchCore, 1000); // Replaced by staggered polling below
 
     // Draw rolling momentum chart in the third table
     function drawRollingMomentumChart() {
@@ -1625,9 +1587,9 @@ updateStrikePanelTTC();
     }
 
     fetchOtherCoreData();
-    setInterval(fetchOtherCoreData, 1000);
+    // setInterval(fetchOtherCoreData, 1000); // Replaced by staggered polling below
     fetchBTCPriceChanges();
-    setInterval(fetchBTCPriceChanges, 1000);
+    // setInterval(fetchBTCPriceChanges, 1000); // Replaced by staggered polling below
   </script>
 
 <script>
@@ -2109,12 +2071,12 @@ async function closeExpiredTrades() {
 
 document.addEventListener('DOMContentLoaded', () => {
   fetchAndRenderTrades();
-  setInterval(fetchAndRenderTrades, 1000);
+  // setInterval(fetchAndRenderTrades, 1000); // Replaced by staggered polling below
   fetchAndRenderRecentTrades();
-  setInterval(fetchAndRenderRecentTrades, 1000);
+  // setInterval(fetchAndRenderRecentTrades, 1000); // Replaced by staggered polling below
   // Ensure Active Trades panel is refreshed in sync with main loop
   updateActiveTrades();
-  setInterval(updateActiveTrades, 1000);
+  // setInterval(updateActiveTrades, 1000); // Replaced by staggered polling below
 });
 
 // Function to refresh the Active Trades panel using up-to-date API data
@@ -2264,3 +2226,20 @@ activeTradesTableBody.addEventListener('click', (event) => {
   50%  { box-shadow: 0 0 8px #00ff00; }
   100% { box-shadow: 0 0 4px #00cc00; }
 }
+
+// === Staggered polling loops for main panels ===
+// Polling refresh loops - staggered to avoid main thread congestion
+function fetchAndRenderStrikeTable() {
+  fetchAndUpdate();
+}
+function fetchAndRenderActiveTrades() {
+  fetchAndRenderTrades();
+}
+function fetchVolatilityAndMomentum() {
+  fetchOtherCoreData();
+  fetchCore();
+  fetchBTCPriceChanges();
+}
+setInterval(fetchAndRenderStrikeTable, 1250);        // Strike panel
+setInterval(fetchAndRenderActiveTrades, 1350);       // Active trades table
+setInterval(fetchVolatilityAndMomentum, 1450);       // Volatility/momentum panels
