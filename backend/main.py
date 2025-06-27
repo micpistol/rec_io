@@ -1,11 +1,13 @@
 from fastapi import FastAPI
 from fastapi import Request
+from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import json
+import asyncio
 from datetime import datetime, timedelta
 import pytz
 import requests
@@ -19,6 +21,10 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "api", "coinbase-api", "coinba
 
 
 app = FastAPI()
+
+
+# Global set of connected websocket clients for preferences
+connected_clients = set()
 
 
 # Global auto_stop state
@@ -594,6 +600,7 @@ async def set_auto_stop(request: Request):
     auto_stop_state["enabled"] = bool(data.get("enabled", True))
     preferences["auto_stop"] = auto_stop_state["enabled"]
     save_preferences(preferences)
+    await broadcast_preferences_update()
     return {"status": "ok"}
 
 # Add set_position_size and set_multiplier routes
@@ -603,6 +610,7 @@ async def set_position_size(request: Request):
     try:
         preferences["position_size"] = int(data.get("position_size", 100))
         save_preferences(preferences)
+        await broadcast_preferences_update()
     except Exception as e:
         print(f"[Set Position Size Error] {e}")
     return {"status": "ok"}
@@ -613,6 +621,7 @@ async def set_multiplier(request: Request):
     try:
         preferences["multiplier"] = int(data.get("multiplier", 1))
         save_preferences(preferences)
+        await broadcast_preferences_update()
     except Exception as e:
         print(f"[Set Multiplier Error] {e}")
     return {"status": "ok"}
@@ -735,6 +744,30 @@ def get_fills_db():
         return {"fills": results}
     except Exception as e:
         return {"error": str(e), "fills": []}
+
+
+# WebSocket endpoint for preferences updates
+@app.websocket("/ws/preferences")
+async def websocket_preferences(websocket: WebSocket):
+    await websocket.accept()
+    connected_clients.add(websocket)
+    try:
+        while True:
+            await websocket.receive_text()  # Keep connection alive
+    except WebSocketDisconnect:
+        connected_clients.remove(websocket)
+
+
+# Broadcast helper function for preferences updates
+async def broadcast_preferences_update():
+    data = json.dumps(load_preferences())
+    to_remove = set()
+    for client in connected_clients:
+        try:
+            await client.send_text(data)
+        except Exception:
+            to_remove.add(client)
+    connected_clients.difference_update(to_remove)
 
 if __name__ == "__main__":
     import threading
