@@ -2219,6 +2219,27 @@ activeTradesTableBody.addEventListener('click', (event) => {
   <audio id="closeTradeSound" preload="auto">
     <source src="/audio/sfx/close_trade_confirmation.wav" type="audio/wav">
   </audio>
+  <!-- === Staggered polling loops for main panels === -->
+  <script>
+  // Polling refresh loops – staggered to avoid main thread congestion
+  function fetchAndRenderStrikeTable() {
+    fetchAndUpdate();
+  }
+
+  function fetchAndRenderActiveTrades() {
+    fetchAndRenderTrades();
+  }
+
+  function fetchVolatilityAndMomentum() {
+    fetchOtherCoreData();
+    fetchCore();
+    fetchBTCPriceChanges();
+  }
+
+  setInterval(fetchAndRenderStrikeTable, 1250);   // Strike panel
+  setInterval(fetchAndRenderActiveTrades, 1350);  // Active trades table
+  setInterval(fetchVolatilityAndMomentum, 1450);  // Volatility/momentum panels
+  </script>
 </html>
 <style>
 @keyframes pulseGlow {
