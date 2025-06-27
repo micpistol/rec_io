@@ -458,30 +458,12 @@ def sync_settlements():
     print(f"💾 {new_count} new settlements written to {SETTLEMENTS_DB_PATH}")
 
 
-def main():
-    print("🔁 Kalshi Account Supervisor Starting...")
-    print("✅ Authenticated account access confirmed via balance endpoint.")
+# --- Script startup: sync balance ---
 
-    last_settlement_sync = 0
-    last_balance_sync = 0
+sync_balance()
 
-    while True:
-        try:
-            sync_positions()
-            sync_fills()
+# Keep the connection alive indefinitely
+print("🟢 Handshake established. Holding connection open...")
+while True:
+    time.sleep(1)
 
-            now = time.time()
-            if now - last_settlement_sync > 60:
-                sync_settlements()
-                last_settlement_sync = now
-            if now - last_balance_sync > 60:
-                sync_balance()
-                last_balance_sync = now
-
-            time.sleep(1)
-        except Exception as e:
-            print(f"❌ Error during sync loop: {e}")
-            time.sleep(5)
-
-if __name__ == "__main__":
-    main()

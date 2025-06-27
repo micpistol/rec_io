@@ -581,6 +581,7 @@ async def startup_event():
 
 
 # Set account mode endpoint
+from backend import account_mode
 from fastapi import Request
 
 @app.post("/api/set_account_mode")
@@ -589,8 +590,11 @@ async def set_account_mode(request: Request):
     mode = data.get("mode")
     if mode not in ("prod", "demo"):
         return {"status": "error", "message": "Invalid mode"}
-    account_mode_state["mode"] = mode
-    return {"status": "ok", "mode": mode}
+    try:
+        account_mode.set_account_mode(mode)
+        return {"status": "ok", "mode": mode}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 # Register the auto_stop endpoints so they are always included when the app is loaded
 
