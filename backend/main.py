@@ -15,7 +15,7 @@ from dateutil import parser
 import sqlite3
 
 
-from backend.account_mode import account_mode_state
+from backend.account_mode import get_account_mode
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "api", "coinbase-api", "coinbase-btc", "data", "btc_price_history.db")
 
@@ -665,9 +665,10 @@ async def get_auto_stop():
     return {"enabled": auto_stop_state["enabled"]}
 
 @app.get("/api/account/balance")
-def get_balance():
+def get_balance(request: Request):
     try:
-        with open(f"backend/accounts/kalshi/{account_mode_state['mode']}/account_balance.json") as f:
+        mode = request.query_params.get("mode", "prod")
+        with open(f"backend/accounts/kalshi/{mode}/account_balance.json") as f:
             raw = json.load(f)
             try:
                 cents = int(raw["balance"])
@@ -679,27 +680,41 @@ def get_balance():
         return {"balance": "0.00", "error": str(e)}
 
 @app.get("/api/account/fills")
-def get_fills():
-    with open(f"backend/accounts/kalshi/{account_mode_state['mode']}/fills.json") as f:
+def get_fills(request: Request):
+    mode = request.query_params.get("mode", "prod")
+    with open(f"backend/accounts/kalshi/{mode}/fills.json") as f:
         return json.load(f)
 
 @app.get("/api/account/positions")
-def get_positions():
-    with open(f"backend/accounts/kalshi/{account_mode_state['mode']}/positions.json") as f:
+def get_positions(request: Request):
+    mode = request.query_params.get("mode", "prod")
+    with open(f"backend/accounts/kalshi/{mode}/positions.json") as f:
         return json.load(f)
 
 
 @app.get("/api/account/settlements")
-def get_settlements():
-    with open(f"backend/accounts/kalshi/{account_mode_state['mode']}/settlements.json") as f:
+def get_settlements(request: Request):
+    mode = request.query_params.get("mode", "prod")
+    with open(f"backend/accounts/kalshi/{mode}/settlements.json") as f:
         return json.load(f)
+
+
+# New endpoint: /api/get_account_mode
+@app.get("/api/get_account_mode")
+async def get_account_mode_api():
+    return {"mode": get_account_mode()}
 
 
 # New route: /api/db/settlements
 @app.get("/api/db/settlements")
 def get_settlements_db():
+    # Ensure correct account mode is used to select the DB file
+    from backend.account_mode import get_account_mode
+    account_mode = get_account_mode()
     try:
-        db_path = os.path.join("backend", "accounts", "kalshi", account_mode_state["mode"], "settlements.db")
+
+        db_path = os.path.join("backend", "accounts", "kalshi", get_account_mode(), "settlements.db")
+
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT ticker, market_result, yes_count, no_count, revenue, settled_time FROM settlements ORDER BY settled_time DESC")
@@ -724,7 +739,7 @@ def get_settlements_db():
 @app.get("/api/db/fills")
 def get_fills_db():
     try:
-        db_path = os.path.join("backend", "accounts", "kalshi", account_mode_state["mode"], "fills.db")
+        db_path = os.path.join("backend", "accounts", "kalshi", get_account_mode(), "fills.db")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time FROM fills ORDER BY created_time DESC")
@@ -748,6 +763,32 @@ def get_fills_db():
         return {"fills": results}
     except Exception as e:
         return {"error": str(e), "fills": []}
+
+# New route: /api/db/positions
+@app.get("/api/db/positions")
+def get_positions_db():
+    try:
+        db_path = os.path.join("backend", "accounts", "kalshi", get_account_mode(), "positions.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT ticker, total_traded, position, market_exposure, realized_pnl, fees_paid, last_updated_ts FROM positions ORDER BY last_updated_ts DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        results = [
+            {
+                "ticker": row[0],
+                "total_traded": row[1],
+                "position": row[2],
+                "market_exposure": row[3],
+                "realized_pnl": row[4],
+                "fees_paid": row[5],
+                "last_updated_ts": row[6]
+            }
+            for row in rows
+        ]
+        return {"positions": results}
+    except Exception as e:
+        return {"error": str(e), "positions": []}
 
 
 # WebSocket endpoint for preferences updates

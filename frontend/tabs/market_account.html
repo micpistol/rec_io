@@ -52,7 +52,20 @@
     <div class="panel">
       <div class="panel-header">Open Positions</div>
       <div class="panel-body" style="height: 150px; overflow-y: auto;">
-        <!-- Table or content will go here in the future -->
+        <table class="data-table" style="width: 100%; text-align: center;">
+          <thead>
+            <tr>
+              <th>ticker</th>
+              <th>Buy Price</th>
+              <th>position</th>
+              <th>fees_paid</th>
+              <th>last_updated_ts</th>
+            </tr>
+          </thead>
+          <tbody id="positions-body">
+            <tr><td colspan="6">Loading...</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -61,7 +74,7 @@
   <div class="panel-container">
     <div class="panel">
       <div class="panel-header">Fills</div>
-      <button id="download-csv-btn" style="margin: 12px 0;">Download Fills CSV</button>
+     
       <div class="panel-body" style="height: 300px; overflow-y: auto;">
         <table class="data-table" style="width: 100%; text-align: center;">
           <thead>
@@ -108,25 +121,61 @@
 
 
   <script>
-    let GLOBAL_ACCOUNT_MODE = "prod";  // Default to prod
+    let GLOBAL_ACCOUNT_MODE = "prod";  // Will be updated by backend
+
+    fetch('/api/get_account_mode')
+      .then(res => res.json())
+      .then(data => {
+        GLOBAL_ACCOUNT_MODE = data.mode;
+        window.GLOBAL_ACCOUNT_MODE = GLOBAL_ACCOUNT_MODE;
+
+        const selector = document.getElementById("account-selector");
+        selector.value = GLOBAL_ACCOUNT_MODE === 'prod' ? 'live' : 'demo';
+
+        const statusEl = document.getElementById("account-status");
+        if (GLOBAL_ACCOUNT_MODE === 'prod') {
+          statusEl.textContent = "*** LIVE TRADING ***";
+          statusEl.style.color = "#00ff00";
+          statusEl.style.fontWeight = "bold";
+        } else {
+          statusEl.textContent = "Paper Trading";
+          statusEl.style.color = "orange";
+          statusEl.style.fontWeight = "normal";
+        }
+
+        loadAccountData();
+      })
+      .catch(console.error);
 
     async function loadAccountData() {
-      const [balanceRes, settlementsRes, fillsRes] = await Promise.all([
-        fetch("/api/account/balance"),
+      const [balanceRes, settlementsRes, fillsRes, positionsRes] = await Promise.all([
+        fetch(`/api/account/balance?mode=${GLOBAL_ACCOUNT_MODE}`),
         fetch("/api/db/settlements"),
         fetch("/api/db/fills"),
+        fetch("/api/db/positions"),
       ]);
 
       const balance = await balanceRes.json();
+      const balanceVal = balance.balance ?? balance.total_balance ?? balance.available_balance ?? 0;
       const settlementsJson = await settlementsRes.json();
       const fillsJson = await fillsRes.json();
+      const positionsJson = await positionsRes.json();
 
       const settlements = settlementsJson.settlements;
       const fills = fillsJson.fills;
+      const positions = positionsJson.positions || [];
 
       window.fills = fills;
 
-      document.getElementById("account-balance").textContent = `$${(balance.balance || 0).toLocaleString()}`;
+      document.getElementById("account-balance").textContent = `$${Number(balanceVal).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+      const [prodBalRes, demoBalRes] = await Promise.all([
+        fetch("/api/account/balance?mode=prod"),
+        fetch("/api/account/balance?mode=demo"),
+      ]);
+
+      const prodBalJson = await prodBalRes.json();
+      const demoBalJson = await demoBalRes.json();
 
       const settlementsBody = document.getElementById("settlements-body");
       settlementsBody.innerHTML = settlements.map(s => `
@@ -149,6 +198,17 @@
           <td>${f.count}</td>
           <td>${f.side === "yes" ? f.yes_price : f.no_price}</td>
           <td>${new Date(f.created_time).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
+        </tr>
+      `).join("");
+
+      const positionsBody = document.getElementById("positions-body");
+      positionsBody.innerHTML = positions.map(p => `
+        <tr>
+          <td>${p.ticker}</td>
+          <td>${p.position !== 0 ? `$${(p.total_traded / p.position / 100).toFixed(2)}` : '$0.00'}</td>
+          <td>${p.position}</td>
+          <td>${p.fees_paid}</td>
+          <td>${new Date(p.last_updated_ts).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
         </tr>
       `).join("");
     }
@@ -180,31 +240,7 @@
       .catch(console.error);
     });
 
-    // On page load, restore mode from localStorage and update selector
-    const savedMode = localStorage.getItem('account_mode') || 'prod';
-    const selector = document.getElementById("account-selector");
-    selector.value = savedMode === 'prod' ? 'live' : 'demo';
-    window.GLOBAL_ACCOUNT_MODE = savedMode;
-    const statusEl = document.getElementById("account-status");
-    if (savedMode === 'prod') {
-      statusEl.textContent = "*** LIVE TRADING ***";
-      statusEl.style.color = "#00ff00";
-      statusEl.style.fontWeight = "bold";
-    } else {
-      statusEl.textContent = "Paper Trading";
-      statusEl.style.color = "orange";
-      statusEl.style.fontWeight = "normal";
-    }
-    fetch('/api/set_account_mode', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: savedMode })
-    }).then(() => loadAccountData())
-      .catch(console.error);
-
-    // Trigger on initial load
-    document.getElementById("account-selector").dispatchEvent(new Event("change"));
-
+    // Respect backend-set mode only
     loadAccountData();
     setInterval(loadAccountData, 5000);
 

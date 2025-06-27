@@ -10,9 +10,13 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
 
+# Add: import account_mode
+import backend.account_mode as account_mode
+
 # Usage: python kalshi_historical_ingest.py [prod|demo]
 
-mode = sys.argv[1] if len(sys.argv) > 1 else "prod"
+# mode = sys.argv[1] if len(sys.argv) > 1 else "prod"
+mode = account_mode.get_account_mode()
 CREDENTIALS_DIR = Path(__file__).resolve().parent / "kalshi-credentials" / mode
 ENV_VARS = dotenv_values(CREDENTIALS_DIR / ".env")
 
@@ -151,6 +155,61 @@ def sync_fills():
     else:
         print("⚠️ No fills found, skipping file write.")
 
+    import sqlite3
+    FILLS_DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "fills.db")
+
+    # Ensure data directory exists
+    os.makedirs(os.path.dirname(FILLS_DB_PATH), exist_ok=True)
+
+    with sqlite3.connect(FILLS_DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS fills (
+                trade_id TEXT PRIMARY KEY,
+                ticker TEXT,
+                order_id TEXT,
+                side TEXT,
+                action TEXT,
+                count INTEGER,
+                yes_price REAL,
+                no_price REAL,
+                is_taker BOOLEAN,
+                created_time TEXT,
+                raw_json TEXT
+            )
+        """)
+        # Get all existing trade_ids
+        c.execute("SELECT trade_id FROM fills")
+        existing_ids = set(row[0] for row in c.fetchall())
+        new_count = 0
+        for fill in all_fills:
+            trade_id = fill.get("trade_id")
+            ticker = fill.get("ticker")
+            order_id = fill.get("order_id")
+            side = fill.get("side")
+            action = fill.get("action")
+            count = fill.get("count")
+            yes_price = float(fill.get("yes_price")) / 100 if fill.get("yes_price") is not None else None
+            no_price = float(fill.get("no_price")) / 100 if fill.get("no_price") is not None else None
+            is_taker = fill.get("is_taker")
+            created_time = fill.get("created_time")
+            raw_json = json.dumps(fill)
+
+            if trade_id in existing_ids:
+                continue
+
+            try:
+                c.execute("""
+                    INSERT OR IGNORE INTO fills
+                    (trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time, raw_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time, raw_json))
+                new_count += 1
+            except Exception as e:
+                print(f"❌ Failed to insert fill {trade_id}: {e}")
+        conn.commit()
+    print(f"💾 {new_count} new fills written to {FILLS_DB_PATH}")
+
 import sqlite3
 
 def write_settlements_to_db():
@@ -274,11 +333,107 @@ def write_fills_to_db():
     conn.close()
     print(f"✅ Fills written to database at {db_path}")
 
+def write_positions_to_db():
+    global mode
+    print("💾 Writing positions to SQLite database...")
+    method = "GET"
+    path = "/portfolio/positions"
+    cursor = ""
+    all_positions = []
+
+    while True:
+        print(f"➡️ Cursor: {cursor}")
+        timestamp = str(int(time.time() * 1000))
+        query = f"?limit=100"
+        if cursor:
+            query += f"&cursor={cursor}"
+        url = f"{BASE_URL}{path}{query}"
+        print(f"🔗 Requesting: {url}")
+
+        full_path_for_signature = f"/trade-api/v2{path}"
+        signature = generate_kalshi_signature(method, full_path_for_signature, timestamp, str(KEY_PATH))
+
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": "KalshiWatcher/1.0",
+            "KALSHI-ACCESS-KEY": KEY_ID,
+            "KALSHI-ACCESS-TIMESTAMP": timestamp,
+            "KALSHI-ACCESS-SIGNATURE": signature,
+        }
+
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            print("🔍 Full response from positions endpoint:", json.dumps(data, indent=2))
+            print("Response keys:", data.keys())
+            if "error" in data:
+                print("⚠️ API error:", data["error"])
+            market_positions = data.get("market_positions", [])
+            event_positions = data.get("event_positions", [])
+            cursor = data.get("cursor")
+            if not cursor:
+                break
+        except Exception as e:
+            print(f"❌ Failed to fetch positions: {e}")
+            return
+
+    positions = market_positions
+    # Save positions JSON to file
+    json_output_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "positions.json")
+    with open(json_output_path, "w") as f:
+        json.dump({"market_positions": market_positions, "event_positions": event_positions}, f, indent=2)
+    print(f"💾 All positions written to {json_output_path}")
+
+    db_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "positions.db")
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    c.execute("DROP TABLE IF EXISTS positions")
+    c.execute("""
+        CREATE TABLE positions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT,
+            total_traded INTEGER,
+            position INTEGER,
+            market_exposure INTEGER,
+            realized_pnl REAL,
+            fees_paid REAL,
+            last_updated_ts TEXT,
+            raw_json TEXT
+        )
+    """)
+
+    for p in positions:
+        try:
+            ticker = p.get("ticker")
+            total_traded = p.get("total_traded")
+            position_value = p.get("position")
+            market_exposure = p.get("market_exposure")
+            realized_pnl = float(p.get("realized_pnl")) / 100 if p.get("realized_pnl") is not None else None
+            fees_paid = float(p.get("fees_paid")) / 100 if p.get("fees_paid") is not None else None
+            last_updated_ts = p.get("last_updated_ts")
+            raw_json = json.dumps(p)
+
+            c.execute("""
+                INSERT INTO positions
+                (ticker, total_traded, position, market_exposure, realized_pnl, fees_paid, last_updated_ts, raw_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (ticker, total_traded, position_value, market_exposure, realized_pnl, fees_paid, last_updated_ts, raw_json))
+        except Exception as e:
+            print(f"❌ Failed to insert position {p.get('ticker')}: {e}")
+
+    conn.commit()
+    conn.close()
+    print(f"✅ Positions written to database at {db_path}")
+
 def main():
     sync_settlements()
     write_settlements_to_db()
     sync_fills()
     write_fills_to_db()
+    write_positions_to_db()
 
 if __name__ == "__main__":
     main()

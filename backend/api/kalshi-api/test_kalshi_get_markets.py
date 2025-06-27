@@ -1,5 +1,10 @@
 from backend.account_mode import get_account_mode
+import uuid
 import os, sys
+
+# --- Flask app for trade triggers ---
+from flask import Flask, request, jsonify
+import threading
 
 print(f"✅ Running in account mode: {get_account_mode()}")
 import requests
@@ -248,28 +253,21 @@ def sync_balance():
 def sync_positions():
     POSITIONS_DB_PATH = f"backend/accounts/kalshi/{get_account_mode()}/positions.db"
     os.makedirs(os.path.dirname(POSITIONS_DB_PATH), exist_ok=True)
-    # Ensure positions table exists with new schema
+    # Ensure positions table exists
     with sqlite3.connect(POSITIONS_DB_PATH) as conn:
         c = conn.cursor()
         c.execute("""
             CREATE TABLE IF NOT EXISTS positions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticker TEXT,
-                total_traded INTEGER,
-                position INTEGER,
-                market_exposure INTEGER,
-                realized_pnl REAL,
-                fees_paid REAL,
-                last_updated_ts TEXT,
-                raw_json TEXT
+                position_id TEXT,
+                data TEXT
             )
         """)
         conn.commit()
     print("⏱ Syncing all positions...")
     method = "GET"
     path = "/portfolio/positions"
-    all_market_positions = []
-    all_event_positions = []
+    all_positions = []
     cursor = ""
 
     while True:
@@ -299,9 +297,7 @@ def sync_positions():
             print("Response keys:", data.keys())
             if "error" in data:
                 print("⚠️ API error:", data["error"])
-            # Use new keys for positions
-            all_market_positions.extend(data.get("market_positions", []))
-            all_event_positions.extend(data.get("event_positions", []))
+            all_positions.extend(data.get("positions", []))
             cursor = data.get("cursor")
             if not cursor:
                 break
@@ -313,35 +309,15 @@ def sync_positions():
     with sqlite3.connect(POSITIONS_DB_PATH) as conn:
         c = conn.cursor()
         c.execute("DELETE FROM positions")
-        for p in all_market_positions:
-            try:
-                ticker = p.get("ticker")
-                total_traded = p.get("total_traded")
-                position_value = p.get("position")
-                market_exposure = p.get("market_exposure")
-                realized_pnl = float(p.get("realized_pnl")) / 100 if p.get("realized_pnl") is not None else None
-                fees_paid = float(p.get("fees_paid")) / 100 if p.get("fees_paid") is not None else None
-                last_updated_ts = p.get("last_updated_ts")
-                raw_json = json.dumps(p)
-
-                c.execute("""
-                    INSERT INTO positions
-                    (ticker, total_traded, position, market_exposure, realized_pnl, fees_paid, last_updated_ts, raw_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (ticker, total_traded, position_value, market_exposure, realized_pnl, fees_paid, last_updated_ts, raw_json))
-            except Exception as e:
-                print(f"❌ Failed to insert position {p.get('ticker')}: {e}")
+        for pos in all_positions:
+            # Use a unique position_id if available, else None
+            pos_id = pos.get("position_id") or pos.get("id") or None
+            c.execute(
+                "INSERT INTO positions (position_id, data) VALUES (?, ?)",
+                (pos_id, json.dumps(pos))
+            )
         conn.commit()
     print(f"💾 All positions written to {POSITIONS_DB_PATH}")
-
-    # Also save market_positions and event_positions to positions.json in the same folder
-    positions_json_path = os.path.join(os.path.dirname(POSITIONS_DB_PATH), "positions.json")
-    try:
-        with open(positions_json_path, "w") as f:
-            json.dump({"market_positions": all_market_positions, "event_positions": all_event_positions}, f, indent=2)
-        print(f"💾 market_positions and event_positions written to {positions_json_path}")
-    except Exception as e:
-        print(f"❌ Failed to write positions.json: {e}")
 
 
 def sync_fills():
@@ -407,29 +383,14 @@ def sync_fills():
         existing_ids = set(row[0] for row in c.fetchall())
         new_count = 0
         for fill in all_fills:
-            trade_id = fill.get("trade_id")
+            trade_id = fill.get("trade_id") or fill.get("id")
             if not trade_id or trade_id in existing_ids:
                 continue
-            ticker = fill.get("ticker")
-            order_id = fill.get("order_id")
-            side = fill.get("side")
-            action = fill.get("action")
-            count = fill.get("count")
-            yes_price = float(fill.get("yes_price")) / 100 if fill.get("yes_price") is not None else None
-            no_price = float(fill.get("no_price")) / 100 if fill.get("no_price") is not None else None
-            is_taker = fill.get("is_taker")
-            created_time = fill.get("created_time")
-            raw_json = json.dumps(fill)
-
-            try:
-                c.execute("""
-                    INSERT OR IGNORE INTO fills
-                    (trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time, raw_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time, raw_json))
-                new_count += 1
-            except Exception as e:
-                print(f"❌ Failed to insert fill {trade_id}: {e}")
+            c.execute(
+                "INSERT OR IGNORE INTO fills (trade_id, data) VALUES (?, ?)",
+                (trade_id, json.dumps(fill))
+            )
+            new_count += 1
         conn.commit()
     print(f"💾 {new_count} new fills written to {FILLS_DB_PATH}")
 
@@ -502,30 +463,37 @@ def sync_settlements():
     print(f"💾 {new_count} new settlements written to {SETTLEMENTS_DB_PATH}")
 
 
-def main():
-    print("🔁 Kalshi Account Supervisor Starting...")
-    print("✅ Authenticated account access confirmed via balance endpoint.")
+# --- Script startup: sync balance ---
 
-    last_settlement_sync = 0
-    last_balance_sync = 0
+sync_balance()
 
-    while True:
-        try:
-            sync_positions()
-            sync_fills()
 
-            now = time.time()
-            if now - last_settlement_sync > 60:
-                sync_settlements()
-                last_settlement_sync = now
-            if now - last_balance_sync > 60:
-                sync_balance()
-                last_balance_sync = now
+# --- Simple get_markets function ---
+def get_markets():
+    method = "GET"
+    path = "/markets"
+    url = f"{get_base_url()}{path}"
+    timestamp = str(int(time.time() * 1000))
 
-            time.sleep(1)
-        except Exception as e:
-            print(f"❌ Error during sync loop: {e}")
-            time.sleep(5)
+    signature = generate_kalshi_signature(method, f"/trade-api/v2{path}", timestamp, str(KEY_PATH))
 
-if __name__ == "__main__":
-    main()
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "KalshiMarketGetter/1.0",
+        "KALSHI-ACCESS-KEY": KEY_ID,
+        "KALSHI-ACCESS-TIMESTAMP": timestamp,
+        "KALSHI-ACCESS-SIGNATURE": signature,
+    }
+
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        print(f"✅ Retrieved {len(data.get('markets', []))} markets:")
+        for m in data.get("markets", []):
+            print(f"- {m.get('ticker')}: YES ask = {m.get('yes_ask')}, NO ask = {m.get('no_ask')}")
+    except Exception as e:
+        print(f"❌ Failed to fetch markets: {e}")
+
+get_markets()
+

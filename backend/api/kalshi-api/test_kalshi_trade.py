@@ -1,5 +1,10 @@
 from backend.account_mode import get_account_mode
+import uuid
 import os, sys
+
+# --- Flask app for trade triggers ---
+from flask import Flask, request, jsonify
+import threading
 
 print(f"✅ Running in account mode: {get_account_mode()}")
 import requests
@@ -461,6 +466,69 @@ def sync_settlements():
 # --- Script startup: sync balance ---
 
 sync_balance()
+
+# Flask app to receive trade trigger requests
+
+app = Flask(__name__)
+
+# --- Market order helper for /trigger_trade ---
+def place_market_order(side, count):
+    method = "POST"
+    path = "/portfolio/orders"
+    url = f"{get_base_url()}{path}"
+    timestamp = str(int(time.time() * 1000))
+
+    payload = {
+        "ticker": "KXBTCD-25JUN2716-T106749.99",
+        "side": side,
+        "type": "market",
+        "count": count,
+        "time_in_force": "fill_or_kill",
+        "action": "buy",
+        "client_order_id": str(uuid.uuid4())
+    }
+
+    signature = generate_kalshi_signature(method, f"/trade-api/v2{path}", timestamp, str(KEY_PATH))
+
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "KalshiTradeExec/1.0",
+        "KALSHI-ACCESS-KEY": KEY_ID,
+        "KALSHI-ACCESS-TIMESTAMP": timestamp,
+        "KALSHI-ACCESS-SIGNATURE": signature,
+        "Content-Type": "application/json"
+    }
+
+    response = requests.post(url, headers=headers, json=payload, timeout=10)
+    if response.status_code >= 400:
+        print("❌ Kalshi error response:", response.text)
+        response.raise_for_status()
+    return response.json()
+
+
+@app.route('/trigger_trade', methods=['POST'])
+def trigger_trade():
+    try:
+        data = request.get_json()
+        side = data.get("side").lower()
+        count = int(data.get("quantity", 1))
+
+        print("📩 Triggering market order:")
+        print(f"📈 Side: {side}")
+        print(f"🔢 Quantity: {count}")
+
+        resp = place_market_order(side, count)
+        print("✅ Kalshi response:", resp)
+        return jsonify({"status": "sent", "kalshi_response": resp}), 200
+    except Exception as e:
+        print(f"❌ Error placing market order: {e}")
+        return jsonify({"error": str(e)}), 500
+
+def run_flask():
+    app.run(host="0.0.0.0", port=5050)
+
+# Start Flask server in a background thread
+threading.Thread(target=run_flask, daemon=True).start()
 
 # Keep the connection alive indefinitely
 print("🟢 Handshake established. Holding connection open...")
