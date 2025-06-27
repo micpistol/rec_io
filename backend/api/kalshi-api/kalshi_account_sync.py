@@ -1,4 +1,8 @@
 from backend.account_mode import account_mode_state
+import sys
+mode = sys.argv[1] if len(sys.argv) > 1 else "prod"
+account_mode_state["mode"] = mode
+print(f"Running in account mode: {mode}")
 import requests
 import json
 import sqlite3
@@ -17,10 +21,23 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
 
-# Load API credentials from local .env file in kalshi-credentials folder
-from pathlib import Path
 
-CREDENTIALS_DIR = Path(__file__).resolve().parent / "kalshi-credentials"
+# Dynamically select API base URL and credentials directory based on account mode
+BASE_URLS = {
+    "prod": "https://api.elections.kalshi.com/trade-api/v2",
+    "demo": "https://demo-api.kalshi.co/trade-api/v2"
+}
+
+def get_base_url():
+    BASE_URLS = {
+        "prod": "https://api.elections.kalshi.com/trade-api/v2",
+        "demo": "https://demo-api.kalshi.co/trade-api/v2"
+    }
+    return BASE_URLS.get(account_mode_state["mode"], BASE_URLS["prod"])
+
+print(f"Using base URL: {get_base_url()} for mode: {account_mode_state['mode']}")
+
+CREDENTIALS_DIR = Path(__file__).resolve().parent / "kalshi-credentials" / account_mode_state["mode"]
 ENV_VARS = dotenv_values(CREDENTIALS_DIR / ".env")
 
 KEY_ID = ENV_VARS.get("KALSHI_API_KEY_ID")
@@ -53,7 +70,6 @@ def generate_kalshi_signature(method, full_path, timestamp, key_path):
     return base64.b64encode(signature).decode("utf-8")
 
 # Config
-BASE_URL = "https://api.elections.kalshi.com/trade-api/v2"
 API_HEADERS = {
     "Accept": "application/json",
     "User-Agent": "KalshiWatcher/1.0"
@@ -190,7 +206,7 @@ def sync_balance():
     print("⏱ Sync attempt...")
     method = "GET"
     path = "/portfolio/balance"
-    url = f"{BASE_URL}{path}"
+    url = f"{get_base_url()}{path}"
     timestamp = str(int(time.time() * 1000))  # milliseconds
 
     if not KEY_ID or not KEY_PATH.exists():
@@ -256,7 +272,7 @@ def sync_positions():
         query = f"?limit=100"
         if cursor:
             query += f"&cursor={cursor}"
-        url = f"{BASE_URL}{path}{query}"
+        url = f"{get_base_url()}{path}{query}"
         print(f"🔗 Requesting: {url}")
 
         full_path_for_signature = f"/trade-api/v2{path}"
@@ -326,7 +342,7 @@ def sync_fills():
         query = f"?limit=100"
         if cursor:
             query += f"&cursor={cursor}"
-        url = f"{BASE_URL}{path}{query}"
+        url = f"{get_base_url()}{path}{query}"
         print(f"🔗 Requesting: {url}")
 
         full_path_for_signature = f"/trade-api/v2{path}"
@@ -400,7 +416,7 @@ def sync_settlements():
         query = f"?limit=100"
         if cursor:
             query += f"&cursor={cursor}"
-        url = f"{BASE_URL}{path}{query}"
+        url = f"{get_base_url()}{path}{query}"
         print(f"🔗 Requesting: {url}")
 
         full_path_for_signature = f"/trade-api/v2{path}"

@@ -46,7 +46,13 @@ def generate_kalshi_signature(method, full_path, timestamp, key_path):
     return base64.b64encode(signature).decode("utf-8")
 
 # Config
-BASE_URL = "https://api.elections.kalshi.com/trade-api/v2"
+BASE_URLS = {
+    "prod": "https://api.elections.kalshi.com/trade-api/v2",
+    "demo": "https://demo-api.kalshi.co/trade-api/v2"
+}
+
+BASE_URL = BASE_URLS.get(mode, BASE_URLS["prod"])
+print(f"Using base URL: {BASE_URL} for mode: {mode}")
 
 def sync_settlements():
     print("⏱ Syncing all settlements...")
@@ -226,7 +232,6 @@ def write_fills_to_db():
 
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-
     c.execute("""
         CREATE TABLE IF NOT EXISTS fills (
             trade_id TEXT PRIMARY KEY,
