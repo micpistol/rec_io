@@ -919,9 +919,9 @@ updateStrikePanelTTC();
       <div class="panel-container" id="buildTrade" style="min-height: 300px; padding: 10px;">
         <div style="font-weight: bold; margin-bottom: 6px; font-size: 0.9rem;">Position Size</div>
         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-          <input type="number" id="position-size" min="1" value="100" style="width: 80px; padding: 6px; font-size: 1rem; border-radius: 4px; border: 1px solid #ccc;" />
+          <input type="number" id="position-size" min="1" style="width: 80px; padding: 6px; font-size: 1rem; border-radius: 4px; border: 1px solid #ccc;" />
           <div>
-            <button class="multiplier-btn active" data-multiplier="1">1x</button>
+            <button class="multiplier-btn" data-multiplier="1">1x</button>
             <button class="multiplier-btn" data-multiplier="2">2x</button>
             <button class="multiplier-btn" data-multiplier="3">3x</button>
           </div>
@@ -935,7 +935,7 @@ updateStrikePanelTTC();
   const positionInput = document.getElementById('position-size');
   const positionDisplay = document.getElementById('position-display');
   const multiplierButtons = document.querySelectorAll('.multiplier-btn');
-  let currentMultiplier = 1;
+  let currentMultiplier;
 
   function updatePositionDisplay() {
     const baseValue = parseInt(positionInput.value, 10) || 0;
@@ -943,20 +943,20 @@ updateStrikePanelTTC();
     positionDisplay.textContent = `${total} contracts`;
   }
 
-  // --- Load preferences from backend ---
+  // --- Load preferences from backend and only update UI after fetch resolves ---
   fetch(window.location.origin + '/api/get_preferences')
     .then(res => res.json())
     .then(data => {
       // Set initial position size
       if (data.position_size !== undefined) {
         positionInput.value = data.position_size;
-        localStorage.setItem('positionSize', data.position_size);
+        // localStorage.setItem('positionSize', data.position_size);
       }
 
       // Set initial multiplier
       if (data.multiplier !== undefined) {
         currentMultiplier = data.multiplier;
-        localStorage.setItem('positionMultiplier', data.multiplier);
+        // localStorage.setItem('positionMultiplier', data.multiplier);
 
         // Highlight the matching multiplier button
         multiplierButtons.forEach(btn => {
@@ -974,7 +974,7 @@ updateStrikePanelTTC();
   // --- Persist position size changes to backend ---
   positionInput.addEventListener('change', () => {
     const value = parseInt(positionInput.value, 10) || 100;
-    localStorage.setItem('positionSize', value);
+    // localStorage.setItem('positionSize', value);
     fetch(window.location.origin + '/api/set_position_size', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -988,9 +988,9 @@ updateStrikePanelTTC();
     btn.addEventListener('click', () => {
       multiplierButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      currentMultiplier = parseInt(btn.dataset.multiplier, 10) || 1;
+      currentMultiplier = parseInt(btn.dataset.multiplier, 10);
       updatePositionDisplay();
-      localStorage.setItem('positionMultiplier', currentMultiplier);
+      // localStorage.setItem('positionMultiplier', currentMultiplier);
       fetch(window.location.origin + '/api/set_multiplier', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -999,7 +999,7 @@ updateStrikePanelTTC();
     });
   });
 
-  updatePositionDisplay();
+  // Do NOT call updatePositionDisplay() here; it is now only called after preferences are fetched.
 })();
 </script>
       <!-- Active Trades Panel (injected as per instructions) -->
@@ -2204,7 +2204,7 @@ activeTradesTableBody.addEventListener('click', (event) => {
     const autoStopToggle = document.getElementById('autoStopToggle');
     const positionInput = document.getElementById('position-size');
     const multiplierButtons = document.querySelectorAll('.multiplier-btn');
-    let currentMultiplier = 1;
+    let currentMultiplier;
 
     if (autoStopToggle && positionInput && multiplierButtons.length > 0) {
       fetch(window.location.origin + '/api/get_preferences')
@@ -2213,20 +2213,20 @@ activeTradesTableBody.addEventListener('click', (event) => {
           // Set AUTO STOP checkbox
           if (data.auto_stop !== undefined) {
             autoStopToggle.checked = data.auto_stop;
-            localStorage.setItem('autoStopEnabled', data.auto_stop);
+            // localStorage.setItem('autoStopEnabled', data.auto_stop);
             window.autoStopEnabled = data.auto_stop;
           }
 
           // Set position size input
           if (data.position_size !== undefined) {
             positionInput.value = data.position_size;
-            localStorage.setItem('positionSize', data.position_size);
+            // localStorage.setItem('positionSize', data.position_size);
           }
 
           // Set position multiplier
           if (data.multiplier !== undefined) {
             currentMultiplier = data.multiplier;
-            localStorage.setItem('positionMultiplier', data.multiplier);
+            // localStorage.setItem('positionMultiplier', data.multiplier);
 
             // Update multiplier button highlight
             multiplierButtons.forEach(btn => {
@@ -2243,16 +2243,15 @@ activeTradesTableBody.addEventListener('click', (event) => {
           }
         })
         .catch(() => {
-          // fallback to localStorage or default true for autoStop
-          const savedState = localStorage.getItem('autoStopEnabled');
-          autoStopToggle.checked = savedState === null ? true : savedState === 'true';
+          // fallback to default true for autoStop
+          autoStopToggle.checked = true;
           window.autoStopEnabled = autoStopToggle.checked;
         });
 
       // Save AUTO STOP state changes and update backend
       autoStopToggle.addEventListener('change', () => {
         const value = autoStopToggle.checked;
-        localStorage.setItem('autoStopEnabled', value);
+        // localStorage.setItem('autoStopEnabled', value);
         window.autoStopEnabled = value;
         fetch(window.location.origin + '/api/set_auto_stop', {
           method: 'POST',
@@ -2270,7 +2269,7 @@ activeTradesTableBody.addEventListener('click', (event) => {
           if (typeof backendValue === 'boolean' && backendValue !== window.autoStopEnabled) {
             window.autoStopEnabled = backendValue;
             autoStopToggle.checked = backendValue;
-            localStorage.setItem('autoStopEnabled', backendValue);
+            // localStorage.setItem('autoStopEnabled', backendValue);
           }
         } catch (e) {
           console.error("Failed to fetch auto stop state", e);
