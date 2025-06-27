@@ -211,6 +211,42 @@
   }
 </style>
 <style>
+  /* === YES BUTTON STYLES (existing) === */
+  .yes-button {
+    background-color: #45d34a;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-size: 1rem;
+    font-weight: bold;
+    transition: background-color 0.2s;
+  }
+  .yes-button:hover {
+    background-color: #28a745;
+    cursor: pointer;
+  }
+  /* === TEST TRADE BUTTON STYLES (copied from .yes-button, color modified) === */
+  .test-trade-button {
+    background-color: #888;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-size: 1rem;
+    font-weight: bold;
+    transition: background-color 0.2s;
+  }
+  .test-trade-button:hover {
+    background-color: #007bff;
+    cursor: pointer;
+  }
+  .test-trade-button:active {
+    background-color: white;
+    color: black;
+  }
+</style>
+<style>
   .trade-popup, .trade-closed-popup {
     position: fixed;
     bottom: 20px;
@@ -918,7 +954,7 @@ updateStrikePanelTTC();
     <div class="column" id="col3">
       <div class="panel-container" id="buildTrade" style="min-height: 300px; padding: 10px;">
         <div style="font-weight: bold; margin-bottom: 6px; font-size: 0.9rem;">Position Size</div>
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+        <div id="positionSizeSelector" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
           <input type="number" id="position-size" min="1" style="width: 60px; padding: 6px; text-align: right; font-size: 1rem; border-radius: 4px; border: 1px solid #ccc;" />
           <div>
             <button class="multiplier-btn" data-multiplier="1">1x</button>
@@ -927,6 +963,8 @@ updateStrikePanelTTC();
           </div>
         </div>
         <div id="position-display" style="font-size: 0.85rem; font-weight: normal; color: #ccc;">100 contracts</div>
+        <button id="testTradeButton" class="test-trade-button">TEST TRADE</button>
+
       </div>
 </body>
 <script>
@@ -1052,6 +1090,39 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   });
+
+  // === TEST TRADE button handler ===
+  const testTradeBtn = document.getElementById("testTradeButton");
+  if (testTradeBtn) {
+    testTradeBtn.addEventListener("click", function () {
+      // Use the value from positionSizePicker, or fallback to position-size if needed
+      let quantity;
+      const pickerInput = document.getElementById("positionSizePicker");
+      if (pickerInput && pickerInput.value) {
+        quantity = pickerInput.value;
+      } else {
+        const posInput = document.getElementById("position-size");
+        quantity = posInput && posInput.value ? posInput.value : null;
+      }
+      if (!quantity) {
+        alert("Please enter a position size.");
+        return;
+      }
+      fetch("http://localhost:5070/trigger_trade", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          side: "yes",
+          quantity: parseInt(quantity)
+        })
+      })
+      .then(response => response.json())
+      .then(data => console.log("✅ Trade executed:", data))
+      .catch(error => console.error("❌ Error triggering trade:", error));
+    });
+  }
 });
 </script>
       <!-- Active Trades Panel (injected as per instructions) -->

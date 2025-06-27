@@ -4,6 +4,7 @@ import os, sys
 
 # --- Flask app for trade triggers ---
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import threading
 
 print(f"✅ Running in account mode: {get_account_mode()}")
@@ -464,6 +465,7 @@ sync_balance()
 # Flask app to receive trade trigger requests
 
 app = Flask(__name__)
+CORS(app)
 
 # --- Market order helper for /trigger_trade ---
 def place_market_order(side, count):
@@ -519,7 +521,7 @@ def trigger_trade():
         return jsonify({"error": str(e)}), 500
 
 def run_flask():
-    app.run(host="0.0.0.0", port=5050)
+    app.run(host="0.0.0.0", port=5070)
 
 # Start Flask server in a background thread
 threading.Thread(target=run_flask, daemon=True).start()
