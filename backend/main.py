@@ -20,8 +20,29 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "api", "coinbase-api", "coinba
 
 app = FastAPI()
 
+
 # Global auto_stop state
-auto_stop_state = {"enabled": True}
+PREFERENCES_PATH = os.path.join("backend", "data", "trade_preferences.json")
+
+def load_preferences():
+    if os.path.exists(PREFERENCES_PATH):
+        try:
+            with open(PREFERENCES_PATH, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"auto_stop": True}
+
+def save_preferences(prefs):
+    try:
+        with open(PREFERENCES_PATH, "w") as f:
+            json.dump(prefs, f)
+    except Exception as e:
+        print(f"[Preferences Save Error] {e}")
+
+# Load preferences on startup
+preferences = load_preferences()
+auto_stop_state = {"enabled": preferences.get("auto_stop", True)}
 
 # CORS setup
 origins = [
@@ -566,11 +587,65 @@ async def set_account_mode(request: Request):
     return {"status": "ok", "mode": mode}
 
 # Register the auto_stop endpoints so they are always included when the app is loaded
+
 @app.post("/api/set_auto_stop")
 async def set_auto_stop(request: Request):
     data = await request.json()
     auto_stop_state["enabled"] = bool(data.get("enabled", True))
+    preferences["auto_stop"] = auto_stop_state["enabled"]
+    save_preferences(preferences)
     return {"status": "ok"}
+
+# Add set_position_size and set_multiplier routes
+@app.post("/api/set_position_size")
+async def set_position_size(request: Request):
+    data = await request.json()
+    try:
+        preferences["position_size"] = int(data.get("position_size", 100))
+        save_preferences(preferences)
+    except Exception as e:
+        print(f"[Set Position Size Error] {e}")
+    return {"status": "ok"}
+
+@app.post("/api/set_multiplier")
+async def set_multiplier(request: Request):
+    data = await request.json()
+    try:
+        preferences["multiplier"] = int(data.get("multiplier", 1))
+        save_preferences(preferences)
+    except Exception as e:
+        print(f"[Set Multiplier Error] {e}")
+    return {"status": "ok"}
+
+# New route: update position size and multiplier preferences
+@app.post("/api/update_preferences")
+async def update_preferences(request: Request):
+    data = await request.json()
+    updated = False
+
+    if "position_size" in data:
+        try:
+            preferences["position_size"] = int(data["position_size"])
+            updated = True
+        except Exception as e:
+            print(f"[Invalid Position Size] {e}")
+
+    if "multiplier" in data:
+        try:
+            preferences["multiplier"] = int(data["multiplier"])
+            updated = True
+        except Exception as e:
+            print(f"[Invalid Multiplier] {e}")
+
+    if updated:
+        save_preferences(preferences)
+    return {"status": "ok"}
+
+
+# Expose trade preferences to the frontend
+@app.get("/api/get_preferences")
+async def get_preferences():
+    return load_preferences()
 
 @app.get("/api/get_auto_stop")
 async def get_auto_stop():

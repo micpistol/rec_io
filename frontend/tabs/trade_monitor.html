@@ -943,14 +943,59 @@ updateStrikePanelTTC();
     positionDisplay.textContent = `${total} contracts`;
   }
 
-  positionInput.addEventListener('input', updatePositionDisplay);
+  // --- Load preferences from backend ---
+  fetch(window.location.origin + '/api/get_preferences')
+    .then(res => res.json())
+    .then(data => {
+      // Set initial position size
+      if (data.position_size !== undefined) {
+        positionInput.value = data.position_size;
+        localStorage.setItem('positionSize', data.position_size);
+      }
 
+      // Set initial multiplier
+      if (data.multiplier !== undefined) {
+        currentMultiplier = data.multiplier;
+        localStorage.setItem('positionMultiplier', data.multiplier);
+
+        // Highlight the matching multiplier button
+        multiplierButtons.forEach(btn => {
+          if (parseInt(btn.dataset.multiplier, 10) === data.multiplier) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+      }
+
+      updatePositionDisplay();
+    });
+
+  // --- Persist position size changes to backend ---
+  positionInput.addEventListener('change', () => {
+    const value = parseInt(positionInput.value, 10) || 100;
+    localStorage.setItem('positionSize', value);
+    fetch(window.location.origin + '/api/set_position_size', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ position_size: value })
+    });
+    updatePositionDisplay();
+  });
+
+  // --- Multiplier button click events and persistence ---
   multiplierButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       multiplierButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentMultiplier = parseInt(btn.dataset.multiplier, 10) || 1;
       updatePositionDisplay();
+      localStorage.setItem('positionMultiplier', currentMultiplier);
+      fetch(window.location.origin + '/api/set_multiplier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ multiplier: currentMultiplier })
+      });
     });
   });
 
@@ -2155,27 +2200,56 @@ activeTradesTableBody.addEventListener('click', (event) => {
   }
 </script>
   <script>
-    // Load, persist, and sync AUTO STOP checkbox state with backend and localStorage
+    // Load, persist, and sync AUTO STOP, position size, and multiplier from unified preferences API
     const autoStopToggle = document.getElementById('autoStopToggle');
-    if (autoStopToggle) {
-      // Initialize checkbox state from backend first
-      fetch(window.location.origin + '/api/get_auto_stop')
+    const positionInput = document.getElementById('position-size');
+    const multiplierButtons = document.querySelectorAll('.multiplier-btn');
+    let currentMultiplier = 1;
+
+    if (autoStopToggle && positionInput && multiplierButtons.length > 0) {
+      fetch(window.location.origin + '/api/get_preferences')
         .then(res => res.json())
         .then(data => {
-          if (typeof data.enabled === 'boolean') {
-            autoStopToggle.checked = data.enabled;
-            window.autoStopEnabled = data.enabled;
-            localStorage.setItem('autoStopEnabled', data.enabled);
+          // Set AUTO STOP checkbox
+          if (data.auto_stop !== undefined) {
+            autoStopToggle.checked = data.auto_stop;
+            localStorage.setItem('autoStopEnabled', data.auto_stop);
+            window.autoStopEnabled = data.auto_stop;
+          }
+
+          // Set position size input
+          if (data.position_size !== undefined) {
+            positionInput.value = data.position_size;
+            localStorage.setItem('positionSize', data.position_size);
+          }
+
+          // Set position multiplier
+          if (data.multiplier !== undefined) {
+            currentMultiplier = data.multiplier;
+            localStorage.setItem('positionMultiplier', data.multiplier);
+
+            // Update multiplier button highlight
+            multiplierButtons.forEach(btn => {
+              if (parseInt(btn.dataset.multiplier, 10) === data.multiplier) {
+                btn.classList.add('active');
+              } else {
+                btn.classList.remove('active');
+              }
+            });
+          }
+
+          if (typeof updatePositionDisplay === 'function') {
+            updatePositionDisplay();
           }
         })
         .catch(() => {
-          // fallback to localStorage or default true
+          // fallback to localStorage or default true for autoStop
           const savedState = localStorage.getItem('autoStopEnabled');
           autoStopToggle.checked = savedState === null ? true : savedState === 'true';
           window.autoStopEnabled = autoStopToggle.checked;
         });
 
-      // Save state changes and update backend
+      // Save AUTO STOP state changes and update backend
       autoStopToggle.addEventListener('change', () => {
         const value = autoStopToggle.checked;
         localStorage.setItem('autoStopEnabled', value);
@@ -2187,12 +2261,12 @@ activeTradesTableBody.addEventListener('click', (event) => {
         });
       });
 
-      // Poll backend for updates every second
+      // Poll backend for AUTO STOP updates every second
       setInterval(async () => {
         try {
-          const res = await fetch(window.location.origin + '/api/get_auto_stop');
+          const res = await fetch(window.location.origin + '/api/get_preferences');
           const data = await res.json();
-          const backendValue = data.enabled;
+          const backendValue = data.auto_stop;
           if (typeof backendValue === 'boolean' && backendValue !== window.autoStopEnabled) {
             window.autoStopEnabled = backendValue;
             autoStopToggle.checked = backendValue;
