@@ -55,11 +55,11 @@
         <table class="data-table" style="width: 100%; text-align: center;">
           <thead>
             <tr>
-              <th>ticker</th>
-              <th>Buy Price</th>
-              <th>position</th>
-              <th>fees_paid</th>
-              <th>last_updated_ts</th>
+              <th>Ticker</th>
+              <th>Buy</th>
+              <th>Position</th>
+              <th>Fees</th>
+              <th>Time</th>
             </tr>
           </thead>
           <tbody id="positions-body">
@@ -202,15 +202,17 @@
       `).join("");
 
       const positionsBody = document.getElementById("positions-body");
-      positionsBody.innerHTML = positions.map(p => `
-        <tr>
-          <td>${p.ticker}</td>
-          <td>${p.position !== 0 ? `$${(p.total_traded / p.position / 100).toFixed(2)}` : '$0.00'}</td>
-          <td>${p.position}</td>
-          <td>${p.fees_paid}</td>
-          <td>${new Date(p.last_updated_ts).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
-        </tr>
-      `).join("");
+      positionsBody.innerHTML = positions
+        .filter(p => p.position !== 0)
+        .map(p => `
+          <tr>
+            <td>${p.ticker}</td>
+            <td>${p.position !== 0 ? `$${(p.total_traded / p.position / 100).toFixed(2)}` : '$0.00'}</td>
+            <td>${p.position}</td>
+            <td>${p.fees_paid}</td>
+            <td>${new Date(p.last_updated_ts).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
+          </tr>
+        `).join("");
     }
 
     document.getElementById("account-selector").addEventListener("change", () => {

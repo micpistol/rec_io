@@ -26,12 +26,6 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
 
 
-# Dynamically select API base URL and credentials directory based on account mode
-BASE_URLS = {
-    "prod": "https://api.elections.kalshi.com/trade-api/v2",
-    "demo": "https://demo-api.kalshi.co/trade-api/v2"
-}
-
 def get_base_url():
     BASE_URLS = {
         "prod": "https://api.elections.kalshi.com/trade-api/v2",
@@ -127,7 +121,7 @@ def get_current_event_ticker():
     return None, None
 
 def fetch_event_json(event_ticker):
-    url = f"{BASE_URL}/events/{event_ticker}"
+    url = f"{get_base_url()}/events/{event_ticker}"
     try:
         response = requests.get(url, headers=API_HEADERS, timeout=10)
         response.raise_for_status()
@@ -479,7 +473,7 @@ def place_market_order(side, count):
     timestamp = str(int(time.time() * 1000))
 
     payload = {
-        "ticker": "KXBTCD-25JUN2716-T106749.99",
+        "ticker": "KXMAYORNYCPARTY-25-D",
         "side": side,
         "type": "market",
         "count": count,
