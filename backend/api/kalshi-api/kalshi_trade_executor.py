@@ -505,14 +505,45 @@ def place_market_order(side, count):
 
 # --- Logging helper for trade events ---
 def log_event(ticket_id, message):
+    """
+    Write an event line to this ticket's rolling log inside
+    backend/trade_history/trade-flow/.
+
+    A simple retention policy keeps only the 20 most‑recent
+    ticket log files to avoid clutter.
+    """
     try:
-        log_path = Path(__file__).resolve().parents[3] / "logs" / "trade_flow.log"
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # File name based on the last 5 characters of the ticket ID
+        log_filename = f"trade_flow_{ticket_id[-5:]}.log"
+
+        # Log directory (…/backend/trade_history/trade-flow/)
+        log_dir = Path(__file__).resolve().parents[2] / "trade_history" / "trade-flow"
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+        # Full path for this ticket's log file
+        log_path = log_dir / log_filename
+
+        # Compose and append the log entry
+        timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
         entry = f"[{timestamp}] Ticket {ticket_id[-5:]}: {message}\n"
         with open(log_path, "a") as f:
             f.write(entry)
+
+        # Echo to stdout for immediate visibility
         print(entry.strip())
+
+        # --- Retention: keep only the 20 most‑recent logs ---
+        logs = sorted(
+            log_dir.glob("trade_flow_*.log"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True
+        )
+        for old in logs[20:]:
+            try:
+                old.unlink()
+            except Exception:
+                # If deletion fails, continue silently
+                pass
     except Exception as e:
         print(f"❌ Failed to write to log: {e}")
 

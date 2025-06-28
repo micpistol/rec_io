@@ -11,8 +11,9 @@ import requests
 def log_event(ticket_id, message):
     try:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        log_path = os.path.join(base_dir, "logs", "trade_flow.log")
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        trade_suffix = ticket_id[-5:] if len(ticket_id) >= 5 else ticket_id
+        log_path = os.path.join(base_dir, "backend", "trade_history", "trade-flow", f"trade_flow_{trade_suffix}.log")
+        timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
         log_line = f"[{timestamp}] Ticket {ticket_id[-5:]}: {message}\n"
         with open(log_path, "a") as f:
             f.write(log_line)

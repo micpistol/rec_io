@@ -604,14 +604,28 @@ async def log_event(request: Request):
     data = await request.json()
     ticket_id = data.get("ticket_id", "UNKNOWN")
     message = data.get("message", "No message provided")
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(pytz.timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S")
 
     log_line = f"[{timestamp}] Ticket {ticket_id}: {message}\n"
-    log_path = os.path.join("logs", "trade_flow.log")
+    # Directory for trade flow logs
+    log_dir = os.path.join("backend", "trade_history", "trade-flow")
+    # Use last 5 characters of ticket_id for log file name, fallback to full ticket_id if too short
+    log_path = os.path.join(log_dir, f"trade_flow_{ticket_id[-5:] if len(ticket_id) >= 5 else ticket_id}.log")
+
     try:
-        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        os.makedirs(log_dir, exist_ok=True)
         with open(log_path, "a") as f:
             f.write(log_line)
+
+        # Prune older log files, keep only latest 20
+        log_files = sorted(
+            [f for f in os.listdir(log_dir) if f.startswith("trade_flow_") and f.endswith(".log")],
+            key=lambda name: os.path.getmtime(os.path.join(log_dir, name)),
+            reverse=True
+        )
+        for old_log in log_files[100:]:
+            os.remove(os.path.join(log_dir, old_log))
+
     except Exception as e:
         return {"status": "error", "message": str(e)}
     return {"status": "ok"}
@@ -831,6 +845,21 @@ async def broadcast_preferences_update():
         except Exception:
             to_remove.add(client)
     connected_clients.difference_update(to_remove)
+
+# Serve trade flow logs from the trade-flow directory
+@app.get("/api/trade_log/{ticket_id}")
+def get_trade_log(ticket_id: str):
+    try:
+        log_dir = os.path.join("backend", "trade_history", "trade-flow")
+        log_filename = f"trade_flow_{ticket_id[-5:]}.log"
+        log_path = os.path.join(log_dir, log_filename)
+        if not os.path.exists(log_path):
+            return {"status": "error", "message": "Log file not found"}
+        with open(log_path, "r") as f:
+            content = f.read()
+        return {"status": "ok", "log": content}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     import threading

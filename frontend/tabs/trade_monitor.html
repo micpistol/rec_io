@@ -211,6 +211,22 @@
   }
 </style>
 <style>
+#errorTooltip {
+  position: absolute;
+  z-index: 9999;
+  background-color: white;
+  color: black;
+  border: 3px solid black;
+  padding: 10px;
+  max-width: 400px;
+  font-family: monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  display: none;
+  pointer-events: none;
+}
+</style>
+<style>
   /* === YES BUTTON STYLES (existing) === */
   .yes-button {
     background-color: #45d34a;
@@ -552,6 +568,8 @@ function openTrade(strike, side, event) {
           message: "MONITOR: TICKET INITIATED — CONFIRMED"
         })
       });
+      // === Prune old trade logs right after logging event ===
+      fetch('/api/prune_trade_logs', { method: 'POST' });
 
       // === Construct new payload as specified ===
       const payload = {
@@ -935,16 +953,10 @@ updateStrikePanelMarketTitle();
 setInterval(fetchMarketTitleRaw, 5000);
 setInterval(updateStrikePanelMarketTitle, 5000);
 
-// TTC clock for strike panel right cell
-async function fetchTTCSeconds() {
-  try {
-    const res = await fetch('/core');
-    const data = await res.json();
-    return data.ttc_seconds;
-  } catch {
-    return null;
-  }
-}
+
+// TTC clock for strike panel right cell (NEW IMPLEMENTATION)
+let cachedTTC = null;
+let lastFetchTimestamp = 0;
 
 function formatTTC(seconds) {
   if (seconds === null || seconds === undefined || isNaN(seconds)) {
@@ -955,48 +967,33 @@ function formatTTC(seconds) {
   return `${m}:${s}`;
 }
 
-async function updateStrikePanelTTC() {
+function updateClockDisplay() {
   const ttcEl = document.getElementById('strikePanelTTC');
-  if (!ttcEl) return;
+  if (!ttcEl || cachedTTC === null) return;
 
-  let seconds = await fetchTTCSeconds();
-  console.log("TTC raw seconds:", seconds);
-  if (seconds === null) {
-    // fallback: count down to next hour
-    const now = new Date();
-    const nextHour = new Date(now);
-    nextHour.setHours(now.getHours() + 1, 0, 0, 0);
-    seconds = Math.floor((nextHour - now) / 1000);
-  }
+  ttcEl.textContent = formatTTC(cachedTTC);
 
-  ttcEl.textContent = formatTTC(seconds);
-
-  // Reset styles
   ttcEl.style.backgroundColor = '';
   ttcEl.style.color = '';
   ttcEl.style.borderRadius = '';
   ttcEl.style.padding = '';
 
-  if (seconds >= 0 && seconds <= 180) {
-    // Red background (0:00 to 3:00)
+  if (cachedTTC >= 0 && cachedTTC <= 180) {
     ttcEl.style.backgroundColor = '#d2372b';
     ttcEl.style.color = '#fff';
     ttcEl.style.borderRadius = '6px';
     ttcEl.style.padding = '0 10px';
-  } else if (seconds > 180 && seconds <= 300) {
-    // Yellow background (3:00 to 5:00)
+  } else if (cachedTTC <= 300) {
     ttcEl.style.backgroundColor = '#ffc107';
     ttcEl.style.color = '#fff';
     ttcEl.style.borderRadius = '6px';
     ttcEl.style.padding = '0 10px';
-  } else if (seconds > 300 && seconds <= 720) {
-    // Green background (5:00 to 12:00)
+  } else if (cachedTTC <= 720) {
     ttcEl.style.backgroundColor = '#45d34a';
     ttcEl.style.color = '#fff';
     ttcEl.style.borderRadius = '6px';
     ttcEl.style.padding = '0 10px';
-  } else if (seconds > 720 && seconds <= 900) {
-    // Yellow background (12:00 to 15:00)
+  } else if (cachedTTC <= 900) {
     ttcEl.style.backgroundColor = '#ffc107';
     ttcEl.style.color = '#fff';
     ttcEl.style.borderRadius = '6px';
@@ -1004,8 +1001,29 @@ async function updateStrikePanelTTC() {
   }
 }
 
-setInterval(updateStrikePanelTTC, 1000);
-updateStrikePanelTTC();
+async function fetchAndCacheTTC() {
+  try {
+    const res = await fetch('/core');
+    const data = await res.json();
+    cachedTTC = data.ttc_seconds;
+    lastFetchTimestamp = Date.now();
+  } catch {
+    cachedTTC = null;
+  }
+}
+
+setInterval(() => {
+  if (cachedTTC !== null) {
+    cachedTTC = Math.max(0, cachedTTC - 1);
+  }
+  updateClockDisplay();
+
+  if (Date.now() - lastFetchTimestamp > 10000) {
+    fetchAndCacheTTC();
+  }
+}, 1000);
+
+fetchAndCacheTTC();
 
 
 </script>
@@ -1028,6 +1046,7 @@ updateStrikePanelTTC();
 
       </div>
 </body>
+  <div id="errorTooltip" class="error-tooltip"></div>
 <script>
 // === Unified Preferences: AUTO STOP, Position Size, Multiplier with WebSocket sync (improved) ===
 document.addEventListener('DOMContentLoaded', () => {
@@ -1870,6 +1889,27 @@ document.addEventListener('DOMContentLoaded', () => {
 const activeTradesTableBody = document.querySelector('#activeTradesTable tbody');
 const recentTradesTableBody = document.querySelector('#recentTradesTable tbody');
 
+const errorTooltip = document.getElementById('errorTooltip');
+
+function positionErrorTooltip(mouseX, mouseY) {
+  if (!errorTooltip) return;
+  const left = mouseX - errorTooltip.offsetWidth - 14;
+  const top  = mouseY - errorTooltip.offsetHeight / 2;
+  errorTooltip.style.left = left + 'px';
+  errorTooltip.style.top  = top  + 'px';
+}
+
+function showErrorTooltip(text, mouseX, mouseY) {
+  if (!errorTooltip) return;
+  errorTooltip.textContent = text;
+  errorTooltip.style.display = 'block';
+  positionErrorTooltip(mouseX, mouseY);
+}
+
+function hideErrorTooltip() {
+  if (errorTooltip) errorTooltip.style.display = 'none';
+}
+
 function formatDateTime(isoString) {
   const date = new Date(isoString);
   const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -2081,12 +2121,42 @@ async function fetchAndRenderTrades() {
             }
           }
           if (!inserted) activeTradesTableBody.appendChild(row);
-          rowObj = { tr: row };
+          rowObj = { tr: row, statusCell };
           activeTradesRowsMap.set(trade.id, rowObj);
         } else {
           rowObj.tr.style.backgroundColor = bgColor;
           rowObj.tr.style.color = textColor;
           // Optionally update cell text if needed
+        }
+        // --- Add error tooltip logic for "error" status ---
+        if (trade.status === "error" && rowObj.statusCell) {
+          const statusTd = rowObj.statusCell;
+          statusTd.style.cursor = 'help';
+          statusTd.classList.add('error-cell');
+          // Remove previous listeners by cloning and replacing node (to avoid stacking listeners)
+          const newStatusTd = statusTd.cloneNode(true);
+          newStatusTd.textContent = statusTd.textContent;
+          newStatusTd.style.cursor = 'help';
+          newStatusTd.classList.add('error-cell');
+          newStatusTd.addEventListener('mouseenter', async (evt) => {
+            try {
+              const resp = await fetch(`/api/trade_log/${trade.ticket_id}`);
+              const data = await resp.json();
+              if (data.status === "ok") {
+                showErrorTooltip(data.log, evt.clientX, evt.clientY);
+              } else {
+                showErrorTooltip("Log not found", evt.clientX, evt.clientY);
+              }
+            } catch (e) {
+              showErrorTooltip('Failed to load trade log.', evt.clientX, evt.clientY);
+            }
+          });
+          newStatusTd.addEventListener('mousemove', (evt) => {
+            positionErrorTooltip(evt.clientX, evt.clientY);
+          });
+          newStatusTd.addEventListener('mouseleave', hideErrorTooltip);
+          rowObj.tr.replaceChild(newStatusTd, statusTd);
+          rowObj.statusCell = newStatusTd;
         }
         return; // Skip rest of render logic for this row
       }
