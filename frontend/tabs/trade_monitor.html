@@ -544,12 +544,11 @@ function openTrade(strike, side, event) {
       const ticket_id = 'TICKET-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
 
       // === Immediately log the initial entry to backend ===
-      const shortId = ticket_id.slice(-5);
       fetch('/api/log_event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ticket_id: shortId,
+          ticket_id: ticket_id,
           message: "MONITOR: TICKET INITIATED — CONFIRMED"
         })
       });
@@ -659,12 +658,12 @@ async function cancelTrade(dbId, ticketId) {
       body: JSON.stringify({ status: 'canceled' })
     });
 
-    // Log using ticket_id suffix
+    // Log using full ticket_id
     await fetch('/api/log_event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ticket_id: ticketId.slice(-5),
+        ticket_id: ticketId,
         message: 'MONITOR: TRADE CANCELED — CONFIRMED'
       })
     });

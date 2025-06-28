@@ -234,10 +234,11 @@ async def add_trade(request: Request):
     try:
         response = requests.post("http://localhost:5070/trigger_trade", json=data, timeout=5)
         print(f"[EXECUTOR RESPONSE] {response.status_code} — {response.text}")
-        if response.status_code != 200 or response.json().get("status") != "sent":
+        if response.status_code != 200:
             update_trade_status(trade_id, "error")
     except Exception as e:
         print(f"[EXECUTOR ERROR] Failed to send trade to executor: {e}")
+        update_trade_status(trade_id, "error")
     return {"id": trade_id}
 
 # Route to fetch an individual trade by ID
