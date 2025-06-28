@@ -387,7 +387,7 @@ def sync_fills():
             )
             new_count += 1
         conn.commit()
-    print(f"💾 {new_count} new fills written to {FILLS_DB_PATH}")
+    print(f"{new_count} new fills written to {FILLS_DB_PATH}")
 
 
 def sync_settlements():
@@ -502,22 +502,32 @@ def place_market_order(side, count):
     return response.json()
 
 
+
+# --- Logging helper for trade events ---
+def log_event(ticket_id, message):
+    try:
+        log_path = Path(__file__).resolve().parents[3] / "logs" / "trade_flow.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        entry = f"[{timestamp}] Ticket {ticket_id[-5:]}: {message}\n"
+        with open(log_path, "a") as f:
+            f.write(entry)
+        print(entry.strip())
+    except Exception as e:
+        print(f"❌ Failed to write to log: {e}")
+
+
 @app.route('/trigger_trade', methods=['POST'])
 def trigger_trade():
     try:
         data = request.get_json()
-        side = data.get("side").lower()
-        count = int(data.get("quantity", 1))
-
-        print("📩 Triggering market order:")
-        print(f"📈 Side: {side}")
-        print(f"🔢 Quantity: {count}")
-
-        resp = place_market_order(side, count)
-        print("✅ Kalshi response:", resp)
-        return jsonify({"status": "sent", "kalshi_response": resp}), 200
+        ticket_id = data.get("ticket_id", "UNKNOWN")
+        log_event(ticket_id, "EXECUTOR: TICKET RECEIVED — CONFIRMED")
+        log_event(ticket_id, "EXECUTOR: TRADE FAILED — ERROR")
+        print("❌ INTENTIONALLY FAILING: simulating error response.")
+        return jsonify({"status": "error", "message": "Simulated failure"}), 400
     except Exception as e:
-        print(f"❌ Error placing market order: {e}")
+        print(f"❌ Error parsing request: {e}")
         return jsonify({"error": str(e)}), 500
 
 def run_flask():

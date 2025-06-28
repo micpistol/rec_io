@@ -598,6 +598,24 @@ async def set_account_mode(request: Request):
 
 # Register the auto_stop endpoints so they are always included when the app is loaded
 
+# Log event endpoint
+@app.post("/api/log_event")
+async def log_event(request: Request):
+    data = await request.json()
+    ticket_id = data.get("ticket_id", "UNKNOWN")
+    message = data.get("message", "No message provided")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    log_line = f"[{timestamp}] Ticket {ticket_id}: {message}\n"
+    log_path = os.path.join("logs", "trade_flow.log")
+    try:
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        with open(log_path, "a") as f:
+            f.write(log_line)
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    return {"status": "ok"}
+
 @app.post("/api/set_auto_stop")
 async def set_auto_stop(request: Request):
     data = await request.json()

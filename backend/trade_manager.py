@@ -6,6 +6,18 @@ import os
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import re
+import requests
+
+def log_event(ticket_id, message):
+    try:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        log_path = os.path.join(base_dir, "logs", "trade_flow.log")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_line = f"[{timestamp}] Ticket {ticket_id[-5:]}: {message}\n"
+        with open(log_path, "a") as f:
+            f.write(log_line)
+    except Exception as e:
+        print(f"[LOG ERROR] Failed to write log: {message} — {e}")
 
 def is_trade_expired(trade):
     contract = trade.get('contract', '')
@@ -66,7 +78,7 @@ def init_trades_db():
         "volatility_delta": "REAL",
         "symbol_close": "REAL",
         "win_loss": "TEXT",
-        "market_id": "TEXT"
+        "ticker": "TEXT"
     }
 
     for column, col_type in additional_columns.items():
@@ -116,15 +128,15 @@ def insert_trade(trade):
     cursor.execute(
         """INSERT INTO trades (
             date, time, strike, side, buy_price, position, status,
-            contract, market_id, symbol, market, trade_strategy, symbol_open,
-            momentum, momentum_delta, volatility, volatility_delta
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            contract, ticker, symbol, market, trade_strategy, symbol_open,
+            momentum, momentum_delta, volatility, volatility_delta, ticket_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             trade['date'], trade['time'], trade['strike'], trade['side'], trade['buy_price'],
             trade['position'], trade.get('status', 'open'), trade.get('contract'),
-            trade.get('market_id'), trade.get('symbol'), trade.get('market'), trade.get('trade_strategy'),
+            trade.get('ticker'), trade.get('symbol'), trade.get('market'), trade.get('trade_strategy'),
             trade.get('symbol_open'), trade.get('momentum'), trade.get('momentum_delta'),
-            trade.get('volatility'), trade.get('volatility_delta')
+            trade.get('volatility'), trade.get('volatility_delta'), trade.get('ticket_id')
         )
     )
     conn.commit()
@@ -215,6 +227,17 @@ async def add_trade(request: Request):
     now_est = datetime.now(ZoneInfo("America/New_York"))
     data["time"] = now_est.strftime("%H:%M:%S")
     trade_id = insert_trade(data)
+    # Log events after inserting the trade
+    log_event(data["ticket_id"], "MANAGER: TICKET RECEIVED — CONFIRMED")
+    log_event(data["ticket_id"], "MANAGER: TRADE LOGGED PENDING — CONFIRMED")
+    log_event(data["ticket_id"], "MANAGER: SENT TO EXECUTOR — CONFIRMED")
+    try:
+        response = requests.post("http://localhost:5070/trigger_trade", json=data, timeout=5)
+        print(f"[EXECUTOR RESPONSE] {response.status_code} — {response.text}")
+        if response.status_code != 200 or response.json().get("status") != "sent":
+            update_trade_status(trade_id, "error")
+    except Exception as e:
+        print(f"[EXECUTOR ERROR] Failed to send trade to executor: {e}")
     return {"id": trade_id}
 
 # Route to fetch an individual trade by ID

@@ -527,48 +527,80 @@ function openTrade(strike, side, event) {
 
       const symbol = getSelectedSymbol();
       const contract = getTruncatedMarketTitle();
-      const market_id = "";  // TEMPORARY - need to calculate Market ID string
+      // Find the relevant strikeData from latestKalshiMarkets if available (simulate for now)
+      let strikeData = { market_id: null };
+      if (window.latestKalshiMarkets && Array.isArray(window.latestKalshiMarkets)) {
+        const match = window.latestKalshiMarkets.find(m => Math.round(m.floor_strike) === strike);
+        if (match) strikeData = match;
+      }
       const symbol_open = getCurrentBTCTickerPrice();
       const momentum = getCurrentMomentumScore();
-      const volatility = coreData?.volatility_score != null
-        ? parseFloat(coreData.volatility_score.toFixed(2))
+      // Use window.coreData for volatility if present
+      const volatility = window.coreData?.volatility_score != null
+        ? parseFloat(window.coreData.volatility_score.toFixed(2))
         : null;
 
-      const payload = {
-        status: "open",
-        date: now.toISOString().split("T")[0],
-        // Format time as hh:mm:ss
-        time: now.toLocaleTimeString('en-US', { hour12: false }),
-        symbol,
-        market: "Kalshi",
-        trade_strategy: "Hourly HTC",
-        contract,
-        // Format strike as currency string
-        strike: `$${Number(strike).toLocaleString()}`,
-        side: side.toUpperCase() === 'YES' ? 'Y' : 'N',
-        market_id,
-        buy_price,
-        position,
-        symbol_open,
-        momentum,
-        momentum_delta: null,
-        volatility,
-        volatility_delta: null
-      };
+      // === Generate unique ticket ID just before payload definition ===
+      const ticket_id = 'TICKET-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
 
-      console.log("Payload being sent:", payload);
-
-      await fetch('/trades', {
+      // === Immediately log the initial entry to backend ===
+      const shortId = ticket_id.slice(-5);
+      fetch('/api/log_event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          ticket_id: shortId,
+          message: "MONITOR: TICKET INITIATED — CONFIRMED"
+        })
       });
 
-      updateActiveTrades();
-      fetchAndRenderRecentTrades();
+      // === Construct new payload as specified ===
+      const payload = {
+        ticket_id:         ticket_id,
+        status:            "pending",
+        date:              now.toISOString().split("T")[0],
+        time:              now.toLocaleTimeString('en-US', { hour12: false }),
+        symbol:            symbol,
+        market:            "Kalshi",
+        trade_strategy:    "Hourly HTC",
+        contract:          contract,
+        strike:            `$${Number(strike).toLocaleString()}`,
+        side:              side.toUpperCase() === 'YES' ? 'Y' : 'N',
+        ticker:            "VALID-MARKET-TICKER",
+        buy_price:         buy_price,
+        position:          position,
+        symbol_open:       symbol_open,
+        symbol_close:      null,
+        momentum:          momentum,
+        momentum_delta:    null,
+        volatility:        volatility,
+        volatility_delta:  null,
+        win_loss:          null
+      };
+
+      // 🔍 Log to console for now — we'll send this to backend and executor in next step
+      console.log("Prepared trade payload:", payload);
+
+      // After playing the sound, proceed directly with the trade (no confirmation popup)
+      setTimeout(() => playSound('open'), 0);
+      proceedWithTrade();
+
+      // Everything after payload construction is now in proceedWithTrade
+      function proceedWithTrade() {
+        fetch('/trades', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        .then(() => {
+          updateActiveTrades();
+          fetchAndRenderRecentTrades();
+        })
+        .catch(err => console.error('Failed to open trade:', err))
+        .finally(() => setTimeout(() => (btn.disabled = false), 500));
+      }
     } catch (err) {
       console.error('Failed to open trade:', err);
-    } finally {
       setTimeout(() => (btn.disabled = false), 500);
     }
   })();
@@ -612,6 +644,36 @@ function closeTrade(tradeId, sellPrice, event) {
       setTimeout(() => (btn.disabled = false), 500);
     }
   })();
+}
+
+/**
+ * Cancel a pending or error trade.
+ * Marks the trade as "canceled" in the backend, logs the event, then refreshes the UI.
+ */
+async function cancelTrade(dbId, ticketId) {
+  try {
+    // Cancel trade in DB
+    await fetch(`/trades/${dbId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'canceled' })
+    });
+
+    // Log using ticket_id suffix
+    await fetch('/api/log_event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ticket_id: ticketId.slice(-5),
+        message: 'MONITOR: TRADE CANCELED — CONFIRMED'
+      })
+    });
+
+    updateActiveTrades();
+    fetchAndRenderRecentTrades();
+  } catch (err) {
+    console.error('Failed to cancel trade:', err);
+  }
 }
 
 // === Track last Yes/No button states ===
@@ -1905,14 +1967,15 @@ const activeTradesRowsMap = new Map();
 const previousClosePrices = {}; // Keyed by trade.id
 
 async function fetchAndRenderTrades() {
-
   console.log(`[DEBUG] fetchAndRenderTrades at ${new Date().toLocaleTimeString()}`);
-
   try {
-    // Fetch open trades
-    const tradesRes = await fetch('/trades?status=open', { cache: 'no-store' });
+    // Fetch both open and pending trades
+    // We'll fetch all trades and filter for status 'open' or 'pending'
+    const tradesRes = await fetch('/trades', { cache: 'no-store' });
     if (!tradesRes.ok) throw new Error("Failed to fetch trades");
-    const trades = await tradesRes.json();
+    let trades = await tradesRes.json();
+    // Only show open, pending, and error trades
+    trades = trades.filter(trade => ['open', 'pending', 'error'].includes(trade.status));
     // Sort trades by strike ascending before rendering
     trades.sort((a, b) => {
       const strikeA = parseFloat(String(a.strike).replace(/\$|,/g, '')) || 0;
@@ -1956,6 +2019,80 @@ async function fetchAndRenderTrades() {
 
     // For each trade, either update or create row
     trades.forEach(trade => {
+      // === PENDING/ERROR TRADE ROW LOGIC: merge Buffer and B/M into one cell ===
+      if (trade.status === "pending" || trade.status === "error") {
+        let rowObj = activeTradesRowsMap.get(trade.id);
+        // Choose color and label
+        let bgColor = trade.status === "pending" ? "#3b82f6" : "#ef4444";
+        let label = trade.status === "pending" ? "PENDING" : "ERROR";
+        let textColor = "white";
+        if (!rowObj) {
+          const row = document.createElement("tr");
+          row.style.backgroundColor = bgColor;
+          row.style.color = textColor;
+          // Strike
+          const strikeCell = document.createElement("td");
+          strikeCell.textContent = trade.strike;
+          row.appendChild(strikeCell);
+          // Side
+          const sideCell = document.createElement("td");
+          sideCell.textContent = trade.side;
+          row.appendChild(sideCell);
+          // Buy (price)
+          const priceCell = document.createElement("td");
+          priceCell.textContent = (typeof trade.buy_price === "number")
+            ? trade.buy_price.toFixed(2)
+            : trade.buy_price;
+          row.appendChild(priceCell);
+          // Position
+          const posCell = document.createElement("td");
+          posCell.textContent = trade.position ?? trade.quantity ?? "";
+          row.appendChild(posCell);
+          // Buffer and B/M merged cell
+          const statusCell = document.createElement("td");
+          statusCell.colSpan = 2;
+          statusCell.style.textAlign = "center";
+          statusCell.style.fontStyle = "italic";
+          statusCell.textContent = label;
+          row.appendChild(statusCell);
+          // === Replacement: Close column (Cancel button for pending/error trades) ===
+          const closeCell = document.createElement("td");
+          closeCell.style.textAlign = "center";
+          // Create a fresh Cancel button styled as price-box
+          const cancelSpan = document.createElement("span");
+          cancelSpan.className = "price-box";
+          cancelSpan.dataset.tradeId = trade.id;
+          cancelSpan.dataset.action = "close";
+          cancelSpan.style.cursor = "pointer";
+          cancelSpan.onclick = () => cancelTrade(trade.id, trade.ticket_id);
+          const innerDiv = document.createElement("div");
+          innerDiv.textContent = "Cancel";
+          cancelSpan.appendChild(innerDiv);
+          closeCell.appendChild(cancelSpan);
+          row.appendChild(closeCell);
+          // Insert in sorted order
+          const newStrike = parseFloat(String(trade.strike).replace(/\$|,/g, '')) || 0;
+          let inserted = false;
+          for (const existingRow of activeTradesTableBody.children) {
+            const existingStrike = parseFloat(existingRow.children[0].textContent.replace(/\$|,/g, '')) || 0;
+            if (newStrike < existingStrike) {
+              activeTradesTableBody.insertBefore(row, existingRow);
+              inserted = true;
+              break;
+            }
+          }
+          if (!inserted) activeTradesTableBody.appendChild(row);
+          rowObj = { tr: row };
+          activeTradesRowsMap.set(trade.id, rowObj);
+        } else {
+          rowObj.tr.style.backgroundColor = bgColor;
+          rowObj.tr.style.color = textColor;
+          // Optionally update cell text if needed
+        }
+        return; // Skip rest of render logic for this row
+      }
+
+      // === OPEN TRADE ROW LOGIC ===
       const strikeNum = parseFloat(String(trade.strike).replace(/\$|,/g, '')) || 0;
       // Directional buffer logic: positive = favorable, negative = at risk, based on side
       const isYes = (trade.side || "").toUpperCase() === "Y";
@@ -2066,7 +2203,8 @@ async function fetchAndRenderTrades() {
       } else {
         // Update row class if needed
         if (rowObj.tr.className !== rowClass) rowObj.tr.className = rowClass;
-        // Only update static cells if changed (optional, but not needed)
+        // Ensure background color is not blue for open trades
+        rowObj.tr.style.backgroundColor = "";
       }
       // Always update Buffer and B/M dynamically
       if (rowObj.bufferTd.textContent !== bufferDisplay) rowObj.bufferTd.textContent = bufferDisplay;
