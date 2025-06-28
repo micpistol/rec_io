@@ -2,6 +2,7 @@
 
 *.db
 *.log
+*.log.*
 **/*.json
 
 # Virtual environments
