@@ -155,60 +155,7 @@ def sync_fills():
     else:
         print("⚠️ No fills found, skipping file write.")
 
-    import sqlite3
-    FILLS_DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "fills.db")
-
-    # Ensure data directory exists
-    os.makedirs(os.path.dirname(FILLS_DB_PATH), exist_ok=True)
-
-    with sqlite3.connect(FILLS_DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS fills (
-                trade_id TEXT PRIMARY KEY,
-                ticker TEXT,
-                order_id TEXT,
-                side TEXT,
-                action TEXT,
-                count INTEGER,
-                yes_price REAL,
-                no_price REAL,
-                is_taker BOOLEAN,
-                created_time TEXT,
-                raw_json TEXT
-            )
-        """)
-        # Get all existing trade_ids
-        c.execute("SELECT trade_id FROM fills")
-        existing_ids = set(row[0] for row in c.fetchall())
-        new_count = 0
-        for fill in all_fills:
-            trade_id = fill.get("trade_id")
-            ticker = fill.get("ticker")
-            order_id = fill.get("order_id")
-            side = fill.get("side")
-            action = fill.get("action")
-            count = fill.get("count")
-            yes_price = float(fill.get("yes_price")) / 100 if fill.get("yes_price") is not None else None
-            no_price = float(fill.get("no_price")) / 100 if fill.get("no_price") is not None else None
-            is_taker = fill.get("is_taker")
-            created_time = fill.get("created_time")
-            raw_json = json.dumps(fill)
-
-            if trade_id in existing_ids:
-                continue
-
-            try:
-                c.execute("""
-                    INSERT OR IGNORE INTO fills
-                    (trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time, raw_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time, raw_json))
-                new_count += 1
-            except Exception as e:
-                print(f"❌ Failed to insert fill {trade_id}: {e}")
-        conn.commit()
-    print(f"💾 {new_count} new fills written to {FILLS_DB_PATH}")
+    # SQLite insertion will be handled later by write_fills_to_db()
 
 import sqlite3
 

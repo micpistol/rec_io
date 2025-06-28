@@ -231,6 +231,7 @@ def sync_balance():
         output_path = os.path.join("backend", "accounts", "kalshi", get_account_mode(), "account_balance.json")
         print(f"🧭 Attempting to write to: {os.path.abspath(output_path)}")
         try:
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
             with open(output_path, "w") as f:
                 json.dump({"balance": data.get("balance")}, f)
             print(f"💾 Balance written to {output_path}")
@@ -505,6 +506,7 @@ def sync_settlements():
 def main():
     print("🔁 Kalshi Account Supervisor Starting...")
     print("✅ Authenticated account access confirmed via balance endpoint.")
+    sync_balance()
 
     last_settlement_sync = 0
     last_balance_sync = 0

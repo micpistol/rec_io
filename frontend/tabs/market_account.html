@@ -155,8 +155,6 @@
         fetch("/api/db/positions"),
       ]);
 
-      const balance = await balanceRes.json();
-      const balanceVal = balance.balance ?? balance.total_balance ?? balance.available_balance ?? 0;
       const settlementsJson = await settlementsRes.json();
       const fillsJson = await fillsRes.json();
       const positionsJson = await positionsRes.json();
@@ -167,8 +165,6 @@
 
       window.fills = fills;
 
-      document.getElementById("account-balance").textContent = `$${Number(balanceVal).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-
       const [prodBalRes, demoBalRes] = await Promise.all([
         fetch("/api/account/balance?mode=prod"),
         fetch("/api/account/balance?mode=demo"),
@@ -176,6 +172,11 @@
 
       const prodBalJson = await prodBalRes.json();
       const demoBalJson = await demoBalRes.json();
+
+      const activeBal = GLOBAL_ACCOUNT_MODE === "prod" ? prodBalJson : demoBalJson;
+      const balanceVal = activeBal.balance ?? activeBal.total_balance ?? activeBal.available_balance ?? 0;
+      document.getElementById("account-balance").textContent =
+        `$${Number(balanceVal).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 
       const settlementsBody = document.getElementById("settlements-body");
       settlementsBody.innerHTML = settlements.map(s => `
