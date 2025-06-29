@@ -1,0 +1,4 @@
+[supervisorctl]
+serverurl=http://127.0.0.1:9001
+username=admin
+password=recpass
