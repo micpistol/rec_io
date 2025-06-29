@@ -1,7 +1,8 @@
 from backend.account_mode import get_account_mode
-from config.ports import KALSHI_EXECUTOR_PORT
+# from config.ports import KALSHI_EXECUTOR_PORT  # Removed hard‑wired port import
 import uuid
 import os, sys
+from backend.util.ports import get_port
 
 # --- Flask app for trade triggers ---
 from flask import Flask, request, jsonify
@@ -468,15 +469,22 @@ sync_balance()
 app = Flask(__name__)
 CORS(app)
 
+# --- DEBUGGING: View last outbound status payload to trade manager ---
+last_status_payload = {}
+
+@app.get("/debug/last_status_message")
+def debug_last_status_message():
+    return jsonify(last_status_payload)
+
 # --- Market order helper for /trigger_trade ---
-def place_market_order(side, count):
+def place_market_order(ticker, side, count):
     method = "POST"
     path = "/portfolio/orders"
     url = f"{get_base_url()}{path}"
     timestamp = str(int(time.time() * 1000))
 
     payload = {
-        "ticker": "KXMAYORNYCPARTY-25-D",
+        "ticker": ticker,
         "side": side,
         "type": "market",
         "count": count,
@@ -554,10 +562,15 @@ def trigger_trade():
     try:
         data = request.get_json()
         ticket_id = data.get("ticket_id", "UNKNOWN")
+        # Normalize ticket_id to avoid double "TICKET-" prefixing
+        if ticket_id.count("TICKET-") > 1:
+            ticket_id = ticket_id.split("TICKET-")[-1]
+            ticket_id = f"TICKET-{ticket_id}"
         log_event(ticket_id, "EXECUTOR: TICKET RECEIVED — CONFIRMED")
 
         ticker = data.get("ticker")
-        # === TESTING OVERRIDE: Force use of static ticker regardless of incoming ticket ===
+        # === TEMP OVERRIDE: Force all trades to use NYC MAYOR PARTY MARKET ===
+        # Comment out the next line to re‑enable dynamic ticker routing.
         ticker = "KXMAYORNYCPARTY-25-D"
         raw_side = data.get("side", "yes")
         side = "yes" if raw_side in ["Y", "yes"] else "no"
@@ -594,32 +607,62 @@ def trigger_trade():
         print(f"📬 RESPONSE STATUS: {response.status_code}")
         print(f"📨 RESPONSE BODY: {response.text}")
 
+        global last_status_payload
         if response.status_code >= 400:
             log_event(ticket_id, "EXECUTOR: TRADE REJECTED — ERROR")
             log_event(ticket_id, f"EXECUTOR: TRADE REJECTED — {response.text.strip()}")
-            requests.post("http://localhost:5000/api/update_trade_status", json={"ticket_id": ticket_id, "status": "error"})
+            status_payload = {"ticket_id": ticket_id, "status": "error"}
+            print(f"[DEBUG] QUEUING STATUS 'error' FOR {ticket_id} TO TRADE MANAGER")
+            manager_port = get_port("MAIN_APP_PORT")
+            status_url = f"http://localhost:{manager_port}/api/update_trade_status"
+            def notify_error():
+                try:
+                    resp = requests.post(status_url, json=status_payload, timeout=5)
+                    print(f"[DEBUG] TRADE MANAGER RESPONSE: {resp.status_code} — {resp.text}")
+                except Exception as e:
+                    print(f"[DEBUG] Failed to notify manager of error: {e}")
+            threading.Thread(target=notify_error, daemon=True).start()
             print(f"❌ TRADE FAILED: {response.status_code} — {response.text.strip()}")
             return jsonify({"status": "rejected", "error": response.text}), response.status_code
-
-        log_event(ticket_id, "EXECUTOR: TRADE SENT TO MARKET — CONFIRMED")
-        log_event(ticket_id, "EXECUTOR: TRADE ACCEPTED — KALSHI CONFIRMED")
-        try:
-            fill_data = response.json()
-            requests.post("http://localhost:5000/api/record_fill", json={"ticket_id": ticket_id, "fill_data": fill_data})
-            log_event(ticket_id, "EXECUTOR: FILL DATA SENT TO TRADE MANAGER")
-        except Exception as e:
-            log_event(ticket_id, f"EXECUTOR: FAILED TO SEND FILL DATA — {e}")
-        print("✅ TRADE SENT SUCCESSFULLY")
-        return jsonify({"status": "sent", "message": "Trade sent successfully"}), 200
+        elif response.status_code == 201:
+            log_event(ticket_id, "EXECUTOR: TRADE SENT TO MARKET — CONFIRMED")
+            log_event(ticket_id, "EXECUTOR: TRADE ACCEPTED — KALSHI CONFIRMED")
+            log_event(ticket_id, "EXECUTOR: TRADE ACCEPTED — OK")
+            # Use the normalized ticket_id
+            status_payload = {"ticket_id": ticket_id, "status": "accepted"}
+            print(f"[DEBUG] QUEUING STATUS 'accepted' FOR {ticket_id} TO TRADE MANAGER")
+            manager_port = get_port("MAIN_APP_PORT")
+            status_url = f"http://localhost:{manager_port}/api/update_trade_status"
+            def notify_accepted():
+                try:
+                    resp = requests.post(status_url, json=status_payload, timeout=5)
+                    print(f"[DEBUG] TRADE MANAGER RESPONSE: {resp.status_code} — {resp.text}")
+                except Exception as e:
+                    print(f"[DEBUG] Failed to notify manager of acceptance: {e}")
+            threading.Thread(target=notify_accepted, daemon=True).start()
+            print("✅ TRADE SENT SUCCESSFULLY")
+            return jsonify({"status": "sent", "message": "Trade sent successfully"}), 200
 
     except Exception as e:
         print(f"❌ Error in trade execution: {e}")
         return jsonify({"error": str(e)}), 500
 
 def run_flask():
-    app.run(host="0.0.0.0", port=KALSHI_EXECUTOR_PORT)
+    """Start the executor's internal Flask app on the configured port."""
+    port = get_port("KALSHI_EXECUTOR_PORT")
+    print(f"[INFO] Executor Flask starting on port {port}")
+    app.run(host="0.0.0.0", port=port)
+
+# Expose a helper that main.py can call to start the Flask server when ready.
+
+def start_executor_server():
+    run_flask()
 
 
-# Run Flask server in the main thread for proper terminal output
-run_flask()
+# NOTE: Automatic server launch removed to avoid port conflicts.
+# To start the executor manually, import `start_executor_server` and call it from the main app.
+
+# If run directly, start the Flask server.
+if __name__ == "__main__":
+    start_executor_server()
 

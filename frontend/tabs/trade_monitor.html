@@ -610,7 +610,7 @@ function openTrade(strike, side, event) {
           body: JSON.stringify(payload)
         })
         .then(() => {
-          updateActiveTrades();
+          fetchAndRenderTrades();
           fetchAndRenderRecentTrades();
         })
         .catch(err => console.error('Failed to open trade:', err))
@@ -652,7 +652,7 @@ function closeTrade(tradeId, sellPrice, event) {
       });
 
       // Refresh panels
-      updateActiveTrades();
+      fetchAndRenderTrades();
       fetchAndRenderRecentTrades();
     } catch (err) {
       console.error('Failed to close trade:', err);
@@ -1045,6 +1045,14 @@ fetchAndCacheTTC();
         <button id="testTradeButton" class="test-trade-button">TEST TRADE</button>
 
       </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Initial load of active trades
+      fetchAndRenderTrades();
+      // Poll for updates every 5 seconds
+      setInterval(fetchAndRenderTrades, 5000);
+    });
+  </script>
 </body>
   <div id="errorTooltip" class="error-tooltip"></div>
 <script>
@@ -2065,6 +2073,12 @@ async function fetchAndRenderTrades() {
 
     // For each trade, either update or create row
     trades.forEach(trade => {
+      // If this trade was pending/error and is now open, remove old row so open-render will recreate it
+      const existing = activeTradesRowsMap.get(trade.id);
+      if (existing && trade.status === "open" && existing.statusCell) {
+        activeTradesTableBody.removeChild(existing.tr);
+        activeTradesRowsMap.delete(trade.id);
+      }
       // === PENDING/ERROR TRADE ROW LOGIC: merge Buffer and B/M into one cell ===
       if (trade.status === "pending" || trade.status === "error") {
         let rowObj = activeTradesRowsMap.get(trade.id);

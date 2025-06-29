@@ -1,4 +1,3 @@
-from config.ports import KALSHI_EXECUTOR_PORT
 import asyncio
 import websockets
 import json

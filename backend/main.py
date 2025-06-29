@@ -1,4 +1,4 @@
-from config.ports import MAIN_APP_PORT
+from backend.util.ports import get_main_app_port
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi import WebSocket, WebSocketDisconnect
@@ -868,6 +868,10 @@ def get_trade_log(ticket_id: str):
 
 if __name__ == "__main__":
     import threading
+    import os
+    import importlib.util
+
     threading.Thread(target=start_websocket, daemon=True).start()
+
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=MAIN_APP_PORT)
+    uvicorn.run(app, host="0.0.0.0", port=get_main_app_port())

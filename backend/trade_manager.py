@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, status, Request
+from backend.util.ports import get_executor_port
 import sqlite3
 import threading
 import time
@@ -225,31 +226,32 @@ def get_trades(status: str = None, recent_hours: int = None):
 @router.post("/trades", status_code=status.HTTP_201_CREATED)
 async def add_trade(request: Request):
     data = await request.json()
-    tm_log("🔥 TRADE MANAGER GOT A TICKET — FIRING UP")
-    tm_log(f"📦 FULL TICKET PAYLOAD: {data}")
     required_fields = {"date", "time", "strike", "side", "buy_price", "position"}
     if not required_fields.issubset(data.keys()):
         raise HTTPException(status_code=400, detail="Missing required trade fields")
+
     # Ensure the "time" field is recorded in EST in HH:MM:SS format
-    from zoneinfo import ZoneInfo
     now_est = datetime.now(ZoneInfo("America/New_York"))
     data["time"] = now_est.strftime("%H:%M:%S")
+
     trade_id = insert_trade(data)
+
     # Log events after inserting the trade
     log_event(data["ticket_id"], "MANAGER: TICKET RECEIVED — CONFIRMED")
     log_event(data["ticket_id"], "MANAGER: TRADE LOGGED PENDING — CONFIRMED")
     log_event(data["ticket_id"], "MANAGER: SENT TO EXECUTOR — CONFIRMED")
+
     try:
-        executor_port = "5050"  # Hardcoded executor port
+        executor_port = get_executor_port()
         tm_log(f"📤 SENDING TO EXECUTOR on port {executor_port}")
         tm_log(f"📤 FULL URL: http://localhost:{executor_port}/trigger_trade")
         response = requests.post(f"http://localhost:{executor_port}/trigger_trade", json=data, timeout=5)
         print(f"[EXECUTOR RESPONSE] {response.status_code} — {response.text}")
-        if response.status_code != 200:
-            update_trade_status(trade_id, "error")
+        # Do not mark as open or error here; status update will come from executor via /api/update_trade_status
     except Exception as e:
         tm_log(f"[❌ EXECUTOR ERROR] Failed to send trade to executor: {e}")
-        update_trade_status(trade_id, "error")
+        log_event(data["ticket_id"], f"❌ EXECUTOR ERROR: {e}")
+
     return {"id": trade_id}
 
 # Route to fetch an individual trade by ID
@@ -286,37 +288,54 @@ def remove_trade(trade_id: int):
     return {"id": trade_id, "deleted": True}
 
 # Route to handle incoming fill data messages from the executor
-@router.post("/api/record_fill")
-async def record_fill(request: Request):
-    try:
-        data = await request.json()
-        ticket_id = data.get("ticket_id")
-        if not ticket_id:
-            raise HTTPException(status_code=400, detail="Missing ticket_id")
 
-        # Find the trade ID associated with the ticket
+@router.post("/api/update_trade_status")
+async def update_trade_status_api(request: Request):
+    tm_log(f"📩 RECEIVED STATUS UPDATE PAYLOAD: {await request.body()}")
+    data = await request.json()
+    trade_id = data.get("trade_id")
+    ticket_id = data.get("ticket_id")
+    new_status = data.get("status", "").strip().lower()
+    print(f"[🔥 STATUS UPDATE API HIT] ticket_id={ticket_id} | trade_id={trade_id} | new_status={new_status}")
+
+    if not new_status or (not trade_id and not ticket_id):
+        raise HTTPException(status_code=400, detail="Missing trade_id or ticket_id or status")
+
+    # If trade_id is not provided, try to fetch it via ticket_id
+    if not trade_id and ticket_id:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM trades WHERE ticket_id = ?", (ticket_id,))
         row = cursor.fetchone()
         conn.close()
-
         if not row:
             raise HTTPException(status_code=404, detail="Trade with provided ticket_id not found")
-
         trade_id = row[0]
-        tm_log(f"🔍 Found trade ID {trade_id} for ticket {ticket_id}")
 
-        # For now, just ensure the trade status is marked as open
+    # Optionally, you might want to fetch ticket_id for logging, if not provided
+    if not ticket_id:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT ticket_id FROM trades WHERE id = ?", (trade_id,))
+        row = cursor.fetchone()
+        conn.close()
+        ticket_id = row[0] if row else None
+
+    if new_status == "accepted":
+        print(f"[DEBUG] Updating trade_id={trade_id} to status=OPEN")
         update_trade_status(trade_id, "open")
-        tm_log(f"✅ Updated trade ID {trade_id} to status 'open'")
-        tm_log(f"✅ TRADE {ticket_id} STATUS SET TO OPEN")
+        tm_log(f"✅ Trade accepted for trade_id {trade_id}, marking status as OPEN")
+        if ticket_id:
+            log_event(ticket_id, "MANAGER: STATUS UPDATED — SET TO 'OPEN'")
+        return {"message": "Trade status updated to open", "trade_id": trade_id}
 
-        log_event(ticket_id, "MANAGER: FILL CONFIRMED — STATUS SET TO OPEN")
-        return {"message": "Trade updated to open", "trade_id": trade_id}
-    except Exception as e:
-        tm_log(f"[❌ FILL HANDLER ERROR] {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    elif new_status == "error":
+        print(f"[DEBUG] Updating trade_id={trade_id} to status=ERROR")
+        update_trade_status(trade_id, "error")
+        return {"message": "Trade status updated to error", "trade_id": trade_id}
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unrecognized status value: '{new_status}'")
 
 # Background trade monitoring thread
 
@@ -349,3 +368,25 @@ def start_trade_monitor():
     if _monitor_thread is None or not _monitor_thread.is_alive():
         _monitor_thread = threading.Thread(target=trade_monitor_loop, daemon=True)
         _monitor_thread.start()
+
+
+
+
+
+# ------------------------------------------------------------------------------
+# Stand-alone FastAPI application
+# ------------------------------------------------------------------------------
+
+from fastapi import FastAPI
+
+app = FastAPI()
+app.include_router(router)
+
+if __name__ == "__main__":
+    import uvicorn
+    from backend.util.ports import get_manager_port
+
+    start_trade_monitor()
+    port = get_manager_port()
+    print(f"[INFO] Trade Manager running on port {port}")
+    uvicorn.run(app, host="127.0.0.1", port=port)

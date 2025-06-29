@@ -1,4 +1,4 @@
-from config.ports import KALSHI_EXECUTOR_PORT
+from backend.util.ports import get_port
 import requests
 import json
 import sqlite3
