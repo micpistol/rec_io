@@ -8,8 +8,12 @@ import sqlite3
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_FILE = os.path.join(BASE_DIR, "data", "btc_price_log.txt")
-DB_FILE = os.path.join(BASE_DIR, "data", "btc_price_history.db")
+# Ensure data directory exists
+DATA_DIR = os.path.join(BASE_DIR, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+
+LOG_FILE = os.path.join(DATA_DIR, "btc_price_log.txt")
+DB_FILE = os.path.join(DATA_DIR, "btc_price_history.db")
 COINBASE_WS_URL = "wss://ws-feed.exchange.coinbase.com"
 
 last_logged_second = None
@@ -69,7 +73,7 @@ async def log_btc_price():
 
                         insert_tick(rounded_timestamp, price)
 
-                        HEARTBEAT_FILE = os.path.join(BASE_DIR, "data", "btc_logger_heartbeat.txt")
+                        HEARTBEAT_FILE = os.path.join(DATA_DIR, "btc_logger_heartbeat.txt")
                         with open(HEARTBEAT_FILE, "w") as hb:
                             hb.write(f"{rounded_timestamp} BTC logger alive\n")
 
