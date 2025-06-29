@@ -1,4 +1,5 @@
 from backend.account_mode import get_account_mode
+from config.ports import KALSHI_EXECUTOR_PORT
 import uuid
 import os, sys
 
@@ -555,12 +556,14 @@ def trigger_trade():
         ticket_id = data.get("ticket_id", "UNKNOWN")
         log_event(ticket_id, "EXECUTOR: TICKET RECEIVED — CONFIRMED")
 
+        ticker = data.get("ticker")
         side = data.get("side", "yes")
-        count = data.get("size", 1)
+        count = data.get("quantity", 1)
+        order_type = data.get("type", "market")
         order_payload = {
-            "ticker": "VALID-MARKET-TICKER",
+            "ticker": ticker,
             "side": side,
-            "type": "market",
+            "type": order_type,
             "count": count,
             "time_in_force": "fill_or_kill",
             "action": "buy",
@@ -581,15 +584,22 @@ def trigger_trade():
         }
 
         url = f"{get_base_url()}{path}"
+        print(f"🚀 SENDING TRADE PAYLOAD TO KALSHI:\n{json.dumps(order_payload, indent=2)}")
+        print(f"📡 HEADERS:\n{json.dumps(headers, indent=2)}")
+        print(f"🌐 URL: {url}")
         response = requests.post(url, headers=headers, json=order_payload, timeout=10)
+        print(f"📬 RESPONSE STATUS: {response.status_code}")
+        print(f"📨 RESPONSE BODY: {response.text}")
 
         if response.status_code >= 400:
             log_event(ticket_id, "EXECUTOR: TRADE REJECTED — ERROR")
             log_event(ticket_id, f"EXECUTOR: TRADE REJECTED — {response.text.strip()}")
             requests.post("http://localhost:5000/api/update_trade_status", json={"ticket_id": ticket_id, "status": "error"})
+            print(f"❌ TRADE FAILED: {response.status_code} — {response.text.strip()}")
             return jsonify({"status": "rejected", "error": response.text}), response.status_code
 
         log_event(ticket_id, "EXECUTOR: TRADE SENT TO MARKET — CONFIRMED")
+        print("✅ TRADE SENT SUCCESSFULLY")
         return jsonify({"status": "sent", "message": "Trade sent successfully"}), 200
 
     except Exception as e:
@@ -597,13 +607,9 @@ def trigger_trade():
         return jsonify({"error": str(e)}), 500
 
 def run_flask():
-    app.run(host="0.0.0.0", port=5070)
+    app.run(host="0.0.0.0", port=KALSHI_EXECUTOR_PORT)
 
-# Start Flask server in a background thread
-threading.Thread(target=run_flask, daemon=True).start()
 
-# Keep the connection alive indefinitely
-print("🟢 Handshake established. Holding connection open...")
-while True:
-    time.sleep(1)
+# Run Flask server in the main thread for proper terminal output
+run_flask()
 

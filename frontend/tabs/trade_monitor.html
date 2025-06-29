@@ -1175,7 +1175,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const testTradeBtn = document.getElementById("testTradeButton");
   if (testTradeBtn) {
     testTradeBtn.addEventListener("click", function () {
-      // Use the value from positionSizePicker, or fallback to position-size if needed
       let quantity;
       const pickerInput = document.getElementById("positionSizePicker");
       if (pickerInput && pickerInput.value) {
@@ -1188,19 +1187,28 @@ document.addEventListener('DOMContentLoaded', () => {
         alert("Please enter a position size.");
         return;
       }
-      fetch("http://localhost:5070/trigger_trade", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          side: "yes",
-          quantity: parseInt(quantity)
+
+      fetch("/public/port_config.json")
+        .then(res => res.json())
+        .then(config => {
+          const execPort = config.KALSHI_EXECUTOR_PORT;
+          const baseURL = window.location.origin.replace(/:\d+$/, `:${execPort}`);
+          return fetch(`${baseURL}/trigger_trade`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              ticker: "KXMAYORNYCPARTY-25-D",
+              side: "no",
+              quantity: parseInt(quantity),
+              type: "market"
+            })
+          });
         })
-      })
-      .then(response => response.json())
-      .then(data => console.log("✅ Trade executed:", data))
-      .catch(error => console.error("❌ Error triggering trade:", error));
+        .then(response => response.json())
+        .then(data => console.log("✅ Trade executed:", data))
+        .catch(error => console.error("❌ Error triggering trade:", error));
     });
   }
 });
@@ -2006,7 +2014,6 @@ const activeTradesRowsMap = new Map();
 const previousClosePrices = {}; // Keyed by trade.id
 
 async function fetchAndRenderTrades() {
-  console.log(`[DEBUG] fetchAndRenderTrades at ${new Date().toLocaleTimeString()}`);
   try {
     // Fetch both open and pending trades
     // We'll fetch all trades and filter for status 'open' or 'pending'

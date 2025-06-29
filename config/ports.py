@@ -1,0 +1,6 @@
+# config/ports.py
+
+KALSHI_EXECUTOR_PORT = 5050
+MAIN_APP_PORT = 8000
+ACCOUNT_SYNC_PORT = 5070
+# Add more as needed

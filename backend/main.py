@@ -1,3 +1,4 @@
+from config.ports import MAIN_APP_PORT
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi import WebSocket, WebSocketDisconnect
@@ -66,6 +67,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Serve heartbeat file
 app.mount(
     "/logger",
@@ -100,6 +102,9 @@ app.mount(
     StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend", "styles")),
     name="styles"
 )
+
+# Serve the public folder as static files under /public
+app.mount("/public", StaticFiles(directory="public"), name="public")
 
 @app.get("/", response_class=HTMLResponse)
 def serve_index():
@@ -865,4 +870,4 @@ if __name__ == "__main__":
     import threading
     threading.Thread(target=start_websocket, daemon=True).start()
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=MAIN_APP_PORT)
