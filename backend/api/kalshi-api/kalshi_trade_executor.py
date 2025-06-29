@@ -557,7 +557,10 @@ def trigger_trade():
         log_event(ticket_id, "EXECUTOR: TICKET RECEIVED — CONFIRMED")
 
         ticker = data.get("ticker")
-        side = data.get("side", "yes")
+        # === TESTING OVERRIDE: Force use of static ticker regardless of incoming ticket ===
+        ticker = "KXMAYORNYCPARTY-25-D"
+        raw_side = data.get("side", "yes")
+        side = "yes" if raw_side in ["Y", "yes"] else "no"
         count = data.get("quantity", 1)
         order_type = data.get("type", "market")
         order_payload = {
@@ -599,6 +602,13 @@ def trigger_trade():
             return jsonify({"status": "rejected", "error": response.text}), response.status_code
 
         log_event(ticket_id, "EXECUTOR: TRADE SENT TO MARKET — CONFIRMED")
+        log_event(ticket_id, "EXECUTOR: TRADE ACCEPTED — KALSHI CONFIRMED")
+        try:
+            fill_data = response.json()
+            requests.post("http://localhost:5000/api/record_fill", json={"ticket_id": ticket_id, "fill_data": fill_data})
+            log_event(ticket_id, "EXECUTOR: FILL DATA SENT TO TRADE MANAGER")
+        except Exception as e:
+            log_event(ticket_id, f"EXECUTOR: FAILED TO SEND FILL DATA — {e}")
         print("✅ TRADE SENT SUCCESSFULLY")
         return jsonify({"status": "sent", "message": "Trade sent successfully"}), 200
 
