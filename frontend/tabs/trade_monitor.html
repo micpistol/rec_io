@@ -1032,6 +1032,13 @@ fetchAndCacheTTC();
 
     <div class="column" id="col3">
       <div class="panel-container" id="buildTrade" style="min-height: 300px; padding: 10px;">
+        <div style="margin-bottom: 12px;">
+          <select id="account-selector" style="padding: 6px; border-radius: 4px;">
+            <option value="live">eric@ewedit.com</option>
+            <option value="demo">eric@ewedit.com DEMO</option>
+          </select>
+          <span id="account-status" style="font-weight: bold; color: #00ff00; margin-left: 10px;"></span>
+        </div>
         <div style="font-weight: bold; margin-bottom: 6px; font-size: 0.9rem;">Position Size</div>
         <div id="positionSizeSelector" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
           <input type="number" id="position-size" min="1" style="width: 60px; padding: 6px; text-align: right; font-size: 1rem; border-radius: 4px; border: 1px solid #ccc;" />
@@ -1051,6 +1058,43 @@ fetchAndCacheTTC();
       fetchAndRenderTrades();
       // Poll for updates every 5 seconds
       setInterval(fetchAndRenderTrades, 5000);
+    });
+  </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      fetch('/api/get_account_mode')
+        .then(res => res.json())
+        .then(data => {
+          const mode = data.mode;
+          const selector = document.getElementById("account-selector");
+          const statusEl = document.getElementById("account-status");
+          selector.value = mode === 'prod' ? 'live' : 'demo';
+          if (mode === 'prod') {
+            statusEl.textContent = "*** LIVE TRADING ***";
+            statusEl.style.color = "#00ff00";
+          } else {
+            statusEl.textContent = "Paper Trading";
+            statusEl.style.color = "orange";
+          }
+        });
+
+      document.getElementById("account-selector").addEventListener("change", () => {
+        const selected = document.getElementById("account-selector").value;
+        const statusEl = document.getElementById("account-status");
+        const mode = selected === "live" ? "prod" : "demo";
+        if (mode === "prod") {
+          statusEl.textContent = "*** LIVE TRADING ***";
+          statusEl.style.color = "#00ff00";
+        } else {
+          statusEl.textContent = "Paper Trading";
+          statusEl.style.color = "orange";
+        }
+        fetch('/api/set_account_mode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode })
+        }).catch(console.error);
+      });
     });
   </script>
 </body>
@@ -1103,6 +1147,17 @@ document.addEventListener('DOMContentLoaded', () => {
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
+
+      // === Account Mode Sync ===
+      if (data.account_mode) {
+        const selector = document.getElementById("account-selector");
+        const statusEl = document.getElementById("account-status");
+        if (selector && statusEl) {
+          selector.value = data.account_mode === "prod" ? "live" : "demo";
+          statusEl.textContent = data.account_mode === "prod" ? "*** LIVE TRADING ***" : "Paper Trading";
+          statusEl.style.color = data.account_mode === "prod" ? "#00ff00" : "orange";
+        }
+      }
 
       // Only update UI if not focused to avoid overwriting user input
       if (autoStopToggle && data.auto_stop !== undefined && document.activeElement !== autoStopToggle) {

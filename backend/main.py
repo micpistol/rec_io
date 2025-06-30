@@ -597,6 +597,7 @@ async def set_account_mode(request: Request):
         return {"status": "error", "message": "Invalid mode"}
     try:
         account_mode.set_account_mode(mode)
+        await broadcast_account_mode(mode)
         return {"status": "ok", "mode": mode}
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -840,6 +841,7 @@ async def websocket_preferences(websocket: WebSocket):
         connected_clients.remove(websocket)
 
 
+
 # Broadcast helper function for preferences updates
 async def broadcast_preferences_update():
     data = json.dumps(load_preferences())
@@ -847,6 +849,17 @@ async def broadcast_preferences_update():
     for client in connected_clients:
         try:
             await client.send_text(data)
+        except Exception:
+            to_remove.add(client)
+    connected_clients.difference_update(to_remove)
+
+# Broadcast helper function for account mode updates
+async def broadcast_account_mode(mode: str):
+    message = json.dumps({"account_mode": mode})
+    to_remove = set()
+    for client in connected_clients:
+        try:
+            await client.send_text(message)
         except Exception:
             to_remove.add(client)
     connected_clients.difference_update(to_remove)

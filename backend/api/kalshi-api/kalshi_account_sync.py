@@ -298,6 +298,8 @@ def sync_positions():
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
             data = response.json()
+            print("🔍 Raw Kalshi positions response:")
+            print(json.dumps(data, indent=2))
             print("Response keys:", data.keys())
             if "error" in data:
                 print("⚠️ API error:", data["error"])
