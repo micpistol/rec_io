@@ -1,3 +1,4 @@
+LAST_POSITIONS_HASH: str | None = None
 from backend.util.ports import get_port
 from backend.account_mode import get_account_mode
 import os, sys
@@ -313,11 +314,33 @@ def sync_positions():
             print(f"❌ Failed to fetch positions: {e}")
             break
 
+    # ----- CHANGE-DETECTION: skip writes if nothing changed -----
+    global LAST_POSITIONS_HASH
+    snapshot_dict = {
+        "market_positions": all_market_positions,
+        "event_positions": all_event_positions,
+    }
+    try:
+        snapshot_hash = hashlib.md5(
+            json.dumps(snapshot_dict, sort_keys=True).encode()
+        ).hexdigest()
+    except Exception as e:
+        print(f"❌ Failed to hash positions snapshot: {e}")
+        return
+
+    if snapshot_hash == LAST_POSITIONS_HASH:
+        print("🔁 No changes in positions — skipping write.")
+        return  # Exit early; nothing new to write
+
+    LAST_POSITIONS_HASH = snapshot_hash
+    # ------------------------------------------------------------
     # Write to positions.db, replacing all
     with sqlite3.connect(POSITIONS_DB_PATH) as conn:
         c = conn.cursor()
         c.execute("DELETE FROM positions")
         for p in all_market_positions:
+            if p.get("position") == 0:
+                continue  # Skip entries with zero position
             try:
                 ticker = p.get("ticker")
                 total_traded = p.get("total_traded")
@@ -527,7 +550,7 @@ def main():
                 sync_balance()
                 last_balance_sync = now
 
-            time.sleep(1)
+            time.sleep(0.5)
         except Exception as e:
             print(f"❌ Error during sync loop: {e}")
             time.sleep(5)

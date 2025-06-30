@@ -1,3 +1,62 @@
+# ---------- CORE HELPERS ----------------------------------------------------
+def create_pending_trade(trade: dict) -> int:
+    """Insert a new ticket immediately with status='pending' and return DB id."""
+    trade_id = insert_trade(trade)
+    log_event(trade["ticket_id"], "MANAGER: TICKET RECEIVED — CONFIRMED")
+    log_event(trade["ticket_id"], "MANAGER: TRADE LOGGED PENDING — CONFIRMED")
+    return trade_id
+
+
+def _wait_for_fill(ticker: str, timeout: int = 10) -> tuple[int | None, float | None]:
+    """
+    Poll /api/db/positions (no hard‑wired port) until ticker appears with
+    non‑zero position, or timeout seconds elapse.
+    Returns (abs_position, buy_price) or (None, None) if not seen in time.
+    """
+    deadline = time.time() + timeout
+    url = "http://localhost/api/db/positions"          # host‑relative; no port hard‑coding
+    while time.time() < deadline:
+        try:
+            r = requests.get(url, timeout=2)
+            if r.status_code == 200:
+                payload = r.json()
+                positions = (
+                    payload.get("positions")
+                    or payload.get("market_positions")
+                    or []
+                )
+                for p in positions:
+                    # Return the first position with pos > 0 and exposure > 0 regardless of ticker
+                    pos = abs(p.get("position", 0))
+                    exposure = abs(p.get("market_exposure", 0))
+                    if pos > 0 and exposure > 0:
+                        price = round(float(exposure) / float(pos) / 100, 2)
+                        print(f"[DEBUG] FILL FOUND — pos={pos}, exposure={exposure}, price={price}")
+                        return int(pos), price
+                    else:
+                        print(f"[DEBUG] Skipping position — position or exposure = 0")
+                print(f"[FILL POLL] No position data yet for any position, retrying...")
+        except Exception:
+            pass
+        time.sleep(1)
+    return None, None
+
+
+def finalize_trade(trade_id: int, ticket_id: str) -> None:
+    """
+    Called only after executor says 'accepted'.
+    Immediately sets status to 'open', no fill checking.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE trades SET status='open' WHERE id=?",
+        (trade_id,)
+    )
+    conn.commit()
+    conn.close()
+    if ticket_id:
+        log_event(ticket_id, "MANAGER: STATUS UPDATED — SET TO 'OPEN'")
 from fastapi import APIRouter, HTTPException, status, Request
 from backend.util.ports import get_executor_port
 import sqlite3
@@ -234,11 +293,7 @@ async def add_trade(request: Request):
     now_est = datetime.now(ZoneInfo("America/New_York"))
     data["time"] = now_est.strftime("%H:%M:%S")
 
-    trade_id = insert_trade(data)
-
-    # Log events after inserting the trade
-    log_event(data["ticket_id"], "MANAGER: TICKET RECEIVED — CONFIRMED")
-    log_event(data["ticket_id"], "MANAGER: TRADE LOGGED PENDING — CONFIRMED")
+    trade_id = create_pending_trade(data)
     log_event(data["ticket_id"], "MANAGER: SENT TO EXECUTOR — CONFIRMED")
 
     try:
@@ -322,17 +377,17 @@ async def update_trade_status_api(request: Request):
         ticket_id = row[0] if row else None
 
     if new_status == "accepted":
-        print(f"[DEBUG] Updating trade_id={trade_id} to status=OPEN")
-        update_trade_status(trade_id, "open")
-        tm_log(f"✅ Trade accepted for trade_id {trade_id}, marking status as OPEN")
-        if ticket_id:
-            log_event(ticket_id, "MANAGER: STATUS UPDATED — SET TO 'OPEN'")
-        return {"message": "Trade status updated to open", "trade_id": trade_id}
+        # spawn background thread so response is immediate
+        threading.Thread(
+            target=finalize_trade, args=(trade_id, ticket_id), daemon=True
+        ).start()
+        return {"message": "Trade accepted – finalizing", "trade_id": trade_id}
 
     elif new_status == "error":
-        print(f"[DEBUG] Updating trade_id={trade_id} to status=ERROR")
         update_trade_status(trade_id, "error")
-        return {"message": "Trade status updated to error", "trade_id": trade_id}
+        if ticket_id:
+            log_event(ticket_id, "MANAGER: STATUS UPDATED — SET TO 'ERROR'")
+        return {"message": "Trade marked error", "trade_id": trade_id}
 
     else:
         raise HTTPException(status_code=400, detail=f"Unrecognized status value: '{new_status}'")
@@ -384,9 +439,9 @@ app.include_router(router)
 
 if __name__ == "__main__":
     import uvicorn
-    from backend.util.ports import get_manager_port
+    import os
 
     start_trade_monitor()
-    port = get_manager_port()
+    port = int(os.environ.get("TRADE_MANAGER_PORT", 5000))
     print(f"[INFO] Trade Manager running on port {port}")
     uvicorn.run(app, host="127.0.0.1", port=port)

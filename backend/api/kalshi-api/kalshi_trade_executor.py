@@ -571,7 +571,7 @@ def trigger_trade():
         ticker = data.get("ticker")
         # === TEMP OVERRIDE: Force all trades to use NYC MAYOR PARTY MARKET ===
         # Comment out the next line to re‑enable dynamic ticker routing.
-        ticker = "KXMAYORNYCPARTY-25-D"
+        ticker = "KXMAYORNYCPARTY-25-R"
         raw_side = data.get("side", "yes")
         side = "yes" if raw_side in ["Y", "yes"] else "no"
         count = data.get("quantity", 1)

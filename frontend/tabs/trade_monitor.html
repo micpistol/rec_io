@@ -514,8 +514,10 @@
 <!-- === STRIKE TABLES JS (inserted as per instructions) === -->
 <script>
 // === Trade Open/Close Master Functions (Symmetric) ===
-function openTrade(strike, side, event) {
-  const btn = event?.target;
+// Modified openTrade to accept a DOM element as the first argument (target)
+function openTrade(target) {
+  // target is the clicked element (e.g., the YES/NO span or cell)
+  const btn = target;
   if (btn?.disabled) return;
   if (btn) {
     btn.disabled = true;
@@ -543,11 +545,40 @@ function openTrade(strike, side, event) {
 
       const symbol = getSelectedSymbol();
       const contract = getTruncatedMarketTitle();
-      // Find the relevant strikeData from latestKalshiMarkets if available (simulate for now)
-      let strikeData = { market_id: null };
-      if (window.latestKalshiMarkets && Array.isArray(window.latestKalshiMarkets)) {
+      // Get the strike and side from data attributes on the parent td or span
+      let strike = null;
+      let side = null;
+      // Attempt to find strike and side from parent td or span
+      // Find the row
+      let row = btn.closest('tr');
+      if (row) {
+        // First td is strike cell
+        const strikeCell = row.querySelector('td');
+        if (strikeCell) {
+          // Remove $ and commas, parse as number
+          strike = parseFloat(strikeCell.textContent.replace(/\$|,/g, ''));
+        }
+        // Determine side by column index
+        const tds = Array.from(row.children);
+        for (let i = 0; i < tds.length; ++i) {
+          if (tds[i].contains(btn)) {
+            if (i === 5) side = 'yes';
+            if (i === 6) side = 'no';
+          }
+        }
+      }
+      // Fallback: try to get from btn.dataset
+      if (!strike && btn.dataset.strike) strike = parseFloat(btn.dataset.strike);
+      if (!side && btn.dataset.side) side = btn.dataset.side;
+      // Get ticker from data-ticker attribute (on td or span)
+      let kalshiTicker = btn.dataset.ticker || null;
+      if (!kalshiTicker && btn.parentElement && btn.parentElement.dataset.ticker) {
+        kalshiTicker = btn.parentElement.dataset.ticker;
+      }
+      // Fallback: try to find from latestKalshiMarkets if available
+      if (!kalshiTicker && window.latestKalshiMarkets && Array.isArray(window.latestKalshiMarkets) && strike != null) {
         const match = window.latestKalshiMarkets.find(m => Math.round(m.floor_strike) === strike);
-        if (match) strikeData = match;
+        if (match) kalshiTicker = match.ticker;
       }
       const symbol_open = getCurrentBTCTickerPrice();
       const momentum = getCurrentMomentumScore();
@@ -582,8 +613,8 @@ function openTrade(strike, side, event) {
         trade_strategy:    "Hourly HTC",
         contract:          contract,
         strike:            `$${Number(strike).toLocaleString()}`,
-        side:              side.toUpperCase() === 'YES' ? 'Y' : 'N',
-        ticker:            "VALID-MARKET-TICKER",
+        side:              side && side.toUpperCase() === 'YES' ? 'Y' : (side && side.toUpperCase() === 'NO' ? 'N' : (side ? side[0].toUpperCase() : null)),
+        ticker:            kalshiTicker,
         buy_price:         buy_price,
         position:          position,
         symbol_open:       symbol_open,
@@ -709,7 +740,7 @@ function debounce(func, wait) {
 }
 
 // Helper function to update Yes/No button with conditional redraw
-function updateYesNoButton(spanEl, strike, side, askPrice, isActive, marketId = null) {
+function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = null) {
   const key = `${strike}-${side}`;
   const prev = lastButtonStates.get(key);
   if (prev && prev.askPrice === askPrice && prev.isActive === isActive) {
@@ -721,14 +752,21 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, marketId = 
   spanEl.className = isActive ? 'price-box' : 'price-box disabled';
   spanEl.style.cursor = isActive ? 'pointer' : 'default';
 
-  // Patch: set data-market-id on the YES/NO cell's parent td
-  if (spanEl.parentElement && marketId) {
-    spanEl.parentElement.setAttribute('data-market-id', marketId);
+  // Set data-ticker on the YES/NO cell's parent td (for reference, if needed)
+  if (spanEl.parentElement && ticker) {
+    spanEl.parentElement.setAttribute('data-ticker', ticker);
   }
+  // Also set data-ticker directly on spanEl for easier access in openTrade
+  if (ticker) {
+    spanEl.setAttribute('data-ticker', ticker);
+  }
+  // Set data-strike and data-side for easier retrieval in openTrade
+  spanEl.setAttribute('data-strike', strike);
+  spanEl.setAttribute('data-side', side);
 
   if (isActive) {
     spanEl.onclick = debounce(function(event) {
-      openTrade(strike, side, event);
+      openTrade(spanEl);
     }, 300);
   } else {
     spanEl.onclick = null;
@@ -782,12 +820,15 @@ function initializeStrikeTable(basePrice) {
 
     // Yes button cell and span
     const yesTd = document.createElement('td');
+    // Set data-ticker on the cell (will be updated later in updateYesNoButton)
+    yesTd.setAttribute('data-ticker', '');
     const yesSpan = document.createElement('span');
     yesTd.appendChild(yesSpan);
     row.appendChild(yesTd);
 
     // No button cell and span
     const noTd = document.createElement('td');
+    noTd.setAttribute('data-ticker', '');
     const noSpan = document.createElement('span');
     noTd.appendChild(noSpan);
     row.appendChild(noTd);
@@ -871,16 +912,16 @@ function updateStrikeTable(coreData, latestKalshiMarkets) {
 
     // Find markets for yes/no asks
     const matchingMarket = latestKalshiMarkets.find(m => Math.round(m.floor_strike) === strike);
-    // Immediately after this lookup, extract the corresponding ticker value from the same matchingMarket object
-    const marketId = matchingMarket ? matchingMarket.ticker : null;
+    // Extract the corresponding ticker value from the same matchingMarket object
+    const ticker = matchingMarket ? matchingMarket.ticker : null;
     const yesAsk = matchingMarket && typeof matchingMarket.yes_ask === "number" ? Math.round(matchingMarket.yes_ask) : 0;
     const noAsk = matchingMarket && typeof matchingMarket.no_ask === "number" ? Math.round(matchingMarket.no_ask) : 0;
 
     const isYesActive = yesAsk > noAsk && yesAsk < 99 && yesAsk >= 40;
     const isNoActive = noAsk > yesAsk && noAsk < 99 && noAsk >= 40;
 
-    updateYesNoButton(yesSpan, strike, "yes", yesAsk, isYesActive, marketId);
-    updateYesNoButton(noSpan, strike, "no", noAsk, isNoActive, marketId);
+    updateYesNoButton(yesSpan, strike, "yes", yesAsk, isYesActive, ticker);
+    updateYesNoButton(noSpan, strike, "no", noAsk, isNoActive, ticker);
   });
 }
 
