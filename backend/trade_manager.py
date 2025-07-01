@@ -374,6 +374,27 @@ def get_trades(status: str = None, recent_hours: int = None):
 @router.post("/trades", status_code=status.HTTP_201_CREATED)
 async def add_trade(request: Request):
     data = await request.json()
+    intent = data.get("intent", "open").lower()
+    if intent == "close":
+        print("[DEBUG] CLOSE TICKET RECEIVED")
+        print("[DEBUG] Close Payload:", data)
+        tm_log(f"[DEBUG] CLOSE TICKET RECEIVED — Payload: {data}")
+        ticker = data.get("ticker")
+        if ticker:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            sell_price = data.get("buy_price")
+            cursor.execute("UPDATE trades SET status = 'closing', sell_price = ? WHERE ticker = ?", (sell_price, ticker))
+            conn.commit()
+            conn.close()
+            tm_log(f"[DEBUG] Trade status set to 'closing' for ticker: {ticker}")
+            # Notify trade monitor of trade change
+            try:
+                from backend.util.broadcast import notify_trade_change
+                notify_trade_change()
+            except Exception as e:
+                tm_log(f"[WARN] Failed to notify monitor of trade change: {e}")
+        return {"message": "Close ticket received and ignored"}
     tm_log("✅ /trades POST route triggered successfully")
     print("✅ TRADE MANAGER received POST")
     required_fields = {"date", "time", "strike", "side", "buy_price", "position"}

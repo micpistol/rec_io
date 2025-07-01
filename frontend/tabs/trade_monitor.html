@@ -515,14 +515,38 @@
 <script>
 // === Trade Open/Close Master Functions (Symmetric) ===
 // Modified openTrade to accept a DOM element as the first argument (target)
+// --- Row Flash CSS ---
+const rowFlashStyle = document.createElement('style');
+rowFlashStyle.innerHTML = `
+.strike-row-flash {
+  animation: strike-row-flash-anim 0.55s linear;
+}
+@keyframes strike-row-flash {
+  0% { background-color: #fff700; color: #222 !important; }
+  80% { background-color: #fff700; color: #222 !important; }
+  100% { background-color: inherit; color: inherit; }
+}
+`;
+document.head.appendChild(rowFlashStyle);
+
 function openTrade(target) {
-  // Instant feedback: sound and popup shown immediately
+  // Play sound and popup immediately
   playSound('open');
   showTradeOpenedPopup();
 
   const btn = target;
   if (btn?.disabled) return;
   btn.disabled = true;
+
+  // --- Visual feedback: row flash highlight ---
+  let row = btn.closest('tr');
+  if (row) {
+    row.classList.add('strike-row-flash');
+    setTimeout(() => row.classList.remove('strike-row-flash'), 600);
+  }
+
+  // --- Immediately trigger trade table update (no debounce, no delay, no backend wait) ---
+  fetchAndRenderTrades();
 
   // Defer backend logic to next tick to decouple from UI thread
   setTimeout(() => {
@@ -545,16 +569,16 @@ function openTrade(target) {
         let side = null;
         // Attempt to find strike and side from parent td or span
         // Find the row
-        let row = btn.closest('tr');
-        if (row) {
+        let row2 = btn.closest('tr');
+        if (row2) {
           // First td is strike cell
-          const strikeCell = row.querySelector('td');
+          const strikeCell = row2.querySelector('td');
           if (strikeCell) {
             // Remove $ and commas, parse as number
             strike = parseFloat(strikeCell.textContent.replace(/\$|,/g, ''));
           }
           // Determine side by column index
-          const tds = Array.from(row.children);
+          const tds = Array.from(row2.children);
           for (let i = 0; i < tds.length; ++i) {
             if (tds[i].contains(btn)) {
               if (i === 5) side = 'yes';
@@ -630,7 +654,7 @@ function openTrade(target) {
           body: JSON.stringify(payload)
         })
         .then(() => {
-          fetchAndRenderTrades();
+          // (Optionally, trigger another refresh here, but already done above)
           fetchAndRenderRecentTrades();
         })
         .catch(err => console.error('Failed to open trade:', err))
@@ -654,23 +678,38 @@ function closeTrade(tradeId, sellPrice, event) {
   if (btn?.disabled) return;
   btn.disabled = true;
 
-  // === DB: close trade ===
+  // === Send close trade ticket as POST ===
   (async () => {
     try {
-      await fetch(`/trades/${tradeId}`, {
-        method: 'PUT',
+      // Fetch trade details to construct the close ticket
+      const tradeRes = await fetch(`/trades/${tradeId}`);
+      if (!tradeRes.ok) throw new Error('Failed to fetch trade for closing');
+      const trade = await tradeRes.json();
+      // Construct close ticket payload
+      // Invert side
+      let invertedSide = null;
+      if (trade.side === 'Y' || trade.side === 'YES') invertedSide = 'N';
+      else if (trade.side === 'N' || trade.side === 'NO') invertedSide = 'Y';
+      else invertedSide = trade.side;
+      // Use current BTC price for symbol_close
+      const symbolClose = getCurrentBTCTickerPrice();
+      // Compose payload to match open ticket, plus intent: 'close'
+      const payload = {
+        intent: 'close',
+        ticker: trade.ticker,
+        side: invertedSide,
+        count: trade.position ?? trade.quantity ?? 1,
+        action: 'close',
+        type: 'market',
+        time_in_force: 'IOC',
+        buy_price: sellPrice,
+        symbol_close: symbolClose
+      };
+      await fetch('/trades', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status     : 'closed',
-          sell_price : sellPrice,
-          closed_at  : new Date().toLocaleTimeString('en-US', {
-            timeZone: 'America/New_York',
-            hour12 : false
-          }),
-          symbol_close: getCurrentBTCTickerPrice()
-        })
+        body: JSON.stringify(payload)
       });
-
       // Refresh panels
       fetchAndRenderTrades();
       fetchAndRenderRecentTrades();
@@ -1922,25 +1961,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 </script>
 </div>
-  <!-- Inserted checkExpiredTrades script block before closing body tag -->
-  <script>
-  function checkExpiredTrades() {
-    setInterval(() => {
-      const now = new Date();
-      const mm = now.getMinutes();
-      const ss = now.getSeconds();
-      if (mm === 59 && ss === 59) {
-        console.log("Triggering closeExpiredTrades at 59:59");
-        closeExpiredTrades();
-      } else if (mm === 0 && (ss === 0 || ss === 1)) {
-        console.log(`Triggering closeExpiredTrades backup at 00:${ss.toString().padStart(2, '0')}`);
-        closeExpiredTrades();
-      }
-    }, 1000);
-  }
-
-  window.addEventListener('load', checkExpiredTrades);
-  </script>
 </body>
 <script>
 // === Active Trades Panel and Trade Execution ===
