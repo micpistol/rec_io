@@ -1123,8 +1123,7 @@ fetchAndCacheTTC();
     document.addEventListener('DOMContentLoaded', () => {
       // Initial load of active trades
       fetchAndRenderTrades();
-      // Poll for updates every 5 seconds
-      setInterval(fetchAndRenderTrades, 5000);
+      // TODO: Replace polling with real-time file change triggers or push-based updates
     });
   </script>
   <script>
@@ -1811,46 +1810,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // === Momentum Chart Duplicate (Chart.js) ===
-    let momentumChartDuplicate = null;
-    function renderMomentumChartDuplicate(history) {
-      const ctx = document.getElementById('momentumChartDuplicate').getContext('2d');
-      if (!momentumChartDuplicate) {
-        momentumChartDuplicate = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: history.map(() => ''),
-            datasets: [{
-              label: 'Momentum Duplicate',
-              data: history,
-              borderColor: '#cc0000',
-              borderWidth: 1,
-              pointRadius: 0,
-              tension: 0.3,
-              fill: false
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            plugins: { legend: { display: false } },
-            scales: {
-              x: { display: true, ticks: { color: '#ccc' }, grid: { display: false } },
-              y: {
-                min: -50,
-                max: 50,
-                ticks: { stepSize: 25, color: '#ccc' },
-                grid: { color: '#444' }
-              }
-            }
-          }
-        });
-      } else {
-        momentumChartDuplicate.data.labels = history.map(() => '');
-        momentumChartDuplicate.data.datasets[0].data = history;
-        momentumChartDuplicate.update();
-      }
-    }
+    // (Poll for fills/positions/settlements/balance REMOVED below)
 
     // === Volatility Score History, Moving Average, Delta Globals ===
     window.volScoreHistory = [];
@@ -1936,6 +1896,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // setInterval(fetchOtherCoreData, 1000); // Replaced by staggered polling below
     fetchBTCPriceChanges();
     // setInterval(fetchBTCPriceChanges, 1000); // Replaced by staggered polling below
+
+    // === POLLING REMOVALS: Fills, Positions, Settlements, Balance ===
+    // The following polling code is disabled as requested:
+    /*
+    // setInterval(() => {
+    //   fetch('/api/db/fills').then(...);
+    //   fetch('/api/db/positions').then(...);
+    //   fetch('/api/db/settlements').then(...);
+    //   fetch('/api/account/balance').then(...);
+    // }, INTERVAL);
+    */
   </script>
 
 <script>
@@ -2106,8 +2077,8 @@ const previousClosePrices = {}; // Keyed by trade.id
 async function fetchAndRenderTrades() {
   try {
     // Fetch both open and pending trades
-    // We'll fetch all trades and filter for status 'open' or 'pending'
-    const tradesRes = await fetch('/trades', { cache: 'no-store' });
+    // Include both open and pending trades via status filter
+    const tradesRes = await fetch('/trades?status=open,pending', { cache: 'no-store' });
     if (!tradesRes.ok) throw new Error("Failed to fetch trades");
     let trades = await tradesRes.json();
     // Only show open, pending, and error trades

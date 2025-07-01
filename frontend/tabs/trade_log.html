@@ -76,6 +76,12 @@
   </div>
 
   <div class="panel-container">
+    <div class="panel-header">
+      Market: Kalshi — <span id="account-mode-label">PROD</span>
+    </div>
+  </div>
+
+  <div class="panel-container">
     <div class="panel-header">Results</div>
     <table id="trade-log-table" aria-label="Trade Log Table">
       <thead>
@@ -92,7 +98,8 @@
           <th data-key="buy_price">Buy</th>
           <th data-key="sell_price">Sell</th>
           <th data-key="position">Position</th>
-          <th data-key="closed_at">Closed At</th>
+          <th data-key="fees">Fees</th>
+          <th data-key="closed_at">Closed</th>
           <th data-key="symbol_open">Symbol Open</th>
           <th data-key="symbol_close">Symbol Close</th>
           <th data-key="momentum">Momentum</th>
@@ -208,6 +215,7 @@
           <td>${trade.buy_price !== null ? Number(trade.buy_price).toFixed(2) : ''}</td>
           <td>${trade.sell_price !== null ? Number(trade.sell_price).toFixed(2) : ''}</td>
           <td>${trade.position !== null ? trade.position : ''}</td>
+          <td>${trade.fees !== null ? Number(trade.fees).toFixed(2) : ''}</td>
           <td>${trade.closed_at !== null ? trade.closed_at : ''}</td>
           <td>${trade.symbol_open !== null ? '$' + Math.round(trade.symbol_open).toLocaleString() : ''}</td>
           <td>${trade.symbol_close !== null ? '$' + Math.round(trade.symbol_close).toLocaleString() : ''}</td>
@@ -218,6 +226,16 @@
         tbody.appendChild(tr);
       }
     }
+
+    fetch('/api/get_account_mode')
+      .then(res => res.json())
+      .then(data => {
+        const label = document.getElementById('account-mode-label');
+        if (label && data && data.mode) {
+          label.textContent = data.mode.toUpperCase();
+        }
+      })
+      .catch(() => {});
 
     window.addEventListener('DOMContentLoaded', () => {
       fetchAllTrades();

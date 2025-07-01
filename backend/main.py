@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from sse_starlette.sse import EventSourceResponse
 import os
 import json
 import asyncio
@@ -22,6 +23,10 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "api", "coinbase-api", "coinba
 
 
 app = FastAPI()
+
+import asyncio
+
+trade_db_event = asyncio.Event()
 
 
 # Global set of connected websocket clients for preferences
@@ -887,4 +892,68 @@ if __name__ == "__main__":
     threading.Thread(target=start_websocket, daemon=True).start()
 
     import uvicorn
+    print(f"[MAIN] Launching app on port {get_main_app_port()}")
     uvicorn.run(app, host="0.0.0.0", port=get_main_app_port())
+
+
+# Serve current trades from trades.db
+@app.get("/api/db/trades")
+def get_trades_db():
+    from backend.account_mode import get_account_mode
+    mode = get_account_mode()
+    try:
+        db_path = os.path.join("backend", "accounts", "kalshi", mode, "trades.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, date, time, strike, side, buy_price, position, status, 
+                   symbol, market, trade_strategy, market_id,
+                   symbol_open, symbol_close, momentum, momentum_delta, 
+                   volatility, volatility_delta, win_loss 
+            FROM trades 
+            ORDER BY id DESC
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+        results = [
+            {
+                "id": row[0],
+                "date": row[1],
+                "time": row[2],
+                "strike": row[3],
+                "side": row[4],
+                "buy_price": row[5],
+                "position": row[6],
+                "status": row[7],
+                "symbol": row[8],
+                "market": row[9],
+                "trade_strategy": row[10],
+                "market_id": row[11],
+                "symbol_open": row[12],
+                "symbol_close": row[13],
+                "momentum": row[14],
+                "momentum_delta": row[15],
+                "volatility": row[16],
+                "volatility_delta": row[17],
+                "win_loss": row[18],
+            }
+            for row in rows
+        ]
+        return {"trades": results}
+    except Exception as e:
+        return {"error": str(e), "trades": []}
+
+# SSE endpoint for watching trades DB updates
+@app.get("/watch/trades")
+async def watch_trades():
+    async def event_stream():
+        while True:
+            await trade_db_event.wait()
+            yield {"event": "update", "data": "trades_db_updated"}
+            trade_db_event.clear()
+    return EventSourceResponse(event_stream())
+
+
+# Helper function to notify trade DB update
+def notify_trade_update():
+    trade_db_event.set()

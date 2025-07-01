@@ -51,16 +51,10 @@ def finalize_trade(id: int, ticket_id: str) -> None:
     """
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute(
-        "UPDATE trades SET status='open' WHERE id=?",
-        (id,)
-    )
-    tm_log(f"[DEBUG] STATUS SET TO OPEN for id={id}")
+    # Removed immediate status='open' update; will update after fill is confirmed.
     tm_log(f"[DEBUG] TRADES DB PATH (finalize_trade): {DB_TRADES_PATH}")
     conn.commit()
     conn.close()
-    if ticket_id:
-        log_event(ticket_id, "MANAGER: STATUS UPDATED — SET TO 'OPEN'")
 
     # Begin polling positions.db for matching ticker
     tm_log(f"[DEBUG] About to query for ticker from trades table for id={id}")
@@ -100,8 +94,6 @@ def finalize_trade(id: int, ticket_id: str) -> None:
             cursor_pos.execute("SELECT position, market_exposure, fees_paid FROM positions WHERE ticker = ?", (expected_ticker,))
             row = cursor_pos.fetchone()
             if row:
-                tm_log(f"[DEBUG] Full row fetched from positions.db: {row}")
-                tm_log(f"[DEBUG] Raw fees_paid from DB (repr): {repr(row[2])}")
                 pos = abs(row[0])
                 exposure = abs(row[1])
                 fees_paid = float(row[2]) if row[2] is not None else 0.0
@@ -111,6 +103,8 @@ def finalize_trade(id: int, ticket_id: str) -> None:
                     tm_log(f"[FILL WATCH] MATCH FOUND — pos={pos}, exposure={exposure}, price={price}, fees={fees}")
                     conn = get_db_connection()
                     cursor = conn.cursor()
+                    # Set status to 'open' now that fill is confirmed
+                    cursor.execute("UPDATE trades SET status='open' WHERE id=?", (id,))
                     cursor.execute(
                         "UPDATE trades SET position=?, buy_price=?, fees=? WHERE id=?",
                         (pos, price, round(fees_paid, 2), id)
@@ -119,7 +113,7 @@ def finalize_trade(id: int, ticket_id: str) -> None:
                     conn.commit()
                     conn.close()
                     log_event(ticket_id, f"MANAGER: FILL CONFIRMED — pos={pos}, price={price}, fees={fees}")
-                    tm_log(f"[FILL WATCH] trades.db UPDATED — id={id}, pos={pos}, price={price}, fees={fees}")
+                    tm_log(f"[FILL WATCH] trades.db UPDATED — id={id}, pos={pos}, price={price}, fees={round(fees_paid, 2)}")
                     break
         except Exception as e:
             tm_log(f"[FILL WATCH] DB read error: {e}")
@@ -127,6 +121,28 @@ def finalize_trade(id: int, ticket_id: str) -> None:
     conn_pos.close()
     tm_log(f"[FILL WATCH] Fill polling complete for ticker: {expected_ticker}")
 from fastapi import APIRouter, HTTPException, status, Request
+router = APIRouter()
+
+@router.post("/api/ping_fill_watch")
+async def ping_fill_watch():
+    """
+    Trigger a re-check of open trades that may be missing fill data.
+    This is a lightweight endpoint for account_sync to notify us of possible changes.
+    """
+    tm_log("[PING] Received ping from account_sync — checking for missing fills")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, ticket_id, position, buy_price FROM trades WHERE status IN ('open', 'pending')")
+    rows = cursor.fetchall()
+    conn.close()
+
+    for row in rows:
+        id, ticket_id, pos, price = row
+        if not pos or not price:
+            tm_log(f"[PING] Found unfilled trade — id={id}, ticket_id={ticket_id}")
+            threading.Thread(target=finalize_trade, args=(id, ticket_id), daemon=True).start()
+
+    return {"message": "Ping received, checking unfilled trades"}
 from backend.util.ports import get_executor_port
 import sqlite3
 import threading
@@ -138,7 +154,7 @@ import re
 import requests
 
 def tm_log(msg):
-    log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "trade_manager.out.log")
+    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs", "trade_manager.out.log")
     with open(log_path, "a") as f:
         f.write(f"{datetime.now().isoformat()} | {msg}\n")
 
@@ -171,7 +187,6 @@ def is_trade_expired(trade):
     expiration = now.replace(hour=hour, minute=0, second=0, microsecond=0)
     return now >= expiration
 
-router = APIRouter()
 
 # Define path for the trades database file
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -359,6 +374,8 @@ def get_trades(status: str = None, recent_hours: int = None):
 @router.post("/trades", status_code=status.HTTP_201_CREATED)
 async def add_trade(request: Request):
     data = await request.json()
+    tm_log("✅ /trades POST route triggered successfully")
+    print("✅ TRADE MANAGER received POST")
     required_fields = {"date", "time", "strike", "side", "buy_price", "position"}
     if not required_fields.issubset(data.keys()):
         raise HTTPException(status_code=400, detail="Missing required trade fields")
