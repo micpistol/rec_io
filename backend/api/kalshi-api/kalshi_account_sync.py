@@ -339,8 +339,6 @@ def sync_positions():
         c = conn.cursor()
         c.execute("DELETE FROM positions")
         for p in all_market_positions:
-            if p.get("position") == 0:
-                continue  # Skip entries with zero position
             try:
                 ticker = p.get("ticker")
                 total_traded = p.get("total_traded")

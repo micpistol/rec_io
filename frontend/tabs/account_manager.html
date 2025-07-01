@@ -35,10 +35,7 @@
   <div class="panel-container">
     <div class="panel">
       <div class="panel-header">Account Information</div>
-      <select id="account-selector" style="margin-top: 8px; margin-bottom: 30px;">
-        <option value="live">eric@ewedit.com</option>
-        <option value="demo">eric@ewedit.com DEMO</option>
-      </select>
+      
       <span id="account-status" style="font-weight: bold; color: #00ff00; margin-left: 10px;"></span>
       <div class="panel-body">
         <div style="font-weight: bold; margin-bottom: 4px;">Balance</div>
@@ -130,7 +127,7 @@
         window.GLOBAL_ACCOUNT_MODE = GLOBAL_ACCOUNT_MODE;
 
         const selector = document.getElementById("account-selector");
-        selector.value = GLOBAL_ACCOUNT_MODE === 'prod' ? 'live' : 'demo';
+        selector.value = data.mode === 'prod' ? 'live' : 'demo';
 
         const statusEl = document.getElementById("account-status");
         if (GLOBAL_ACCOUNT_MODE === 'prod') {
@@ -216,32 +213,7 @@
         `).join("");
     }
 
-    document.getElementById("account-selector").addEventListener("change", () => {
-      const selected = document.getElementById("account-selector").value;
-      const statusEl = document.getElementById("account-status");
-      if (selected === "live") {
-        statusEl.textContent = "*** LIVE TRADING ***";
-        statusEl.style.color = "#00ff00";
-        statusEl.style.fontWeight = "bold";
-        GLOBAL_ACCOUNT_MODE = "prod";
-        window.GLOBAL_ACCOUNT_MODE = GLOBAL_ACCOUNT_MODE;
-        localStorage.setItem('account_mode', 'prod');
-      } else {
-        statusEl.textContent = "Paper Trading";
-        statusEl.style.color = "orange";
-        statusEl.style.fontWeight = "normal";
-        GLOBAL_ACCOUNT_MODE = "demo";
-        window.GLOBAL_ACCOUNT_MODE = GLOBAL_ACCOUNT_MODE;
-        localStorage.setItem('account_mode', 'demo');
-      }
-      fetch('/api/set_account_mode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: GLOBAL_ACCOUNT_MODE })
-      })
-      .then(() => loadAccountData())
-      .catch(console.error);
-    });
+
 
     // Respect backend-set mode only
     loadAccountData();

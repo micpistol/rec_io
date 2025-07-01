@@ -5,6 +5,7 @@ class AppState {
   constructor() {
     this.state = {
       btcPrice: null,
+      accountMode: "prod",
     };
     this.listeners = new Set();
   }
@@ -45,3 +46,14 @@ class AppState {
 // Export a singleton instance
 const appState = new AppState();
 export default appState;
+
+  setAccountMode(mode) {
+    if (this.state.accountMode !== mode) {
+      this.state.accountMode = mode;
+      this._notify();
+    }
+  }
+
+  getAccountMode() {
+    return this.state.accountMode;
+  }

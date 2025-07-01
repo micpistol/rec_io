@@ -1090,9 +1090,35 @@ fetchAndCacheTTC();
           </div>
         </div>
         <div id="position-display" style="font-size: 0.85rem; font-weight: normal; color: #ccc;">100 contracts</div>
-        <button id="testTradeButton" class="test-trade-button">TEST TRADE</button>
-
       </div>
+  <script>
+    // Sync the mode picker with the global mode on load
+    async function syncModePickerWithGlobal() {
+        const res = await fetch("/api/get_account_mode");
+        const data = await res.json();
+        const modePicker = document.getElementById("accountModePicker");
+        if (modePicker) {
+            modePicker.value = data.mode;
+        }
+    }
+    // Call this on load
+    syncModePickerWithGlobal();
+
+    // If the mode picker changes, update the backend global mode
+    document.addEventListener('DOMContentLoaded', function() {
+      const modePicker = document.getElementById("accountModePicker");
+      if (modePicker) {
+        modePicker.addEventListener("change", function() {
+          const mode = modePicker.value;
+          fetch('/api/set_account_mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode })
+          }).catch(console.error);
+        });
+      }
+    });
+  </script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       // Initial load of active trades
@@ -1275,46 +1301,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // === TEST TRADE button handler ===
-  const testTradeBtn = document.getElementById("testTradeButton");
-  if (testTradeBtn) {
-    testTradeBtn.addEventListener("click", function () {
-      let quantity;
-      const pickerInput = document.getElementById("positionSizePicker");
-      if (pickerInput && pickerInput.value) {
-        quantity = pickerInput.value;
-      } else {
-        const posInput = document.getElementById("position-size");
-        quantity = posInput && posInput.value ? posInput.value : null;
-      }
-      if (!quantity) {
-        alert("Please enter a position size.");
-        return;
-      }
-
-      fetch("/public/port_config.json")
-        .then(res => res.json())
-        .then(config => {
-          const execPort = config.KALSHI_EXECUTOR_PORT;
-          const baseURL = window.location.origin.replace(/:\d+$/, `:${execPort}`);
-          return fetch(`${baseURL}/trigger_trade`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              ticker: "KXMAYORNYCPARTY-25-D",
-              side: "no",
-              quantity: parseInt(quantity),
-              type: "market"
-            })
-          });
-        })
-        .then(response => response.json())
-        .then(data => console.log("✅ Trade executed:", data))
-        .catch(error => console.error("❌ Error triggering trade:", error));
-    });
-  }
 });
 </script>
       <!-- Active Trades Panel (injected as per instructions) -->

@@ -38,11 +38,30 @@ def get_base_url():
 
 print(f"Using base URL: {get_base_url()} for mode: {get_account_mode()}")
 
-CREDENTIALS_DIR = Path(__file__).resolve().parent / "kalshi-credentials" / get_account_mode()
-ENV_VARS = dotenv_values(CREDENTIALS_DIR / ".env")
 
-KEY_ID = ENV_VARS.get("KALSHI_API_KEY_ID")
-KEY_PATH = CREDENTIALS_DIR / "kalshi.pem"
+
+# --- Credentials loading ---
+def load_credentials():
+    mode = get_account_mode()
+    cred_dir = Path(__file__).resolve().parent / "kalshi-credentials" / mode
+    print(f"[DEBUG] get_account_mode(): {mode}")
+    print(f"[DEBUG] CREDENTIALS_DIR: {cred_dir}")
+    print(f"[DEBUG] .env path: {cred_dir / '.env'}")
+    env_vars = dotenv_values(cred_dir / ".env")
+    print(f"[DEBUG] .env contents: {env_vars}")
+    return {
+        "KEY_ID": env_vars.get("KALSHI_API_KEY_ID"),
+        "KEY_PATH": cred_dir / "kalshi.pem"
+    }
+
+# --- Helper to get current credentials (for key rotation, etc.) ---
+def get_current_credentials():
+    creds = load_credentials()
+    return creds["KEY_ID"], creds["KEY_PATH"]
+
+creds = load_credentials()
+KEY_ID = creds["KEY_ID"]
+KEY_PATH = creds["KEY_PATH"]
 
 def generate_kalshi_signature(method, full_path, timestamp, key_path):
     from cryptography.hazmat.primitives import serialization, hashes
@@ -589,6 +608,8 @@ def trigger_trade():
         timestamp = str(int(time.time() * 1000))
         path = "/portfolio/orders"
         full_path = f"/trade-api/v2{path}"
+        # Refresh credentials at trade time
+        KEY_ID, KEY_PATH = get_current_credentials()
         signature = generate_kalshi_signature("POST", full_path, timestamp, str(KEY_PATH))
         headers = {
             "Accept": "application/json",

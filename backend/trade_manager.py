@@ -13,8 +13,9 @@ def _wait_for_fill(ticker: str, timeout: int = 10) -> tuple[int | None, float | 
     non‑zero position, or timeout seconds elapse.
     Returns (abs_position, buy_price) or (None, None) if not seen in time.
     """
+    from backend.util.ports import get_trade_manager_port
     deadline = time.time() + timeout
-    url = "http://localhost/api/db/positions"          # host‑relative; no port hard‑coding
+    url = f"http://localhost:{get_trade_manager_port()}/api/db/positions"          # host‑relative; no port hard‑coding
     while time.time() < deadline:
         try:
             r = requests.get(url, timeout=2)
@@ -42,7 +43,8 @@ def _wait_for_fill(ticker: str, timeout: int = 10) -> tuple[int | None, float | 
     return None, None
 
 
-def finalize_trade(trade_id: int, ticket_id: str) -> None:
+def finalize_trade(id: int, ticket_id: str) -> None:
+    tm_log(f"[DEBUG] ENTERED finalize_trade — id={id}, ticket_id={ticket_id}")
     """
     Called only after executor says 'accepted'.
     Immediately sets status to 'open', no fill checking.
@@ -51,12 +53,73 @@ def finalize_trade(trade_id: int, ticket_id: str) -> None:
     cur = conn.cursor()
     cur.execute(
         "UPDATE trades SET status='open' WHERE id=?",
-        (trade_id,)
+        (id,)
     )
+    tm_log(f"[DEBUG] STATUS SET TO OPEN for id={id}")
+    tm_log(f"[DEBUG] TRADES DB PATH (finalize_trade): {DB_TRADES_PATH}")
     conn.commit()
     conn.close()
     if ticket_id:
         log_event(ticket_id, "MANAGER: STATUS UPDATED — SET TO 'OPEN'")
+
+    # Begin polling positions.db for matching ticker
+    tm_log(f"[DEBUG] About to query for ticker from trades table for id={id}")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT ticker FROM trades WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        tm_log(f"[DEBUG] No row found when checking ticker for id={id}")
+        tm_log(f"[FILL WATCH] No trade found for ID {id}")
+        return
+    expected_ticker = row[0]
+    tm_log(f"[DEBUG] Confirmed ticker for fill match: {expected_ticker}")
+    tm_log(f"[DEBUG] Retrieved expected_ticker: {expected_ticker}")
+    print("[DEBUG] Retrieved expected_ticker:", expected_ticker)
+    print("[DEBUG] Starting polling block — direct DB read")
+
+    # Directly read from positions.db
+    demo_env = os.environ.get("DEMO_MODE", "false")
+    DEMO_MODE = demo_env.strip().lower() == "true"
+    if DEMO_MODE:
+        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "accounts", "kalshi", "demo", "positions.db")
+    else:
+        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "accounts", "kalshi", "prod", "positions.db")
+    if not os.path.exists(POSITIONS_DB_PATH):
+        tm_log(f"[FATAL] Positions DB path not found: {POSITIONS_DB_PATH}")
+        return
+    else:
+        tm_log(f"[DEBUG] Using positions DB path: {POSITIONS_DB_PATH}")
+    conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
+    cursor_pos = conn_pos.cursor()
+    deadline = time.time() + 15
+    tm_log(f"[DEBUG] Fill watch (direct DB) started for ticker: {expected_ticker}")
+    while time.time() < deadline:
+        try:
+            cursor_pos.execute("SELECT position, market_exposure, fees_paid FROM positions WHERE ticker = ?", (expected_ticker,))
+            row = cursor_pos.fetchone()
+            if row:
+                pos = abs(row[0])
+                exposure = abs(row[1])
+                fees_paid = float(row[2]) if row[2] is not None else 0.0
+                price = round(float(exposure) / float(pos) / 100, 2) if pos > 0 else 0.0
+                fees = round(fees_paid / 100, 2)
+                if pos > 0 and exposure > 0:
+                    tm_log(f"[FILL WATCH] MATCH FOUND — pos={pos}, exposure={exposure}, price={price}, fees={fees}")
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("UPDATE trades SET position=?, buy_price=?, fees_paid=? WHERE id=?", (pos, price, fees, id))
+                    conn.commit()
+                    conn.close()
+                    log_event(ticket_id, f"MANAGER: FILL CONFIRMED — pos={pos}, price={price}, fees={fees}")
+                    tm_log(f"[FILL WATCH] trades.db UPDATED — id={id}, pos={pos}, price={price}")
+                    break
+        except Exception as e:
+            tm_log(f"[FILL WATCH] DB read error: {e}")
+        time.sleep(1)
+    conn_pos.close()
+    tm_log(f"[FILL WATCH] Fill polling complete for ticker: {expected_ticker}")
 from fastapi import APIRouter, HTTPException, status, Request
 from backend.util.ports import get_executor_port
 import sqlite3
@@ -132,6 +195,9 @@ def init_trades_db():
     # Check if sell_price column exists, add if not
     if "sell_price" not in columns:
         cursor.execute("ALTER TABLE trades ADD COLUMN sell_price REAL DEFAULT NULL")
+    # Add fees_paid column if not present
+    if "fees_paid" not in columns:
+        cursor.execute("ALTER TABLE trades ADD COLUMN fees_paid REAL DEFAULT NULL")
     # Additional columns to ensure exist
     additional_columns = {
         "symbol": "TEXT",
@@ -188,6 +254,7 @@ def fetch_all_trades():
     return [dict(zip(columns, row)) for row in rows]
 
 def insert_trade(trade):
+    tm_log(f"[DEBUG] TRADES DB PATH (insert_trade): {DB_TRADES_PATH}")
     print("[DEBUG] Inserting trade data:", trade)
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -348,16 +415,16 @@ def remove_trade(trade_id: int):
 async def update_trade_status_api(request: Request):
     tm_log(f"📩 RECEIVED STATUS UPDATE PAYLOAD: {await request.body()}")
     data = await request.json()
-    trade_id = data.get("trade_id")
+    id = data.get("id")
     ticket_id = data.get("ticket_id")
     new_status = data.get("status", "").strip().lower()
-    print(f"[🔥 STATUS UPDATE API HIT] ticket_id={ticket_id} | trade_id={trade_id} | new_status={new_status}")
+    print(f"[🔥 STATUS UPDATE API HIT] ticket_id={ticket_id} | id={id} | new_status={new_status}")
 
-    if not new_status or (not trade_id and not ticket_id):
-        raise HTTPException(status_code=400, detail="Missing trade_id or ticket_id or status")
+    if not new_status or (not id and not ticket_id):
+        raise HTTPException(status_code=400, detail="Missing id or ticket_id or status")
 
-    # If trade_id is not provided, try to fetch it via ticket_id
-    if not trade_id and ticket_id:
+    # If id is not provided, try to fetch it via ticket_id
+    if not id and ticket_id:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM trades WHERE ticket_id = ?", (ticket_id,))
@@ -365,29 +432,30 @@ async def update_trade_status_api(request: Request):
         conn.close()
         if not row:
             raise HTTPException(status_code=404, detail="Trade with provided ticket_id not found")
-        trade_id = row[0]
+        id = row[0]
 
-    # Optionally, you might want to fetch ticket_id for logging, if not provided
+    # If ticket_id is not provided, try to fetch it via id
     if not ticket_id:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT ticket_id FROM trades WHERE id = ?", (trade_id,))
+        cursor.execute("SELECT ticket_id FROM trades WHERE id = ?", (id,))
         row = cursor.fetchone()
         conn.close()
         ticket_id = row[0] if row else None
 
     if new_status == "accepted":
         # spawn background thread so response is immediate
+        tm_log(f"[🧵 STARTING FINALIZE TRADE THREAD] id={id}, ticket_id={ticket_id}")
         threading.Thread(
-            target=finalize_trade, args=(trade_id, ticket_id), daemon=True
+            target=finalize_trade, args=(id, ticket_id), daemon=True
         ).start()
-        return {"message": "Trade accepted – finalizing", "trade_id": trade_id}
+        return {"message": "Trade accepted – finalizing", "id": id}
 
     elif new_status == "error":
-        update_trade_status(trade_id, "error")
+        update_trade_status(id, "error")
         if ticket_id:
             log_event(ticket_id, "MANAGER: STATUS UPDATED — SET TO 'ERROR'")
-        return {"message": "Trade marked error", "trade_id": trade_id}
+        return {"message": "Trade marked error", "id": id}
 
     else:
         raise HTTPException(status_code=400, detail=f"Unrecognized status value: '{new_status}'")
