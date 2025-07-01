@@ -268,6 +268,23 @@ def sync_positions():
             )
         """)
         conn.commit()
+
+        # --- Ensure ticker uniqueness for UPSERT logic ---
+        # 1) Deduplicate existing rows (keep the first row per ticker)
+        c.execute("""
+            DELETE FROM positions
+            WHERE id NOT IN (
+                SELECT MIN(id)
+                FROM positions
+                GROUP BY ticker
+            )
+        """)
+        conn.commit()
+
+        # 2) Create a UNIQUE index on ticker if it doesn't already exist
+        c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_positions_ticker ON positions (ticker)")
+        conn.commit()
+        # -------------------------------------------------
     print("⏱ Syncing all positions...")
     method = "GET"
     path = "/portfolio/positions"

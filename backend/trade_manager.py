@@ -100,6 +100,8 @@ def finalize_trade(id: int, ticket_id: str) -> None:
             cursor_pos.execute("SELECT position, market_exposure, fees_paid FROM positions WHERE ticker = ?", (expected_ticker,))
             row = cursor_pos.fetchone()
             if row:
+                tm_log(f"[DEBUG] Full row fetched from positions.db: {row}")
+                tm_log(f"[DEBUG] Raw fees_paid from DB (repr): {repr(row[2])}")
                 pos = abs(row[0])
                 exposure = abs(row[1])
                 fees_paid = float(row[2]) if row[2] is not None else 0.0
@@ -109,11 +111,15 @@ def finalize_trade(id: int, ticket_id: str) -> None:
                     tm_log(f"[FILL WATCH] MATCH FOUND — pos={pos}, exposure={exposure}, price={price}, fees={fees}")
                     conn = get_db_connection()
                     cursor = conn.cursor()
-                    cursor.execute("UPDATE trades SET position=?, buy_price=?, fees_paid=? WHERE id=?", (pos, price, fees, id))
+                    cursor.execute(
+                        "UPDATE trades SET position=?, buy_price=?, fees=? WHERE id=?",
+                        (pos, price, round(fees_paid, 2), id)
+                    )
+                    tm_log(f"[DEBUG] Executed UPDATE with pos={pos}, price={price}, fees={round(fees_paid, 2)}")
                     conn.commit()
                     conn.close()
                     log_event(ticket_id, f"MANAGER: FILL CONFIRMED — pos={pos}, price={price}, fees={fees}")
-                    tm_log(f"[FILL WATCH] trades.db UPDATED — id={id}, pos={pos}, price={price}")
+                    tm_log(f"[FILL WATCH] trades.db UPDATED — id={id}, pos={pos}, price={price}, fees={fees}")
                     break
         except Exception as e:
             tm_log(f"[FILL WATCH] DB read error: {e}")
@@ -186,7 +192,8 @@ def init_trades_db():
         position INTEGER NOT NULL,
         status TEXT NOT NULL DEFAULT 'open',
         closed_at TEXT DEFAULT NULL,
-        contract TEXT DEFAULT NULL
+        contract TEXT DEFAULT NULL,
+        fees_paid REAL DEFAULT NULL
     )
     """)
     # Check existing columns
