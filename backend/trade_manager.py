@@ -389,12 +389,63 @@ async def add_trade(request: Request):
             conn.commit()
             conn.close()
             tm_log(f"[DEBUG] Trade status set to 'closing' for ticker: {ticker}")
-            # Notify trade monitor of trade change
+            # Confirm close match in positions.db
             try:
-                from backend.util.broadcast import notify_trade_change
-                notify_trade_change()
+                # Determine the correct positions.db path
+                demo_env = os.environ.get("DEMO_MODE", "false")
+                DEMO_MODE = demo_env.strip().lower() == "true"
+                if DEMO_MODE:
+                    POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "accounts", "kalshi", "demo", "positions.db")
+                else:
+                    POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "accounts", "kalshi", "prod", "positions.db")
+
+                if os.path.exists(POSITIONS_DB_PATH):
+                    conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
+                    cursor_pos = conn_pos.cursor()
+                    cursor_pos.execute("SELECT position FROM positions WHERE ticker = ?", (ticker,))
+                    row = cursor_pos.fetchone()
+                    conn_pos.close()
+
+                    if row:
+                        pos_db = abs(row[0])
+                        conn = get_db_connection()
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT position FROM trades WHERE ticker = ?", (ticker,))
+                        trade_row = cursor.fetchone()
+                        conn.close()
+
+                        if trade_row and abs(trade_row[0]) == pos_db:
+                            tm_log(f"[CLOSE CHECK] ✅ Confirmed matching position for {ticker} — abs(pos) = {pos_db}")
+                        else:
+                            tm_log(f"[CLOSE CHECK] ❌ Mismatch for {ticker}: trades.db = {abs(trade_row[0]) if trade_row else 'None'}, positions.db = {pos_db}")
+                    else:
+                        tm_log(f"[CLOSE CHECK] ⚠️ No matching entry in positions.db for ticker: {ticker}")
+                else:
+                    tm_log(f"[CLOSE CHECK] ❌ positions.db not found: {POSITIONS_DB_PATH}")
             except Exception as e:
-                tm_log(f"[WARN] Failed to notify monitor of trade change: {e}")
+                tm_log(f"[CLOSE CHECK ERROR] Exception while checking close match for {ticker}: {e}")
+
+            # --- Send close ticket to executor and handle response ---
+            try:
+                from backend.util.ports import get_executor_port
+                executor_port = get_executor_port()
+                tm_log(f"[CLOSE EXECUTOR] Sending close trade to executor on port {executor_port}")
+                close_payload = {
+                    "ticker": ticker,
+                    "side": data.get("side"),
+                    "count": data.get("count"),
+                    "action": "close",
+                    "type": "market",
+                    "time_in_force": "IOC",
+                    "buy_price": sell_price,
+                    "symbol_close": symbol_close,
+                    "intent": "close"
+                }
+                response = requests.post(f"http://localhost:{executor_port}/trigger_trade", json=close_payload, timeout=5)
+                tm_log(f"[CLOSE EXECUTOR] Executor responded with {response.status_code}: {response.text}")
+            except Exception as e:
+                tm_log(f"[CLOSE EXECUTOR ERROR] Failed to send close trade to executor: {e}")
+
         return {"message": "Close ticket received and ignored"}
     tm_log("✅ /trades POST route triggered successfully")
     print("✅ TRADE MANAGER received POST")
