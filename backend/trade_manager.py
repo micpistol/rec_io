@@ -93,31 +93,64 @@ def finalize_trade(id: int, ticket_id: str) -> None:
         try:
             cursor_pos.execute("SELECT position, market_exposure, fees_paid FROM positions WHERE ticker = ?", (expected_ticker,))
             row = cursor_pos.fetchone()
-            if row:
-                pos = abs(row[0])
-                exposure = abs(row[1])
-                fees_paid = float(row[2]) if row[2] is not None else 0.0
-                price = round(float(exposure) / float(pos) / 100, 2) if pos > 0 else 0.0
-                fees = round(fees_paid / 100, 2)
-                if pos > 0 and exposure > 0:
-                    tm_log(f"[FILL WATCH] MATCH FOUND — pos={pos}, exposure={exposure}, price={price}, fees={fees}")
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    # Only set status to 'open' if current status is still 'pending'
-                    cursor.execute("SELECT status FROM trades WHERE id=?", (id,))
-                    current_status = cursor.fetchone()[0]
-                    if current_status == "pending":
-                        cursor.execute("UPDATE trades SET status='open' WHERE id=?", (id,))
-                    cursor.execute(
-                        "UPDATE trades SET position=?, buy_price=?, fees=? WHERE id=?",
-                        (pos, price, round(fees_paid, 2), id)
-                    )
-                    tm_log(f"[DEBUG] Executed UPDATE with pos={pos}, price={price}, fees={round(fees_paid, 2)}")
-                    conn.commit()
-                    conn.close()
-                    log_event(ticket_id, f"MANAGER: FILL CONFIRMED — pos={pos}, price={price}, fees={fees}")
-                    tm_log(f"[FILL WATCH] trades.db UPDATED — id={id}, pos={pos}, price={price}, fees={round(fees_paid, 2)}")
-                    break
+            pos = abs(row[0]) if row else 0
+            exposure = abs(row[1]) if row else 0
+            fees_paid = float(row[2]) if row and row[2] is not None else 0.0
+            price = round(float(exposure) / float(pos) / 100, 2) if pos > 0 else 0.0
+            fees = round(fees_paid / 100, 2)
+
+            # ------------------------------------------------------------------
+            # Decide what to do based on the latest trade status
+            # ------------------------------------------------------------------
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT status FROM trades WHERE id=?", (id,))
+            status_row = cursor.fetchone()
+            current_status = status_row[0] if status_row else None
+            conn.close()
+
+            # ❶ If trade is still pending, finalize once position appears
+            if current_status == "pending" and pos > 0 and exposure > 0:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE trades
+                    SET status = 'open',
+                        position = ?,
+                        buy_price = ?,
+                        fees      = ?
+                    WHERE id = ?
+                """, (pos, price, round(fees_paid, 2), id))
+                conn.commit()
+                conn.close()
+                log_event(ticket_id, f"MANAGER: FILL CONFIRMED — pos={pos}, price={price}, fees={fees}")
+                tm_log(f"[FILL WATCH] trades.db UPDATED — id={id}, pos={pos}, price={price}, fees={round(fees_paid, 2)}")
+                break
+
+            # ❷ If trade is closing, wait until position is zero (row missing or pos == 0)
+            elif current_status == "closing" and (row is None or pos == 0):
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                closed_at = datetime.now(ZoneInfo("America/New_York")).strftime("%H:%M:%S")
+                cursor.execute("""
+                    UPDATE trades
+                    SET status    = 'closed',
+                        closed_at = ?,
+                        fees      = COALESCE(fees, 0) + ?,
+                        position  = 0
+                    WHERE ticker = ? AND status = 'closing'
+                """, (closed_at, round(fees_paid, 2), expected_ticker))
+                conn.commit()
+                conn.close()
+                log_event(ticket_id, f"MANAGER: TRADE FINALIZED — CLOSED (fees={round(fees_paid,2)})")
+                tm_log(f"[CLOSE COMPLETE] Trade {expected_ticker} closed successfully.")
+                break
+            # ------------------------------------------------------------------
+            # Comment out noisy [DEBUG] logs
+            # tm_log(f"[DEBUG] Executed UPDATE with pos={pos}, price={price}, fees={round(fees_paid, 2)}")
+            # print(f"[DEBUG] FILL FOUND — pos={pos}, exposure={exposure}, price={price}")
+            # print(f"[DEBUG] Skipping position — position or exposure = 0")
+            # print(f"[FILL POLL] No position data yet for any position, retrying...")
         except Exception as e:
             tm_log(f"[FILL WATCH] DB read error: {e}")
         time.sleep(1)

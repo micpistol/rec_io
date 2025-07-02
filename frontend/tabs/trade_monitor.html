@@ -685,6 +685,22 @@ function closeTrade(tradeId, sellPrice, event) {
       const tradeRes = await fetch(`/trades/${tradeId}`);
       if (!tradeRes.ok) throw new Error('Failed to fetch trade for closing');
       const trade = await tradeRes.json();
+      // === Generate unique ticket ID just like in openTrade ===
+      const ticket_id = 'TICKET-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+
+      // === Immediately log the close ticket creation ===
+      await fetch('/api/log_event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticket_id: ticket_id,
+          message: "MONITOR: CLOSE TICKET INITIATED — CONFIRMED"
+        })
+      });
+
+      // === Prune old trade logs (keep file size sane) ===
+      await fetch('/api/prune_trade_logs', { method: 'POST' });
+
       // Construct close ticket payload
       // Invert side
       let invertedSide = null;
@@ -695,15 +711,16 @@ function closeTrade(tradeId, sellPrice, event) {
       const symbolClose = getCurrentBTCTickerPrice();
       // Compose payload to match open ticket, plus intent: 'close'
       const payload = {
-        intent: 'close',
-        ticker: trade.ticker,
-        side: invertedSide,
-        count: trade.position ?? trade.quantity ?? 1,
-        action: 'close',
-        type: 'market',
-        time_in_force: 'IOC',
-        buy_price: sellPrice,
-        symbol_close: symbolClose
+        ticket_id:        ticket_id,
+        intent:           'close',
+        ticker:           trade.ticker,
+        side:             invertedSide,
+        count:            trade.position ?? trade.quantity ?? 1,
+        action:           'close',
+        type:             'market',
+        time_in_force:    'IOC',
+        buy_price:        sellPrice,
+        symbol_close:     symbolClose
       };
       await fetch('/trades', {
         method: 'POST',
