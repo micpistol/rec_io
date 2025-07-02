@@ -2085,19 +2085,15 @@ const previousClosePrices = {}; // Keyed by trade.id
 
 async function fetchAndRenderTrades() {
   try {
-    // Fetch both open and pending trades
-    // Include both open and pending trades via status filter
-    const tradesRes = await fetch('/trades?status=open,pending', { cache: 'no-store' });
+    // Fetch all trades (all statuses) from backend
+    const tradesRes = await fetch('/trades', { cache: 'no-store' });
     if (!tradesRes.ok) throw new Error("Failed to fetch trades");
     let trades = await tradesRes.json();
-    // Only show open, pending, and error trades
-    trades = trades.filter(trade => ['open', 'pending', 'error'].includes(trade.status));
-    // Sort trades by strike ascending before rendering
-    trades.sort((a, b) => {
-      const strikeA = parseFloat(String(a.strike).replace(/\$|,/g, '')) || 0;
-      const strikeB = parseFloat(String(b.strike).replace(/\$|,/g, '')) || 0;
-      return strikeA - strikeB;
-    });
+    // Only show trades whose status is not "closed"
+    const validStatuses = ["open", "pending", "error", "closing", "canceled"];
+    trades = trades.filter(trade =>
+      trade.status !== "closed"
+    );
 
     // Fetch core data and markets snapshot concurrently
     const [coreRes, marketsRes] = await Promise.all([
@@ -2111,13 +2107,6 @@ async function fetchAndRenderTrades() {
 
     const ttcSeconds = coreData.ttc_seconds || 1;
     const ttcMinutes = ttcSeconds / 60;
-
-    // --- SORT active trades by strike ascending before rendering ---
-    trades.sort((a, b) => {
-      const strikeA = parseFloat(String(a.strike).replace(/\$|,/g, '')) || 0;
-      const strikeB = parseFloat(String(b.strike).replace(/\$|,/g, '')) || 0;
-      return strikeA - strikeB;
-    });
 
     // Build a map of trade.id to trade for quick lookup
     const tradeIdSet = new Set(trades.map(trade => trade.id));
@@ -2135,19 +2124,26 @@ async function fetchAndRenderTrades() {
 
     // For each trade, either update or create row
     trades.forEach(trade => {
-      // If this trade was pending/error and is now open, remove old row so open-render will recreate it
+      // Re-render the row if status has changed
       const existing = activeTradesRowsMap.get(trade.id);
-      if (existing && trade.status === "open" && existing.statusCell) {
+      if (existing && existing.status !== trade.status) {
         activeTradesTableBody.removeChild(existing.tr);
         activeTradesRowsMap.delete(trade.id);
       }
-      // === PENDING/ERROR TRADE ROW LOGIC: merge Buffer and B/M into one cell ===
-      if (trade.status === "pending" || trade.status === "error") {
+      // === PENDING/ERROR/CLOSING TRADE ROW LOGIC: merge Buffer and B/M into one cell ===
+      if (["pending", "error", "closing"].includes(trade.status)) {
         let rowObj = activeTradesRowsMap.get(trade.id);
         // Choose color and label
-        let bgColor = trade.status === "pending" ? "#3b82f6" : "#ef4444";
-        let label = trade.status === "pending" ? "PENDING" : "ERROR";
-        let textColor = "white";
+        let bgColor, label, textColor;
+        if (trade.status === "pending" || trade.status === "closing") {
+          bgColor = "#3b82f6";
+          label = trade.status === "pending" ? "PENDING" : "CLOSING";
+          textColor = "white";
+        } else if (trade.status === "error") {
+          bgColor = "#ef4444";
+          label = "ERROR";
+          textColor = "white";
+        }
         if (!rowObj) {
           const row = document.createElement("tr");
           row.style.backgroundColor = bgColor;
@@ -2177,7 +2173,7 @@ async function fetchAndRenderTrades() {
           statusCell.style.fontStyle = "italic";
           statusCell.textContent = label;
           row.appendChild(statusCell);
-          // === Replacement: Close column (Cancel button for pending/error trades) ===
+          // === Replacement: Close column (Cancel button for pending/error/closing trades) ===
           const closeCell = document.createElement("td");
           closeCell.style.textAlign = "center";
           // Create a fresh Cancel button styled as price-box
@@ -2204,12 +2200,13 @@ async function fetchAndRenderTrades() {
             }
           }
           if (!inserted) activeTradesTableBody.appendChild(row);
-          rowObj = { tr: row, statusCell };
+          rowObj = { tr: row, statusCell, status: trade.status };
           activeTradesRowsMap.set(trade.id, rowObj);
         } else {
           rowObj.tr.style.backgroundColor = bgColor;
           rowObj.tr.style.color = textColor;
           // Optionally update cell text if needed
+          rowObj.status = trade.status;
         }
         // --- Add error tooltip logic for "error" status ---
         if (trade.status === "error" && rowObj.statusCell) {
@@ -2349,7 +2346,8 @@ async function fetchAndRenderTrades() {
         if (!inserted) activeTradesTableBody.appendChild(tr);
         // Save references for dynamic update
         rowObj = {
-          tr, strikeTd, sideTd, priceTd, posTd, bufferTd, bmTd, closeTd
+          tr, strikeTd, sideTd, priceTd, posTd, bufferTd, bmTd, closeTd,
+          status: trade.status
         };
         activeTradesRowsMap.set(trade.id, rowObj);
       } else {
@@ -2357,6 +2355,8 @@ async function fetchAndRenderTrades() {
         if (rowObj.tr.className !== rowClass) rowObj.tr.className = rowClass;
         // Ensure background color is not blue for open trades
         rowObj.tr.style.backgroundColor = "";
+        // Update visual state if needed
+        rowObj.status = trade.status;
       }
       // Always update Buffer and B/M dynamically
       if (rowObj.bufferTd.textContent !== bufferDisplay) rowObj.bufferTd.textContent = bufferDisplay;
