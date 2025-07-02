@@ -103,8 +103,11 @@ def finalize_trade(id: int, ticket_id: str) -> None:
                     tm_log(f"[FILL WATCH] MATCH FOUND — pos={pos}, exposure={exposure}, price={price}, fees={fees}")
                     conn = get_db_connection()
                     cursor = conn.cursor()
-                    # Set status to 'open' now that fill is confirmed
-                    cursor.execute("UPDATE trades SET status='open' WHERE id=?", (id,))
+                    # Only set status to 'open' if current status is still 'pending'
+                    cursor.execute("SELECT status FROM trades WHERE id=?", (id,))
+                    current_status = cursor.fetchone()[0]
+                    if current_status == "pending":
+                        cursor.execute("UPDATE trades SET status='open' WHERE id=?", (id,))
                     cursor.execute(
                         "UPDATE trades SET position=?, buy_price=?, fees=? WHERE id=?",
                         (pos, price, round(fees_paid, 2), id)
@@ -143,7 +146,6 @@ async def ping_fill_watch():
             threading.Thread(target=finalize_trade, args=(id, ticket_id), daemon=True).start()
 
     return {"message": "Ping received, checking unfilled trades"}
-from backend.util.ports import get_executor_port
 import sqlite3
 import threading
 import time
@@ -152,6 +154,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import re
 import requests
+from backend.util.ports import get_executor_port
 
 def tm_log(msg):
     log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs", "trade_manager.out.log")
@@ -427,7 +430,6 @@ async def add_trade(request: Request):
 
             # --- Send close ticket to executor and handle response ---
             try:
-                from backend.util.ports import get_executor_port
                 executor_port = get_executor_port()
                 tm_log(f"[CLOSE EXECUTOR] Sending close trade to executor on port {executor_port}")
                 close_payload = {
@@ -445,6 +447,20 @@ async def add_trade(request: Request):
                 tm_log(f"[CLOSE EXECUTOR] Executor responded with {response.status_code}: {response.text}")
             except Exception as e:
                 tm_log(f"[CLOSE EXECUTOR ERROR] Failed to send close trade to executor: {e}")
+
+            # --- Ensure finalize_trade runs again after close ticket is sent ---
+            ticker = data.get("ticker")
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM trades WHERE ticker = ?", (ticker,))
+            row = cursor.fetchone()
+            conn.close()
+
+            if row:
+                trade_id = row[0]
+                threading.Thread(target=finalize_trade, args=(trade_id, data.get("ticket_id")), daemon=True).start()
+            else:
+                tm_log(f"[FINALIZE THREAD ERROR] Could not find trade id for ticker: {ticker}")
 
         return {"message": "Close ticket received and ignored"}
     tm_log("✅ /trades POST route triggered successfully")
