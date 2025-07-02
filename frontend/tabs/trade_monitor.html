@@ -2106,10 +2106,9 @@ async function fetchAndRenderTrades() {
     const tradesRes = await fetch('/trades', { cache: 'no-store' });
     if (!tradesRes.ok) throw new Error("Failed to fetch trades");
     let trades = await tradesRes.json();
-    // Only show trades whose status is not "closed"
-    const validStatuses = ["open", "pending", "error", "closing", "canceled"];
+    // Only show trades whose status is not "closed" and not "expired"
     trades = trades.filter(trade =>
-      trade.status !== "closed"
+      trade.status !== "closed" && trade.status !== "expired"
     );
 
     // Fetch core data and markets snapshot concurrently

@@ -159,6 +159,7 @@ def finalize_trade(id: int, ticket_id: str) -> None:
 from fastapi import APIRouter, HTTPException, status, Request
 router = APIRouter()
 
+
 @router.post("/api/ping_fill_watch")
 async def ping_fill_watch():
     """
@@ -179,6 +180,28 @@ async def ping_fill_watch():
             threading.Thread(target=finalize_trade, args=(id, ticket_id), daemon=True).start()
 
     return {"message": "Ping received, checking unfilled trades"}
+
+
+# New endpoint: ping_settlement_watch
+@router.post("/api/ping_settlement_watch")
+async def ping_settlement_watch():
+    """
+    Called when account_sync confirms new entries in settlements.db.
+    If any expired trades are still unfinalized, finalize them now.
+    """
+    tm_log("[PING] Received ping from account_sync — checking for expired trades")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, ticket_id FROM trades WHERE status = 'expired'")
+    expired_trades = cursor.fetchall()
+    conn.close()
+
+    for id, ticket_id in expired_trades:
+        tm_log(f"[PING] Triggering finalize_trade for expired trade id={id}")
+        threading.Thread(target=finalize_trade, args=(id, ticket_id), daemon=True).start()
+
+    return {"message": f"Triggered finalize_trade for {len(expired_trades)} expired trades"}
 import sqlite3
 import threading
 import time
@@ -664,31 +687,38 @@ def run_expiration_closure():
         open_trades = fetch_open_trades_light()
         for trade in open_trades:
             if is_trade_expired(trade):
-                print(f"[Expiration Closure] Auto-closing expired trade id={trade['id']}")
-                update_trade_status(trade['id'], 'closed')
+                print(f"[Expiration Closure] Marking trade id={trade['id']} as expired")
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("UPDATE trades SET status = 'expired' WHERE id = ?", (trade["id"],))
+                conn.commit()
+                conn.close()
+                print(f"[Expiration Closure] Trade id={trade['id']} marked as expired")
     except Exception as e:
         print(f"[Expiration Closure] Error: {e}")
 
+
 # ------------------------------------------------------------------------------
-# Safe APScheduler Initialization (add jobs inside try)
+# APScheduler Initialization (defer start to FastAPI startup event)
 # ------------------------------------------------------------------------------
-try:
-    _scheduler = BackgroundScheduler(timezone=ZoneInfo("America/New_York"))
-    # Add expiration closure job to run every minute
-    _scheduler.add_job(run_expiration_closure, CronTrigger(minute="*"))
-    _scheduler.start()
-    print("[SCHEDULER] APScheduler started successfully")
-except Exception as e:
-    print(f"[SCHEDULER ERROR] Failed to start APScheduler: {e}")
+_scheduler = BackgroundScheduler(timezone=ZoneInfo("America/New_York"))
+_scheduler.add_job(run_expiration_closure, CronTrigger(minute=0, second=0))
 
 app = FastAPI()
 app.include_router(router)
+
+# Start the scheduler only when the FastAPI app starts
 
 if __name__ == "__main__":
     import uvicorn
     import os
 
-    start_trade_monitor()
+    try:
+        _scheduler.start()
+        print("[SCHEDULER] APScheduler started successfully")
+    except Exception as e:
+        print(f"[SCHEDULER ERROR] Failed to start APScheduler: {e}")
+
     port = int(os.environ.get("TRADE_MANAGER_PORT", 5000))
     print(f"[INFO] Trade Manager running on port {port}")
     uvicorn.run(app, host="127.0.0.1", port=port)

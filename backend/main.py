@@ -582,12 +582,9 @@ def kalshi_market_snapshot():
 # Trade manager integration
 #
 # Ensure trade_manager uses buy_price instead of price in all SQL queries and data mappings.
-from backend.trade_manager import router as trade_router, start_trade_monitor
+from backend.trade_manager import router as trade_router
 app.include_router(trade_router)
 
-@app.on_event("startup")
-async def startup_event():
-    start_trade_monitor()
 
 
 # Set account mode endpoint
@@ -829,6 +826,7 @@ def get_positions_db():
             }
             for row in rows
         ]
+        notify_trade_update()
         return {"positions": results}
     except Exception as e:
         return {"error": str(e), "positions": []}
