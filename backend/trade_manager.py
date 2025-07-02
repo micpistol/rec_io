@@ -188,6 +188,9 @@ from zoneinfo import ZoneInfo
 import re
 import requests
 from backend.util.ports import get_executor_port
+# APScheduler imports
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 def tm_log(msg):
     log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs", "trade_manager.out.log")
@@ -647,6 +650,36 @@ def start_trade_monitor():
 # ------------------------------------------------------------------------------
 
 from fastapi import FastAPI
+
+
+# ------------------------------------------------------------------------------
+# Expiration Closure Job for APScheduler
+# ------------------------------------------------------------------------------
+def run_expiration_closure():
+    """
+    This function can be scheduled to run periodically by APScheduler
+    to auto-close expired trades.
+    """
+    try:
+        open_trades = fetch_open_trades_light()
+        for trade in open_trades:
+            if is_trade_expired(trade):
+                print(f"[Expiration Closure] Auto-closing expired trade id={trade['id']}")
+                update_trade_status(trade['id'], 'closed')
+    except Exception as e:
+        print(f"[Expiration Closure] Error: {e}")
+
+# ------------------------------------------------------------------------------
+# Safe APScheduler Initialization (add jobs inside try)
+# ------------------------------------------------------------------------------
+try:
+    _scheduler = BackgroundScheduler(timezone=ZoneInfo("America/New_York"))
+    # Add expiration closure job to run every minute
+    _scheduler.add_job(run_expiration_closure, CronTrigger(minute="*"))
+    _scheduler.start()
+    print("[SCHEDULER] APScheduler started successfully")
+except Exception as e:
+    print(f"[SCHEDULER ERROR] Failed to start APScheduler: {e}")
 
 app = FastAPI()
 app.include_router(router)
