@@ -1,4 +1,5 @@
 LAST_POSITIONS_HASH: str | None = None
+LAST_FILLS_HASH: str | None = None
 from backend.util.ports import get_port
 from backend.account_mode import get_account_mode
 import os, sys
@@ -441,6 +442,30 @@ def sync_fills():
             print(f"❌ Failed to fetch fills: {e}")
             break
 
+    # ----- CHANGE-DETECTION: skip writes if nothing changed -----
+    global LAST_FILLS_HASH
+    try:
+        fills_snapshot_hash = hashlib.md5(
+            json.dumps(all_fills, sort_keys=True).encode()
+        ).hexdigest()
+    except Exception as e:
+        print(f"❌ Failed to hash fills snapshot: {e}")
+        fills_snapshot_hash = None
+
+    if fills_snapshot_hash and fills_snapshot_hash == LAST_FILLS_HASH:
+        print("🔁 No changes in fills — skipping DB/JSON write.")
+        return
+
+    LAST_FILLS_HASH = fills_snapshot_hash
+
+    if all_fills:
+        latest_time = all_fills[0].get("created_time")
+        oldest_time = all_fills[-1].get("created_time")
+        print(f"🕒 Fills range — newest: {latest_time}, oldest: {oldest_time}, total: {len(all_fills)}")
+    else:
+        print("⚠️ API returned zero fills.")
+    # ------------------------------------------------------------
+
     # Deduplicate/appends to fills.db by trade_id
     with sqlite3.connect(FILLS_DB_PATH) as conn:
         c = conn.cursor()
@@ -473,10 +498,19 @@ def sync_fills():
             except Exception as e:
                 print(f"❌ Failed to insert fill {trade_id}: {e}")
         conn.commit()
+        # Save all_fills to fills.json in the same folder
+        fills_json_path = os.path.join(os.path.dirname(FILLS_DB_PATH), "fills.json")
+        try:
+            with open(fills_json_path, "w") as f:
+                json.dump({"fills": all_fills}, f, indent=2)
+            print(f"💾 fills snapshot written to {fills_json_path}")
+        except Exception as e:
+            print(f"❌ Failed to write fills.json: {e}")
     print(f"💾 {new_count} new fills written to {FILLS_DB_PATH}")
 
 
 def sync_settlements():
+    import sqlite3
     SETTLEMENTS_DB_PATH = f"backend/accounts/kalshi/{get_account_mode()}/settlements.db"
     os.makedirs(os.path.dirname(SETTLEMENTS_DB_PATH), exist_ok=True)
     # Ensure settlements table exists
@@ -485,7 +519,15 @@ def sync_settlements():
         c.execute("""
             CREATE TABLE IF NOT EXISTS settlements (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                data TEXT
+                ticker TEXT,
+                market_result TEXT,
+                yes_count INTEGER,
+                yes_total_cost REAL,
+                no_count INTEGER,
+                no_total_cost REAL,
+                revenue REAL,
+                settled_time TEXT,
+                raw_json TEXT
             )
         """)
         conn.commit()
@@ -530,18 +572,40 @@ def sync_settlements():
             print(f"❌ Failed to fetch settlements: {e}")
             break
 
-    # Insert all settlements (no deduplication, no settlement_id column)
-    with sqlite3.connect(SETTLEMENTS_DB_PATH) as conn:
-        c = conn.cursor()
-        new_count = 0
-        for settlement in all_settlements:
-            c.execute(
-                "INSERT INTO settlements (data) VALUES (?)",
-                (json.dumps(settlement),)
-            )
-            new_count += 1
-        conn.commit()
-    print(f"💾 {new_count} new settlements written to {SETTLEMENTS_DB_PATH}")
+    # Transform settlements for insertion
+    new_settlements = []
+    for settlement in all_settlements:
+        new_settlements.append((
+            settlement.get("ticker"),
+            settlement.get("market_result"),
+            settlement.get("yes_count"),
+            float(settlement.get("yes_total_cost", 0)) / 100 if settlement.get("yes_total_cost") is not None else None,
+            settlement.get("no_count"),
+            float(settlement.get("no_total_cost", 0)) / 100 if settlement.get("no_total_cost") is not None else None,
+            float(settlement.get("revenue", 0)) / 100 if settlement.get("revenue") is not None else None,
+            settlement.get("settled_time"),
+            json.dumps(settlement)
+        ))
+
+    # Insert all settlements with duplicate handling
+    def sync_log(msg):
+        print(msg)
+
+    with sqlite3.connect(SETTLEMENTS_DB_PATH) as db:
+        try:
+            db.executemany("""
+                INSERT INTO settlements
+                (ticker, market_result, yes_count, yes_total_cost, no_count, no_total_cost, revenue, settled_time, raw_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, new_settlements)
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint failed" in str(e):
+                sync_log("⚠️ Some settlements already existed in DB — skipping duplicates")
+            else:
+                raise
+        else:
+            db.commit()
+    print(f"💾 {len(new_settlements)} new settlements written to {SETTLEMENTS_DB_PATH}")
 
 
 def main():
