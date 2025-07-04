@@ -13,9 +13,10 @@ def _wait_for_fill(ticker: str, timeout: int = 10) -> tuple[int | None, float | 
     non‑zero position, or timeout seconds elapse.
     Returns (abs_position, buy_price) or (None, None) if not seen in time.
     """
-    from backend.util.ports import get_trade_manager_port
     deadline = time.time() + timeout
-    url = f"http://localhost:{get_trade_manager_port()}/api/db/positions"          # host‑relative; no port hard‑coding
+    # Use the main agent port for positions API
+    port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5000)))
+    url = f"http://localhost:{port}/api/db/positions"          # host‑relative; no port hard‑coding
     while time.time() < deadline:
         try:
             r = requests.get(url, timeout=2)
@@ -77,9 +78,9 @@ def finalize_trade(id: int, ticket_id: str) -> None:
     demo_env = os.environ.get("DEMO_MODE", "false")
     DEMO_MODE = demo_env.strip().lower() == "true"
     if DEMO_MODE:
-        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "accounts", "kalshi", "demo", "positions.db")
+        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "data", "accounts", "kalshi", "demo", "positions.db")
     else:
-        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "accounts", "kalshi", "prod", "positions.db")
+        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "data", "accounts", "kalshi", "prod", "positions.db")
     if not os.path.exists(POSITIONS_DB_PATH):
         tm_log(f"[FATAL] Positions DB path not found: {POSITIONS_DB_PATH}")
         return
@@ -210,7 +211,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import re
 import requests
-from backend.util.ports import get_executor_port
+from core.config.settings import config
 # APScheduler imports
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -251,11 +252,14 @@ def is_trade_expired(trade):
 
 
 # Define path for the trades database file
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_TRADES_PATH = os.path.join(BASE_DIR, "backend", "trade_history", "trades.db")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_TRADES_PATH = os.path.join(BASE_DIR, "data", "trade_history", "trades.db")
 
 # Initialize trades DB and table
 def init_trades_db():
+    # Ensure the parent directory exists
+    os.makedirs(os.path.dirname(DB_TRADES_PATH), exist_ok=True)
+    
     conn = sqlite3.connect(DB_TRADES_PATH)
     cursor = conn.cursor()
     cursor.execute("""
@@ -457,9 +461,9 @@ async def add_trade(request: Request):
                 demo_env = os.environ.get("DEMO_MODE", "false")
                 DEMO_MODE = demo_env.strip().lower() == "true"
                 if DEMO_MODE:
-                    POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "accounts", "kalshi", "demo", "positions.db")
+                    POSITIONS_DB_PATH = os.path.join(BASE_DIR, "data", "accounts", "kalshi", "demo", "positions.db")
                 else:
-                    POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "accounts", "kalshi", "prod", "positions.db")
+                    POSITIONS_DB_PATH = os.path.join(BASE_DIR, "data", "accounts", "kalshi", "prod", "positions.db")
 
                 if os.path.exists(POSITIONS_DB_PATH):
                     conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
@@ -719,6 +723,9 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"[SCHEDULER ERROR] Failed to start APScheduler: {e}")
 
-    port = int(os.environ.get("TRADE_MANAGER_PORT", 5000))
+    port = int(os.environ.get("TRADE_MANAGER_PORT", config.get("agents.trade_manager.port", 5002)))
     print(f"[INFO] Trade Manager running on port {port}")
     uvicorn.run(app, host="127.0.0.1", port=port)
+
+def get_executor_port():
+    return int(os.environ.get("KALSHI_EXECUTOR_PORT", config.get("agents.trade_executor.port", 5050)))

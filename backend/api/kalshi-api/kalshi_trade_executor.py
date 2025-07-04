@@ -1,8 +1,14 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
+print('PYTHONPATH:', sys.path)
 from backend.account_mode import get_account_mode
 # from config.ports import KALSHI_EXECUTOR_PORT  # Removed hard‑wired port import
 import uuid
 import os, sys
-from backend.util.ports import get_port
+# Add the backend directory to the Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from core.config.settings import config
 
 # --- Flask app for trade triggers ---
 from flask import Flask, request, jsonify
@@ -95,9 +101,14 @@ API_HEADERS = {
     "User-Agent": "KalshiWatcher/1.0"
 }
 
-DB_PATH = "backend/api/kalshi-api/data/kalshi_market_log.db"
-JSON_SNAPSHOT_PATH = "backend/api/kalshi-api/data/latest_market_snapshot.json"
-HEARTBEAT_PATH = "backend/api/kalshi-api/data/kalshi_logger_heartbeat.txt"
+from backend.util.paths import get_kalshi_data_dir, get_accounts_data_dir, ensure_data_dirs
+
+# Ensure all data directories exist
+ensure_data_dirs()
+
+DB_PATH = os.path.join(get_kalshi_data_dir(), "kalshi_market_log.db")
+JSON_SNAPSHOT_PATH = os.path.join(get_kalshi_data_dir(), "latest_market_snapshot.json")
+HEARTBEAT_PATH = os.path.join(get_kalshi_data_dir(), "kalshi_logger_heartbeat.txt")
 
 POLL_INTERVAL_SECONDS = 1
 
@@ -248,8 +259,8 @@ def sync_balance():
         response.raise_for_status()
         data = response.json()
         print(f"[{datetime.now()}] ✅ Balance: {data.get('balance')}")
-        # Save balance to JSON
-        output_path = os.path.join("backend", "accounts", "kalshi", get_account_mode(), "account_balance.json")
+        # Save balance to JSON using unified data directory
+        output_path = os.path.join(get_accounts_data_dir(), "kalshi", get_account_mode(), "account_balance.json")
         print(f"🧭 Attempting to write to: {os.path.abspath(output_path)}")
         try:
             with open(output_path, "w") as f:
@@ -267,7 +278,7 @@ def sync_balance():
 
 
 def sync_positions():
-    POSITIONS_DB_PATH = f"backend/accounts/kalshi/{get_account_mode()}/positions.db"
+    POSITIONS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", get_account_mode(), "positions.db")
     os.makedirs(os.path.dirname(POSITIONS_DB_PATH), exist_ok=True)
     # Ensure positions table exists
     with sqlite3.connect(POSITIONS_DB_PATH) as conn:
@@ -337,7 +348,7 @@ def sync_positions():
 
 
 def sync_fills():
-    FILLS_DB_PATH = f"backend/accounts/kalshi/{get_account_mode()}/fills.db"
+    FILLS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", get_account_mode(), "fills.db")
     os.makedirs(os.path.dirname(FILLS_DB_PATH), exist_ok=True)
     # Ensure fills table exists
     with sqlite3.connect(FILLS_DB_PATH) as conn:
@@ -412,7 +423,7 @@ def sync_fills():
 
 
 def sync_settlements():
-    SETTLEMENTS_DB_PATH = f"backend/accounts/kalshi/{get_account_mode()}/settlements.db"
+    SETTLEMENTS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", get_account_mode(), "settlements.db")
     os.makedirs(os.path.dirname(SETTLEMENTS_DB_PATH), exist_ok=True)
     # Ensure settlements table exists
     with sqlite3.connect(SETTLEMENTS_DB_PATH) as conn:
@@ -634,7 +645,7 @@ def trigger_trade():
             log_event(ticket_id, f"EXECUTOR: TRADE REJECTED — {response.text.strip()}")
             status_payload = {"ticket_id": ticket_id, "status": "error"}
             print(f"[DEBUG] QUEUING STATUS 'error' FOR {ticket_id} TO TRADE MANAGER")
-            manager_port = get_port("MAIN_APP_PORT")
+            manager_port = get_manager_port()
             status_url = f"http://localhost:{manager_port}/api/update_trade_status"
             def notify_error():
                 try:
@@ -652,7 +663,7 @@ def trigger_trade():
             # Use the normalized ticket_id
             status_payload = {"ticket_id": ticket_id, "status": "accepted"}
             print(f"[DEBUG] QUEUING STATUS 'accepted' FOR {ticket_id} TO TRADE MANAGER")
-            manager_port = get_port("MAIN_APP_PORT")
+            manager_port = get_manager_port()
             status_url = f"http://localhost:{manager_port}/api/update_trade_status"
             def notify_accepted():
                 try:
@@ -668,9 +679,15 @@ def trigger_trade():
         print(f"❌ Error in trade execution: {e}")
         return jsonify({"error": str(e)}), 500
 
+def get_executor_port():
+    return int(os.environ.get("KALSHI_EXECUTOR_PORT", config.get("agents.trade_executor.port", 5050)))
+
+def get_manager_port():
+    return int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5000)))
+
 def run_flask():
     """Start the executor's internal Flask app on the configured port."""
-    port = get_port("KALSHI_EXECUTOR_PORT")
+    port = get_executor_port()
     print(f"[INFO] Executor Flask starting on port {port}")
     app.run(host="0.0.0.0", port=port)
 

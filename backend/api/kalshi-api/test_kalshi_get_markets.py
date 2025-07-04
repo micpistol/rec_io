@@ -1,4 +1,4 @@
-from backend.account_mode import get_account_mode
+from account_mode import get_account_mode
 import uuid
 import os, sys
 
@@ -79,9 +79,9 @@ API_HEADERS = {
     "User-Agent": "KalshiWatcher/1.0"
 }
 
-DB_PATH = "backend/api/kalshi-api/data/kalshi_market_log.db"
-JSON_SNAPSHOT_PATH = "backend/api/kalshi-api/data/latest_market_snapshot.json"
-HEARTBEAT_PATH = "backend/api/kalshi-api/data/kalshi_logger_heartbeat.txt"
+DB_PATH = "data/kalshi/kalshi_market_log.db"
+JSON_SNAPSHOT_PATH = "data/kalshi/latest_market_snapshot.json"
+HEARTBEAT_PATH = "data/kalshi/kalshi_logger_heartbeat.txt"
 
 POLL_INTERVAL_SECONDS = 1
 

@@ -1,10 +1,9 @@
-LAST_POSITIONS_HASH: str | None = None
-LAST_FILLS_HASH: str | None = None
-from backend.util.ports import get_port
+import sys
+import os
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.insert(0, project_root)
+from backend.core.config.settings import config
 from backend.account_mode import get_account_mode
-import os, sys
-
-print(f"✅ Running in account mode: {get_account_mode()}")
 import requests
 import json
 import sqlite3
@@ -77,9 +76,20 @@ API_HEADERS = {
     "User-Agent": "KalshiWatcher/1.0"
 }
 
-DB_PATH = "backend/api/kalshi-api/data/kalshi_market_log.db"
-JSON_SNAPSHOT_PATH = "backend/api/kalshi-api/data/latest_market_snapshot.json"
-HEARTBEAT_PATH = "backend/api/kalshi-api/data/kalshi_logger_heartbeat.txt"
+# Add project root to path for imports
+import sys
+import os
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.insert(0, project_root)
+
+from backend.util.paths import get_kalshi_data_dir, get_accounts_data_dir, ensure_data_dirs
+
+# Ensure all data directories exist
+ensure_data_dirs()
+
+DB_PATH = os.path.join(get_kalshi_data_dir(), "kalshi_market_log.db")
+JSON_SNAPSHOT_PATH = os.path.join(get_kalshi_data_dir(), "latest_market_snapshot.json")
+HEARTBEAT_PATH = os.path.join(get_kalshi_data_dir(), "kalshi_logger_heartbeat.txt")
 
 POLL_INTERVAL_SECONDS = 1
 
@@ -89,6 +99,10 @@ EST = ZoneInfo("America/New_York")
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 last_failed_ticker = None  # Global tracker
+
+# === PATCH: Initialize global hashes to prevent crash ===
+LAST_POSITIONS_HASH = None
+LAST_FILLS_HASH = None
 
 def get_current_event_ticker():
     global last_failed_ticker
@@ -125,7 +139,7 @@ def get_current_event_ticker():
     return None, None
 
 def fetch_event_json(event_ticker):
-    url = f"{BASE_URL}/events/{event_ticker}"
+    url = f"{get_base_url()}/events/{event_ticker}"
     try:
         response = requests.get(url, headers=API_HEADERS, timeout=10)
         response.raise_for_status()
@@ -230,8 +244,8 @@ def sync_balance():
         response.raise_for_status()
         data = response.json()
         print(f"[{datetime.now()}] ✅ Balance: {data.get('balance')}")
-        # Save balance to JSON
-        output_path = os.path.join("backend", "accounts", "kalshi", get_account_mode(), "account_balance.json")
+        # Save balance to JSON using unified data directory
+        output_path = os.path.join(get_accounts_data_dir(), "kalshi", get_account_mode(), "account_balance.json")
         print(f"🧭 Attempting to write to: {os.path.abspath(output_path)}")
         try:
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -250,7 +264,7 @@ def sync_balance():
 
 
 def sync_positions():
-    POSITIONS_DB_PATH = f"backend/accounts/kalshi/{get_account_mode()}/positions.db"
+    POSITIONS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", get_account_mode(), "positions.db")
     os.makedirs(os.path.dirname(POSITIONS_DB_PATH), exist_ok=True)
     # Ensure positions table exists with new schema
     with sqlite3.connect(POSITIONS_DB_PATH) as conn:
@@ -388,7 +402,7 @@ def sync_positions():
 
 
 def sync_fills():
-    FILLS_DB_PATH = f"backend/accounts/kalshi/{get_account_mode()}/fills.db"
+    FILLS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", get_account_mode(), "fills.db")
     os.makedirs(os.path.dirname(FILLS_DB_PATH), exist_ok=True)
     # Ensure fills table exists
     with sqlite3.connect(FILLS_DB_PATH) as conn:
@@ -511,7 +525,7 @@ def sync_fills():
 
 def sync_settlements():
     import sqlite3
-    SETTLEMENTS_DB_PATH = f"backend/accounts/kalshi/{get_account_mode()}/settlements.db"
+    SETTLEMENTS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", get_account_mode(), "settlements.db")
     os.makedirs(os.path.dirname(SETTLEMENTS_DB_PATH), exist_ok=True)
     # Ensure settlements table exists
     with sqlite3.connect(SETTLEMENTS_DB_PATH) as conn:

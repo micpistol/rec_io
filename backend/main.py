@@ -1,4 +1,4 @@
-from backend.util.ports import get_main_app_port
+# Port management now handled by config
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi import WebSocket, WebSocketDisconnect
@@ -17,9 +17,15 @@ from dateutil import parser
 import sqlite3
 
 
-from backend.account_mode import get_account_mode
+from account_mode import get_account_mode
+from core.config.settings import config
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "api", "coinbase-api", "coinbase-btc", "data", "btc_price_history.db")
+from backend.util.paths import get_price_history_dir, get_data_dir, ensure_data_dirs
+
+# Ensure all data directories exist
+ensure_data_dirs()
+
+DB_PATH = os.path.join(get_price_history_dir(), "btc_price_history.db")
 
 
 app = FastAPI()
@@ -34,7 +40,7 @@ connected_clients = set()
 
 
 # Global auto_stop state
-PREFERENCES_PATH = os.path.join("backend", "data", "trade_preferences.json")
+PREFERENCES_PATH = os.path.join(get_data_dir(), "trade_preferences.json")
 
 def load_preferences():
     if os.path.exists(PREFERENCES_PATH):
@@ -76,7 +82,7 @@ app.add_middleware(
 # Serve heartbeat file
 app.mount(
     "/logger",
-    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "api", "coinbase-api", "coinbase-btc", "data")),
+    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "data", "coinbase")),
     name="logger"
 )
 
@@ -327,6 +333,16 @@ def get_core_data():
             "change3h": "Error",
             "change1d": "Error"
         })
+    
+    # Add Kalshi market data to core response
+    try:
+        with open("backend/data/kalshi/latest_market_snapshot.json", "r") as f:
+            kalshi_data = json.load(f)
+            core_data["kalshi_markets"] = kalshi_data.get("markets", [])
+    except Exception as e:
+        print(f"[Kalshi Market Data Error] {e}")
+        core_data["kalshi_markets"] = []
+    
     return core_data
 
 # Serve just the latest BTC price and timestamp for hover popup
@@ -523,9 +539,10 @@ def get_btc_changes():
 def get_market_title():
     import json
     try:
-        with open(os.path.join(os.path.dirname(__file__), "api", "kalshi-api", "data", "latest_market_snapshot.json"), "r") as f:
+        with open("backend/data/kalshi/latest_market_snapshot.json", "r") as f:
             data = json.load(f)
-            title = data.get("title", "No Title Available")
+            # Extract title from the event object
+            title = data.get("event", {}).get("title", "No Title Available")
     except Exception:
         title = "No Title Available"
     return {"title": title}
@@ -571,7 +588,7 @@ def get_feed_status():
 def kalshi_market_snapshot():
     import json
     try:
-        with open("backend/api/kalshi-api/data/latest_market_snapshot.json", "r") as f:
+        with open("backend/data/kalshi/latest_market_snapshot.json", "r") as f:
             return json.load(f)
     except Exception:
         return {"markets": []}
@@ -708,7 +725,7 @@ async def get_auto_stop():
 def get_balance(request: Request):
     try:
         mode = request.query_params.get("mode", "prod")
-        with open(f"backend/accounts/kalshi/{mode}/account_balance.json") as f:
+        with open(os.path.join("backend", "data", "accounts", "kalshi", mode, "account_balance.json")) as f:
             raw = json.load(f)
             try:
                 cents = int(raw["balance"])
@@ -722,20 +739,19 @@ def get_balance(request: Request):
 @app.get("/api/account/fills")
 def get_fills(request: Request):
     mode = request.query_params.get("mode", "prod")
-    with open(f"backend/accounts/kalshi/{mode}/fills.json") as f:
+    with open(os.path.join("backend", "data", "accounts", "kalshi", mode, "fills.json")) as f:
         return json.load(f)
 
 @app.get("/api/account/positions")
 def get_positions(request: Request):
     mode = request.query_params.get("mode", "prod")
-    with open(f"backend/accounts/kalshi/{mode}/positions.json") as f:
+    with open(os.path.join("backend", "data", "accounts", "kalshi", mode, "positions.json")) as f:
         return json.load(f)
-
 
 @app.get("/api/account/settlements")
 def get_settlements(request: Request):
     mode = request.query_params.get("mode", "prod")
-    with open(f"backend/accounts/kalshi/{mode}/settlements.json") as f:
+    with open(os.path.join("backend", "data", "accounts", "kalshi", mode, "settlements.json")) as f:
         return json.load(f)
 
 
@@ -748,13 +764,9 @@ async def get_account_mode_api():
 # New route: /api/db/settlements
 @app.get("/api/db/settlements")
 def get_settlements_db():
-    # Ensure correct account mode is used to select the DB file
-    from backend.account_mode import get_account_mode
-    account_mode = get_account_mode()
     try:
-
-        db_path = os.path.join("backend", "accounts", "kalshi", get_account_mode(), "settlements.db")
-
+        mode = get_account_mode()
+        db_path = os.path.join("backend", "data", "accounts", "kalshi", mode, "settlements.db")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT ticker, market_result, yes_count, no_count, revenue, settled_time FROM settlements ORDER BY settled_time DESC")
@@ -767,7 +779,7 @@ def get_settlements_db():
                 "yes_count": row[2],
                 "no_count": row[3],
                 "revenue": row[4],
-                "settled_time": row[5]
+                "settled_time": row[5],
             }
             for row in rows
         ]
@@ -779,7 +791,8 @@ def get_settlements_db():
 @app.get("/api/db/fills")
 def get_fills_db():
     try:
-        db_path = os.path.join("backend", "accounts", "kalshi", get_account_mode(), "fills.db")
+        mode = get_account_mode()
+        db_path = os.path.join("backend", "data", "accounts", "kalshi", mode, "fills.db")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time FROM fills ORDER BY created_time DESC")
@@ -796,7 +809,7 @@ def get_fills_db():
                 "yes_price": row[6],
                 "no_price": row[7],
                 "is_taker": row[8],
-                "created_time": row[9]
+                "created_time": row[9],
             }
             for row in rows
         ]
@@ -808,7 +821,8 @@ def get_fills_db():
 @app.get("/api/db/positions")
 def get_positions_db():
     try:
-        db_path = os.path.join("backend", "accounts", "kalshi", get_account_mode(), "positions.db")
+        mode = get_account_mode()
+        db_path = os.path.join("backend", "data", "accounts", "kalshi", mode, "positions.db")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT ticker, total_traded, position, market_exposure, realized_pnl, fees_paid, last_updated_ts FROM positions ORDER BY last_updated_ts DESC")
@@ -822,11 +836,10 @@ def get_positions_db():
                 "market_exposure": row[3],
                 "realized_pnl": row[4],
                 "fees_paid": row[5],
-                "last_updated_ts": row[6]
+                "last_updated_ts": row[6],
             }
             for row in rows
         ]
-        notify_trade_update()
         return {"positions": results}
     except Exception as e:
         return {"error": str(e), "positions": []}
@@ -890,17 +903,17 @@ if __name__ == "__main__":
     threading.Thread(target=start_websocket, daemon=True).start()
 
     import uvicorn
-    print(f"[MAIN] Launching app on port {get_main_app_port()}")
-    uvicorn.run(app, host="0.0.0.0", port=get_main_app_port())
+    port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))
+    print(f"[MAIN] Launching app on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 
 # Serve current trades from trades.db
 @app.get("/api/db/trades")
 def get_trades_db():
-    from backend.account_mode import get_account_mode
     mode = get_account_mode()
     try:
-        db_path = os.path.join("backend", "accounts", "kalshi", mode, "trades.db")
+        db_path = os.path.join(os.path.dirname(__file__), "data", "trade_history", "trades.db")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("""
@@ -955,3 +968,17 @@ async def watch_trades():
 # Helper function to notify trade DB update
 def notify_trade_update():
     trade_db_event.set()
+
+def get_main_app_port():
+    return int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5000)))
+
+@app.post("/ping")
+async def ping_handler(request: Request):
+    data = await request.json()
+    ticket_id = data.get("ticket_id")
+    status = data.get("status")
+    
+    # Simple ping handler - just acknowledge receipt
+    print(f"Received ping for ticket {ticket_id} with status {status}")
+    
+    return {"message": "Ping received"}

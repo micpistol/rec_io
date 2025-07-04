@@ -3,61 +3,43 @@
 <head>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../styles/global.css">
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Trade Monitor</title>
 <style>
-  html, body {
-    margin: 0;
-    height: 100%;
-    background-color: #222932; /* grey/blue tone */
-    color: white;
-    overflow: hidden;
-    font-family: 'IBM Plex Sans', sans-serif;
-  }
+  
 
-  #container {
+  body {
     display: flex;
-    height: 100vh;
-    width: 100vw;
+    flex-direction: row;
   }
 
   .column {
     width: 33.3333vw;
     overflow-y: auto;
     padding: 10px;
+    padding-top: 0px;
+  
   }
   .column#col2 {
     width: 33.3333vw;
     overflow-y: auto;
-    padding: 10px;
     padding-left: 0px;
     padding-right: 0px;
   }
 
   .column:first-child {
     border-left: none;
+    padding-left: 0px;
   }
 
-  .panel-container {
-    width: 100%;
-    padding: 10px;
-    background-color: #323c4e;
-    box-sizing: border-box;
-    border-radius: 6px;
-    margin-bottom: 10px;
-  }
   .panel-table {
     width: 100%;
     height: 100%;
     box-sizing: border-box;
   }
 
-  .panel-content {
-    width: 100%;
-    height: 100%;
-    box-sizing: border-box;
-  }
 
   #tickerPanel {
     /* height removed to avoid conflicts */
@@ -65,13 +47,13 @@
     overflow: auto;
     border-collapse: collapse;
     color: white;
-    padding-top: 20px;
   }
 
   #tickerPanel td {
     padding: 4px;
     text-align: left;
     vertical-align: bottom;
+    padding-top: 4px;
   }
 
   #tickerPanel tr.instrument-row td {
@@ -80,7 +62,6 @@
 
   #tickerPanel tr.price-row td {
     font-size: 270%;
-    padding-top: 0;
     padding-bottom: 0;
     vertical-align: baseline;
   }
@@ -201,6 +182,8 @@
     background-color: #222c3c;
     padding: 4px 6px;
   }
+</style>
+<style>
 
   /* Remove top, left, right, and interior borders from header row in Active Trades table */
   #activeTradesTable thead tr th {
@@ -242,24 +225,16 @@
     background-color: #28a745;
     cursor: pointer;
   }
-  /* === TEST TRADE BUTTON STYLES (copied from .yes-button, color modified) === */
-  .test-trade-button {
-    background-color: #888;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    padding: 8px 16px;
-    font-size: 1rem;
-    font-weight: bold;
-    transition: background-color 0.2s;
-  }
-  .test-trade-button:hover {
-    background-color: #007bff;
-    cursor: pointer;
-  }
-  .test-trade-button:active {
-    background-color: white;
-    color: black;
+</style>
+<style>
+  #activeTradesTable tr.spanner-row td {
+    background-color: #535668;
+    color: #c0c0c0;
+    text-align: center;
+    font-size: 12px;
+    font-style: italic;
+    height: 25px;
+    padding: 2px 4px;
   }
 </style>
 <style>
@@ -397,8 +372,6 @@
 
 </head>
 <body>
-  
-  <div id="container">
     <div class="column" id="col1">
       <div class="panel-container" style="min-height: 200px;" id="tickerPanelContainer">
         <table id="tickerPanel" class="panel-table">
@@ -438,10 +411,11 @@
         </table>
       </div>
       <div class="panel-container" style="min-height: 00px;" id="momentumPanelContainer">
+        <div class="panel-header">Momentum</div>
         <div class="panel-content" id="momentumPanelContent">
           <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 8px 8px 8px;">
-            <div style="font-size: 12px; font-weight: bold; opacity: 0.7; align: top;">Momentum</div>
-            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 6px; padding-right: 8px;">
+            <div></div>
+            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 6px; ">
               <div id="momentum-score-value" style="font-size: 25px; font-weight: bold; color: white;">—</div>
               <!-- momentum delta indicator removed -->
             </div>
@@ -457,20 +431,20 @@
         </div>
       </div>
       <div class="panel-container" style="min-height: 150px;" id="volatilityPanel">
-        <div style="font-size: 12px; font-weight: bold; opacity: 0.7; padding-left: 8px; padding-bottom: 8px;">Volatility</div>
-        <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; gap: 6px; padding-right: 8px;">
+        <div class="panel-header">Volatility</div>
+        <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; gap: 6px;">
           <span style="text-align: right; min-width: 40px;">Score:</span>
           <span id="volScore" style="text-align: right; display: inline-block; width: 50px;">0.00</span>
         </div>
-        <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; gap: 6px; padding-right: 8px;">
+        <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; gap: 6px;">
           <span style="text-align: right; min-width: 40px;">Vol MA:</span>
           <span id="volMovingAvg" style="text-align: right; display: inline-block; width: 50px;">0.00</span>
         </div>
-        <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; gap: 6px; padding-right: 8px;">
+        <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; gap: 6px;">
           <span style="text-align: right; min-width: 40px;">Vol Δ:</span>
           <span id="volDelta" style="text-align: right; display: inline-block; width: 50px;">0.00</span>
         </div>
-        <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; margin-top: 12px; gap: 6px; padding-right: 8px;">
+        <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; margin-top: 12px; gap: 6px;">
           <span style="text-align: right; min-width: 40px;">Spike:</span>
           <span id="volSpike" style="text-align: right; display: inline-block; width: 50px;">0.00</span>
         </div>
@@ -479,7 +453,7 @@
     
     <div class="column" id="col2">
       <!-- === STRIKE TABLES AND UI (inserted as per instructions) === -->
-      <div class="panel-container" style="min-height: 200px; padding-top: 0px; padding-bottom: 1px; " id="strikePanelContainer">
+      <div class="panel-container" style="min-height: 200px; " id="strikePanelContainer">
         <table id="strikePanelTable" style="width: 100%; height: 100%; ">
           <tbody>
             <tr>
@@ -490,23 +464,31 @@
             </tr>
           </tbody>
         </table>
-        <table id="strike-table">
-          <thead>
-            <tr>
-              <th>STRIKE</th>
-              <th>BUFFER</th>
-              <th>B/M</th>
-              <th>Adj</th>
-              <th>RISK</th>
-              <th>YES</th>
-              <th>NO</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div style="display: flex; align-items: flex-start;">
+          <!-- Momentum Heat Band -->
+          <div id="momentum-heat-band" style="width: 12px; height: 100%; min-height: 400px; margin-right: 8px; position: relative; border: 1px solid #888; box-sizing: border-box;">
+            <div id="momentum-heat-gradient" style="width: 100%; height: 100%; border-radius: 2px; transition: all 0.3s ease; background: linear-gradient(to top, #6c757d 80%, #495057 80%, #495057 100%); opacity: 0.3;"></div>
+          </div>
+          
+          <!-- Strike Table -->
+          <table id="strike-table" style="flex: 1;">
+            <thead>
+              <tr>
+                <th>STRIKE</th>
+                <th style="width: 10px;">BUFFER</th>
+                <th style="width: 10px;">B/M</th>
+                <th style="width: 10px;">Adj</th>
+                <th>RISK</th>
+                <th>YES</th>
+                <th>NO</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
       <div class="panel-container" style="min-height: 150px;" id="watchlistPanel">
-        <div style="font-size: 12px; font-weight: bold; opacity: 0.7; padding-left: 8px; padding-bottom: 8px;">Watchlist</div>
+        <div class="panel-header">Watchlist</div>Œ
         <!-- Watchlist content will go here -->
       </div>
 </script>
@@ -557,10 +539,14 @@ function openTrade(target) {
         // Convert prices like 96 to 0.96
         const buy_price = parseFloat((parseFloat(btnText) / 100).toFixed(2));
 
-        const basePosition = parseInt(document.getElementById('position-size').value, 10) || 100;
+        const posInput = document.getElementById('position-size');
+        const rawBasePos = posInput ? parseInt(posInput.value, 10) : NaN;
+        const validBase = Number.isFinite(rawBasePos) && rawBasePos > 0 ? rawBasePos : null;
+
         const multiplierBtn = document.querySelector('.multiplier-btn.active');
         const multiplier = multiplierBtn ? parseInt(multiplierBtn.dataset.multiplier, 10) : 1;
-        const position = basePosition * multiplier;
+
+        const position = validBase !== null ? validBase * multiplier : null;
 
         const symbol = getSelectedSymbol();
         const contract = getTruncatedMarketTitle();
@@ -635,7 +621,7 @@ function openTrade(target) {
           side:              side && side.toUpperCase() === 'YES' ? 'Y' : (side && side.toUpperCase() === 'NO' ? 'N' : (side ? side[0].toUpperCase() : null)),
           ticker:            kalshiTicker,
           buy_price:         buy_price,
-          position:          position,
+          // position will be set below if valid
           symbol_open:       symbol_open,
           symbol_close:      null,
           momentum:          momentum,
@@ -644,6 +630,9 @@ function openTrade(target) {
           volatility_delta:  null,
           win_loss:          null
         };
+        if (position !== null) {
+          payload.position = position;
+        }
 
         // 🔍 Log to console for now — we'll send this to backend and executor in next step
         console.log("Prepared trade payload:", payload);
@@ -701,7 +690,22 @@ function closeTrade(tradeId, sellPrice, event) {
       // === Prune old trade logs (keep file size sane) ===
       await fetch('/api/prune_trade_logs', { method: 'POST' });
 
-      // Construct close ticket payload
+      // === Restore original logic for extracting count from active trades table row ===
+      // Find the row in the active trades table corresponding to this tradeId
+      let count = null;
+      const rows = activeTradesTableBody ? activeTradesTableBody.querySelectorAll('tr') : [];
+      for (const row of rows) {
+        // Assume a data-position attribute exists on the row for the position count
+        if (row.getAttribute && row.getAttribute('data-trade-id') == tradeId) {
+          count = parseInt(row.getAttribute('data-position'), 10);
+          break;
+        }
+      }
+      // Fallback to trade.position if not found in DOM (but do not provide a default/fallback value)
+      if (count === null || isNaN(count)) {
+        count = trade.position;
+      }
+
       // Invert side
       let invertedSide = null;
       if (trade.side === 'Y' || trade.side === 'YES') invertedSide = 'N';
@@ -715,7 +719,7 @@ function closeTrade(tradeId, sellPrice, event) {
         intent:           'close',
         ticker:           trade.ticker,
         side:             invertedSide,
-        count:            trade.position ?? trade.quantity ?? 1,
+        count:            count,
         action:           'close',
         type:             'market',
         time_in_force:    'IOC',
@@ -955,8 +959,17 @@ function updateStrikeTable(coreData, latestKalshiMarkets) {
       });
     }
 
-    // Find markets for yes/no asks
-    const matchingMarket = latestKalshiMarkets.find(m => Math.round(m.floor_strike) === strike);
+    // Find markets for yes/no asks - use more flexible matching
+    const matchingMarket = latestKalshiMarkets.find(m => {
+      const marketStrike = Math.round(m.floor_strike);
+      return marketStrike === strike || Math.abs(marketStrike - strike) <= 1;
+    });
+    
+    // Debug logging for first few strikes
+    if (strike >= 107000 && strike <= 109000 && !matchingMarket) {
+      console.log(`No market found for strike ${strike}. Available strikes in range:`, latestKalshiMarkets.filter(m => m.floor_strike >= 107000 && m.floor_strike <= 109000).map(m => Math.round(m.floor_strike)));
+    }
+    
     // Extract the corresponding ticker value from the same matchingMarket object
     const ticker = matchingMarket ? matchingMarket.ticker : null;
     const yesAsk = matchingMarket && typeof matchingMarket.yes_ask === "number" ? Math.round(matchingMarket.yes_ask) : 0;
@@ -967,7 +980,113 @@ function updateStrikeTable(coreData, latestKalshiMarkets) {
 
     updateYesNoButton(yesSpan, strike, "yes", yesAsk, isYesActive, ticker);
     updateYesNoButton(noSpan, strike, "no", noAsk, isNoActive, ticker);
+    
+    // Update position indicator (subtle background tint)
+    updatePositionIndicator(cells.row.children[0], strike);
   });
+  
+  // Update momentum heat band
+  updateMomentumHeatBandSegmented();
+}
+
+// Function to update momentum heat band
+function updateMomentumHeatBandSegmented() {
+  const momentumScore = getCurrentMomentumScore();
+  const heatBand = document.getElementById('momentum-heat-gradient');
+  const strikeTable = document.getElementById('strike-table');
+  if (!heatBand || !strikeTable) return;
+
+  // Parse momentum score
+  const score = typeof momentumScore === 'string' ? parseFloat(momentumScore) : momentumScore;
+  if (isNaN(score)) {
+    heatBand.innerHTML = '';
+    heatBand.style.background = 'none';
+    return;
+  }
+
+  // Get all strike rows
+  const rows = strikeTable.querySelectorAll('tbody tr');
+  if (!rows.length) return;
+
+  // Find ATM row (the one with border highlight)
+  let atmIndex = -1;
+  rows.forEach((row, idx) => {
+    if (row.children[0].style.borderTop && row.children[0].style.borderTop.includes('3px')) {
+      atmIndex = idx;
+    }
+  });
+  if (atmIndex === -1) atmIndex = Math.floor(rows.length / 2); // fallback
+
+  // Clear previous
+  heatBand.innerHTML = '';
+  heatBand.style.display = 'flex';
+  heatBand.style.flexDirection = 'column';
+  heatBand.style.justifyContent = 'stretch';
+  heatBand.style.background = 'none';
+  heatBand.style.height = strikeTable.offsetHeight + 'px';
+
+  // Color settings
+  const maxMomentum = 50;
+  const intensity = Math.min(Math.abs(score) / maxMomentum, 1);
+  const green = `rgba(69, 211, 74, ${0.15 + 0.65 * intensity})`;
+  const red = `rgba(220, 53, 69, ${0.15 + 0.65 * intensity})`;
+  const neutral = 'rgba(120,120,120,0.18)';
+
+  // Build segments
+  rows.forEach((row, idx) => {
+    const seg = document.createElement('div');
+    seg.style.flex = '1 1 0';
+    seg.style.width = '100%';
+    seg.style.margin = '0';
+    seg.style.padding = '0';
+    seg.style.transition = 'background 0.3s';
+    if (idx === atmIndex) {
+      seg.style.background = neutral;
+    } else if (score > 0) {
+      // Positive momentum: above ATM helped (green), below ATM hurt (red)
+      seg.style.background = idx < atmIndex ? green : red;
+    } else if (score < 0) {
+      // Negative momentum: below ATM helped (green), above ATM hurt (red)
+      seg.style.background = idx > atmIndex ? green : red;
+    } else {
+      seg.style.background = neutral;
+    }
+    heatBand.appendChild(seg);
+  });
+}
+
+// Function to update position indicator
+async function updatePositionIndicator(strikeCell, strike) {
+  try {
+    // Fetch active trades to check for positions at this strike
+    const tradesRes = await fetch('/trades', { cache: 'no-store' });
+    if (!tradesRes.ok) return;
+    
+    const trades = await tradesRes.json();
+    const activeTrades = trades.filter(trade => 
+      trade.status !== "closed" && 
+      trade.status !== "expired"
+    );
+    
+    // Check if any active trade has this strike
+    const hasPosition = activeTrades.some(trade => {
+      const tradeStrike = parseFloat(trade.strike.replace(/[^\d.-]/g, ''));
+      return tradeStrike === strike;
+    });
+    
+    // Update visual indicator
+    if (hasPosition) {
+      strikeCell.style.backgroundColor = '#1a2a1a'; // Very subtle green tint
+      strikeCell.style.borderLeft = '3px solid #45d34a'; // Green left border
+    } else {
+      strikeCell.style.backgroundColor = '';
+      strikeCell.style.borderLeft = '';
+    }
+  } catch (e) {
+    console.error('Error updating position indicator:', e);
+    strikeCell.style.backgroundColor = '';
+    strikeCell.style.borderLeft = '';
+  }
 }
 
 // --- Main periodic fetcher for strike table ---
@@ -985,6 +1104,16 @@ async function fetchAndUpdate() {
     }
     updateStrikeTable(coreData, latestKalshiMarkets);
 
+    // --- PATCH: Force heat band height to match strike table ---
+    setTimeout(() => {
+      const strikeTable = document.getElementById('strike-table');
+      const heatBand = document.getElementById('momentum-heat-band');
+      if (strikeTable && heatBand) {
+        heatBand.style.height = strikeTable.offsetHeight + 'px';
+      }
+      updateMomentumHeatBandSegmented(); // Always update after table render
+    }, 0);
+
     // Check if ATM strike has drifted more than 2 rows from center
     const currentCenterStrike = Math.round(coreData.btc_price / 250) * 250;
     const strikeList = Array.from(strikeRowsMap.keys()).sort((a, b) => a - b);
@@ -993,8 +1122,8 @@ async function fetchAndUpdate() {
 
     const drift = currentCenterStrike - currentCenter;
 
-    // If drift exceeds 2 steps (±500), shift table one row in that direction
-    if (drift >= 750 || drift <= -750) {
+    // If ATM strike is more than 2 rows from center (rows 5-9), shift table one row in that direction
+    if (drift >= 500 || drift <= -500) {
       const newBase = currentCenter + (drift > 0 ? 250 : -250);
       initializeStrikeTable(newBase);
     }
@@ -1116,8 +1245,10 @@ fetchAndCacheTTC();
 
 </div>
 
-    <div class="column" id="col3">
-      <div class="panel-container" id="buildTrade" style="min-height: 300px; padding: 10px;">
+    <div class="column" id="col3" style="padding-right: 0px;">
+      
+      <div class="panel-container" id="buildTrade" style="min-height: 300px; padding-top: 0px;">
+        <div class="panel-header">Trade Builder</div>
         <div style="margin-bottom: 12px;">
           <select id="account-selector" style="padding: 6px; border-radius: 4px;">
             <option value="live">eric@ewedit.com</option>
@@ -1347,11 +1478,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 });
 </script>
-      <!-- Active Trades Panel (injected as per instructions) -->
-      <div class="panel-container" style="min-height: 300px;" id="activeTradesPanel">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-left: 8px; padding-right: 8px;">
-          <div style="font-size: 12px; font-weight: bold; opacity: 0.7;">Active Trades</div>
-          <label style="font-size: 12px; user-select: none; color: white; display: flex; align-items: center; gap: 6px;">
+      <div class="panel-container" style="min-height: 319px;" id="activeTradesPanel">
+        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Active Trades</span>
+          <label style="font-size: 12px; user-select: none; color: white; display: flex; align-items: center; gap: 6px; margin: 0;">
             AUTO STOP
             <input type="checkbox" id="autoStopToggle" />
           </label>
@@ -1373,7 +1503,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
       <!-- Recent Trades Panel -->
       <div class="panel-container" style="min-height: 100px;" id="recentTradesPanel">
-        <div style="font-size: 12px; font-weight: bold; opacity: 0.7; padding-left: 8px; padding-bottom: 8px;">Recent Trades</div>
+        <div class="panel-header">Recent Trades</div>
         <table id="recentTradesTable" class="panel-table" style="width: 100%; border-collapse: collapse;">
           <thead>
             <tr>
@@ -2106,7 +2236,7 @@ async function fetchAndRenderTrades() {
     const tradesRes = await fetch('/trades', { cache: 'no-store' });
     if (!tradesRes.ok) throw new Error("Failed to fetch trades");
     let trades = await tradesRes.json();
-    // Only show trades whose status is not "closed" and not "expired"
+    // Only show trades whose status is not "closed" or "expired"
     trades = trades.filter(trade =>
       trade.status !== "closed" && trade.status !== "expired"
     );
@@ -2138,8 +2268,35 @@ async function fetchAndRenderTrades() {
       }
     }
 
-    // For each trade, either update or create row
-    trades.forEach(trade => {
+    // --- Remove all existing spanner rows before rendering trade rows ---
+    activeTradesTableBody.querySelectorAll('.spanner-row').forEach(row => row.remove());
+
+    // --- Sort trades by strike (ascending) for correct row order ---
+    trades.sort((a, b) => {
+      const strikeA = parseFloat(String(a.strike).replace(/[^\d.-]/g, '')) || 0;
+      const strikeB = parseFloat(String(b.strike).replace(/[^\d.-]/g, '')) || 0;
+      return strikeA - strikeB;
+    });
+
+    // === Prepare to build all rows in an array ===
+    const tradeRows = [];
+    const currentPrice = coreData.btc_price;
+    let spannerInserted = false;
+    let spannerIndex = trades.length; // default to end
+
+    // Find the correct index to insert the spanner row
+    for (let i = 0; i < trades.length; i++) {
+      const strike = parseFloat(String(trades[i].strike).replace(/[^\d.-]/g, '')) || 0;
+      if (!spannerInserted && currentPrice < strike) {
+        spannerIndex = i;
+        spannerInserted = true;
+        break;
+      }
+    }
+
+    // Build trade rows (do not append yet)
+    trades.forEach((trade, idx) => {
+      // --- Remove spanner row logic from here ---
       // Re-render the row if status has changed
       const existing = activeTradesRowsMap.get(trade.id);
       if (existing && existing.status !== trade.status) {
@@ -2204,24 +2361,11 @@ async function fetchAndRenderTrades() {
           cancelSpan.appendChild(innerDiv);
           closeCell.appendChild(cancelSpan);
           row.appendChild(closeCell);
-          // Insert in sorted order
-          const newStrike = parseFloat(String(trade.strike).replace(/\$|,/g, '')) || 0;
-          let inserted = false;
-          for (const existingRow of activeTradesTableBody.children) {
-            const existingStrike = parseFloat(existingRow.children[0].textContent.replace(/\$|,/g, '')) || 0;
-            if (newStrike < existingStrike) {
-              activeTradesTableBody.insertBefore(row, existingRow);
-              inserted = true;
-              break;
-            }
-          }
-          if (!inserted) activeTradesTableBody.appendChild(row);
           rowObj = { tr: row, statusCell, status: trade.status };
           activeTradesRowsMap.set(trade.id, rowObj);
         } else {
           rowObj.tr.style.backgroundColor = bgColor;
           rowObj.tr.style.color = textColor;
-          // Optionally update cell text if needed
           rowObj.status = trade.status;
         }
         // --- Add error tooltip logic for "error" status ---
@@ -2229,7 +2373,6 @@ async function fetchAndRenderTrades() {
           const statusTd = rowObj.statusCell;
           statusTd.style.cursor = 'help';
           statusTd.classList.add('error-cell');
-          // Remove previous listeners by cloning and replacing node (to avoid stacking listeners)
           const newStatusTd = statusTd.cloneNode(true);
           newStatusTd.textContent = statusTd.textContent;
           newStatusTd.style.cursor = 'help';
@@ -2254,32 +2397,37 @@ async function fetchAndRenderTrades() {
           rowObj.tr.replaceChild(newStatusTd, statusTd);
           rowObj.statusCell = newStatusTd;
         }
-        return; // Skip rest of render logic for this row
+        tradeRows.push(rowObj.tr);
+        return;
       }
 
       // === OPEN TRADE ROW LOGIC ===
       const strikeNum = parseFloat(String(trade.strike).replace(/\$|,/g, '')) || 0;
-      // Directional buffer logic: positive = favorable, negative = at risk, based on side
       const isYes = (trade.side || "").toUpperCase() === "Y";
-      const rawBuffer = isYes
-        ? coreData.btc_price - strikeNum
-        : strikeNum - coreData.btc_price;
-      const buffer = rawBuffer;
-      const absBuffer = Math.abs(buffer);
-      // Use absBuffer for risk coloring and display
-      const bpm = absBuffer / ttcMinutes;
-      const bufferDisplay = absBuffer.toLocaleString(undefined, {maximumFractionDigits: 0});
-      const bmDisplay = Math.round(bpm).toLocaleString();
-
-      // Assign row class based on absBuffer value (risk coloring)
+      const priceVal = coreData.btc_price;
+      let inTheMoney = false;
+      if (isYes) {
+        inTheMoney = priceVal >= strikeNum;
+      } else {
+        inTheMoney = priceVal <= strikeNum;
+      }
+      const rawBuffer = priceVal - strikeNum;
+      let buffer, bm;
+      if (inTheMoney) {
+        buffer = Math.abs(rawBuffer);
+        bm = Math.abs(rawBuffer) / ttcMinutes;
+      } else {
+        buffer = -Math.abs(rawBuffer);
+        bm = -Math.abs(rawBuffer) / ttcMinutes;
+      }
+      const bufferDisplay = buffer.toLocaleString(undefined, {maximumFractionDigits: 0});
+      const bmDisplay = Math.round(bm).toLocaleString();
       let rowClass = '';
-      if (absBuffer >= 300) rowClass = 'ultra-safe';
-      else if (absBuffer >= 200) rowClass = 'safe';
-      else if (absBuffer >= 100) rowClass = 'caution';
-      else if (absBuffer >= 50) rowClass = 'high-risk';
+      if (Math.abs(buffer) >= 300) rowClass = 'ultra-safe';
+      else if (Math.abs(buffer) >= 200) rowClass = 'safe';
+      else if (Math.abs(buffer) >= 100) rowClass = 'caution';
+      else if (Math.abs(buffer) >= 50) rowClass = 'high-risk';
       else rowClass = 'danger-stop';
-
-      // "Close" button logic: get the current ask price for the opposite side from the strike table
       const oppositeSide = (trade.side && trade.side.toUpperCase() === 'Y') ? 'NO' : 'YES';
       const strikeFormatted = '$' + strikeNum.toLocaleString();
       let closeButtonSpan = null;
@@ -2300,32 +2448,24 @@ async function fetchAndRenderTrades() {
       }
       let askPrice = parseFloat(closeButtonSpan?.textContent || 'NaN');
       let isActive = closeButtonSpan && !closeButtonSpan.classList.contains('disabled');
-
-      // Get or create row/cells
       let rowObj = activeTradesRowsMap.get(trade.id);
       if (!rowObj) {
-        // Build static row and insert in sorted strike order
         const tr = document.createElement('tr');
         tr.className = rowClass;
-        // Static cells
         const strikeTd = document.createElement('td');
         strikeTd.textContent = trade.strike;
         const sideTd = document.createElement('td');
         sideTd.textContent = trade.side;
         const priceTd = document.createElement('td');
-        // Format buy_price as decimal (show as-is with 2 decimals)
         priceTd.textContent = trade.buy_price.toFixed(2);
         const posTd = document.createElement('td');
         posTd.textContent = trade.position;
-        // Dynamic cells
         const bufferTd = document.createElement('td');
         bufferTd.textContent = bufferDisplay;
         const bmTd = document.createElement('td');
         bmTd.textContent = bmDisplay;
-        // "Close" cell
         const closeTd = document.createElement('td');
         closeTd.className = 'center';
-        // Render Close button if available
         if (closeButtonSpan) {
           const clonedSpan = closeButtonSpan.cloneNode(true);
           clonedSpan.classList.remove('disabled');
@@ -2340,7 +2480,6 @@ async function fetchAndRenderTrades() {
           closeTd.textContent = 'N/A';
           previousClosePrices[trade.id] = null;
         }
-        // Append all cells
         tr.appendChild(strikeTd);
         tr.appendChild(sideTd);
         tr.appendChild(priceTd);
@@ -2348,40 +2487,21 @@ async function fetchAndRenderTrades() {
         tr.appendChild(bufferTd);
         tr.appendChild(bmTd);
         tr.appendChild(closeTd);
-        // --- Insert in sorted strike order ---
-        const newStrike = parseFloat(String(trade.strike).replace(/\$|,/g, '')) || 0;
-        let inserted = false;
-        for (const existingRow of activeTradesTableBody.children) {
-          const existingStrike = parseFloat(existingRow.children[0].textContent.replace(/\$|,/g, '')) || 0;
-          if (newStrike < existingStrike) {
-            activeTradesTableBody.insertBefore(tr, existingRow);
-            inserted = true;
-            break;
-          }
-        }
-        if (!inserted) activeTradesTableBody.appendChild(tr);
-        // Save references for dynamic update
         rowObj = {
           tr, strikeTd, sideTd, priceTd, posTd, bufferTd, bmTd, closeTd,
           status: trade.status
         };
         activeTradesRowsMap.set(trade.id, rowObj);
       } else {
-        // Update row class if needed
         if (rowObj.tr.className !== rowClass) rowObj.tr.className = rowClass;
-        // Ensure background color is not blue for open trades
         rowObj.tr.style.backgroundColor = "";
-        // Update visual state if needed
         rowObj.status = trade.status;
       }
-      // Always update Buffer and B/M dynamically
       if (rowObj.bufferTd.textContent !== bufferDisplay) rowObj.bufferTd.textContent = bufferDisplay;
       if (rowObj.bmTd.textContent !== bmDisplay) rowObj.bmTd.textContent = bmDisplay;
-      // Update "Close" button only if askPrice has changed
       const prevAsk = previousClosePrices[trade.id];
       if (closeButtonSpan) {
         if (prevAsk !== askPrice) {
-          // Remove previous children
           rowObj.closeTd.innerHTML = '';
           const clonedSpan = closeButtonSpan.cloneNode(true);
           clonedSpan.classList.remove('disabled');
@@ -2393,29 +2513,73 @@ async function fetchAndRenderTrades() {
           rowObj.closeTd.appendChild(clonedSpan);
           previousClosePrices[trade.id] = askPrice;
         }
-        // else: do nothing, keep button stable
       } else {
         if (prevAsk !== null) {
           rowObj.closeTd.textContent = 'N/A';
           previousClosePrices[trade.id] = null;
         }
       }
-      // Ensure row is in the DOM (append if not present)
       if (!rowObj.tr.parentNode) {
-        // Insert in sorted order if not present (should be rare)
-        const newStrike = parseFloat(String(trade.strike).replace(/\$|,/g, '')) || 0;
-        let inserted = false;
-        for (const existingRow of activeTradesTableBody.children) {
-          const existingStrike = parseFloat(existingRow.children[0].textContent.replace(/\$|,/g, '')) || 0;
-          if (newStrike < existingStrike) {
-            activeTradesTableBody.insertBefore(rowObj.tr, existingRow);
-            inserted = true;
-            break;
-          }
-        }
-        if (!inserted) activeTradesTableBody.appendChild(rowObj.tr);
+        // Not appending here; will append in batch below
       }
+      tradeRows.push(rowObj.tr);
     });
+
+    // Only insert the spanner row if there are open trades
+    if (tradeRows.length > 0) {
+      // Build the spanner row
+      const spannerRow = document.createElement("tr");
+      spannerRow.className = "spanner-row";
+      const spannerTd = document.createElement("td");
+      spannerTd.colSpan = 7;
+
+      // --- Add arrow icons based on momentum score ---
+      // Helper to get current momentum score from DOM
+      function getCurrentMomentumScoreForArrow() {
+        const el = document.getElementById('momentum-score-value');
+        if (el && el.textContent) {
+          const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
+          return isNaN(val) ? 0 : val;
+        }
+        return 0;
+      }
+      let momentumScore = getCurrentMomentumScoreForArrow();
+      let arrow = '';
+      // SVGs for straight arrows (no margin)
+      const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      const svgUpDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 2l4 4M8 2l-4 4M8 14l4-4M8 14l-4-4" stroke="#aaa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      const absMomentum = Math.abs(momentumScore);
+      let arrowBlock = '';
+      if (momentumScore === 0) {
+        arrowBlock = svgUpDown;
+      } else if (momentumScore > 0) {
+        if (absMomentum <= 10) {
+          arrowBlock = svgDown;
+        } else if (absMomentum <= 20) {
+          arrowBlock = svgDown + svgDown;
+        } else {
+          arrowBlock = svgDown + svgDown + svgDown;
+        }
+      } else if (momentumScore < 0) {
+        if (absMomentum <= 10) {
+          arrowBlock = svgUp;
+        } else if (absMomentum <= 20) {
+          arrowBlock = svgUp + svgUp;
+        } else {
+          arrowBlock = svgUp + svgUp + svgUp;
+        }
+      }
+      spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
+      spannerRow.appendChild(spannerTd);
+
+      // Insert the spanner row at the correct index
+      tradeRows.splice(spannerIndex, 0, spannerRow);
+    }
+
+    // Clear and re-append all rows
+    activeTradesTableBody.innerHTML = '';
+    tradeRows.forEach(row => activeTradesTableBody.appendChild(row));
   } catch (err) {
     console.error('Error fetching trades:', err);
   }
@@ -2663,27 +2827,51 @@ activeTradesTableBody.addEventListener('click', (event) => {
   setInterval(fetchAndRenderActiveTrades, 1350);  // Active trades table
   setInterval(fetchVolatilityAndMomentum, 1450);  // Volatility/momentum panels
   </script>
-</html>
-<style>
-@keyframes pulseGlow {
-  0%   { box-shadow: 0 0 4px #00cc00; }
-  50%  { box-shadow: 0 0 8px #00ff00; }
-  100% { box-shadow: 0 0 4px #00cc00; }
-}
 
-// === Staggered polling loops for main panels ===
-// Polling refresh loops - staggered to avoid main thread congestion
-function fetchAndRenderStrikeTable() {
-  fetchAndUpdate();
-}
-function fetchAndRenderActiveTrades() {
-  fetchAndRenderTrades();
-}
-function fetchVolatilityAndMomentum() {
-  fetchOtherCoreData();
-  fetchCore();
-  fetchBTCPriceChanges();
-}
-setInterval(fetchAndRenderStrikeTable, 1250);        // Strike panel
-setInterval(fetchAndRenderActiveTrades, 1350);       // Active trades table
-setInterval(fetchVolatilityAndMomentum, 1450);       // Volatility/momentum panels
+  <!-- --- Add a MutationObserver to update arrows when momentum score changes --- -->
+  <script>
+  (function setupMomentumArrowObserver() {
+    const momentumEl = document.getElementById('momentum-score-value');
+    if (!momentumEl) return;
+    const observer = new MutationObserver(() => {
+      // Find the spanner row and update arrows
+      const spannerRow = document.querySelector('#activeTradesTable tr.spanner-row');
+      if (!spannerRow) return;
+      const spannerTd = spannerRow.querySelector('td');
+      if (!spannerTd) return;
+      const val = parseFloat(momentumEl.textContent.replace(/[^\d\.\-]/g, ''));
+      let arrow = '';
+      // SVGs for straight arrows (no margin)
+      const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      const svgUpDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 2l4 4M8 2l-4 4M8 14l4-4M8 14l-4-4" stroke="#aaa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      const absMomentum = Math.abs(val);
+      let arrowBlock = '';
+      if (val === 0) {
+        arrowBlock = svgUpDown;
+      } else if (val > 0) {
+        if (absMomentum <= 10) {
+          arrowBlock = svgDown;
+        } else if (absMomentum <= 20) {
+          arrowBlock = svgDown + svgDown;
+        } else {
+          arrowBlock = svgDown + svgDown + svgDown;
+        }
+      } else if (val < 0) {
+        if (absMomentum <= 10) {
+          arrowBlock = svgUp;
+        } else if (absMomentum <= 20) {
+          arrowBlock = svgUp + svgUp;
+        } else {
+          arrowBlock = svgUp + svgUp + svgUp;
+        }
+      }
+      // Extract the price from the current text
+      const match = spannerTd.textContent.match(/Current Price: \$[\d,]+/);
+      const priceText = match ? match[0] : '';
+      spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>${priceText}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
+    });
+    observer.observe(momentumEl, { childList: true, characterData: true, subtree: true });
+  })();
+  </script>
+</html>

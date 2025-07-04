@@ -6,20 +6,27 @@ from datetime import timezone
 from zoneinfo import ZoneInfo
 import sqlite3
 import os
+import sys
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Ensure data directory exists
-DATA_DIR = os.path.join(BASE_DIR, "data")
-os.makedirs(DATA_DIR, exist_ok=True)
+# Add project root to path for imports
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
-LOG_FILE = os.path.join(DATA_DIR, "btc_price_log.txt")
-DB_FILE = os.path.join(DATA_DIR, "btc_price_history.db")
+from backend.util.paths import get_coinbase_data_dir, get_price_history_dir, ensure_data_dirs
+
+# Ensure all data directories exist
+ensure_data_dirs()
+
+BTC_LOG_PATH = os.path.join(get_coinbase_data_dir(), "btc_price_log.txt")
+BTC_HEARTBEAT_PATH = os.path.join(get_coinbase_data_dir(), "btc_logger_heartbeat.txt")
+BTC_PRICE_HISTORY_DB = os.path.join(get_price_history_dir(), "btc_price_history.db")
 COINBASE_WS_URL = "wss://ws-feed.exchange.coinbase.com"
 
 last_logged_second = None
 
 def insert_tick(timestamp: str, price: float):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(BTC_PRICE_HISTORY_DB)
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS price_log (
@@ -68,13 +75,12 @@ async def log_btc_price():
                         formatted_price = f"${price:,.2f}"
                         log_entry = f"{rounded_timestamp} | {formatted_price}\n"
 
-                        with open(LOG_FILE, "a") as f:
+                        with open(BTC_LOG_PATH, "a") as f:
                             f.write(log_entry)
 
                         insert_tick(rounded_timestamp, price)
 
-                        HEARTBEAT_FILE = os.path.join(DATA_DIR, "btc_logger_heartbeat.txt")
-                        with open(HEARTBEAT_FILE, "w") as hb:
+                        with open(BTC_HEARTBEAT_PATH, "w") as hb:
                             hb.write(f"{rounded_timestamp} BTC logger alive\n")
 
                     except asyncio.TimeoutError:

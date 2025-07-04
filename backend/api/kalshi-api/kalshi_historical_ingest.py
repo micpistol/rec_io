@@ -100,7 +100,7 @@ def sync_settlements():
             print(f"❌ Failed to fetch settlements: {e}")
             break
 
-    output_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "settlements.json")
+    output_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "accounts", "kalshi", mode, "settlements.json")
     with open(output_path, "w") as f:
         json.dump({"settlements": all_settlements}, f, indent=2)
     print(f"💾 All settlements written to {output_path}")
@@ -147,7 +147,7 @@ def sync_fills():
             print(f"❌ Failed to fetch fills: {e}")
             break
 
-    output_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "fills.json")
+    output_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "accounts", "kalshi", mode, "fills.json")
     if all_fills:
         with open(output_path, "w") as f:
             json.dump({"fills": all_fills}, f, indent=2)
@@ -162,8 +162,8 @@ import sqlite3
 def write_settlements_to_db():
     global mode
     print("💾 Writing settlements to SQLite database...")
-    settlements_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "settlements.json")
-    db_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "settlements.db")
+    settlements_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "accounts", "kalshi", mode, "settlements.json")
+    db_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "accounts", "kalshi", mode, "settlements.db")
 
     # Ensure data directory exists
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -226,8 +226,8 @@ def write_settlements_to_db():
 def write_fills_to_db():
     global mode
     print("💾 Writing fills to SQLite database...")
-    fills_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "fills.json")
-    db_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "fills.db")
+    fills_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "accounts", "kalshi", mode, "fills.json")
+    db_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "accounts", "kalshi", mode, "fills.db")
 
     # Ensure data directory exists
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -332,7 +332,7 @@ def write_positions_to_db():
         json.dump({"market_positions": market_positions, "event_positions": event_positions}, f, indent=2)
     print(f"💾 All positions written to {json_output_path}")
 
-    db_path = os.path.join(os.path.dirname(__file__), "..", "..", "accounts", "kalshi", mode, "positions.db")
+    db_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "accounts", "kalshi", mode, "positions.db")
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
     conn = sqlite3.connect(db_path)

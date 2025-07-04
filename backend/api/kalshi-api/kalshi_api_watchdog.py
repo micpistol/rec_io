@@ -1,11 +1,20 @@
-from backend.util.ports import get_port
+import sys
+import os
+# Add the project root to the Python path (permanent scalable fix)
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+print('DEBUG sys.path:', sys.path)
+
+# Now import everything else
+
+from backend.core.config.settings import config
 import requests
 import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import time
-import os
 
 # Config
 BASE_URL = "https://api.elections.kalshi.com/trade-api/v2"
@@ -14,9 +23,14 @@ API_HEADERS = {
     "User-Agent": "KalshiWatcher/1.0"
 }
 
-DB_PATH = "backend/api/kalshi-api/data/kalshi_market_log.db"
-JSON_SNAPSHOT_PATH = "backend/api/kalshi-api/data/latest_market_snapshot.json"
-HEARTBEAT_PATH = "backend/api/kalshi-api/data/kalshi_logger_heartbeat.txt"
+from backend.util.paths import get_kalshi_data_dir, ensure_data_dirs
+
+# Ensure all data directories exist
+ensure_data_dirs()
+
+DB_PATH = os.path.join(get_kalshi_data_dir(), "kalshi_market_log.db")
+JSON_SNAPSHOT_PATH = os.path.join(get_kalshi_data_dir(), "latest_market_snapshot.json")
+HEARTBEAT_PATH = os.path.join(get_kalshi_data_dir(), "kalshi_logger_heartbeat.txt")
 
 POLL_INTERVAL_SECONDS = 1
 
@@ -26,6 +40,9 @@ EST = ZoneInfo("America/New_York")
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 last_failed_ticker = None  # Global tracker
+
+def get_port():
+    return int(os.environ.get("API_WATCHDOG_PORT", config.get("agents.market_watchdog.port", 5090)))
 
 def get_current_event_ticker():
     global last_failed_ticker
