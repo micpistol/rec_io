@@ -604,7 +604,7 @@ def trigger_trade():
         # ticker = "KXMAYORNYCPARTY-25-R"
         raw_side = data.get("side", "yes")
         side = "yes" if raw_side in ["Y", "yes"] else "no"
-        count = data.get("position", 1)
+        count = data.get("count", data.get("position", 1))
         order_type = data.get("type", "market")
         order_payload = {
             "ticker": ticker,

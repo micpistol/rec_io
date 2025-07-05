@@ -844,20 +844,14 @@ function closeTrade(tradeId, sellPrice, event) {
       // === Prune old trade logs (keep file size sane) ===
       await fetch('/api/prune_trade_logs', { method: 'POST' });
 
-      // === Restore original logic for extracting count from active trades table row ===
-      // Find the row in the active trades table corresponding to this tradeId
-      let count = null;
-      const rows = activeTradesTableBody ? activeTradesTableBody.querySelectorAll('tr') : [];
-      for (const row of rows) {
-        // Assume a data-position attribute exists on the row for the position count
-        if (row.getAttribute && row.getAttribute('data-trade-id') == tradeId) {
-          count = parseInt(row.getAttribute('data-position'), 10);
-          break;
-        }
-      }
-      // Fallback to trade.position if not found in DOM (but do not provide a default/fallback value)
-      if (count === null || isNaN(count)) {
-        count = trade.position;
+      // === Get the ACTUAL position count from the trade data ===
+      // Use the position from the trade data directly - this is the source of truth
+      let count = trade.position;
+      
+      // Validate that we have a valid position count
+      if (count === null || count === undefined || isNaN(count) || count <= 0) {
+        console.error('Invalid position count for trade:', tradeId, 'position:', count);
+        throw new Error(`Invalid position count: ${count}. Trade ID: ${tradeId}`);
       }
 
       // Invert side
@@ -1559,55 +1553,33 @@ function updateWatchlistDisplay() {
     strikeRowMap.set(cellStrike, row);
   });
 
-  // Remove rows for strikes no longer in watchlist
-  Array.from(watchlistBody.children).forEach(row => {
-    const strike = parseFloat(row.children[0].textContent.replace(/[\$,]/g, ''));
-    if (!watchlistData.includes(strike)) {
-      watchlistBody.removeChild(row);
-    }
-  });
-
-  // Add or update rows for each watched strike (don't clear innerHTML)
+  // Sort watchlist data by strike value (ascending)
   watchlistData.sort((a, b) => a - b);
   
-  // Create a set of existing strikes in the watchlist for quick lookup
-  const existingStrikes = new Set();
-  Array.from(watchlistBody.children).forEach(row => {
-    const strike = parseFloat(row.children[0].textContent.replace(/[\$,]/g, ''));
-    existingStrikes.add(strike);
-  });
+  // Clear the watchlist body and rebuild in correct order
+  watchlistBody.innerHTML = '';
   
   watchlistData.forEach(strike => {
     const marketRow = strikeRowMap.get(strike);
     if (!marketRow) return;
     
-    let row = Array.from(watchlistBody.children).find(r => {
-      return parseFloat(r.children[0].textContent.replace(/[\$,]/g, '')) === strike;
+    // Create new row
+    const row = document.createElement('tr');
+    row.className = marketRow.className + ' watchlist-row';
+    Array.from(marketRow.children).forEach((cell, cellIndex) => {
+      const newCell = cell.cloneNode(true);
+      if (cellIndex === 0) {
+        newCell.style.cursor = 'pointer';
+        newCell.title = 'Click to remove from watchlist';
+        newCell.onclick = () => removeFromWatchlist(strike);
+      } else {
+        newCell.style.cursor = '';
+        newCell.title = '';
+      }
+      row.appendChild(newCell);
     });
     
-    if (!row) {
-      // Create new row only if it doesn't exist
-      row = document.createElement('tr');
-      row.className = marketRow.className + ' watchlist-row';
-      Array.from(marketRow.children).forEach((cell, cellIndex) => {
-        const newCell = cell.cloneNode(true);
-        if (cellIndex === 0) {
-          newCell.style.cursor = 'pointer';
-          newCell.title = 'Click to remove from watchlist';
-          newCell.onclick = () => removeFromWatchlist(strike);
-        } else {
-          newCell.style.cursor = '';
-          newCell.title = '';
-        }
-        row.appendChild(newCell);
-      });
-      watchlistBody.appendChild(row);
-    } else {
-      // Update existing row class to match market row
-      row.className = marketRow.className + ' watchlist-row';
-    }
-    
-    // Remove ATM border highlight from all cells in the watchlist row (force clear)
+    // Remove ATM border highlight from all cells in the watchlist row
     Array.from(row.children).forEach(cell => {
       cell.style.borderTop = '';
       cell.style.borderBottom = '';
@@ -1630,7 +1602,11 @@ function updateWatchlistDisplay() {
         watchCell.appendChild(watchSpan);
       }
       updateYesNoButton(watchSpan, strikeValue, side, askPrice, isActive, ticker);
+      
     });
+    
+    // Append the row to maintain sorted order
+    watchlistBody.appendChild(row);
   });
 }
 
@@ -3258,9 +3234,12 @@ async function fetchAndRenderTrades() {
       tradeRows.splice(spannerIndex, 0, spannerRow);
     }
 
-    // Clear and re-append all rows
-    activeTradesTableBody.innerHTML = '';
-    tradeRows.forEach(row => activeTradesTableBody.appendChild(row));
+    // Only append rows that aren't already in the table
+    tradeRows.forEach(row => {
+      if (!row.parentNode) {
+        activeTradesTableBody.appendChild(row);
+      }
+    });
   } catch (err) {
     console.error('Error fetching trades:', err);
   }

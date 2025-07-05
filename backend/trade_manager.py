@@ -156,7 +156,6 @@ def finalize_trade(id: int, ticket_id: str) -> None:
                     SET status    = 'closed',
                         closed_at = ?,
                         fees      = COALESCE(fees, 0) + ?,
-                        position  = 0,
                         pnl       = ?,
                         win_loss  = ?
                     WHERE ticker = ? AND status = 'closing'
