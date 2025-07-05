@@ -1481,6 +1481,8 @@ function updateWatchlistDisplay() {
   });
 
   // Add or update rows for each watched strike
+  watchlistData.sort((a, b) => a - b);
+  watchlistBody.innerHTML = '';
   watchlistData.forEach(strike => {
     let row = Array.from(watchlistBody.children).find(r => {
       return parseFloat(r.children[0].textContent.replace(/[\$,]/g, '')) === strike;
@@ -1503,11 +1505,15 @@ function updateWatchlistDisplay() {
         }
         row.appendChild(newCell);
       });
-      watchlistBody.appendChild(row);
     } else {
       // Update row class to match market row
       row.className = marketRow.className + ' watchlist-row';
     }
+    // Remove ATM border highlight from all cells in the watchlist row (force clear)
+    Array.from(row.children).forEach(cell => {
+      cell.style.borderTop = '';
+      cell.style.borderBottom = '';
+    });
     // Update YES/NO buttons in place
     [5, 6].forEach(idx => {
       const marketCell = marketRow.children[idx];
@@ -1526,6 +1532,7 @@ function updateWatchlistDisplay() {
       }
       updateYesNoButton(watchSpan, strikeValue, side, askPrice, isActive, ticker);
     });
+    watchlistBody.appendChild(row);
   });
 }
 
