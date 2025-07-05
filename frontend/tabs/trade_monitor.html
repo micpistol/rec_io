@@ -113,6 +113,11 @@
     text-align: center;
   }
 
+  /* Hide the header row in the watchlist table but preserve column widths */
+  #watchlist-table thead {
+    visibility: collapse;
+  }
+
   .price-box {
     display: inline-flex;
     justify-content: center;
@@ -128,16 +133,30 @@
     transition: background-color 0.2s ease;
     cursor: default;
   }
-
   .price-box:hover {
     background-color: rgba(0, 0, 0, 0.1);
   }
-
   .price-box.disabled {
     opacity: 0.1;
     pointer-events: none;
     cursor: default;
   }
+
+  /* Risk color classes */
+  .ultra-safe { background-color: #58b558 !important; }
+  .safe { background-color: #7ec27e !important; }
+  .caution { background-color: #c5ab50 !important; }
+  .high-risk { background-color: #a07777 !important; }
+  .danger-stop { background-color: #ec3434 !important; }
+
+  /* Column width classes */
+  .col-strike { width: 60px; }
+  .col-buffer { width: 40px; }
+  .col-bm { width: 40px; }
+  .col-adj { width: 40px; }
+  .col-risk { width: 40px; }
+  .col-yes { width: 60px; }
+  .col-no { width: 60px; }
 
   /* === ACTIVE TRADES TABLE STYLES === */
   #activeTradesTable {
@@ -549,7 +568,7 @@
       <div class="panel-container" style="min-height: 100px;" id="watchlistPanel">
         <div class="panel-header">Watchlist</div>
         <div style="display: flex; flex-direction: row; align-items: stretch;">
-          <table id="watchlist-table" class="strike-table" style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
+          <table id="strike-table" class="strike-table" style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
             
             <colgroup>
               <col class="col-strike">
@@ -560,7 +579,7 @@
               <col class="col-yes">
               <col class="col-no">
             </colgroup>
-            <thead>
+            <thead style="display:none;">
               <tr>
                 <th>STRIKE</th>
                 <th>BUFFER</th>
@@ -1076,6 +1095,8 @@ function updateStrikeTable(coreData, latestKalshiMarkets) {
   
   // Update momentum heat band
   updateMomentumHeatBandSegmented();
+  // Also update the watchlist to keep it in sync with the strike table
+  updateWatchlistDisplay();
 }
 
 // Function to update momentum heat band
@@ -1416,33 +1437,20 @@ let watchlistData = [];
 
 // Function to add a strike to the watchlist
 function addToWatchlist(strikeRow) {
-  const strike = parseFloat(strikeRow.querySelector('td:first-child').textContent.replace(/[^\d.-]/g, ''));
-  
+  const strike = parseFloat(strikeRow.querySelector('td:first-child').textContent.replace(/[\$,]/g, ''));
   // Check if already in watchlist
-  if (watchlistData.some(item => item.strike === strike)) {
+  if (watchlistData.includes(strike)) {
     console.log(`Strike ${strike} already in watchlist`);
     return;
   }
-  
-  // Clone the row data
-  const rowData = {
-    strike: strike,
-    row: strikeRow.cloneNode(true),
-    timestamp: Date.now()
-  };
-  
-  // Add to watchlist data
-  watchlistData.push(rowData);
-  
-  // Update watchlist display
+  watchlistData.push(strike);
   updateWatchlistDisplay();
-  
   console.log(`Added strike ${strike} to watchlist`);
 }
 
 // Function to remove a strike from the watchlist
 function removeFromWatchlist(strike) {
-  watchlistData = watchlistData.filter(item => item.strike !== strike);
+  watchlistData = watchlistData.filter(item => item !== strike);
   updateWatchlistDisplay();
   console.log(`Removed strike ${strike} from watchlist`);
 }
@@ -1451,34 +1459,73 @@ function removeFromWatchlist(strike) {
 function updateWatchlistDisplay() {
   const watchlistBody = document.getElementById('watchlist-body');
   if (!watchlistBody) return;
-  
-  watchlistBody.innerHTML = '';
-  
-  watchlistData.forEach((item, index) => {
-    const row = document.createElement('tr');
-    row.className = 'watchlist-row';
-    row.dataset.strike = item.strike;
-    
-    // Copy all classes from the original row to preserve styling
-    const originalRow = item.row;
-    row.className = originalRow.className + ' watchlist-row';
-    
-    // Clone the cells from the original row
-    const originalCells = originalRow.querySelectorAll('td');
-    originalCells.forEach((cell, cellIndex) => {
-      const newCell = cell.cloneNode(true);
-      
-      // Add click handler to remove from watchlist
-      if (cellIndex === 0) { // Strike column
-        newCell.style.cursor = 'pointer';
-        newCell.title = 'Click to remove from watchlist';
-        newCell.addEventListener('click', () => removeFromWatchlist(item.strike));
-      }
-      
-      row.appendChild(newCell);
+  const strikeTable = document.getElementById('strike-table');
+  if (!strikeTable) return;
+  const strikeRows = Array.from(strikeTable.querySelectorAll('tbody tr'));
+
+  // Build a map of strike value to strike table row
+  const strikeRowMap = new Map();
+  strikeRows.forEach(row => {
+    const cell = row.querySelector('td');
+    if (!cell) return;
+    const cellStrike = parseFloat(cell.textContent.replace(/[\$,]/g, ''));
+    strikeRowMap.set(cellStrike, row);
+  });
+
+  // Remove rows for strikes no longer in watchlist
+  Array.from(watchlistBody.children).forEach(row => {
+    const strike = parseFloat(row.children[0].textContent.replace(/[\$,]/g, ''));
+    if (!watchlistData.includes(strike)) {
+      watchlistBody.removeChild(row);
+    }
+  });
+
+  // Add or update rows for each watched strike
+  watchlistData.forEach(strike => {
+    let row = Array.from(watchlistBody.children).find(r => {
+      return parseFloat(r.children[0].textContent.replace(/[\$,]/g, '')) === strike;
     });
-    
-    watchlistBody.appendChild(row);
+    const marketRow = strikeRowMap.get(strike);
+    if (!marketRow) return;
+    if (!row) {
+      // Create new row
+      row = document.createElement('tr');
+      row.className = marketRow.className + ' watchlist-row';
+      Array.from(marketRow.children).forEach((cell, cellIndex) => {
+        const newCell = cell.cloneNode(true);
+        if (cellIndex === 0) {
+          newCell.style.cursor = 'pointer';
+          newCell.title = 'Click to remove from watchlist';
+          newCell.onclick = () => removeFromWatchlist(strike);
+        } else {
+          newCell.style.cursor = '';
+          newCell.title = '';
+        }
+        row.appendChild(newCell);
+      });
+      watchlistBody.appendChild(row);
+    } else {
+      // Update row class to match market row
+      row.className = marketRow.className + ' watchlist-row';
+    }
+    // Update YES/NO buttons in place
+    [5, 6].forEach(idx => {
+      const marketCell = marketRow.children[idx];
+      const watchCell = row.children[idx];
+      if (!marketCell || !watchCell) return;
+      const marketSpan = marketCell.querySelector('span');
+      let askPrice = marketSpan ? marketSpan.textContent : '';
+      let isActive = marketSpan ? !marketSpan.classList.contains('disabled') : false;
+      let ticker = marketSpan ? marketSpan.getAttribute('data-ticker') : null;
+      const strikeValue = strike;
+      const side = idx === 5 ? 'yes' : 'no';
+      let watchSpan = watchCell.querySelector('span');
+      if (!watchSpan) {
+        watchSpan = document.createElement('span');
+        watchCell.appendChild(watchSpan);
+      }
+      updateYesNoButton(watchSpan, strikeValue, side, askPrice, isActive, ticker);
+    });
   });
 }
 
@@ -1489,9 +1536,27 @@ function addStrikeTableClickHandlers() {
   
   const rows = strikeTable.querySelectorAll('tbody tr');
   rows.forEach(row => {
-    row.style.cursor = 'pointer';
-    row.title = 'Click to add to watchlist';
-    row.addEventListener('click', () => addToWatchlist(row));
+    // Remove row-level cursor and title
+    row.style.cursor = '';
+    row.title = '';
+    // Set cell-level cursor and title
+    Array.from(row.children).forEach((cell, idx) => {
+      if (idx >= 0 && idx <= 4) {
+        cell.style.cursor = 'pointer';
+        cell.title = 'Click to add to watchlist';
+      } else {
+        cell.style.cursor = 'default';
+        cell.title = '';
+      }
+    });
+    row.addEventListener('click', (event) => {
+      // Only trigger if not clicking on YES or NO columns (6 or 7)
+      const cell = event.target.closest('td');
+      if (!cell) return;
+      const cellIndex = Array.from(row.children).indexOf(cell);
+      if (cellIndex === 5 || cellIndex === 6) return; // YES or NO columns
+      addToWatchlist(row);
+    });
   });
 }
 
@@ -1523,7 +1588,10 @@ document.addEventListener('DOMContentLoaded', () => {
           </select>
           <span id="account-status" style="font-weight: bold; color: #00ff00; margin-left: 10px;"></span>
         </div>
-        <span id="account-balance" style="font-weight: bold; color: white; font-size: 14px;">Loading...</span>
+        <div style="display: flex; flex-direction: column; align-items: flex-end;">
+          <span style="font-size: 11px; color: #ccc; font-weight: normal; margin-bottom: 0px;">Balance</span>
+          <span id="account-balance" style="font-weight: bold; color: white; font-size: 14px;">Loading...</span>
+        </div>
       </div>
       <div class="panel-container" id="buildTrade" style="min-height: 300px;">
         <div class="panel-header">Trade Builder</div>
@@ -1624,7 +1692,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const balanceEl = document.getElementById("account-balance");
         if (balanceEl) {
           const balance = data.balance || 0;
-          balanceEl.textContent = `Balance: $${Number(balance).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+          balanceEl.textContent = `$${Number(balance).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
         }
       } catch (error) {
         console.error('Error fetching account balance:', error);
