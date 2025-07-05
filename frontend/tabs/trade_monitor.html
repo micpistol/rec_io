@@ -383,6 +383,46 @@
 }
 </style>
 <style>
+#recoToggle {
+  accent-color: #00ff00;
+  background-color: transparent;
+  border: none;
+  outline: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  position: relative;
+  cursor: pointer;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px white;
+  transition: outline 0.2s ease;
+}
+
+#recoToggle:checked {
+  background-color: #00ff00;
+  box-shadow: none;
+}
+
+#recoToggle:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+#recoToggle:focus-visible {
+  outline: 2px solid #00ff00;
+  outline-offset: 2px;
+}
+</style>
+<style>
   /* === Multiplier Button Styles === */
   .multiplier-btn {
     background-color: transparent;
@@ -566,7 +606,13 @@
         </div>
       </div>
       <div class="panel-container" style="min-height: 100px;" id="watchlistPanel">
-        <div class="panel-header">Watchlist</div>
+        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Watchlist</span>
+          <label style="font-size: 12px; user-select: none; color: white; display: flex; align-items: center; gap: 6px; margin: 0;">
+            RECO
+            <input type="checkbox" id="recoToggle" />
+          </label>
+        </div>
         <div style="display: flex; flex-direction: row; align-items: stretch;">
           <table id="strike-table" class="strike-table" style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
             
@@ -1521,17 +1567,26 @@ function updateWatchlistDisplay() {
     }
   });
 
-  // Add or update rows for each watched strike
+  // Add or update rows for each watched strike (don't clear innerHTML)
   watchlistData.sort((a, b) => a - b);
-  watchlistBody.innerHTML = '';
+  
+  // Create a set of existing strikes in the watchlist for quick lookup
+  const existingStrikes = new Set();
+  Array.from(watchlistBody.children).forEach(row => {
+    const strike = parseFloat(row.children[0].textContent.replace(/[\$,]/g, ''));
+    existingStrikes.add(strike);
+  });
+  
   watchlistData.forEach(strike => {
+    const marketRow = strikeRowMap.get(strike);
+    if (!marketRow) return;
+    
     let row = Array.from(watchlistBody.children).find(r => {
       return parseFloat(r.children[0].textContent.replace(/[\$,]/g, '')) === strike;
     });
-    const marketRow = strikeRowMap.get(strike);
-    if (!marketRow) return;
+    
     if (!row) {
-      // Create new row
+      // Create new row only if it doesn't exist
       row = document.createElement('tr');
       row.className = marketRow.className + ' watchlist-row';
       Array.from(marketRow.children).forEach((cell, cellIndex) => {
@@ -1546,15 +1601,18 @@ function updateWatchlistDisplay() {
         }
         row.appendChild(newCell);
       });
+      watchlistBody.appendChild(row);
     } else {
-      // Update row class to match market row
+      // Update existing row class to match market row
       row.className = marketRow.className + ' watchlist-row';
     }
+    
     // Remove ATM border highlight from all cells in the watchlist row (force clear)
     Array.from(row.children).forEach(cell => {
       cell.style.borderTop = '';
       cell.style.borderBottom = '';
     });
+    
     // Update YES/NO buttons in place
     [5, 6].forEach(idx => {
       const marketCell = marketRow.children[idx];
@@ -1573,7 +1631,6 @@ function updateWatchlistDisplay() {
       }
       updateYesNoButton(watchSpan, strikeValue, side, askPrice, isActive, ticker);
     });
-    watchlistBody.appendChild(row);
   });
 }
 
@@ -1584,10 +1641,28 @@ function addStrikeTableClickHandlers() {
   
   const rows = strikeTable.querySelectorAll('tbody tr');
   rows.forEach(row => {
-    // Remove row-level cursor and title
+    // Remove existing click handlers first
+    row.removeEventListener('click', row._watchlistClickHandler);
+    
+    // Check if RECO is enabled - if so, don't add click handlers
+    if (window.recoEnabled) {
+      row.style.cursor = 'default';
+      row.title = 'RECO mode - manual selection disabled';
+      Array.from(row.children).forEach((cell, idx) => {
+        if (idx >= 0 && idx <= 4) {
+          cell.style.cursor = 'default';
+          cell.title = 'RECO mode - manual selection disabled';
+        } else {
+          cell.style.cursor = 'default';
+          cell.title = '';
+        }
+      });
+      return; // Skip adding click handlers when RECO is enabled
+    }
+    
+    // RECO is disabled - add normal click handlers
     row.style.cursor = '';
     row.title = '';
-    // Set cell-level cursor and title
     Array.from(row.children).forEach((cell, idx) => {
       if (idx >= 0 && idx <= 4) {
         cell.style.cursor = 'pointer';
@@ -1597,14 +1672,18 @@ function addStrikeTableClickHandlers() {
         cell.title = '';
       }
     });
-    row.addEventListener('click', (event) => {
+    
+    const clickHandler = (event) => {
       // Only trigger if not clicking on YES or NO columns (6 or 7)
       const cell = event.target.closest('td');
       if (!cell) return;
       const cellIndex = Array.from(row.children).indexOf(cell);
       if (cellIndex === 5 || cellIndex === 6) return; // YES or NO columns
       addToWatchlist(row);
-    });
+    };
+    
+    row._watchlistClickHandler = clickHandler;
+    row.addEventListener('click', clickHandler);
   });
 }
 
@@ -1624,10 +1703,101 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => {
         addStrikeTableClickHandlers();
         updateWatchlistDisplay(); // Update watchlist after strike table updates
+        updateWatchlistBasedOnReco(); // Apply RECO filtering if enabled
+        updateClickHandlersForReco(); // Update click handlers based on RECO state
       }, 100); // Small delay to ensure rows are rendered
     };
   }
 });
+
+// Function to apply RECO filtering criteria
+function applyRecoFilter(strikeRows) {
+  if (!window.recoEnabled) return []; // Return empty if RECO is off
+  
+  const filteredStrikes = [];
+  
+  strikeRows.forEach(row => {
+    const cells = Array.from(row.children);
+    if (cells.length < 7) return; // Need at least 7 columns
+    
+    // Get Adj B/M value (column 3, index 3)
+    const adjBmCell = cells[3];
+    const adjBmText = adjBmCell ? adjBmCell.textContent.trim() : '';
+    const adjBm = parseFloat(adjBmText.replace(/[^\d.-]/g, '')) || 0;
+    
+    // Get YES and NO prices (columns 5 and 6, indices 5 and 6)
+    const yesCell = cells[5];
+    const noCell = cells[6];
+    
+    let yesPrice = 0;
+    let noPrice = 0;
+    let yesActive = false;
+    let noActive = false;
+    
+    if (yesCell) {
+      const yesSpan = yesCell.querySelector('span');
+      if (yesSpan && !yesSpan.classList.contains('disabled')) {
+        yesPrice = parseFloat(yesSpan.textContent) || 0;
+        yesActive = true;
+      }
+    }
+    
+    if (noCell) {
+      const noSpan = noCell.querySelector('span');
+      if (noSpan && !noSpan.classList.contains('disabled')) {
+        noPrice = parseFloat(noSpan.textContent) || 0;
+        noActive = true;
+      }
+    }
+    
+    // Get the higher of the two active prices
+    const activePrice = Math.max(yesActive ? yesPrice : 0, noActive ? noPrice : 0);
+    
+    // Apply RECO criteria: Adj B/M > 25 AND active price ≤ 97
+    if (adjBm > 25 && activePrice <= 97 && activePrice > 0) {
+      // Get strike value from first column
+      const strikeCell = cells[0];
+      const strikeText = strikeCell ? strikeCell.textContent.trim() : '';
+      const strike = parseFloat(strikeText.replace(/[\$,]/g, '')) || 0;
+      
+      if (strike > 0) {
+        filteredStrikes.push(strike);
+      }
+    }
+  });
+  
+  console.log('RECO filter applied. Found', filteredStrikes.length, 'strikes meeting criteria');
+  return filteredStrikes;
+}
+
+// Function to update watchlist based on RECO state
+function updateWatchlistBasedOnReco() {
+  console.log('updateWatchlistBasedOnReco called, RECO enabled:', window.recoEnabled);
+  
+  if (window.recoEnabled) {
+    // RECO is ON - apply automatic filtering
+    console.log('Applying RECO filtering...');
+    const strikeTable = document.getElementById('strike-table');
+    if (!strikeTable) return;
+    
+    const strikeRows = Array.from(strikeTable.querySelectorAll('tbody tr'));
+    const filteredStrikes = applyRecoFilter(strikeRows);
+    
+    // Update watchlist with filtered strikes
+    watchlistData = filteredStrikes;
+    updateWatchlistDisplay();
+    saveWatchlistToPreferences();
+  } else {
+    // RECO is OFF - do absolutely nothing, don't touch the watchlist
+    console.log('RECO is OFF - leaving manual watchlist alone');
+  }
+}
+
+// Function to enable/disable click handlers based on RECO state
+function updateClickHandlersForReco() {
+  // Simply call addStrikeTableClickHandlers which now handles RECO state
+  addStrikeTableClickHandlers();
+}
 
 </script>
 
@@ -1774,6 +1944,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const autoStopToggle = document.getElementById('autoStopToggle');
   const positionInput = document.getElementById('position-size');
   const multiplierButtons = document.querySelectorAll('.multiplier-btn');
+  const recoToggle = document.getElementById('recoToggle');
   let currentMultiplier = null;
   // Remove: let ignoreWsUpdates = false; (now global)
 
@@ -1793,6 +1964,24 @@ document.addEventListener('DOMContentLoaded', () => {
       if (autoStopToggle && data.auto_stop !== undefined) {
         autoStopToggle.checked = data.auto_stop;
         window.autoStopEnabled = data.auto_stop;
+      }
+      if (recoToggle && data.reco !== undefined) {
+        recoToggle.checked = data.reco;
+        window.recoEnabled = data.reco;
+        
+        // If RECO is enabled on initial load, apply filtering
+        if (data.reco) {
+          console.log('RECO enabled on initial load - applying automatic filtering');
+          setTimeout(() => {
+            updateWatchlistBasedOnReco();
+            updateClickHandlersForReco(); // Disable click handlers
+          }, 1000); // Delay to ensure strike table is loaded
+        } else {
+          // If RECO is disabled on initial load, enable click handlers
+          setTimeout(() => {
+            updateClickHandlersForReco(); // Enable click handlers
+          }, 1000); // Delay to ensure strike table is loaded
+        }
       }
       if (positionInput && data.position_size !== undefined) {
         positionInput.value = data.position_size;
@@ -1855,6 +2044,26 @@ document.addEventListener('DOMContentLoaded', () => {
         ignoreWsUpdates = false;
       }
 
+      if (recoToggle && data.reco !== undefined && document.activeElement !== recoToggle) {
+        ignoreWsUpdates = true;
+        console.log('Received RECO update via WebSocket:', data.reco);
+        recoToggle.checked = data.reco;
+        window.recoEnabled = data.reco;
+        
+        // If RECO is being turned ON, apply filtering immediately
+        if (data.reco) {
+          console.log('RECO enabled - applying automatic filtering');
+          updateWatchlistBasedOnReco();
+          updateClickHandlersForReco(); // Disable click handlers
+        } else {
+          // If RECO is being turned OFF, re-enable click handlers
+          console.log('RECO disabled - re-enabling click handlers');
+          updateClickHandlersForReco(); // Re-enable click handlers
+        }
+        
+        ignoreWsUpdates = false;
+      }
+
       if (positionInput && data.position_size !== undefined && document.activeElement !== positionInput) {
         ignoreWsUpdates = true;
         positionInput.value = data.position_size;
@@ -1887,6 +2096,32 @@ document.addEventListener('DOMContentLoaded', () => {
       const value = autoStopToggle.checked;
       window.autoStopEnabled = value;
       fetch(window.location.origin + '/api/set_auto_stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: value })
+      });
+    });
+  }
+
+  if (recoToggle) {
+    recoToggle.addEventListener('change', () => {
+      if (ignoreWsUpdates) return;
+      const value = recoToggle.checked;
+      console.log('RECO toggle changed to:', value);
+      window.recoEnabled = value;
+      
+      // If RECO is being turned ON, apply filtering immediately
+      if (value) {
+        console.log('RECO enabled - applying automatic filtering');
+        updateWatchlistBasedOnReco();
+        updateClickHandlersForReco(); // Disable click handlers
+      } else {
+        // If RECO is being turned OFF, re-enable click handlers
+        console.log('RECO disabled - re-enabling click handlers');
+        updateClickHandlersForReco(); // Re-enable click handlers
+      }
+      
+      fetch(window.location.origin + '/api/set_reco', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: value })

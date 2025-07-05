@@ -49,7 +49,7 @@ def load_preferences():
                 return json.load(f)
         except Exception:
             pass
-    return {"auto_stop": True, "watchlist": []}
+    return {"auto_stop": True, "watchlist": [], "reco": False}
 
 def save_preferences(prefs):
     try:
@@ -656,6 +656,15 @@ async def set_auto_stop(request: Request):
     data = await request.json()
     prefs = load_preferences()
     prefs["auto_stop"] = bool(data.get("enabled", True))
+    save_preferences(prefs)
+    await broadcast_preferences_update()
+    return {"status": "ok"}
+
+@app.post("/api/set_reco")
+async def set_reco(request: Request):
+    data = await request.json()
+    prefs = load_preferences()
+    prefs["reco"] = bool(data.get("enabled", False))
     save_preferences(prefs)
     await broadcast_preferences_update()
     return {"status": "ok"}
