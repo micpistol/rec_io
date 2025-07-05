@@ -30,7 +30,6 @@ body {
   box-sizing: border-box;
   border-radius: 6px;
   margin-bottom: 10px;
-  padding-top: 0px;
 }
 
 /* Panel Header */
@@ -38,7 +37,18 @@ body {
   font-size: 12px;
   font-weight: bold;
   text-align: left;
+  vertical-align: top;;
   opacity: 0.7;
-  padding-top: 10px;
-  padding-bottom: 10px;
+  padding-top: 0px;
+  padding-bottom: 8px;
+}
+
+/* Dropdown Picker Styles */
+.dropdown-picker {
+  background-color: #3c495e;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px;
+  text-align: left;
 }

@@ -50,39 +50,24 @@
   }
 
   #tickerPanel td {
-    padding: 4px;
+    padding-bottom: 8px;
     text-align: left;
     vertical-align: bottom;
-    padding-top: 4px;
   }
 
-  #tickerPanel tr.instrument-row td {
-    padding-bottom: 0;
-  }
 
   #tickerPanel tr.price-row td {
     font-size: 270%;
-    padding-bottom: 0;
     vertical-align: baseline;
-  }
-  #ticker-picker {
-    background-color: #3c495e !important;
-    color: white !important;
-    border: none;
-    padding: 0px 8px;
-    border-radius: 4px;
-    text-align: left;
   }
 
   #tickerPanel tr.change-row td {
     font-size: 70%;
-    padding-bottom: 10px;
   }
 
   #tickerPanel tr.chart-row td {
     height: 100%;
     vertical-align: top;
-    padding: 0;
   }
 
   #newPanel {
@@ -373,36 +358,26 @@
 </head>
 <body>
     <div class="column" id="col1">
+      <div class="panel-container" style="height: 50px; min-height: 50px; max-height: 50px; margin-bottom: 10px; display: flex; align-items: center; justify-content: flex-start;">
+        <select id="ticker-picker" class="dropdown-picker" name="ticker">
+          <option value="BTC">BTC/USD</option>
+          <option value="ETH">ETH/USD</option>
+        </select>
+      </div>
       <div class="panel-container" style="min-height: 200px;" id="tickerPanelContainer">
         <table id="tickerPanel" class="panel-table">
           <tbody>
-            <tr class="instrument-row">
-              <td id="ticker-instrument-cell">
-                <select id="ticker-picker" name="ticker">
-                  <option value="BTC">BTC/USD</option>
-                  <option value="ETH">ETH/USD</option>
-                </select>
-              </td>
-            </tr>
             <tr class="price-row">
               <td style="position: relative;">
                 <span id="btc-price-value" style="display: inline-block;">$—</span>
                 <div id="volIndicator" style="display: inline-block; float: right; text-align: center; margin-left: 10px;">
                   <div style="font-size: 10px; color: #ccc; letter-spacing: 0.5px;">VOL</div>
-                  <div id="volLight" style="
-                    width: 24px;
-                    height: 24px;
-                    border-radius: 50%;
-                    margin-top: 4px;
-                    background: radial-gradient(circle at 30% 30%, #00cc00, #006600);
-                    box-shadow: 0 0 4px #00cc00;
-                    border: 1px solid #444;
-                  "></div>
+                  <div id="volLight" style="width: 24px; height: 24px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, #00cc00, #006600); box-shadow: 0 0 4px #00cc00; border: 1px solid #444;"></div>
                 </div>
               </td>
             </tr>
             <tr class="change-row">
-              <td id="btc-changes-cell">1h <span id="change-1h">—</span> &nbsp;&nbsp; 3h <span id="change-3h">—</span> &nbsp;&nbsp; 1d <span id="change-1d">—</span></td>
+              <td id="btc-changes-cell">1h &nbsp;<span id="change-1h">—</span> &nbsp;&nbsp; 3h &nbsp;<span id="change-3h">—</span> &nbsp;&nbsp; 1d &nbsp;<span id="change-1d">—</span></td>
             </tr>
             <tr class="chart-row">
               <td><div id="tradingview_12345"></div></td>
@@ -452,22 +427,20 @@
     </div>
     
     <div class="column" id="col2">
-      <!-- === STRIKE TABLES AND UI (inserted as per instructions) === -->
+      <div class="panel-container" style="height: 50px; min-height: 50px; max-height: 50px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+        <div id="strikePanelMarketTitleCell" style="font-size: 16px; text-align: left;">Loading market title...</div>
+        <div id="strikePanelTTC" style="font-size: 27px; font-weight: bold; text-align: right;">&nbsp;</div>
+      </div>
       <div class="panel-container" style="min-height: 200px; " id="strikePanelContainer">
         <table id="strikePanelTable" style="width: 100%; height: 100%; ">
           <tbody>
-            <tr>
-              <td id="strikePanelMarketTitleCell" style="font-size: 16px; width: 85%; padding: 0px; text-align: top; border: none;">Loading market title...</td>
-              <td style="font-size: 35px; font-weight: bold; padding: 8px; text-align: center; border: none;">
-                <div id="strikePanelTTC">&nbsp;</div>
-              </td>
-            </tr>
+            <!-- Market title and TTC clock row removed -->
           </tbody>
         </table>
         <div style="display: flex; align-items: flex-start;">
           <!-- Momentum Heat Band -->
-          <div id="momentum-heat-band" style="width: 12px; height: 100%; min-height: 400px; margin-right: 8px; position: relative; border: 1px solid #888; box-sizing: border-box;">
-            <div id="momentum-heat-gradient" style="width: 100%; height: 100%; border-radius: 2px; transition: all 0.3s ease; background: linear-gradient(to top, #6c757d 80%, #495057 80%, #495057 100%); opacity: 0.3;"></div>
+          <div id="momentum-heat-band" style="width: 20px; height: 100%; min-height: 400px; margin-right: 8px; position: relative; border: 1px solid #888; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center;">
+            <div id="momentum-heat-gradient" style="width: 100%; height: 100%; border-radius: 2px; transition: all 0.3s ease; position: relative; display: flex; flex-direction: column; justify-content: center;"></div>
           </div>
           
           <!-- Strike Table -->
@@ -488,7 +461,7 @@
         </div>
       </div>
       <div class="panel-container" style="min-height: 150px;" id="watchlistPanel">
-        <div class="panel-header">Watchlist</div>Œ
+        <div class="panel-header">Watchlist</div>
         <!-- Watchlist content will go here -->
       </div>
 </script>
@@ -1021,38 +994,120 @@ function updateMomentumHeatBandSegmented() {
   heatBand.innerHTML = '';
   heatBand.style.display = 'flex';
   heatBand.style.flexDirection = 'column';
-  heatBand.style.justifyContent = 'stretch';
+  heatBand.style.justifyContent = 'center';
   heatBand.style.background = 'none';
   heatBand.style.height = strikeTable.offsetHeight + 'px';
 
-  // Color settings
-  const maxMomentum = 50;
-  const intensity = Math.min(Math.abs(score) / maxMomentum, 1);
-  const green = `rgba(69, 211, 74, ${0.15 + 0.65 * intensity})`;
-  const red = `rgba(220, 53, 69, ${0.15 + 0.65 * intensity})`;
-  const neutral = 'rgba(120,120,120,0.18)';
+  // Always create the center neutral segment
+  const centerSeg = document.createElement('div');
+  centerSeg.style.flex = '1 1 0';
+  centerSeg.style.width = '100%';
+  centerSeg.style.margin = '0';
+  centerSeg.style.padding = '0';
+  centerSeg.style.background = 'rgba(120,120,120,0.3)';
+  centerSeg.style.border = '1px solid rgba(120,120,120,0.5)';
 
-  // Build segments
-  rows.forEach((row, idx) => {
+  // If momentum is zero, only show the center segment
+  if (score === 0) {
+    // Fill above and below with empty space to keep center centered
+    for (let i = 0; i < atmIndex; ++i) {
+      const empty = document.createElement('div');
+      empty.style.flex = '1 1 0';
+      heatBand.appendChild(empty);
+    }
+    heatBand.appendChild(centerSeg);
+    for (let i = atmIndex + 1; i < rows.length; ++i) {
+      const empty = document.createElement('div');
+      empty.style.flex = '1 1 0';
+      heatBand.appendChild(empty);
+    }
+    return;
+  }
+
+  // Otherwise, build the heatmap
+  // The length of the bars is proportional to |momentum| (maxes at ±50)
+  const maxMomentum = 50;
+  const absScore = Math.min(Math.abs(score), maxMomentum);
+  const barLength = Math.round((rows.length - 1) / 2 * (absScore / maxMomentum));
+
+  // Helper to get color for a segment (gradient)
+  function getGradientColor(baseColor, relIdx, totalLen, intensity) {
+    // relIdx: 0 (closest to center) to totalLen-1 (farthest)
+    // intensity: 0-1
+    let alpha = 0.15 + 0.7 * ((relIdx + 1) / totalLen) * intensity;
+    if (baseColor === 'green') return `rgba(69, 211, 74, ${alpha})`;
+    if (baseColor === 'red') return `rgba(220, 53, 69, ${alpha})`;
+    return 'rgba(120,120,120,0.18)';
+  }
+
+  // Build segments above (upwards from center)
+  for (let i = 0; i < atmIndex; ++i) {
     const seg = document.createElement('div');
     seg.style.flex = '1 1 0';
     seg.style.width = '100%';
     seg.style.margin = '0';
     seg.style.padding = '0';
-    seg.style.transition = 'background 0.3s';
-    if (idx === atmIndex) {
-      seg.style.background = neutral;
-    } else if (score > 0) {
-      // Positive momentum: above ATM helped (green), below ATM hurt (red)
-      seg.style.background = idx < atmIndex ? green : red;
-    } else if (score < 0) {
-      // Negative momentum: below ATM helped (green), above ATM hurt (red)
-      seg.style.background = idx > atmIndex ? green : red;
-    } else {
-      seg.style.background = neutral;
+    // Only color if within barLength from center
+    const relIdx = atmIndex - 1 - i;
+    if (relIdx < barLength) {
+      // For positive momentum: red up, negative: green up
+      const color = score > 0 ? 'red' : 'green';
+      seg.style.background = getGradientColor(color, relIdx, barLength, absScore / maxMomentum);
     }
     heatBand.appendChild(seg);
-  });
+  }
+  // Center
+  heatBand.appendChild(centerSeg);
+  // Build segments below (downwards from center)
+  for (let i = atmIndex + 1; i < rows.length; ++i) {
+    const seg = document.createElement('div');
+    seg.style.flex = '1 1 0';
+    seg.style.width = '100%';
+    seg.style.margin = '0';
+    seg.style.padding = '0';
+    // Only color if within barLength from center
+    const relIdx = i - (atmIndex + 1);
+    if (relIdx < barLength) {
+      // For positive momentum: green down, negative: red down
+      const color = score > 0 ? 'green' : 'red';
+      seg.style.background = getGradientColor(color, relIdx, barLength, absScore / maxMomentum);
+    }
+    heatBand.appendChild(seg);
+  }
+}
+
+// Helper function to create gradient bars
+function createGradientBar(container, direction, color, intensity, length) {
+  const bar = document.createElement('div');
+  bar.style.flex = `${length} 1 0`;
+  bar.style.width = '100%';
+  bar.style.margin = '0';
+  bar.style.padding = '0';
+  bar.style.position = 'relative';
+  bar.style.overflow = 'hidden';
+  
+  // Create gradient effect
+  const gradient = document.createElement('div');
+  gradient.style.width = '100%';
+  gradient.style.height = '100%';
+  gradient.style.position = 'absolute';
+  gradient.style.top = '0';
+  gradient.style.left = '0';
+  
+  if (color === 'green') {
+    gradient.style.background = `linear-gradient(${direction === 'down' ? 'to bottom' : 'to top'}, 
+      rgba(69, 211, 74, ${0.2 + 0.4 * intensity}) 0%, 
+      rgba(69, 211, 74, ${0.4 + 0.6 * intensity}) 50%, 
+      rgba(69, 211, 74, ${0.6 + 0.4 * intensity}) 100%)`;
+  } else {
+    gradient.style.background = `linear-gradient(${direction === 'down' ? 'to bottom' : 'to top'}, 
+      rgba(220, 53, 69, ${0.2 + 0.4 * intensity}) 0%, 
+      rgba(220, 53, 69, ${0.4 + 0.6 * intensity}) 50%, 
+      rgba(220, 53, 69, ${0.6 + 0.4 * intensity}) 100%)`;
+  }
+  
+  bar.appendChild(gradient);
+  container.appendChild(bar);
 }
 
 // Function to update position indicator
@@ -1246,16 +1301,18 @@ fetchAndCacheTTC();
 </div>
 
     <div class="column" id="col3" style="padding-right: 0px;">
-      
-      <div class="panel-container" id="buildTrade" style="min-height: 300px; padding-top: 0px;">
-        <div class="panel-header">Trade Builder</div>
-        <div style="margin-bottom: 12px;">
-          <select id="account-selector" style="padding: 6px; border-radius: 4px;">
+      <div class="panel-container" style="height: 50px; min-height: 50px; max-height: 50px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center;">
+          <select id="account-selector" class="dropdown-picker">
             <option value="live">eric@ewedit.com</option>
             <option value="demo">eric@ewedit.com DEMO</option>
           </select>
           <span id="account-status" style="font-weight: bold; color: #00ff00; margin-left: 10px;"></span>
         </div>
+        <span id="account-balance" style="font-weight: bold; color: white; font-size: 14px;">Loading...</span>
+      </div>
+      <div class="panel-container" id="buildTrade" style="min-height: 300px;">
+        <div class="panel-header">Trade Builder</div>
         <div style="font-weight: bold; margin-bottom: 6px; font-size: 0.9rem;">Position Size</div>
         <div id="positionSizeSelector" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
           <input type="number" id="position-size" min="1" style="width: 60px; padding: 6px; text-align: right; font-size: 1rem; border-radius: 4px; border: 1px solid #ccc;" />
@@ -1312,12 +1369,15 @@ fetchAndCacheTTC();
           const statusEl = document.getElementById("account-status");
           selector.value = mode === 'prod' ? 'live' : 'demo';
           if (mode === 'prod') {
-            statusEl.textContent = "*** LIVE TRADING ***";
+            statusEl.textContent = "LIVE TRADING";
             statusEl.style.color = "#00ff00";
           } else {
             statusEl.textContent = "Paper Trading";
             statusEl.style.color = "orange";
           }
+          
+          // Fetch and update account balance
+          updateAccountBalance(mode);
         });
 
       document.getElementById("account-selector").addEventListener("change", () => {
@@ -1325,7 +1385,7 @@ fetchAndCacheTTC();
         const statusEl = document.getElementById("account-status");
         const mode = selected === "live" ? "prod" : "demo";
         if (mode === "prod") {
-          statusEl.textContent = "*** LIVE TRADING ***";
+          statusEl.textContent = "LIVE TRADING";
           statusEl.style.color = "#00ff00";
         } else {
           statusEl.textContent = "Paper Trading";
@@ -1336,8 +1396,39 @@ fetchAndCacheTTC();
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mode })
         }).catch(console.error);
+        
+        // Update balance when account mode changes
+        updateAccountBalance(mode);
       });
     });
+    
+    // Function to fetch and update account balance
+    async function updateAccountBalance(mode) {
+      try {
+        const response = await fetch(`/api/account/balance?mode=${mode}`);
+        const data = await response.json();
+        const balanceEl = document.getElementById("account-balance");
+        if (balanceEl) {
+          const balance = data.balance || 0;
+          balanceEl.textContent = `Balance: $${Number(balance).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        }
+      } catch (error) {
+        console.error('Error fetching account balance:', error);
+        const balanceEl = document.getElementById("account-balance");
+        if (balanceEl) {
+          balanceEl.textContent = "Error";
+        }
+      }
+    }
+    
+    // Update balance every 30 seconds
+    setInterval(() => {
+      const selector = document.getElementById("account-selector");
+      if (selector) {
+        const mode = selector.value === "live" ? "prod" : "demo";
+        updateAccountBalance(mode);
+      }
+    }, 30000);
   </script>
 </body>
   <div id="errorTooltip" class="error-tooltip"></div>
@@ -1396,7 +1487,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const statusEl = document.getElementById("account-status");
         if (selector && statusEl) {
           selector.value = data.account_mode === "prod" ? "live" : "demo";
-          statusEl.textContent = data.account_mode === "prod" ? "*** LIVE TRADING ***" : "Paper Trading";
+          statusEl.textContent = data.account_mode === "prod" ? "LIVE TRADING" : "Paper Trading";
           statusEl.style.color = data.account_mode === "prod" ? "#00ff00" : "orange";
         }
       }
