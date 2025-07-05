@@ -1434,25 +1434,66 @@ fetchAndCacheTTC();
 
 // === WATCHLIST FUNCTIONALITY ===
 let watchlistData = [];
+let ignoreWsUpdates = false; // Move to global scope
 
-// Function to add a strike to the watchlist
-function addToWatchlist(strikeRow) {
-  const strike = parseFloat(strikeRow.querySelector('td:first-child').textContent.replace(/[\$,]/g, ''));
-  // Check if already in watchlist
-  if (watchlistData.includes(strike)) {
-    console.log(`Strike ${strike} already in watchlist`);
-    return;
+// Load watchlist from preferences on page load
+async function loadWatchlistFromPreferences() {
+  try {
+    const response = await fetch('/api/get_watchlist');
+    const data = await response.json();
+    watchlistData = data.watchlist || [];
+    console.log('Loaded watchlist from preferences:', watchlistData);
+    updateWatchlistDisplay();
+  } catch (error) {
+    console.error('Error loading watchlist from preferences:', error);
   }
-  watchlistData.push(strike);
-  updateWatchlistDisplay();
-  console.log(`Added strike ${strike} to watchlist`);
 }
 
-// Function to remove a strike from the watchlist
+// Save watchlist to preferences
+async function saveWatchlistToPreferences() {
+  console.log('saveWatchlistToPreferences called with watchlistData:', watchlistData);
+  console.log('ignoreWsUpdates:', ignoreWsUpdates);
+  if (ignoreWsUpdates) {
+    console.log('Skipping save due to ignoreWsUpdates flag');
+    return;
+  }
+  try {
+    console.log('Saving watchlist to preferences:', watchlistData);
+    const response = await fetch('/api/set_watchlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ watchlist: watchlistData })
+    });
+    console.log('Save response status:', response.status);
+    if (!response.ok) {
+      console.error('Save failed with status:', response.status);
+    } else {
+      console.log('Watchlist saved successfully');
+    }
+  } catch (error) {
+    console.error('Error saving watchlist to preferences:', error);
+  }
+}
+
+function addToWatchlist(strikeRow) {
+  console.log('addToWatchlist called with strikeRow:', strikeRow);
+  const strike = parseFloat(strikeRow.children[0].textContent.replace(/[\$,]/g, ''));
+  console.log('Parsed strike value:', strike);
+  if (watchlistData.includes(strike)) {
+    console.log('Strike already in watchlist, skipping');
+    return; // Already in watchlist
+  }
+  console.log('Adding strike to watchlistData');
+  watchlistData.push(strike);
+  console.log('Updated watchlistData:', watchlistData);
+  updateWatchlistDisplay();
+  saveWatchlistToPreferences();
+}
+
 function removeFromWatchlist(strike) {
   watchlistData = watchlistData.filter(item => item !== strike);
   updateWatchlistDisplay();
-  console.log(`Removed strike ${strike} from watchlist`);
+  saveWatchlistToPreferences();
 }
 
 // Function to update the watchlist display
@@ -1569,6 +1610,9 @@ function addStrikeTableClickHandlers() {
 
 // Initialize watchlist functionality
 document.addEventListener('DOMContentLoaded', () => {
+  // Load watchlist from preferences on page load
+  loadWatchlistFromPreferences();
+  
   // Add click handlers to existing strike table rows
   addStrikeTableClickHandlers();
   
@@ -1577,7 +1621,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (originalUpdateStrikeTable) {
     window.updateStrikeTable = function(...args) {
       originalUpdateStrikeTable.apply(this, args);
-      setTimeout(addStrikeTableClickHandlers, 100); // Small delay to ensure rows are rendered
+      setTimeout(() => {
+        addStrikeTableClickHandlers();
+        updateWatchlistDisplay(); // Update watchlist after strike table updates
+      }, 100); // Small delay to ensure rows are rendered
     };
   }
 });
@@ -1728,7 +1775,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const positionInput = document.getElementById('position-size');
   const multiplierButtons = document.querySelectorAll('.multiplier-btn');
   let currentMultiplier = null;
-  let ignoreWsUpdates = false;
+  // Remove: let ignoreWsUpdates = false; (now global)
 
   function updatePositionDisplay() {
     const baseValue = parseInt(positionInput.value, 10) || 0;
@@ -1761,6 +1808,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
       updatePositionDisplay();
+      
+      // Load watchlist from preferences
+      if (data.watchlist !== undefined) {
+        watchlistData = data.watchlist;
+        // Update watchlist display after a short delay to ensure strike table is built
+        setTimeout(() => {
+          updateWatchlistDisplay();
+        }, 500);
+      }
     });
 
   // WebSocket setup
@@ -1769,6 +1825,7 @@ document.addEventListener('DOMContentLoaded', () => {
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
+      console.log('WebSocket message received:', data);
 
       // === Account Mode Sync ===
       if (data.account_mode) {
@@ -1779,6 +1836,15 @@ document.addEventListener('DOMContentLoaded', () => {
           statusEl.textContent = data.account_mode === "prod" ? "LIVE TRADING" : "Paper Trading";
           statusEl.style.color = data.account_mode === "prod" ? "#00ff00" : "orange";
         }
+      }
+
+      // === Watchlist Sync ===
+      if (data.watchlist !== undefined) {
+        ignoreWsUpdates = true;
+        console.log('Received watchlist update via WebSocket:', data.watchlist);
+        watchlistData = data.watchlist || [];
+        updateWatchlistDisplay();
+        ignoreWsUpdates = false;
       }
 
       // Only update UI if not focused to avoid overwriting user input

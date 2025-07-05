@@ -49,7 +49,7 @@ def load_preferences():
                 return json.load(f)
         except Exception:
             pass
-    return {"auto_stop": True}
+    return {"auto_stop": True, "watchlist": []}
 
 def save_preferences(prefs):
     try:
@@ -57,10 +57,6 @@ def save_preferences(prefs):
             json.dump(prefs, f)
     except Exception as e:
         print(f"[Preferences Save Error] {e}")
-
-# Load preferences on startup
-preferences = load_preferences()
-auto_stop_state = {"enabled": preferences.get("auto_stop", True)}
 
 # CORS setup
 origins = [
@@ -658,9 +654,9 @@ async def log_event(request: Request):
 @app.post("/api/set_auto_stop")
 async def set_auto_stop(request: Request):
     data = await request.json()
-    auto_stop_state["enabled"] = bool(data.get("enabled", True))
-    preferences["auto_stop"] = auto_stop_state["enabled"]
-    save_preferences(preferences)
+    prefs = load_preferences()
+    prefs["auto_stop"] = bool(data.get("enabled", True))
+    save_preferences(prefs)
     await broadcast_preferences_update()
     return {"status": "ok"}
 
@@ -668,9 +664,10 @@ async def set_auto_stop(request: Request):
 @app.post("/api/set_position_size")
 async def set_position_size(request: Request):
     data = await request.json()
+    prefs = load_preferences()
     try:
-        preferences["position_size"] = int(data.get("position_size", 100))
-        save_preferences(preferences)
+        prefs["position_size"] = int(data.get("position_size", 100))
+        save_preferences(prefs)
         await broadcast_preferences_update()
     except Exception as e:
         print(f"[Set Position Size Error] {e}")
@@ -679,36 +676,65 @@ async def set_position_size(request: Request):
 @app.post("/api/set_multiplier")
 async def set_multiplier(request: Request):
     data = await request.json()
+    prefs = load_preferences()
     try:
-        preferences["multiplier"] = int(data.get("multiplier", 1))
-        save_preferences(preferences)
+        prefs["multiplier"] = int(data.get("multiplier", 1))
+        save_preferences(prefs)
         await broadcast_preferences_update()
     except Exception as e:
         print(f"[Set Multiplier Error] {e}")
     return {"status": "ok"}
 
+@app.post("/api/set_watchlist")
+async def set_watchlist(request: Request):
+    data = await request.json()
+    print('[DEBUG] Received set_watchlist:', data)
+    prefs = load_preferences()
+    try:
+        prefs["watchlist"] = data.get("watchlist", [])
+        print('[DEBUG] Updated prefs before save:', prefs)
+        save_preferences(prefs)
+        await broadcast_preferences_update()
+    except Exception as e:
+        print(f"[Set Watchlist Error] {e}")
+    return {"status": "ok"}
+
+@app.get("/api/get_watchlist")
+async def get_watchlist():
+    prefs = load_preferences()
+    return {"watchlist": prefs.get("watchlist", [])}
+
 # New route: update position size and multiplier preferences
 @app.post("/api/update_preferences")
 async def update_preferences(request: Request):
     data = await request.json()
+    prefs = load_preferences()
     updated = False
 
     if "position_size" in data:
         try:
-            preferences["position_size"] = int(data["position_size"])
+            prefs["position_size"] = int(data["position_size"])
             updated = True
         except Exception as e:
             print(f"[Invalid Position Size] {e}")
 
     if "multiplier" in data:
         try:
-            preferences["multiplier"] = int(data["multiplier"])
+            prefs["multiplier"] = int(data["multiplier"])
             updated = True
         except Exception as e:
             print(f"[Invalid Multiplier] {e}")
 
+    if "watchlist" in data:
+        try:
+            prefs["watchlist"] = data["watchlist"]
+            updated = True
+        except Exception as e:
+            print(f"[Invalid Watchlist] {e}")
+
     if updated:
-        save_preferences(preferences)
+        save_preferences(prefs)
+        await broadcast_preferences_update()
     return {"status": "ok"}
 
 
@@ -719,7 +745,8 @@ async def get_preferences():
 
 @app.get("/api/get_auto_stop")
 async def get_auto_stop():
-    return {"enabled": auto_stop_state["enabled"]}
+    prefs = load_preferences()
+    return {"enabled": prefs.get("auto_stop", True)}
 
 @app.get("/api/account/balance")
 def get_balance(request: Request):
