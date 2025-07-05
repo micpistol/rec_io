@@ -1,6 +1,8 @@
 # ---------- CORE HELPERS ----------------------------------------------------
 def create_pending_trade(trade: dict) -> int:
     """Insert a new ticket immediately with status='pending' and return DB id."""
+    # Ensure the trade is created with 'pending' status
+    trade['status'] = 'pending'
     trade_id = insert_trade(trade)
     log_event(trade["ticket_id"], "MANAGER: TICKET RECEIVED — CONFIRMED")
     log_event(trade["ticket_id"], "MANAGER: TRADE LOGGED PENDING — CONFIRMED")
@@ -78,9 +80,9 @@ def finalize_trade(id: int, ticket_id: str) -> None:
     demo_env = os.environ.get("DEMO_MODE", "false")
     DEMO_MODE = demo_env.strip().lower() == "true"
     if DEMO_MODE:
-        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "data", "accounts", "kalshi", "demo", "positions.db")
+        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "positions.db")
     else:
-        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "data", "accounts", "kalshi", "prod", "positions.db")
+        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "positions.db")
     if not os.path.exists(POSITIONS_DB_PATH):
         tm_log(f"[FATAL] Positions DB path not found: {POSITIONS_DB_PATH}")
         return
@@ -133,18 +135,36 @@ def finalize_trade(id: int, ticket_id: str) -> None:
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 closed_at = datetime.now(ZoneInfo("America/New_York")).strftime("%H:%M:%S")
+                
+                # Get trade data for PnL and win_loss calculation
+                cursor.execute("SELECT buy_price, sell_price, position FROM trades WHERE ticker = ? AND status = 'closing'", (expected_ticker,))
+                trade_row = cursor.fetchone()
+                if trade_row:
+                    buy_price, sell_price, position = trade_row
+                    # Calculate PnL
+                    pnl = None
+                    win_loss = None
+                    if buy_price is not None and sell_price is not None and position is not None:
+                        buy_value = buy_price * position
+                        sell_value = sell_price * position
+                        fees = round(fees_paid, 2) if fees_paid is not None else 0.0
+                        pnl = sell_value - buy_value - fees
+                        win_loss = 'W' if sell_price > buy_price else 'L'
+                
                 cursor.execute("""
                     UPDATE trades
                     SET status    = 'closed',
                         closed_at = ?,
                         fees      = COALESCE(fees, 0) + ?,
-                        position  = 0
+                        position  = 0,
+                        pnl       = ?,
+                        win_loss  = ?
                     WHERE ticker = ? AND status = 'closing'
-                """, (closed_at, round(fees_paid, 2), expected_ticker))
+                """, (closed_at, round(fees_paid, 2), pnl, win_loss, expected_ticker))
                 conn.commit()
                 conn.close()
-                log_event(ticket_id, f"MANAGER: TRADE FINALIZED — CLOSED (fees={round(fees_paid,2)})")
-                tm_log(f"[CLOSE COMPLETE] Trade {expected_ticker} closed successfully.")
+                log_event(ticket_id, f"MANAGER: TRADE FINALIZED — CLOSED (fees={round(fees_paid,2)}, pnl={pnl}, win_loss={win_loss})")
+                tm_log(f"[CLOSE COMPLETE] Trade {expected_ticker} closed successfully with PnL={pnl}, win_loss={win_loss}.")
                 break
             # ------------------------------------------------------------------
             # Comment out noisy [DEBUG] logs
@@ -252,8 +272,8 @@ def is_trade_expired(trade):
 
 
 # Define path for the trades database file
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_TRADES_PATH = os.path.join(BASE_DIR, "data", "trade_history", "trades.db")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_TRADES_PATH = os.path.join(BASE_DIR, "backend", "data", "trade_history", "trades.db")
 
 # Initialize trades DB and table
 def init_trades_db():
@@ -286,6 +306,9 @@ def init_trades_db():
     # Add fees_paid column if not present
     if "fees_paid" not in columns:
         cursor.execute("ALTER TABLE trades ADD COLUMN fees_paid REAL DEFAULT NULL")
+    # Add pnl column if not present
+    if "pnl" not in columns:
+        cursor.execute("ALTER TABLE trades ADD COLUMN pnl REAL DEFAULT NULL")
     # Additional columns to ensure exist
     additional_columns = {
         "symbol": "TEXT",
@@ -374,19 +397,30 @@ def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbo
             est_now = utc_now.astimezone(ZoneInfo("America/New_York"))
             closed_at = est_now.isoformat()
 
-        # Fetch buy_price for win/loss calculation
-        cursor.execute("SELECT buy_price FROM trades WHERE id = ?", (trade_id,))
+        # Fetch trade data for PnL calculation
+        cursor.execute("SELECT buy_price, position, fees_paid FROM trades WHERE id = ?", (trade_id,))
         row = cursor.fetchone()
         buy_price = row[0] if row else None
+        position = row[1] if row else None
+        fees_paid = row[2] if row else 0.0
 
+        # Calculate win/loss
         if buy_price is not None and sell_price is not None:
             win_loss = 'W' if sell_price > buy_price else 'L'
         else:
             win_loss = None
 
+        # Calculate PnL
+        pnl = None
+        if buy_price is not None and sell_price is not None and position is not None:
+            buy_value = buy_price * position
+            sell_value = sell_price * position
+            fees = fees_paid if fees_paid is not None else 0.0
+            pnl = sell_value - buy_value - fees
+
         cursor.execute(
-            "UPDATE trades SET status = ?, closed_at = ?, sell_price = ?, symbol_close = ?, win_loss = ? WHERE id = ?",
-            (status, closed_at, sell_price, symbol_close, win_loss, trade_id)
+            "UPDATE trades SET status = ?, closed_at = ?, sell_price = ?, symbol_close = ?, win_loss = ?, pnl = ? WHERE id = ?",
+            (status, closed_at, sell_price, symbol_close, win_loss, pnl, trade_id)
         )
     else:
         cursor.execute("UPDATE trades SET status = ? WHERE id = ?", (status, trade_id))
@@ -406,14 +440,14 @@ def fetch_recent_closed_trades(hours=24):
     cutoff = datetime.utcnow() - timedelta(hours=hours)
     cutoff_iso = cutoff.isoformat()
     cursor.execute("""
-        SELECT id, date, time, strike, side, buy_price, position, status, closed_at, contract, sell_price
+        SELECT id, date, time, strike, side, buy_price, position, status, closed_at, contract, sell_price, pnl, win_loss
         FROM trades
         WHERE status = 'closed' AND closed_at >= ?
         ORDER BY closed_at DESC
     """, (cutoff_iso,))
     rows = cursor.fetchall()
     conn.close()
-    return [dict(zip(["id","date","time","strike","side","buy_price","position","status","closed_at","contract","sell_price"], row)) for row in rows]
+    return [dict(zip(["id","date","time","strike","side","buy_price","position","status","closed_at","contract","sell_price","pnl","win_loss"], row)) for row in rows]
 
 # API routes for trade management
 
@@ -461,9 +495,9 @@ async def add_trade(request: Request):
                 demo_env = os.environ.get("DEMO_MODE", "false")
                 DEMO_MODE = demo_env.strip().lower() == "true"
                 if DEMO_MODE:
-                    POSITIONS_DB_PATH = os.path.join(BASE_DIR, "data", "accounts", "kalshi", "demo", "positions.db")
+                    POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "positions.db")
                 else:
-                    POSITIONS_DB_PATH = os.path.join(BASE_DIR, "data", "accounts", "kalshi", "prod", "positions.db")
+                    POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "positions.db")
 
                 if os.path.exists(POSITIONS_DB_PATH):
                     conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
@@ -643,85 +677,190 @@ def check_stop_trigger(trade):
     # For now, never triggers
     return False
 
-def trade_monitor_loop():
-    while True:
-        try:
-            open_trades = fetch_open_trades_light()
-            for trade in open_trades:
-                if check_stop_trigger(trade):
-                    print(f"[Trade Monitor] Closing trade id={trade['id']} due to stop trigger")
-                    update_trade_status(trade['id'], 'closed')
-                else:
-                    now_est = datetime.now(ZoneInfo("America/New_York"))
-                    if now_est.minute == 0 and now_est.second == 0 and is_trade_expired(trade):
-                        print(f"[Trade Monitor] Auto-closing trade id={trade['id']} at top of hour")
-                        update_trade_status(trade['id'], 'closed')
-        except Exception as e:
-            print(f"[Trade Monitor] Error: {e}")
-        time.sleep(1)  # Check every 1 second
-
 _monitor_thread = None
 
 def start_trade_monitor():
-    global _monitor_thread
-    if _monitor_thread is None or not _monitor_thread.is_alive():
-        _monitor_thread = threading.Thread(target=trade_monitor_loop, daemon=True)
-        _monitor_thread.start()
+    # REMOVED: No longer needed since APScheduler handles expiration
+    # The APScheduler is started in the FastAPI startup event
+    pass
+
+# ------------------------------------------------------------------------------
+# SIMPLE HOURLY EXPIRATION CHECK
+# ------------------------------------------------------------------------------
+def check_expired_trades():
+    """
+    TRIGGER: Called at top of every hour (minute=0, second=0)
+    
+    LOGIC:
+    1. Check for OPEN trades
+    2. Mark them as EXPIRED with current time and BTC price
+    3. Poll settlements.db every 2 seconds
+    4. When settlements.db updates, check for matching tickers
+    5. Mark matching trades as CLOSED with sell_price and W/L
+    6. Stop polling when all expired trades are closed
+    """
+    try:
+        # Step 1: Get all OPEN trades
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, ticker FROM trades WHERE status = 'open'")
+        open_trades = cursor.fetchall()
+        conn.close()
+        
+        if not open_trades:
+            print("[EXPIRATION] No open trades to check")
+            return
+            
+        print(f"[EXPIRATION] Found {len(open_trades)} open trades to expire")
+        
+        # Step 2: Mark all OPEN trades as EXPIRED
+        now_est = datetime.now(ZoneInfo("America/New_York"))
+        closed_at = now_est.strftime("%H:%M:%S")
+        
+        # Get current BTC price from watchdog
+        try:
+            import requests
+            main_port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))
+            response = requests.get(f"http://localhost:{main_port}/core", timeout=5)
+            if response.ok:
+                core_data = response.json()
+                symbol_close = core_data.get('btc_price')
+            else:
+                symbol_close = None
+        except Exception as e:
+            print(f"[EXPIRATION] Failed to get BTC price: {e}")
+            symbol_close = None
+        
+        # Mark trades as expired
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE trades 
+            SET status = 'expired', 
+                closed_at = ?, 
+                symbol_close = ?
+            WHERE status = 'open'
+        """, (closed_at, symbol_close))
+        conn.commit()
+        conn.close()
+        
+        print(f"[EXPIRATION] Marked {len(open_trades)} trades as expired")
+        
+        # Step 3: Poll settlements.db for matches
+        expired_tickers = [trade[1] for trade in open_trades]
+        poll_settlements_for_matches(expired_tickers)
+        
+    except Exception as e:
+        print(f"[EXPIRATION] Error: {e}")
 
 
-
+def poll_settlements_for_matches(expired_tickers):
+    """
+    Poll settlements.db every 2 seconds until all expired trades are closed
+    """
+    print(f"[SETTLEMENTS] Starting to poll for {len(expired_tickers)} expired tickers")
+    
+    # Get settlements.db path
+    demo_env = os.environ.get("DEMO_MODE", "false")
+    DEMO_MODE = demo_env.strip().lower() == "true"
+    if DEMO_MODE:
+        SETTLEMENTS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "settlements.db")
+    else:
+        SETTLEMENTS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "settlements.db")
+    
+    if not os.path.exists(SETTLEMENTS_DB_PATH):
+        print(f"[SETTLEMENTS] Settlements DB not found: {SETTLEMENTS_DB_PATH}")
+        return
+    
+    # Track which tickers we've found settlements for
+    found_tickers = set()
+    
+    while len(found_tickers) < len(expired_tickers):
+        try:
+            conn = sqlite3.connect(SETTLEMENTS_DB_PATH, timeout=0.25)
+            cursor = conn.cursor()
+            
+            # Check for new settlements matching our expired tickers
+            for ticker in expired_tickers:
+                if ticker in found_tickers:
+                    continue
+                    
+                cursor.execute("SELECT revenue FROM settlements WHERE ticker = ? ORDER BY settled_time DESC LIMIT 1", (ticker,))
+                row = cursor.fetchone()
+                
+                if row:
+                    revenue = row[0]
+                    sell_price = 1.00 if revenue > 0 else 0.00
+                    
+                    # Update the expired trade to closed with PnL calculation
+                    conn_trades = get_db_connection()
+                    cursor_trades = conn_trades.cursor()
+                    
+                    # Get trade data for PnL calculation
+                    cursor_trades.execute("SELECT buy_price, position, fees_paid FROM trades WHERE ticker = ? AND status = 'expired'", (ticker,))
+                    trade_row = cursor_trades.fetchone()
+                    if trade_row:
+                        buy_price, position, fees_paid = trade_row
+                        # Calculate PnL
+                        pnl = None
+                        if buy_price is not None and sell_price is not None and position is not None:
+                            buy_value = buy_price * position
+                            sell_value = sell_price * position
+                            fees = fees_paid if fees_paid is not None else 0.0
+                            pnl = sell_value - buy_value - fees
+                    
+                    cursor_trades.execute("""
+                        UPDATE trades 
+                        SET status = 'closed',
+                            sell_price = ?,
+                            win_loss = ?,
+                            pnl = ?
+                        WHERE ticker = ? AND status = 'expired'
+                    """, (sell_price, 'W' if sell_price > 0 else 'L', pnl, ticker))
+                    conn_trades.commit()
+                    conn_trades.close()
+                    
+                    found_tickers.add(ticker)
+                    print(f"[SETTLEMENTS] Closed trade for {ticker} with sell_price={sell_price}")
+            
+            conn.close()
+            
+            if len(found_tickers) < len(expired_tickers):
+                print(f"[SETTLEMENTS] Found {len(found_tickers)}/{len(expired_tickers)} settlements, continuing to poll...")
+                time.sleep(2)  # Poll every 2 seconds
+            else:
+                print(f"[SETTLEMENTS] All {len(expired_tickers)} expired trades have been closed")
+                break
+                
+        except Exception as e:
+            print(f"[SETTLEMENTS] Error polling settlements: {e}")
+            time.sleep(2)
 
 
 # ------------------------------------------------------------------------------
-# Stand-alone FastAPI application
+# APScheduler Setup for Hourly Expiration Checks
 # ------------------------------------------------------------------------------
+_scheduler = BackgroundScheduler(timezone=ZoneInfo("America/New_York"))
+_scheduler.add_job(check_expired_trades, CronTrigger(minute=0, second=0))
 
 from fastapi import FastAPI
 
-
-# ------------------------------------------------------------------------------
-# Expiration Closure Job for APScheduler
-# ------------------------------------------------------------------------------
-def run_expiration_closure():
-    """
-    This function can be scheduled to run periodically by APScheduler
-    to auto-close expired trades.
-    """
-    try:
-        open_trades = fetch_open_trades_light()
-        for trade in open_trades:
-            if is_trade_expired(trade):
-                print(f"[Expiration Closure] Marking trade id={trade['id']} as expired")
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("UPDATE trades SET status = 'expired' WHERE id = ?", (trade["id"],))
-                conn.commit()
-                conn.close()
-                print(f"[Expiration Closure] Trade id={trade['id']} marked as expired")
-    except Exception as e:
-        print(f"[Expiration Closure] Error: {e}")
-
-
-# ------------------------------------------------------------------------------
-# APScheduler Initialization (defer start to FastAPI startup event)
-# ------------------------------------------------------------------------------
-_scheduler = BackgroundScheduler(timezone=ZoneInfo("America/New_York"))
-_scheduler.add_job(run_expiration_closure, CronTrigger(minute=0, second=0))
-
 app = FastAPI()
-app.include_router(router)
 
-# Start the scheduler only when the FastAPI app starts
-
-if __name__ == "__main__":
-    import uvicorn
-    import os
-
+@app.on_event("startup")
+async def startup_event():
+    """Start APScheduler when FastAPI app starts"""
     try:
         _scheduler.start()
         print("[SCHEDULER] APScheduler started successfully")
     except Exception as e:
         print(f"[SCHEDULER ERROR] Failed to start APScheduler: {e}")
+
+app.include_router(router)
+
+if __name__ == "__main__":
+    import uvicorn
+    import os
 
     port = int(os.environ.get("TRADE_MANAGER_PORT", config.get("agents.trade_manager.port", 5002)))
     print(f"[INFO] Trade Manager running on port {port}")

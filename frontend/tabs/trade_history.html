@@ -30,7 +30,7 @@
       transform: translateY(-50%);
     }
     tbody tr:nth-child(even) {
-      //background-color: #323c4e;
+      /* background-color: #323c4e; */
     }
     caption {
       font-size: 1.2rem;
@@ -99,6 +99,7 @@
           <th data-key="sell_price">Sell</th>
           <th data-key="position">Position</th>
           <th data-key="fees">Fees</th>
+          <th data-key="pnl">PnL</th>
           <th data-key="closed_at">Closed</th>
           <th data-key="symbol_open">Symbol Open</th>
           <th data-key="symbol_close">Symbol Close</th>
@@ -115,6 +116,13 @@
     let currentSort = { key: null, asc: true };
     let trades = [];
 
+    function displayPnL(trade) {
+      if (trade.pnl !== null && trade.pnl !== undefined) {
+        return Number(trade.pnl).toFixed(2);
+      }
+      return '';
+    }
+
     async function fetchAllTrades() {
       console.log('Fetching trades at', new Date().toLocaleTimeString());
       try {
@@ -127,7 +135,7 @@
         renderTrades(trades);
       } catch (error) {
         const tbody = document.querySelector('#trade-log-table tbody');
-        tbody.innerHTML = `<tr><td colspan="19" style="color:red;">Failed to load trades: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="20" style="color:red;">Failed to load trades: ${error.message}</td></tr>`;
       }
     }
 
@@ -150,7 +158,7 @@
         if (valB === null || valB === undefined) valB = '';
 
         // Try to parse as numbers for numeric fields
-        const numericKeys = ['id', 'strike', 'buy_price', 'sell_price', 'position', 'symbol_open', 'symbol_close', 'momentum', 'volatility', 'win_loss'];
+        const numericKeys = ['id', 'strike', 'buy_price', 'sell_price', 'position', 'symbol_open', 'symbol_close', 'momentum', 'volatility', 'win_loss', 'pnl'];
         if (numericKeys.includes(currentSort.key)) {
           valA = Number(valA);
           valB = Number(valB);
@@ -186,7 +194,7 @@
       const tbody = document.querySelector('#trade-log-table tbody');
       tbody.innerHTML = '';
       if (!Array.isArray(trades) || trades.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="19">No trades found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="20">No trades found.</td></tr>';
         return;
       }
 
@@ -216,6 +224,7 @@
           <td>${trade.sell_price !== null ? Number(trade.sell_price).toFixed(2) : ''}</td>
           <td>${trade.position !== null ? trade.position : ''}</td>
           <td>${trade.fees !== null ? Number(trade.fees).toFixed(2) : ''}</td>
+          <td>${displayPnL(trade)}</td>
           <td>${trade.closed_at !== null ? trade.closed_at : ''}</td>
           <td>${trade.symbol_open !== null ? '$' + Math.round(trade.symbol_open).toLocaleString() : ''}</td>
           <td>${trade.symbol_close !== null ? '$' + Math.round(trade.symbol_close).toLocaleString() : ''}</td>

@@ -954,6 +954,52 @@ def get_trades_db():
     except Exception as e:
         return {"error": str(e), "trades": []}
 
+# Frontend-compatible /trades endpoint
+@app.get("/trades")
+def get_trades():
+    mode = get_account_mode()
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "data", "trade_history", "trades.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, date, time, strike, side, buy_price, position, status, 
+                   symbol, market, trade_strategy, market_id,
+                   symbol_open, symbol_close, momentum, momentum_delta, 
+                   volatility, volatility_delta, win_loss 
+            FROM trades 
+            ORDER BY id DESC
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+        results = [
+            {
+                "id": row[0],
+                "date": row[1],
+                "time": row[2],
+                "strike": row[3],
+                "side": row[4],
+                "buy_price": row[5],
+                "position": row[6],
+                "status": row[7],
+                "symbol": row[8],
+                "market": row[9],
+                "trade_strategy": row[10],
+                "market_id": row[11],
+                "symbol_open": row[12],
+                "symbol_close": row[13],
+                "momentum": row[14],
+                "momentum_delta": row[15],
+                "volatility": row[16],
+                "volatility_delta": row[17],
+                "win_loss": row[18],
+            }
+            for row in rows
+        ]
+        return results
+    except Exception as e:
+        return []
+
 # SSE endpoint for watching trades DB updates
 @app.get("/watch/trades")
 async def watch_trades():

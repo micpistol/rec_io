@@ -1,7 +1,8 @@
 // btcPriceService.js
 // Module to fetch live BTC price from backend API and notify subscribers
 
-const BTC_API_URL = "http://localhost:8000/core"; // Adjust if your backend API endpoint differs
+// Use configurable API URL instead of hardcoded port
+const BTC_API_URL = window.location.origin + "/core"; // Use relative URL to avoid hardcoded ports
 
 export class BtcPriceService {
   constructor(pollIntervalMs = 1000, dbUpdateCallback = null) {
