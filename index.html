@@ -25,6 +25,7 @@
       min-width: 50px;
       height: 100vh;
       transition: width 0.3s ease;
+      padding-left: 3px;
     }
     
     .sidebar.collapsed {
@@ -63,6 +64,8 @@
       background: none;
       font-family: inherit;
       cursor: pointer;
+      opacity: 0.5;
+      transition: background-color 0.2s, opacity 0.2s;
     }
     
     .nav-icon {
@@ -71,6 +74,49 @@
       min-width: 32px;
       text-align: center;
       font-size: 18px;
+
+      
+      opacity: 0.5;
+      transition: opacity 0.2s;
+    }
+    
+    .nav-item:not(.active):hover {
+      position: relative;
+      opacity: 1;
+    }
+    
+    .nav-item:not(.active):hover::before {
+      content: '';
+      position: absolute;
+      top: 5px;
+      left: 11px;
+      right: 0;
+      bottom: 5px;
+      background: rgba(50, 60, 78, 0.5);
+      border-radius: 6px;
+      z-index: -1;
+    }
+    
+    .nav-item.active {
+      position: relative;
+      z-index: 1;
+      opacity: 1;
+    }
+    
+    .nav-item.active::before {
+      content: '';
+      position: absolute;
+      top: 5px;
+      left: 11px;
+      right: 0;
+      bottom: 5px;
+      background: #323c4e;
+      border-radius: 6px;
+      z-index: -1;
+    }
+    
+    .nav-item.active .nav-icon {
+      opacity: 1;
     }
     
     .nav-label {
@@ -94,7 +140,10 @@
     }
     
     .sidebar-toggle {
-      padding: 16px 0 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 0 12px 15px;
       text-align: left;
       cursor: pointer;
       user-select: none;
@@ -104,6 +153,50 @@
       width: 100%;
       color: inherit;
       outline: none;
+      position: relative;
+      opacity: 0.5;
+      transition: opacity 0.2s;
+    }
+    .sidebar-toggle .toggle-icon {
+      display: inline-block;
+      width: 32px;
+      min-width: 32px;
+      text-align: center;
+      font-size: 18px;
+      margin-left: 0;
+    }
+    .sidebar-toggle .toggle-label {
+      margin-left: 12px;
+      white-space: nowrap;
+      opacity: 1;
+      max-width: 180px;
+      transition: 
+        opacity 0.3s ease,
+        max-width 0.3s ease,
+        visibility 0.3s ease;
+      visibility: visible;
+    }
+    .sidebar.collapsed .sidebar-toggle .toggle-label {
+      opacity: 0;
+      max-width: 0;
+      visibility: hidden;
+    }
+    .sidebar-toggle:hover {
+      opacity: 1;
+    }
+    .sidebar-toggle:hover .toggle-icon {
+      opacity: 1;
+    }
+    .sidebar-toggle:hover::before {
+      content: '';
+      position: absolute;
+      top: 5px;
+      left: 11px;
+      right: 0;
+      bottom: 5px;
+      background: rgba(50, 60, 78, 0.5);
+      border-radius: 6px;
+      z-index: -1;
     }
     
     .main-content {
@@ -116,6 +209,15 @@
       width: 100%;
       height: 100%;
       border: none;
+    }
+    
+    /* Rotate the arrow icon when sidebar is collapsed */
+    .sidebar.collapsed .sidebar-toggle .nav-icon svg {
+      transform: rotate(180deg);
+      transition: transform 0.3s;
+    }
+    .sidebar-toggle .nav-icon svg {
+      transition: transform 0.3s;
     }
   </style>
 </head>
@@ -146,7 +248,14 @@
       </div>
       
       <!-- Collapse/Expand Button -->
-      <button class="sidebar-toggle" id="sidebarToggle">◀</button>
+      <button class="sidebar-toggle" id="sidebarToggle">
+        <span class="nav-icon" aria-hidden="true">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="white" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="20,8 12,16 20,24" />
+          </svg>
+        </span>
+        <span class="toggle-label">Collapse</span>
+      </button>
     </nav>
     
     <!-- Main Content Area -->
@@ -165,7 +274,6 @@
     // Toggle sidebar collapse/expand
     sidebarToggle.addEventListener('click', () => {
       sidebar.classList.toggle('collapsed');
-      sidebarToggle.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
     });
     
     // Navigation functionality
