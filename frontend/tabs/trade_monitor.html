@@ -314,6 +314,28 @@
   }
 </style>
 <style>
+  #strike-table tr.spanner-row td {
+    background-color: #535668;
+    color: #c0c0c0;
+    text-align: center;
+    font-size: 12px;
+    font-style: italic;
+    height: 25px;
+    padding: 2px 4px;
+  }
+</style>
+<style>
+  #watchlist-table tr.spanner-row td {
+    background-color: #535668;
+    color: #c0c0c0;
+    text-align: center;
+    font-size: 12px;
+    font-style: italic;
+    height: 25px;
+    padding: 2px 4px;
+  }
+</style>
+<style>
   .trade-popup, .trade-closed-popup {
     position: fixed;
     bottom: 20px;
@@ -1056,6 +1078,31 @@ function updateStrikeTable(coreData, latestKalshiMarkets) {
   const ttcMinutes = ttcSeconds / 60;
   const centerPrice = coreData.btc_price;
 
+  // Remove any existing spanner rows first
+  const strikeTableBody = document.querySelector('#strike-table tbody');
+  strikeTableBody.querySelectorAll('.spanner-row').forEach(row => row.remove());
+
+  // Build array of strike rows for proper ordering
+  const strikeRows = [];
+  const strikes = Array.from(strikeRowsMap.keys()).sort((a, b) => a - b);
+  
+  strikes.forEach(strike => {
+    const cells = strikeRowsMap.get(strike);
+    if (cells && cells.row) {
+      strikeRows.push(cells.row);
+    }
+  });
+
+  // Find the correct index to insert the spanner row
+  let spannerIndex = strikeRows.length; // default to end
+  for (let i = 0; i < strikeRows.length; i++) {
+    const strike = strikes[i];
+    if (centerPrice < strike) {
+      spannerIndex = i;
+      break;
+    }
+  }
+
   strikeRowsMap.forEach((cells, strike) => {
     const { row, bufferTd, bmTd, adjBmTd, riskTd, yesSpan, noSpan } = cells;
 
@@ -1099,6 +1146,7 @@ function updateStrikeTable(coreData, latestKalshiMarkets) {
     const lowerBound = strike;
     const upperBound = strike + 249.9999;
     const isActiveRow = centerPrice >= lowerBound && centerPrice <= upperBound;
+    /*
     if (isActiveRow) {
       [cells.row.children[0], bufferTd, bmTd, adjBmTd, riskTd, yesSpan.parentElement, noSpan.parentElement].forEach(cell => {
         cell.style.borderTop = "3px solid #444";
@@ -1110,6 +1158,7 @@ function updateStrikeTable(coreData, latestKalshiMarkets) {
         cell.style.borderBottom = "";
       });
     }
+    */
 
     // Find markets for yes/no asks - use more flexible matching
     const matchingMarket = latestKalshiMarkets.find(m => {
@@ -1136,6 +1185,62 @@ function updateStrikeTable(coreData, latestKalshiMarkets) {
     // Update position indicator (subtle background tint)
     updatePositionIndicator(cells.row.children[0], strike);
   });
+
+  // Insert spanner row at the correct position
+  if (strikeRows.length > 0) {
+    // Build the spanner row
+    const spannerRow = document.createElement("tr");
+    spannerRow.className = "spanner-row";
+    const spannerTd = document.createElement("td");
+    spannerTd.colSpan = 7;
+
+    // --- Add arrow icons based on momentum score ---
+    // Helper to get current momentum score from DOM
+    function getCurrentMomentumScoreForArrow() {
+      const el = document.getElementById('momentum-score-value');
+      if (el && el.textContent) {
+        const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
+        return isNaN(val) ? 0 : val;
+      }
+      return 0;
+    }
+    let momentumScore = getCurrentMomentumScoreForArrow();
+    let arrow = '';
+    // SVGs for straight arrows (no margin)
+    const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const svgUpDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 2l4 4M8 2l-4 4M8 14l4-4M8 14l-4-4" stroke="#aaa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const absMomentum = Math.abs(momentumScore);
+    let arrowBlock = '';
+    if (momentumScore === 0) {
+      arrowBlock = svgUpDown;
+    } else if (momentumScore > 0) {
+      if (absMomentum <= 10) {
+        arrowBlock = svgDown;
+      } else if (absMomentum <= 20) {
+        arrowBlock = svgDown + svgDown;
+      } else {
+        arrowBlock = svgDown + svgDown + svgDown;
+      }
+    } else if (momentumScore < 0) {
+      if (absMomentum <= 10) {
+        arrowBlock = svgUp;
+      } else if (absMomentum <= 20) {
+        arrowBlock = svgUp + svgUp;
+      } else {
+        arrowBlock = svgUp + svgUp + svgUp;
+      }
+    }
+    spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>Current Price: $${Math.round(centerPrice).toLocaleString()}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
+    spannerRow.appendChild(spannerTd);
+
+    // Insert the spanner row at the correct index
+    if (spannerIndex < strikeRows.length) {
+      strikeTableBody.insertBefore(spannerRow, strikeRows[spannerIndex]);
+    } else {
+      strikeTableBody.appendChild(spannerRow);
+    }
+  }
   
   // Update momentum heat band
   updateMomentumHeatBandSegmented();
@@ -1568,6 +1673,28 @@ function updateWatchlistDisplay() {
   // Clear the watchlist body and rebuild in correct order
   watchlistBody.innerHTML = '';
   
+  // If watchlist is empty, show nothing (no spanner row)
+  if (watchlistData.length === 0) {
+    return;
+  }
+  
+  // Get current price for spanner row positioning
+  const currentPriceEl = document.getElementById('btc-price-value');
+  const currentPrice = currentPriceEl ? parseFloat(currentPriceEl.textContent.replace(/\$|,/g, '')) : 0;
+  
+  // Build array of watchlist rows for proper ordering
+  const watchlistRows = [];
+  let spannerIndex = watchlistData.length; // default to end
+  
+  // Find the correct index to insert the spanner row
+  for (let i = 0; i < watchlistData.length; i++) {
+    const strike = watchlistData[i];
+    if (currentPrice < strike) {
+      spannerIndex = i;
+      break;
+    }
+  }
+  
   watchlistData.forEach(strike => {
     const marketRow = strikeRowMap.get(strike);
     if (!marketRow) return;
@@ -1614,7 +1741,64 @@ function updateWatchlistDisplay() {
       
     });
     
-    // Append the row to maintain sorted order
+    // Add to array for proper ordering
+    watchlistRows.push(row);
+  });
+  
+  // Insert spanner row at the correct position
+  if (watchlistRows.length > 0) {
+    // Build the spanner row
+    const spannerRow = document.createElement("tr");
+    spannerRow.className = "spanner-row";
+    const spannerTd = document.createElement("td");
+    spannerTd.colSpan = 7;
+
+    // --- Add arrow icons based on momentum score ---
+    // Helper to get current momentum score from DOM
+    function getCurrentMomentumScoreForArrow() {
+      const el = document.getElementById('momentum-score-value');
+      if (el && el.textContent) {
+        const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
+        return isNaN(val) ? 0 : val;
+      }
+      return 0;
+    }
+    let momentumScore = getCurrentMomentumScoreForArrow();
+    let arrow = '';
+    // SVGs for straight arrows (no margin)
+    const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const svgUpDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 2l4 4M8 2l-4 4M8 14l4-4M8 14l-4-4" stroke="#aaa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const absMomentum = Math.abs(momentumScore);
+    let arrowBlock = '';
+    if (momentumScore === 0) {
+      arrowBlock = svgUpDown;
+    } else if (momentumScore > 0) {
+      if (absMomentum <= 10) {
+        arrowBlock = svgDown;
+      } else if (absMomentum <= 20) {
+        arrowBlock = svgDown + svgDown;
+      } else {
+        arrowBlock = svgDown + svgDown + svgDown;
+      }
+    } else if (momentumScore < 0) {
+      if (absMomentum <= 10) {
+        arrowBlock = svgUp;
+      } else if (absMomentum <= 20) {
+        arrowBlock = svgUp + svgUp;
+      } else {
+        arrowBlock = svgUp + svgUp + svgUp;
+      }
+    }
+    spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
+    spannerRow.appendChild(spannerTd);
+
+    // Insert the spanner row at the correct index
+    watchlistRows.splice(spannerIndex, 0, spannerRow);
+  }
+  
+  // Append all rows to the watchlist body
+  watchlistRows.forEach(row => {
     watchlistBody.appendChild(row);
   });
 }
@@ -3479,42 +3663,48 @@ activeTradesTableBody.addEventListener('click', (event) => {
     const momentumEl = document.getElementById('momentum-score-value');
     if (!momentumEl) return;
     const observer = new MutationObserver(() => {
-      // Find the spanner row and update arrows
-      const spannerRow = document.querySelector('#activeTradesTable tr.spanner-row');
-      if (!spannerRow) return;
-      const spannerTd = spannerRow.querySelector('td');
-      if (!spannerTd) return;
-      const val = parseFloat(momentumEl.textContent.replace(/[^\d\.\-]/g, ''));
-      let arrow = '';
-      // SVGs for straight arrows (no margin)
-      const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-      const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-      const svgUpDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 2l4 4M8 2l-4 4M8 14l4-4M8 14l-4-4" stroke="#aaa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-      const absMomentum = Math.abs(val);
-      let arrowBlock = '';
-      if (val === 0) {
-        arrowBlock = svgUpDown;
-      } else if (val > 0) {
-        if (absMomentum <= 10) {
-          arrowBlock = svgDown;
-        } else if (absMomentum <= 20) {
-          arrowBlock = svgDown + svgDown;
-        } else {
-          arrowBlock = svgDown + svgDown + svgDown;
+      // Helper function to update spanner row arrows
+      function updateSpannerArrows(tableSelector) {
+        const spannerRow = document.querySelector(`${tableSelector} tr.spanner-row`);
+        if (!spannerRow) return;
+        const spannerTd = spannerRow.querySelector('td');
+        if (!spannerTd) return;
+        const val = parseFloat(momentumEl.textContent.replace(/[^\d\.\-]/g, ''));
+        let arrow = '';
+        // SVGs for straight arrows (no margin)
+        const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        const svgUpDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 2l4 4M8 2l-4 4M8 14l4-4M8 14l-4-4" stroke="#aaa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        const absMomentum = Math.abs(val);
+        let arrowBlock = '';
+        if (val === 0) {
+          arrowBlock = svgUpDown;
+        } else if (val > 0) {
+          if (absMomentum <= 10) {
+            arrowBlock = svgDown;
+          } else if (absMomentum <= 20) {
+            arrowBlock = svgDown + svgDown;
+          } else {
+            arrowBlock = svgDown + svgDown + svgDown;
+          }
+        } else if (val < 0) {
+          if (absMomentum <= 10) {
+            arrowBlock = svgUp;
+          } else if (absMomentum <= 20) {
+            arrowBlock = svgUp + svgUp;
+          } else {
+            arrowBlock = svgUp + svgUp + svgUp;
+          }
         }
-      } else if (val < 0) {
-        if (absMomentum <= 10) {
-          arrowBlock = svgUp;
-        } else if (absMomentum <= 20) {
-          arrowBlock = svgUp + svgUp;
-        } else {
-          arrowBlock = svgUp + svgUp + svgUp;
-        }
+        // Extract the price from the current text
+        const match = spannerTd.textContent.match(/Current Price: \$[\d,]+/);
+        const priceText = match ? match[0] : '';
+        spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>${priceText}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
       }
-      // Extract the price from the current text
-      const match = spannerTd.textContent.match(/Current Price: \$[\d,]+/);
-      const priceText = match ? match[0] : '';
-      spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>${priceText}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
+      
+      // Update both active trades and watchlist spanner rows
+      updateSpannerArrows('#activeTradesTable');
+      updateSpannerArrows('#watchlist-table');
     });
     observer.observe(momentumEl, { childList: true, characterData: true, subtree: true });
   })();
