@@ -550,19 +550,23 @@
         <div class="panel-header">Volatility</div>
         <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; gap: 6px;">
           <span style="text-align: right; min-width: 40px;">Score:</span>
-          <span id="volScore" style="text-align: right; display: inline-block; width: 50px;">0.00</span>
+          <span id="volScore" style="text-align: right; display: inline-block; width: 50px;">0.000</span>
         </div>
         <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; gap: 6px;">
-          <span style="text-align: right; min-width: 40px;">Vol MA:</span>
-          <span id="volMovingAvg" style="text-align: right; display: inline-block; width: 50px;">0.00</span>
+          <span style="text-align: right; min-width: 40px;">1m:</span>
+          <span id="vol1m" style="text-align: right; display: inline-block; width: 50px;">0.000</span>
         </div>
         <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; gap: 6px;">
-          <span style="text-align: right; min-width: 40px;">Vol Δ:</span>
-          <span id="volDelta" style="text-align: right; display: inline-block; width: 50px;">0.00</span>
+          <span style="text-align: right; min-width: 40px;">2m:</span>
+          <span id="vol2m" style="text-align: right; display: inline-block; width: 50px;">0.000</span>
         </div>
-        <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; margin-top: 12px; gap: 6px;">
-          <span style="text-align: right; min-width: 40px;">Spike:</span>
-          <span id="volSpike" style="text-align: right; display: inline-block; width: 50px;">0.00</span>
+        <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; gap: 6px;">
+          <span style="text-align: right; min-width: 40px;">5m:</span>
+          <span id="vol5m" style="text-align: right; display: inline-block; width: 50px;">0.000</span>
+        </div>
+        <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 14px; font-weight: bold; gap: 6px;">
+          <span style="text-align: right; min-width: 40px;">10m:</span>
+          <span id="vol10m" style="text-align: right; display: inline-block; width: 50px;">0.000</span>
         </div>
       </div>
     </div>
@@ -1526,6 +1530,11 @@ function addToWatchlist(strikeRow) {
   console.log('Adding strike to watchlistData');
   watchlistData.push(strike);
   console.log('Updated watchlistData:', watchlistData);
+
+
+
+
+  
   updateWatchlistDisplay();
   saveWatchlistToPreferences();
 }
@@ -2644,11 +2653,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // === Momentum Chart Duplicate (Chart.js) ===
     // (Poll for fills/positions/settlements/balance REMOVED below)
 
-    // === Volatility Score History, Moving Average, Delta Globals ===
-    window.volScoreHistory = [];
-    window.volScoreMovingAvg = 0;
-    window.volScoreDelta = 0;
-
     function fetchOtherCoreData() {
       fetch('/core')
         .then(response => response.json())
@@ -2659,68 +2663,49 @@ document.addEventListener('DOMContentLoaded', () => {
             const el = document.getElementById('btc-price-value');
             if (el) el.textContent = formatUSD(price);
           }
-          // Volatility Score/Spike (format to 2 decimals)
-          let prevMovingAvg = window.volScoreMovingAvg || 0;
-          if ('volScore' in data) {
-            const score = Number(data.volScore);
-            const el = document.getElementById('volScore');
-            if (el && !isNaN(score)) {
-              el.textContent = score.toFixed(2);
-              // --- Update volIndicator light color based on score, with conditional animation ---
-              const volLight = document.getElementById("volLight");
-              if (volLight) {
-                if (score < 60) {
-                  volLight.style.background = "radial-gradient(circle at 30% 30%, #00cc00, #006600)";
-                  volLight.style.boxShadow = "0 0 4px #00cc00";
-                } else if (score < 80) {
-                  volLight.style.background = "radial-gradient(circle at 30% 30%, #cccc00, #999900)";
-                  volLight.style.boxShadow = "0 0 4px #cccc00";
-                } else {
-                  volLight.style.background = "radial-gradient(circle at 30% 30%, red, #222c3c)";
-                  volLight.style.boxShadow = "0 0 10px #cc0000";
-                }
-              }
-            }
-            // --- Volatility Score History, Moving Average, Delta ---
-            window.volScoreHistory.push(score);
-            if (window.volScoreHistory.length > 30) {
-              window.volScoreHistory = window.volScoreHistory.slice(-30);
-            }
-            // Moving average over last 10 points
-            let ma = 0;
-            if (window.volScoreHistory.length > 0) {
-              const last10 = window.volScoreHistory.slice(-10);
-              ma = last10.reduce((a,b) => a + b, 0) / last10.length;
-            }
-            // Delta: current MA - previous MA
-            let prev10 = window.volScoreHistory.length > 10
-              ? window.volScoreHistory.slice(-11, -1)
-              : [];
-            let prevMa = prev10.length > 0
-              ? prev10.reduce((a,b) => a + b, 0) / prev10.length
-              : ma; // fallback to current MA if not enough history
-            let delta = ma - prevMa;
-            window.volScoreMovingAvg = ma;
-            window.volScoreDelta = delta;
-            // Update spans in UI
-            const maEl = document.getElementById('volMovingAvg');
-            if (maEl) maEl.textContent = ma.toFixed(2);
-            const deltaEl = document.getElementById('volDelta');
-            if (deltaEl) deltaEl.textContent = delta.toFixed(2);
-          }
-          // Store volatility score in coreData for other consumers
-          if (typeof window.coreData !== "object") window.coreData = {};
-          window.coreData.volatility_score = data.volScore;
-          if ('volSpike' in data) {
-            const volSpike = Number(data.volSpike);
-            const el = document.getElementById('volSpike');
-            if (el && typeof volSpike === 'number' && !isNaN(volSpike)) {
-              el.textContent = volSpike.toFixed(2);
-            }
-          }
         })
         .catch(error => {
           console.error('Live core fetch error:', error);
+        });
+      
+      // Fetch composite volatility score from backend using multiple timeframes
+      fetch('/api/composite_volatility_score')
+        .then(response => response.json())
+        .then(data => {
+          if (data.composite_abs_vol_score !== undefined) {
+            const volScoreEl = document.getElementById('volScore');
+            if (volScoreEl) {
+              volScoreEl.textContent = data.composite_abs_vol_score.toFixed(3);
+            }
+            
+            // Update individual timeframe scores
+            if (data.timeframes) {
+              const vol1mEl = document.getElementById('vol1m');
+              const vol2mEl = document.getElementById('vol2m');
+              const vol5mEl = document.getElementById('vol5m');
+              const vol10mEl = document.getElementById('vol10m');
+              
+              if (vol1mEl && data.timeframes['1m'] !== undefined) {
+                vol1mEl.textContent = data.timeframes['1m'].toFixed(3);
+              }
+              if (vol2mEl && data.timeframes['2m'] !== undefined) {
+                vol2mEl.textContent = data.timeframes['2m'].toFixed(3);
+              }
+              if (vol5mEl && data.timeframes['5m'] !== undefined) {
+                vol5mEl.textContent = data.timeframes['5m'].toFixed(3);
+              }
+              if (vol10mEl && data.timeframes['10m'] !== undefined) {
+                vol10mEl.textContent = data.timeframes['10m'].toFixed(3);
+              }
+            }
+            
+            // Store in coreData for other consumers
+            if (typeof window.coreData !== "object") window.coreData = {};
+            window.coreData.volatility_score = data.composite_abs_vol_score;
+          }
+        })
+        .catch(error => {
+          console.error('Composite volatility score fetch error:', error);
         });
     }
 

@@ -262,7 +262,7 @@
     
     <!-- Main Content Area -->
     <div class="main-content">
-      <iframe id="contentFrame" class="content-frame" src="/tabs/trade_monitor.html"></iframe>
+      <iframe id="contentFrame" class="content-frame" src="about:blank"></iframe>
     </div>
   </div>
 
@@ -272,6 +272,11 @@
     const sidebarToggle = document.getElementById('sidebarToggle');
     const navItems = document.querySelectorAll('.nav-item');
     const contentFrame = document.getElementById('contentFrame');
+    
+    // On initial page load, force refresh for default page
+    window.addEventListener('DOMContentLoaded', () => {
+      contentFrame.src = '/tabs/trade_monitor.html?v=' + Date.now() + '&version=' + Math.random();
+    });
     
     // Toggle sidebar collapse/expand
     sidebarToggle.addEventListener('click', () => {
@@ -289,7 +294,7 @@
         // Add active class to clicked item
         item.classList.add('active');
         
-        // Load content in iframe with cache-busting query string
+        // Load content in iframe with cache-busting
         const href = item.getAttribute('href');
         contentFrame.src = href + '?v=' + Date.now();
       });

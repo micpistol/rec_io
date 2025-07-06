@@ -15,6 +15,8 @@ import pytz
 import requests
 from dateutil import parser
 import sqlite3
+import math
+import numpy as np
 
 
 from account_mode import get_account_mode
@@ -173,7 +175,12 @@ def serve_index():
     )
     content = pattern.sub(delta_js.strip(), content)
 
-    return content
+    # Return HTMLResponse with cache-busting headers
+    response = HTMLResponse(content=content)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 @app.get("/status")
 def get_status():
@@ -239,8 +246,6 @@ def get_core_data():
         delta_30m = calc_pct_delta(get_price_delta(cursor, 1750))
 
         # BTC Volatility Calculations
-        import numpy as np
-
         def get_volatility(cursor, window):
             try:
                 cursor.execute(
@@ -880,6 +885,76 @@ def get_positions_db():
     except Exception as e:
         return {"error": str(e), "positions": []}
 
+# New route: /api/db/btc_price_history
+@app.get("/api/db/btc_price_history")
+def get_btc_price_history_db():
+    """Get BTC price history from the database (identical to other /api/db/* endpoints)"""
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "data", "price_history", "btc_price_history.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT price, timestamp 
+            FROM price_log 
+            ORDER BY timestamp DESC 
+            LIMIT 1000
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+        results = [
+            {
+                "price": float(row[0]),
+                "timestamp": row[1]
+            }
+            for row in rows
+        ]
+        return {"prices": results, "count": len(results)}
+    except Exception as e:
+        return {"error": str(e), "prices": [], "count": 0}
+
+# New route: /api/volatility_score
+@app.get("/api/volatility_score")
+def get_volatility_score():
+    """Calculate the absolute volatility score using raw realized volatility (no annualization)"""
+    try:
+        # Get the last 1500 prices from the database
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT price, timestamp 
+            FROM price_log 
+            ORDER BY timestamp DESC 
+            LIMIT 1500
+        """)
+        results = cursor.fetchall()
+        conn.close()
+        # Return prices in chronological order (oldest first)
+        prices = [float(row[0]) for row in reversed(results)]
+        if len(prices) < 61:
+            return {"error": "Not enough data for volatility calculation"}
+        # Calculate log returns for the most recent 60 prices
+        log_returns = [math.log(prices[i+1] / prices[i]) for i in range(-61, -1) if prices[i] > 0 and prices[i+1] > 0]
+        if len(log_returns) < 59:
+            return {"error": "Not enough valid log returns"}
+        # Sample standard deviation (realized volatility, not annualized)
+        sigma = np.std(log_returns, ddof=1)
+        # Build historical buffer of 1-minute realized volatility (rolling window)
+        historical_sigmas = []
+        for start in range(len(prices) - 60):
+            window = prices[start:start+61]
+            if any(p <= 0 for p in window):
+                continue
+            window_log_returns = [math.log(window[j+1] / window[j]) for j in range(60)]
+            window_sigma = np.std(window_log_returns, ddof=1)
+            historical_sigmas.append(window_sigma)
+        if not historical_sigmas:
+            return {"error": "No valid historical volatility windows"}
+        # Percentile rank of current sigma in historical buffer
+        count = sum(1 for s in historical_sigmas if s <= sigma)
+        score = count / len(historical_sigmas)
+        return {"score": score, "sigma": sigma, "historical_count": len(historical_sigmas)}
+    except Exception as e:
+        return {"error": str(e)}
 
 # WebSocket endpoint for preferences updates
 @app.websocket("/ws/preferences")
@@ -930,6 +1005,113 @@ def get_trade_log(ticket_id: str):
         return {"status": "ok", "log": content}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+@app.get("/api/composite_volatility_score")
+def get_composite_volatility_score():
+    """Calculate composite absolute volatility score using multiple timeframes and historical context"""
+    try:
+        # Get the last 1500 prices from the database (15 minutes of 1-second data)
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT price, timestamp 
+            FROM price_log 
+            ORDER BY timestamp DESC 
+            LIMIT 1500
+        """)
+        results = cursor.fetchall()
+        conn.close()
+        
+        # Return prices in chronological order (oldest first)
+        prices = [float(row[0]) for row in reversed(results)]
+        
+        if len(prices) < 900:  # Need at least 15 minutes of data
+            return {"error": "Not enough data for composite volatility calculation"}
+        
+        # Calculate log returns for the most recent 900 prices (15 minutes)
+        recent_prices = prices[-900:]
+        log_returns = []
+        for i in range(1, len(recent_prices)):
+            if recent_prices[i-1] > 0 and recent_prices[i] > 0:
+                log_return = math.log(recent_prices[i] / recent_prices[i-1])
+                log_returns.append(log_return)
+        
+        if len(log_returns) < 899:
+            return {"error": "Not enough valid log returns"}
+        
+        # Define timeframes and their weights
+        timeframes = [
+            {"window": 60, "weight": 0.30, "name": "1m"},
+            {"window": 120, "weight": 0.25, "name": "2m"},
+            {"window": 300, "weight": 0.20, "name": "5m"},
+            {"window": 600, "weight": 0.15, "name": "10m"},
+            {"window": 900, "weight": 0.10, "name": "15m"}
+        ]
+        
+        # Calculate current volatility for each timeframe
+        current_volatilities = {}
+        for tf in timeframes:
+            window_size = tf["window"]
+            if len(log_returns) >= window_size:
+                window_returns = log_returns[-window_size:]
+                sigma = np.std(window_returns, ddof=1)
+                current_volatilities[tf["name"]] = sigma
+        
+        # Build historical reference distributions for each timeframe
+        historical_distributions = {}
+        for tf in timeframes:
+            window_size = tf["window"]
+            historical_sigmas = []
+            
+            # Calculate historical volatilities for this window size
+            for start in range(len(log_returns) - window_size + 1):
+                window_returns = log_returns[start:start + window_size]
+                if len(window_returns) == window_size:
+                    sigma = np.std(window_returns, ddof=1)
+                    historical_sigmas.append(sigma)
+            
+            historical_distributions[tf["name"]] = historical_sigmas
+        
+        # Calculate percentiles for each timeframe
+        percentiles = {}
+        for tf in timeframes:
+            tf_name = tf["name"]
+            if tf_name in current_volatilities and tf_name in historical_distributions:
+                current_sigma = current_volatilities[tf_name]
+                historical_sigmas = historical_distributions[tf_name]
+                
+                if historical_sigmas:
+                    # Calculate percentile rank
+                    count = sum(1 for s in historical_sigmas if s <= current_sigma)
+                    percentile = count / len(historical_sigmas)
+                    percentiles[tf_name] = percentile
+        
+        # Calculate weighted average of percentiles
+        composite_score = 0.0
+        total_weight = 0.0
+        
+        for tf in timeframes:
+            tf_name = tf["name"]
+            if tf_name in percentiles:
+                weight = tf["weight"]
+                percentile = percentiles[tf_name]
+                composite_score += weight * percentile
+                total_weight += weight
+        
+        if total_weight > 0:
+            composite_score = composite_score / total_weight
+        else:
+            composite_score = 0.0
+        
+        return {
+            "composite_abs_vol_score": round(composite_score, 3),
+            "timeframes": percentiles,
+            "current_volatilities": {k: round(v, 6) for k, v in current_volatilities.items()},
+            "historical_counts": {k: len(v) for k, v in historical_distributions.items()}
+        }
+        
+    except Exception as e:
+        return {"error": str(e)}
 
 if __name__ == "__main__":
     import threading
