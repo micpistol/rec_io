@@ -129,7 +129,7 @@
         opacity 0.3s ease,
         max-width 0.3s ease,
         visibility 0.3s ease;
-      margin-left: 12px;
+      margin-left: 5px;
       visibility: visible;
     }
     
@@ -166,8 +166,10 @@
       margin-left: 0;
     }
     .sidebar-toggle .toggle-label {
-      margin-left: 12px;
+      margin-left: 0px;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       opacity: 1;
       max-width: 180px;
       transition: 
@@ -190,10 +192,10 @@
     .sidebar-toggle:hover::before {
       content: '';
       position: absolute;
-      top: 5px;
+      top: 10px;
       left: 11px;
       right: 0;
-      bottom: 5px;
+      bottom: 10px;
       background: rgba(50, 60, 78, 0.5);
       border-radius: 6px;
       z-index: -1;
@@ -224,7 +226,7 @@
 <body>
   <div class="app-container">
     <!-- Sidebar -->
-    <nav class="sidebar" id="sidebar">
+    <nav class="sidebar collapsed" id="sidebar">
       <!-- Logo Header -->
       <div class="sidebar-header">
         <img src="/images/rec_logo_1.png" alt="REC.IO" class="sidebar-logo">
@@ -287,9 +289,9 @@
         // Add active class to clicked item
         item.classList.add('active');
         
-        // Load content in iframe
+        // Load content in iframe with cache-busting query string
         const href = item.getAttribute('href');
-        contentFrame.src = href;
+        contentFrame.src = href + '?v=' + Date.now();
       });
     });
   </script>
