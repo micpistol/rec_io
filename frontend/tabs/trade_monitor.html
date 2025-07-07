@@ -1584,6 +1584,7 @@ fetchAndCacheTTC();
 // === WATCHLIST FUNCTIONALITY ===
 let watchlistData = [];
 let ignoreWsUpdates = false; // Move to global scope
+let watchlistRowsMap = new Map(); // Persistent watchlist rows
 
 // Load watchlist from preferences on page load
 async function loadWatchlistFromPreferences() {
@@ -1636,10 +1637,6 @@ function addToWatchlist(strikeRow) {
   watchlistData.push(strike);
   console.log('Updated watchlistData:', watchlistData);
 
-
-
-
-  
   updateWatchlistDisplay();
   saveWatchlistToPreferences();
 }
@@ -1650,7 +1647,7 @@ function removeFromWatchlist(strike) {
   saveWatchlistToPreferences();
 }
 
-// Function to update the watchlist display
+// Function to update the watchlist display with persistent rows
 function updateWatchlistDisplay() {
   const watchlistBody = document.getElementById('watchlist-body');
   if (!watchlistBody) return;
@@ -1670,23 +1667,20 @@ function updateWatchlistDisplay() {
   // Sort watchlist data by strike value (ascending)
   watchlistData.sort((a, b) => a - b);
   
-  // Clear the watchlist body and rebuild in correct order
-  watchlistBody.innerHTML = '';
-  
-  // If watchlist is empty, show nothing (no spanner row)
+  // If watchlist is empty, clear and return
   if (watchlistData.length === 0) {
+    watchlistBody.innerHTML = '';
+    watchlistRowsMap.clear();
     return;
   }
   
   // Get current price for spanner row positioning
   const currentPriceEl = document.getElementById('btc-price-value');
   const currentPrice = currentPriceEl ? parseFloat(currentPriceEl.textContent.replace(/\$|,/g, '')) : 0;
-  
-  // Build array of watchlist rows for proper ordering
-  const watchlistRows = [];
-  let spannerIndex = watchlistData.length; // default to end
+  console.log('Watchlist debug - currentPriceEl:', currentPriceEl, 'currentPrice:', currentPrice, 'watchlistData:', watchlistData);
   
   // Find the correct index to insert the spanner row
+  let spannerIndex = watchlistData.length; // default to end
   for (let i = 0; i < watchlistData.length; i++) {
     const strike = watchlistData[i];
     if (currentPrice < strike) {
@@ -1694,113 +1688,221 @@ function updateWatchlistDisplay() {
       break;
     }
   }
+  console.log('Watchlist debug - spannerIndex:', spannerIndex);
   
-  watchlistData.forEach(strike => {
-    const marketRow = strikeRowMap.get(strike);
-    if (!marketRow) return;
-    
-    // Create new row
-    const row = document.createElement('tr');
-    row.className = marketRow.className + ' watchlist-row';
-    Array.from(marketRow.children).forEach((cell, cellIndex) => {
-      const newCell = cell.cloneNode(true);
-      if (cellIndex === 0) {
-        newCell.style.cursor = 'pointer';
-        newCell.title = 'Click to remove from watchlist';
-        newCell.onclick = () => removeFromWatchlist(strike);
-      } else {
-        newCell.style.cursor = '';
-        newCell.title = '';
-      }
-      row.appendChild(newCell);
-    });
-    
-    // Remove ATM border highlight from all cells in the watchlist row
-    Array.from(row.children).forEach(cell => {
-      cell.style.borderTop = '';
-      cell.style.borderBottom = '';
-    });
-    
-    // Update YES/NO buttons in place
-    [5, 6].forEach(idx => {
-      const marketCell = marketRow.children[idx];
-      const watchCell = row.children[idx];
-      if (!marketCell || !watchCell) return;
-      const marketSpan = marketCell.querySelector('span');
-      let askPrice = marketSpan ? marketSpan.textContent : '';
-      let isActive = marketSpan ? !marketSpan.classList.contains('disabled') : false;
-      let ticker = marketSpan ? marketSpan.getAttribute('data-ticker') : null;
-      const strikeValue = strike;
-      const side = idx === 5 ? 'yes' : 'no';
-      let watchSpan = watchCell.querySelector('span');
-      if (!watchSpan) {
-        watchSpan = document.createElement('span');
-        watchCell.appendChild(watchSpan);
-      }
-      updateYesNoButton(watchSpan, strikeValue, side, askPrice, isActive, ticker);
-      
-    });
-    
-    // Add to array for proper ordering
-    watchlistRows.push(row);
+  // Remove any existing spanner rows first
+  watchlistBody.querySelectorAll('.spanner-row').forEach(row => row.remove());
+  
+  // Only rebuild if the watchlist structure has changed
+  const currentStrikes = new Set(watchlistData);
+  const existingStrikes = new Set();
+  watchlistBody.querySelectorAll('tr:not(.spanner-row)').forEach(row => {
+    const strikeCell = row.querySelector('td');
+    if (strikeCell) {
+      const strike = parseFloat(strikeCell.textContent.replace(/[\$,]/g, ''));
+      existingStrikes.add(strike);
+    }
   });
   
-  // Insert spanner row at the correct position
-  if (watchlistRows.length > 0) {
-    // Build the spanner row
-    const spannerRow = document.createElement("tr");
-    spannerRow.className = "spanner-row";
-    const spannerTd = document.createElement("td");
-    spannerTd.colSpan = 7;
-
-    // --- Add arrow icons based on momentum score ---
-    // Helper to get current momentum score from DOM
-    function getCurrentMomentumScoreForArrow() {
-      const el = document.getElementById('momentum-score-value');
-      if (el && el.textContent) {
-        const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
-        return isNaN(val) ? 0 : val;
+  // Check if we need to rebuild the structure
+  const needsRebuild = watchlistData.length !== existingStrikes.size || 
+                       !watchlistData.every(strike => existingStrikes.has(strike));
+  
+  if (needsRebuild) {
+    // Clear and rebuild only when structure changes
+    watchlistBody.innerHTML = '';
+    
+    watchlistData.forEach((strike, index) => {
+      const marketRow = strikeRowMap.get(strike);
+      if (!marketRow) return;
+      
+      // Create new persistent row
+      const row = document.createElement('tr');
+      row.className = marketRow.className + ' watchlist-row';
+      row.dataset.strike = strike;
+      Array.from(marketRow.children).forEach((cell, cellIndex) => {
+        const newCell = cell.cloneNode(true);
+        if (cellIndex === 0) {
+          newCell.style.cursor = 'pointer';
+          newCell.title = 'Click to remove from watchlist';
+          newCell.onclick = () => removeFromWatchlist(strike);
+        } else {
+          newCell.style.cursor = '';
+          newCell.title = '';
+        }
+        row.appendChild(newCell);
+      });
+      
+      // Remove ATM border highlight from all cells in the watchlist row
+      Array.from(row.children).forEach(cell => {
+        cell.style.borderTop = '';
+        cell.style.borderBottom = '';
+      });
+      
+      // Store references to cells for in-place updates
+      const yesCell = row.children[5];
+      const noCell = row.children[6];
+      let yesSpan = yesCell.querySelector('span');
+      let noSpan = noCell.querySelector('span');
+      
+      if (!yesSpan) {
+        yesSpan = document.createElement('span');
+        yesCell.appendChild(yesSpan);
       }
-      return 0;
+      if (!noSpan) {
+        noSpan = document.createElement('span');
+        noCell.appendChild(noSpan);
+      }
+      
+      const rowObj = {
+        tr: row,
+        yesSpan: yesSpan,
+        noSpan: noSpan,
+        strike: strike
+      };
+      watchlistRowsMap.set(strike, rowObj);
+      
+      // Add to DOM
+      watchlistBody.appendChild(row);
+      
+      // Insert spanner row after this row if this is the correct position
+      if (index === spannerIndex - 1) {
+        const spannerRow = createSpannerRow(currentPrice);
+        watchlistBody.appendChild(spannerRow);
+      }
+    });
+    
+    // If spanner should be at the beginning, add it first
+    if (spannerIndex === 0) {
+      const spannerRow = createSpannerRow(currentPrice);
+      watchlistBody.insertBefore(spannerRow, watchlistBody.firstChild);
     }
-    let momentumScore = getCurrentMomentumScoreForArrow();
-    let arrow = '';
-    // SVGs for straight arrows (no margin)
-    const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    const svgUpDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 2l4 4M8 2l-4 4M8 14l4-4M8 14l-4-4" stroke="#aaa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    const absMomentum = Math.abs(momentumScore);
-    let arrowBlock = '';
-    if (momentumScore === 0) {
-      arrowBlock = svgUpDown;
-    } else if (momentumScore > 0) {
-      if (absMomentum <= 10) {
-        arrowBlock = svgDown;
-      } else if (absMomentum <= 20) {
-        arrowBlock = svgDown + svgDown;
-      } else {
-        arrowBlock = svgDown + svgDown + svgDown;
+  } else {
+    // Just update existing rows in place
+    watchlistData.forEach(strike => {
+      const marketRow = strikeRowMap.get(strike);
+      if (!marketRow) return;
+      
+      const rowObj = watchlistRowsMap.get(strike);
+      if (!rowObj) return;
+      
+      // Update YES/NO buttons in place (only if prices changed)
+      [5, 6].forEach(idx => {
+        const marketCell = marketRow.children[idx];
+        if (!marketCell) return;
+        
+        const marketSpan = marketCell.querySelector('span');
+        let askPrice = marketSpan ? marketSpan.textContent : '';
+        let isActive = marketSpan ? !marketSpan.classList.contains('disabled') : false;
+        let ticker = marketSpan ? marketSpan.getAttribute('data-ticker') : null;
+        const side = idx === 5 ? 'yes' : 'no';
+        
+        if (idx === 5) {
+          updateYesNoButton(rowObj.yesSpan, strike, side, askPrice, isActive, ticker);
+        } else {
+          updateYesNoButton(rowObj.noSpan, strike, side, askPrice, isActive, ticker);
+        }
+      });
+    });
+    
+    // Update or create spanner row
+    let existingSpanner = watchlistBody.querySelector('.spanner-row');
+    console.log('Watchlist spanner debug - currentPrice:', currentPrice, 'existingSpanner:', !!existingSpanner);
+    
+    if (existingSpanner) {
+      const newSpanner = createSpannerRow(currentPrice);
+      existingSpanner.replaceWith(newSpanner);
+      console.log('Replaced existing spanner row');
+    } else {
+      // Create spanner row if it doesn't exist
+      const spannerRow = createSpannerRow(currentPrice);
+      
+      // Find the correct position to insert the spanner row
+      const rows = Array.from(watchlistBody.children);
+      let insertIndex = rows.length; // default to end
+      
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (row.classList.contains('spanner-row')) continue;
+        
+        const strikeCell = row.querySelector('td');
+        if (strikeCell) {
+          const strike = parseFloat(strikeCell.textContent.replace(/[\$,]/g, ''));
+          if (currentPrice < strike) {
+            insertIndex = i;
+            break;
+          }
+        }
       }
-    } else if (momentumScore < 0) {
-      if (absMomentum <= 10) {
-        arrowBlock = svgUp;
-      } else if (absMomentum <= 20) {
-        arrowBlock = svgUp + svgUp;
+      
+      console.log('Watchlist spanner debug - insertIndex:', insertIndex, 'rows.length:', rows.length);
+      
+      if (insertIndex < rows.length) {
+        watchlistBody.insertBefore(spannerRow, rows[insertIndex]);
+        console.log('Inserted spanner row at index:', insertIndex);
       } else {
-        arrowBlock = svgUp + svgUp + svgUp;
+        watchlistBody.appendChild(spannerRow);
+        console.log('Appended spanner row to end');
       }
     }
-    spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
-    spannerRow.appendChild(spannerTd);
-
-    // Insert the spanner row at the correct index
-    watchlistRows.splice(spannerIndex, 0, spannerRow);
   }
   
-  // Append all rows to the watchlist body
-  watchlistRows.forEach(row => {
-    watchlistBody.appendChild(row);
-  });
+  // Clean up removed strikes from the persistent map
+  for (const [strike, rowObj] of watchlistRowsMap.entries()) {
+    if (!currentStrikes.has(strike)) {
+      watchlistRowsMap.delete(strike);
+    }
+  }
+}
+
+// Helper function to create spanner row
+function createSpannerRow(currentPrice) {
+  const spannerRow = document.createElement("tr");
+  spannerRow.className = "spanner-row";
+  const spannerTd = document.createElement("td");
+  spannerTd.colSpan = 7;
+
+  // --- Add arrow icons based on momentum score ---
+  // Helper to get current momentum score from DOM
+  function getCurrentMomentumScoreForArrow() {
+    const el = document.getElementById('momentum-score-value');
+    if (el && el.textContent) {
+      const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
+      return isNaN(val) ? 0 : val;
+    }
+    return 0;
+  }
+  let momentumScore = getCurrentMomentumScoreForArrow();
+  let arrow = '';
+  // SVGs for straight arrows (no margin)
+  const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const svgUpDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 2l4 4M8 2l-4 4M8 14l4-4M8 14l-4-4" stroke="#aaa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const absMomentum = Math.abs(momentumScore);
+  let arrowBlock = '';
+  if (momentumScore === 0) {
+    arrowBlock = svgUpDown;
+  } else if (momentumScore > 0) {
+    if (absMomentum <= 10) {
+      arrowBlock = svgDown;
+    } else if (absMomentum <= 20) {
+      arrowBlock = svgDown + svgDown;
+    } else {
+      arrowBlock = svgDown + svgDown + svgDown;
+    }
+  } else if (momentumScore < 0) {
+    if (absMomentum <= 10) {
+      arrowBlock = svgUp;
+    } else if (absMomentum <= 20) {
+      arrowBlock = svgUp + svgUp;
+    } else {
+      arrowBlock = svgUp + svgUp + svgUp;
+    }
+  }
+  spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
+  spannerRow.appendChild(spannerTd);
+  
+  return spannerRow;
 }
 
 // Function to add click handlers to strike table rows
@@ -3094,7 +3196,7 @@ async function fetchAndRenderTrades() {
       }
     }
 
-    // --- Remove all existing spanner rows before rendering trade rows ---
+    // --- Remove all existing spanner rows first ---
     activeTradesTableBody.querySelectorAll('.spanner-row').forEach(row => row.remove());
 
     // --- Sort trades by strike (ascending) for correct row order ---
@@ -3107,28 +3209,27 @@ async function fetchAndRenderTrades() {
     // === Prepare to build all rows in an array ===
     const tradeRows = [];
     const currentPrice = coreData.btc_price;
-    let spannerInserted = false;
     let spannerIndex = trades.length; // default to end
 
     // Find the correct index to insert the spanner row
+    // The spanner row should be inserted AFTER the last trade whose strike is <= currentPrice
     for (let i = 0; i < trades.length; i++) {
       const strike = parseFloat(String(trades[i].strike).replace(/[^\d.-]/g, '')) || 0;
-      if (!spannerInserted && currentPrice < strike) {
+      if (currentPrice < strike) {
         spannerIndex = i;
-        spannerInserted = true;
         break;
       }
     }
 
     // Build trade rows (do not append yet)
     trades.forEach((trade, idx) => {
-      // --- Remove spanner row logic from here ---
       // Re-render the row if status has changed
       const existing = activeTradesRowsMap.get(trade.id);
       if (existing && existing.status !== trade.status) {
         activeTradesTableBody.removeChild(existing.tr);
         activeTradesRowsMap.delete(trade.id);
       }
+      
       // === PENDING/ERROR/CLOSING TRADE ROW LOGIC: merge Buffer and B/M into one cell ===
       if (["pending", "error", "closing"].includes(trade.status)) {
         let rowObj = activeTradesRowsMap.get(trade.id);
@@ -3328,15 +3429,23 @@ async function fetchAndRenderTrades() {
       const prevAsk = previousClosePrices[trade.id];
       if (closeButtonSpan) {
         if (prevAsk !== askPrice) {
-          rowObj.closeTd.innerHTML = '';
-          const clonedSpan = closeButtonSpan.cloneNode(true);
-          clonedSpan.classList.remove('disabled');
-          clonedSpan.style.opacity = '';
-          clonedSpan.style.pointerEvents = '';
-          clonedSpan.style.cursor = 'pointer';
-          clonedSpan.dataset.tradeId = trade.id;
-          clonedSpan.dataset.action = 'close';
-          rowObj.closeTd.appendChild(clonedSpan);
+          // Instead of recreating the entire button, just update the text content
+          let existingCloseSpan = rowObj.closeTd.querySelector('span.price-box');
+          if (!existingCloseSpan) {
+            // Create the button only if it doesn't exist
+            existingCloseSpan = closeButtonSpan.cloneNode(true);
+            existingCloseSpan.classList.remove('disabled');
+            existingCloseSpan.style.opacity = '';
+            existingCloseSpan.style.pointerEvents = '';
+            existingCloseSpan.style.cursor = 'pointer';
+            existingCloseSpan.dataset.tradeId = trade.id;
+            existingCloseSpan.dataset.action = 'close';
+            rowObj.closeTd.innerHTML = '';
+            rowObj.closeTd.appendChild(existingCloseSpan);
+          } else {
+            // Just update the text content of the existing button
+            existingCloseSpan.textContent = closeButtonSpan.textContent;
+          }
           previousClosePrices[trade.id] = askPrice;
         }
       } else {
@@ -3403,10 +3512,28 @@ async function fetchAndRenderTrades() {
       tradeRows.splice(spannerIndex, 0, spannerRow);
     }
 
-    // Only append rows that aren't already in the table
-    tradeRows.forEach(row => {
-      if (!row.parentNode) {
-        activeTradesTableBody.appendChild(row);
+    // Instead of clearing and rebuilding, update the table structure in place
+    const existingRows = Array.from(activeTradesTableBody.children);
+    const existingTradeRows = existingRows.filter(row => !row.classList.contains('spanner-row'));
+    
+    // Remove rows that are no longer needed
+    existingTradeRows.forEach((row, index) => {
+      if (index >= tradeRows.length) {
+        activeTradesTableBody.removeChild(row);
+      }
+    });
+    
+    // Update or add rows as needed
+    tradeRows.forEach((newRow, index) => {
+      if (index < existingTradeRows.length) {
+        // Replace existing row
+        const existingRow = existingTradeRows[index];
+        if (existingRow !== newRow) {
+          activeTradesTableBody.replaceChild(newRow, existingRow);
+        }
+      } else {
+        // Add new row
+        activeTradesTableBody.appendChild(newRow);
       }
     });
   } catch (err) {

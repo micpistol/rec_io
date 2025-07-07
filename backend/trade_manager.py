@@ -35,11 +35,8 @@ def _wait_for_fill(ticker: str, timeout: int = 10) -> tuple[int | None, float | 
                     exposure = abs(p.get("market_exposure", 0))
                     if pos > 0 and exposure > 0:
                         price = round(float(exposure) / float(pos) / 100, 2)
-                        print(f"[DEBUG] FILL FOUND — pos={pos}, exposure={exposure}, price={price}")
                         return int(pos), price
-                    else:
-                        print(f"[DEBUG] Skipping position — position or exposure = 0")
-                print(f"[FILL POLL] No position data yet for any position, retrying...")
+                # print(f"[FILL POLL] No position data yet for any position, retrying...")
         except Exception:
             pass
         time.sleep(1)
@@ -47,7 +44,6 @@ def _wait_for_fill(ticker: str, timeout: int = 10) -> tuple[int | None, float | 
 
 
 def finalize_trade(id: int, ticket_id: str) -> None:
-    tm_log(f"[DEBUG] ENTERED finalize_trade — id={id}, ticket_id={ticket_id}")
     """
     Called only after executor says 'accepted'.
     Immediately sets status to 'open', no fill checking.
@@ -55,28 +51,19 @@ def finalize_trade(id: int, ticket_id: str) -> None:
     conn = get_db_connection()
     cur = conn.cursor()
     # Removed immediate status='open' update; will update after fill is confirmed.
-    tm_log(f"[DEBUG] TRADES DB PATH (finalize_trade): {DB_TRADES_PATH}")
     conn.commit()
     conn.close()
 
     # Begin polling positions.db for matching ticker
-    tm_log(f"[DEBUG] About to query for ticker from trades table for id={id}")
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT ticker FROM trades WHERE id = ?", (id,))
     row = cursor.fetchone()
     conn.close()
     if not row:
-        tm_log(f"[DEBUG] No row found when checking ticker for id={id}")
-        tm_log(f"[FILL WATCH] No trade found for ID {id}")
+        log_event(ticket_id, f"MANAGER: No trade found for ID {id}")
         return
     expected_ticker = row[0]
-    tm_log(f"[DEBUG] Confirmed ticker for fill match: {expected_ticker}")
-    tm_log(f"[DEBUG] Retrieved expected_ticker: {expected_ticker}")
-    print("[DEBUG] Retrieved expected_ticker:", expected_ticker)
-    print("[DEBUG] Starting polling block — direct DB read")
-
-    # Directly read from positions.db
     demo_env = os.environ.get("DEMO_MODE", "false")
     DEMO_MODE = demo_env.strip().lower() == "true"
     if DEMO_MODE:
@@ -84,14 +71,11 @@ def finalize_trade(id: int, ticket_id: str) -> None:
     else:
         POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "positions.db")
     if not os.path.exists(POSITIONS_DB_PATH):
-        tm_log(f"[FATAL] Positions DB path not found: {POSITIONS_DB_PATH}")
+        log_event(ticket_id, f"MANAGER: Positions DB path not found: {POSITIONS_DB_PATH}")
         return
-    else:
-        tm_log(f"[DEBUG] Using positions DB path: {POSITIONS_DB_PATH}")
     conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
     cursor_pos = conn_pos.cursor()
     deadline = time.time() + 15
-    tm_log(f"[DEBUG] Fill watch (direct DB) started for ticker: {expected_ticker}")
     while time.time() < deadline:
         try:
             cursor_pos.execute("SELECT position, market_exposure, fees_paid FROM positions WHERE ticker = ?", (expected_ticker,))
@@ -127,7 +111,6 @@ def finalize_trade(id: int, ticket_id: str) -> None:
                 conn.commit()
                 conn.close()
                 log_event(ticket_id, f"MANAGER: FILL CONFIRMED — pos={pos}, price={price}, fees={fees}")
-                tm_log(f"[FILL WATCH] trades.db UPDATED — id={id}, pos={pos}, price={price}, fees={round(fees_paid, 2)}")
                 break
 
             # ❷ If trade is closing, wait until position is zero (row missing or pos == 0)
@@ -163,19 +146,13 @@ def finalize_trade(id: int, ticket_id: str) -> None:
                 conn.commit()
                 conn.close()
                 log_event(ticket_id, f"MANAGER: TRADE FINALIZED — CLOSED (fees={round(fees_paid,2)}, pnl={pnl}, win_loss={win_loss})")
-                tm_log(f"[CLOSE COMPLETE] Trade {expected_ticker} closed successfully with PnL={pnl}, win_loss={win_loss}.")
                 break
-            # ------------------------------------------------------------------
-            # Comment out noisy [DEBUG] logs
-            # tm_log(f"[DEBUG] Executed UPDATE with pos={pos}, price={price}, fees={round(fees_paid, 2)}")
-            # print(f"[DEBUG] FILL FOUND — pos={pos}, exposure={exposure}, price={price}")
-            # print(f"[DEBUG] Skipping position — position or exposure = 0")
-            # print(f"[FILL POLL] No position data yet for any position, retrying...")
         except Exception as e:
-            tm_log(f"[FILL WATCH] DB read error: {e}")
+            log_event(ticket_id, f"MANAGER: FILL WATCH DB read error: {e}")
         time.sleep(1)
     conn_pos.close()
-    tm_log(f"[FILL WATCH] Fill polling complete for ticker: {expected_ticker}")
+    log_event(ticket_id, f"MANAGER: FILL WATCH polling complete for ticker: {expected_ticker}")
+
 from fastapi import APIRouter, HTTPException, status, Request
 router = APIRouter()
 
@@ -186,7 +163,7 @@ async def ping_fill_watch():
     Trigger a re-check of open trades that may be missing fill data.
     This is a lightweight endpoint for account_sync to notify us of possible changes.
     """
-    tm_log("[PING] Received ping from account_sync — checking for missing fills")
+    log("[PING] Received ping from account_sync — checking for missing fills")
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id, ticket_id, position, buy_price FROM trades WHERE status IN ('open', 'pending')")
@@ -196,7 +173,7 @@ async def ping_fill_watch():
     for row in rows:
         id, ticket_id, pos, price = row
         if not pos or not price:
-            tm_log(f"[PING] Found unfilled trade — id={id}, ticket_id={ticket_id}")
+            log(f"[PING] Found unfilled trade — id={id}, ticket_id={ticket_id}")
             threading.Thread(target=finalize_trade, args=(id, ticket_id), daemon=True).start()
 
     return {"message": "Ping received, checking unfilled trades"}
@@ -209,7 +186,7 @@ async def ping_settlement_watch():
     Called when account_sync confirms new entries in settlements.db.
     If any expired trades are still unfinalized, finalize them now.
     """
-    tm_log("[PING] Received ping from account_sync — checking for expired trades")
+    log("[PING] Received ping from account_sync — checking for expired trades")
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -218,7 +195,7 @@ async def ping_settlement_watch():
     conn.close()
 
     for id, ticket_id in expired_trades:
-        tm_log(f"[PING] Triggering finalize_trade for expired trade id={id}")
+        log(f"[PING] Triggering finalize_trade for expired trade id={id}")
         threading.Thread(target=finalize_trade, args=(id, ticket_id), daemon=True).start()
 
     return {"message": f"Triggered finalize_trade for {len(expired_trades)} expired trades"}
@@ -235,7 +212,7 @@ from core.config.settings import config
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-def tm_log(msg):
+def log(msg):
     log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs", "trade_manager.out.log")
     with open(log_path, "a") as f:
         f.write(f"{datetime.now().isoformat()} | {msg}\n")
@@ -364,7 +341,7 @@ def fetch_all_trades():
     return [dict(zip(columns, row)) for row in rows]
 
 def insert_trade(trade):
-    tm_log(f"[DEBUG] TRADES DB PATH (insert_trade): {DB_TRADES_PATH}")
+    log(f"[DEBUG] TRADES DB PATH (insert_trade): {DB_TRADES_PATH}")
     print("[DEBUG] Inserting trade data:", trade)
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -477,7 +454,7 @@ async def add_trade(request: Request):
     if intent == "close":
         print("[DEBUG] CLOSE TICKET RECEIVED")
         print("[DEBUG] Close Payload:", data)
-        tm_log(f"[DEBUG] CLOSE TICKET RECEIVED — Payload: {data}")
+        log(f"[DEBUG] CLOSE TICKET RECEIVED — Payload: {data}")
         ticker = data.get("ticker")
         if ticker:
             conn = get_db_connection()
@@ -487,7 +464,7 @@ async def add_trade(request: Request):
             cursor.execute("UPDATE trades SET status = 'closing', sell_price = ?, symbol_close = ? WHERE ticker = ?", (sell_price, symbol_close, ticker))
             conn.commit()
             conn.close()
-            tm_log(f"[DEBUG] Trade status set to 'closing' for ticker: {ticker}")
+            log(f"[DEBUG] Trade status set to 'closing' for ticker: {ticker}")
             # Confirm close match in positions.db
             try:
                 # Determine the correct positions.db path
@@ -514,20 +491,20 @@ async def add_trade(request: Request):
                         conn.close()
 
                         if trade_row and abs(trade_row[0]) == pos_db:
-                            tm_log(f"[CLOSE CHECK] ✅ Confirmed matching position for {ticker} — abs(pos) = {pos_db}")
+                            log(f"[CLOSE CHECK] ✅ Confirmed matching position for {ticker} — abs(pos) = {pos_db}")
                         else:
-                            tm_log(f"[CLOSE CHECK] ❌ Mismatch for {ticker}: trades.db = {abs(trade_row[0]) if trade_row else 'None'}, positions.db = {pos_db}")
+                            log(f"[CLOSE CHECK] ❌ Mismatch for {ticker}: trades.db = {abs(trade_row[0]) if trade_row else 'None'}, positions.db = {pos_db}")
                     else:
-                        tm_log(f"[CLOSE CHECK] ⚠️ No matching entry in positions.db for ticker: {ticker}")
+                        log(f"[CLOSE CHECK] ⚠️ No matching entry in positions.db for ticker: {ticker}")
                 else:
-                    tm_log(f"[CLOSE CHECK] ❌ positions.db not found: {POSITIONS_DB_PATH}")
+                    log(f"[CLOSE CHECK] ❌ positions.db not found: {POSITIONS_DB_PATH}")
             except Exception as e:
-                tm_log(f"[CLOSE CHECK ERROR] Exception while checking close match for {ticker}: {e}")
+                log(f"[CLOSE CHECK ERROR] Exception while checking close match for {ticker}: {e}")
 
             # --- Send close ticket to executor and handle response ---
             try:
                 executor_port = get_executor_port()
-                tm_log(f"[CLOSE EXECUTOR] Sending close trade to executor on port {executor_port}")
+                log(f"[CLOSE EXECUTOR] Sending close trade to executor on port {executor_port}")
                 close_payload = {
                     "ticker": ticker,
                     "side": data.get("side"),
@@ -540,9 +517,9 @@ async def add_trade(request: Request):
                     "intent": "close"
                 }
                 response = requests.post(f"http://localhost:{executor_port}/trigger_trade", json=close_payload, timeout=5)
-                tm_log(f"[CLOSE EXECUTOR] Executor responded with {response.status_code}: {response.text}")
+                log(f"[CLOSE EXECUTOR] Executor responded with {response.status_code}: {response.text}")
             except Exception as e:
-                tm_log(f"[CLOSE EXECUTOR ERROR] Failed to send close trade to executor: {e}")
+                log(f"[CLOSE EXECUTOR ERROR] Failed to send close trade to executor: {e}")
 
             # --- Ensure finalize_trade runs again after close ticket is sent ---
             ticker = data.get("ticker")
@@ -556,10 +533,10 @@ async def add_trade(request: Request):
                 trade_id = row[0]
                 threading.Thread(target=finalize_trade, args=(trade_id, data.get("ticket_id")), daemon=True).start()
             else:
-                tm_log(f"[FINALIZE THREAD ERROR] Could not find trade id for ticker: {ticker}")
+                log(f"[FINALIZE THREAD ERROR] Could not find trade id for ticker: {ticker}")
 
         return {"message": "Close ticket received and ignored"}
-    tm_log("✅ /trades POST route triggered successfully")
+    log("✅ /trades POST route triggered successfully")
     print("✅ TRADE MANAGER received POST")
     required_fields = {"date", "time", "strike", "side", "buy_price", "position"}
     if not required_fields.issubset(data.keys()):
@@ -574,13 +551,13 @@ async def add_trade(request: Request):
 
     try:
         executor_port = get_executor_port()
-        tm_log(f"📤 SENDING TO EXECUTOR on port {executor_port}")
-        tm_log(f"📤 FULL URL: http://localhost:{executor_port}/trigger_trade")
+        log(f"📤 SENDING TO EXECUTOR on port {executor_port}")
+        log(f"📤 FULL URL: http://localhost:{executor_port}/trigger_trade")
         response = requests.post(f"http://localhost:{executor_port}/trigger_trade", json=data, timeout=5)
         print(f"[EXECUTOR RESPONSE] {response.status_code} — {response.text}")
         # Do not mark as open or error here; status update will come from executor via /api/update_trade_status
     except Exception as e:
-        tm_log(f"[❌ EXECUTOR ERROR] Failed to send trade to executor: {e}")
+        log(f"[❌ EXECUTOR ERROR] Failed to send trade to executor: {e}")
         log_event(data["ticket_id"], f"❌ EXECUTOR ERROR: {e}")
 
     return {"id": trade_id}
@@ -622,7 +599,7 @@ def remove_trade(trade_id: int):
 
 @router.post("/api/update_trade_status")
 async def update_trade_status_api(request: Request):
-    tm_log(f"📩 RECEIVED STATUS UPDATE PAYLOAD: {await request.body()}")
+    log(f"📩 RECEIVED STATUS UPDATE PAYLOAD: {await request.body()}")
     data = await request.json()
     id = data.get("id")
     ticket_id = data.get("ticket_id")
@@ -654,7 +631,7 @@ async def update_trade_status_api(request: Request):
 
     if new_status == "accepted":
         # spawn background thread so response is immediate
-        tm_log(f"[🧵 STARTING FINALIZE TRADE THREAD] id={id}, ticket_id={ticket_id}")
+        log(f"[🧵 STARTING FINALIZE TRADE THREAD] id={id}, ticket_id={ticket_id}")
         threading.Thread(
             target=finalize_trade, args=(id, ticket_id), daemon=True
         ).start()

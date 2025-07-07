@@ -50,11 +50,7 @@ print(f"Using base URL: {get_base_url()} for mode: {get_account_mode()}")
 def load_credentials():
     mode = get_account_mode()
     cred_dir = Path(__file__).resolve().parent / "kalshi-credentials" / mode
-    print(f"[DEBUG] get_account_mode(): {mode}")
-    print(f"[DEBUG] CREDENTIALS_DIR: {cred_dir}")
-    print(f"[DEBUG] .env path: {cred_dir / '.env'}")
     env_vars = dotenv_values(cred_dir / ".env")
-    print(f"[DEBUG] .env contents: {env_vars}")
     return {
         "KEY_ID": env_vars.get("KALSHI_API_KEY_ID"),
         "KEY_PATH": cred_dir / "kalshi.pem"
@@ -644,15 +640,13 @@ def trigger_trade():
             log_event(ticket_id, "EXECUTOR: TRADE REJECTED — ERROR")
             log_event(ticket_id, f"EXECUTOR: TRADE REJECTED — {response.text.strip()}")
             status_payload = {"ticket_id": ticket_id, "status": "error"}
-            print(f"[DEBUG] QUEUING STATUS 'error' FOR {ticket_id} TO TRADE MANAGER")
             manager_port = get_manager_port()
             status_url = f"http://localhost:{manager_port}/api/update_trade_status"
             def notify_error():
                 try:
                     resp = requests.post(status_url, json=status_payload, timeout=5)
-                    print(f"[DEBUG] TRADE MANAGER RESPONSE: {resp.status_code} — {resp.text}")
                 except Exception as e:
-                    print(f"[DEBUG] Failed to notify manager of error: {e}")
+                    pass
             threading.Thread(target=notify_error, daemon=True).start()
             print(f"❌ TRADE FAILED: {response.status_code} — {response.text.strip()}")
             return jsonify({"status": "rejected", "error": response.text}), response.status_code
@@ -662,15 +656,13 @@ def trigger_trade():
             log_event(ticket_id, "EXECUTOR: TRADE ACCEPTED — OK")
             # Use the normalized ticket_id
             status_payload = {"ticket_id": ticket_id, "status": "accepted"}
-            print(f"[DEBUG] QUEUING STATUS 'accepted' FOR {ticket_id} TO TRADE MANAGER")
             manager_port = get_manager_port()
             status_url = f"http://localhost:{manager_port}/api/update_trade_status"
             def notify_accepted():
                 try:
                     resp = requests.post(status_url, json=status_payload, timeout=5)
-                    print(f"[DEBUG] TRADE MANAGER RESPONSE: {resp.status_code} — {resp.text}")
                 except Exception as e:
-                    print(f"[DEBUG] Failed to notify manager of acceptance: {e}")
+                    pass
             threading.Thread(target=notify_accepted, daemon=True).start()
             print("✅ TRADE SENT SUCCESSFULLY")
             return jsonify({"status": "sent", "message": "Trade sent successfully"}), 200
