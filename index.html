@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>REC.IO Trading Platform</title>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Tektur:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles/global.css">
   <style>
     /* Minimal layout CSS - no custom colors, only structure */
@@ -25,7 +26,7 @@
       min-width: 50px;
       height: 100vh;
       transition: width 0.3s ease;
-      padding-left: 3px;
+      padding-left: 1px;
     }
     
     .sidebar.collapsed {
@@ -69,13 +70,13 @@
     }
     
     .nav-icon {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       width: 32px;
       min-width: 32px;
-      text-align: center;
+      height: 32px;
       font-size: 18px;
-
-      
       opacity: 0.5;
       transition: opacity 0.2s;
     }
@@ -88,10 +89,10 @@
     .nav-item:not(.active):hover::before {
       content: '';
       position: absolute;
-      top: 5px;
+      top: 7px;
       left: 11px;
       right: 0;
-      bottom: 5px;
+      bottom: 7px;
       background: rgba(50, 60, 78, 0.5);
       border-radius: 6px;
       z-index: -1;
@@ -106,10 +107,10 @@
     .nav-item.active::before {
       content: '';
       position: absolute;
-      top: 5px;
+      top: 7px;
       left: 11px;
       right: 0;
-      bottom: 5px;
+      bottom: 7px;
       background: #323c4e;
       border-radius: 6px;
       z-index: -1;
@@ -221,6 +222,68 @@
     .sidebar-toggle .nav-icon svg {
       transition: transform 0.3s;
     }
+    
+    /* Tooltip styles for collapsed sidebar */
+    .sidebar.collapsed .nav-item {
+      position: relative;
+    }
+    
+    .sidebar.collapsed .nav-item::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: 60px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: #323c4e;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+      z-index: 1000;
+      pointer-events: none;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    .sidebar.collapsed .nav-item:hover::after {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    /* Tooltip for sidebar toggle button when collapsed */
+    .sidebar.collapsed .sidebar-toggle::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: 60px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: #323c4e;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+      z-index: 1000;
+      pointer-events: none;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    .sidebar.collapsed .sidebar-toggle:hover::after {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    /* User Section Styles */
+    .user-section {
+      margin-top: auto;
+      margin-bottom: 0px;
+    }
   </style>
 </head>
 <body>
@@ -230,27 +293,43 @@
       <!-- Logo Header -->
       <div class="sidebar-header">
         <img src="/images/rec_logo_1.png" alt="REC.IO" class="sidebar-logo">
-        <span class="nav-label" style="font-size: 24px; font-weight: bold;">rec.io</span>
+        <span class="nav-label" style="font-size: 24px; font-weight: normal; font-family: 'Tektur', sans-serif; letter-spacing: 0.05em; padding-left: 7px;">rec.io</span>
       </div>
       
       <!-- Navigation Menu -->
       <div class="sidebar-nav">
-        <a href="/tabs/trade_monitor.html" class="nav-item active" data-page="trade-monitor">
-          <span class="nav-icon">📊</span>
+        <a href="/tabs/trade_monitor.html" class="nav-item active" data-page="trade-monitor" data-tooltip="Trade Monitor">
+          <span class="nav-icon">
+            <img src="/images/icons/trade_monitor_icon.png" alt="Trade Monitor" style="width: 25px; height: 25px; object-fit: contain;">
+          </span>
           <span class="nav-label">Trade Monitor</span>
         </a>
-        <a href="/tabs/trade_history.html" class="nav-item" data-page="history">
-          <span class="nav-icon">📈</span>
+        <a href="/tabs/trade_history.html" class="nav-item" data-page="history" data-tooltip="History">
+          <span class="nav-icon">
+            <img src="/images/icons/trade_history.png" alt="History" style="width: 30px; height: 30px; object-fit: contain;">
+          </span>
           <span class="nav-label">History</span>
         </a>
-        <a href="/tabs/account_manager.html" class="nav-item" data-page="account">
-          <span class="nav-icon">👤</span>
+        <a href="/tabs/account_manager.html" class="nav-item" data-page="account" data-tooltip="Account">
+          <span class="nav-icon">
+            <img src="/images/icons/account_manager_icon.png" alt="Account" style="width: 30px; height: 30px; object-fit: contain;">
+          </span>
           <span class="nav-label">Account</span>
         </a>
       </div>
       
+      <!-- User Section -->
+      <div class="user-section">
+        <a href="/tabs/user_config.html" class="nav-item" data-page="user-config" data-tooltip="eric@ewedit.com">
+          <span class="nav-icon">
+            <img src="/images/icons/user_icon.png" alt="User" style="width: 25px; height: 25px; object-fit: contain;">
+          </span>
+          <span class="nav-label">eric@ewedit.com</span>
+        </a>
+      </div>
+      
       <!-- Collapse/Expand Button -->
-      <button class="sidebar-toggle" id="sidebarToggle">
+      <button class="sidebar-toggle" id="sidebarToggle" data-tooltip="Expand">
         <span class="nav-icon" aria-hidden="true">
           <svg width="32" height="32" viewBox="0 0 32 32" fill="white" xmlns="http://www.w3.org/2000/svg">
             <polygon points="20,8 12,16 20,24" />

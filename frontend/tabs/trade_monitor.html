@@ -1205,31 +1205,19 @@ function updateStrikeTable(coreData, latestKalshiMarkets) {
       return 0;
     }
     let momentumScore = getCurrentMomentumScoreForArrow();
-    let arrow = '';
     // SVGs for straight arrows (no margin)
     const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    const svgUpDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 2l4 4M8 2l-4 4M8 14l4-4M8 14l-4-4" stroke="#aaa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    const absMomentum = Math.abs(momentumScore);
     let arrowBlock = '';
-    if (momentumScore === 0) {
-      arrowBlock = svgUpDown;
-    } else if (momentumScore > 0) {
-      if (absMomentum <= 10) {
-        arrowBlock = svgDown;
-      } else if (absMomentum <= 20) {
-        arrowBlock = svgDown + svgDown;
-      } else {
-        arrowBlock = svgDown + svgDown + svgDown;
-      }
-    } else if (momentumScore < 0) {
-      if (absMomentum <= 10) {
-        arrowBlock = svgUp;
-      } else if (absMomentum <= 20) {
-        arrowBlock = svgUp + svgUp;
-      } else {
-        arrowBlock = svgUp + svgUp + svgUp;
-      }
+    const absMomentum = Math.abs(momentumScore);
+    if (absMomentum < 5) {
+      arrowBlock = '-';
+    } else if (absMomentum < 10) {
+      arrowBlock = momentumScore > 0 ? svgDown : svgUp;
+    } else if (absMomentum < 20) {
+      arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(2);
+    } else {
+      arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(3);
     }
     spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>Current Price: $${Math.round(centerPrice).toLocaleString()}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
     spannerRow.appendChild(spannerTd);
@@ -1873,31 +1861,19 @@ function createSpannerRow(currentPrice) {
     return 0;
   }
   let momentumScore = getCurrentMomentumScoreForArrow();
-  let arrow = '';
   // SVGs for straight arrows (no margin)
   const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  const svgUpDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 2l4 4M8 2l-4 4M8 14l4-4M8 14l-4-4" stroke="#aaa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  const absMomentum = Math.abs(momentumScore);
   let arrowBlock = '';
-  if (momentumScore === 0) {
-    arrowBlock = svgUpDown;
-  } else if (momentumScore > 0) {
-    if (absMomentum <= 10) {
-      arrowBlock = svgDown;
-    } else if (absMomentum <= 20) {
-      arrowBlock = svgDown + svgDown;
-    } else {
-      arrowBlock = svgDown + svgDown + svgDown;
-    }
-  } else if (momentumScore < 0) {
-    if (absMomentum <= 10) {
-      arrowBlock = svgUp;
-    } else if (absMomentum <= 20) {
-      arrowBlock = svgUp + svgUp;
-    } else {
-      arrowBlock = svgUp + svgUp + svgUp;
-    }
+  const absMomentum = Math.abs(momentumScore);
+  if (absMomentum < 5) {
+    arrowBlock = '-';
+  } else if (absMomentum < 10) {
+    arrowBlock = momentumScore > 0 ? svgDown : svgUp;
+  } else if (absMomentum < 20) {
+    arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(2);
+  } else {
+    arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(3);
   }
   spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
   spannerRow.appendChild(spannerTd);
@@ -3196,7 +3172,7 @@ async function fetchAndRenderTrades() {
       }
     }
 
-    // --- Remove all existing spanner rows first ---
+    // --- Remove all existing spanner rows before rendering trade rows ---
     activeTradesTableBody.querySelectorAll('.spanner-row').forEach(row => row.remove());
 
     // --- Sort trades by strike (ascending) for correct row order ---
@@ -3223,13 +3199,13 @@ async function fetchAndRenderTrades() {
 
     // Build trade rows (do not append yet)
     trades.forEach((trade, idx) => {
+      // --- Remove spanner row logic from here ---
       // Re-render the row if status has changed
       const existing = activeTradesRowsMap.get(trade.id);
       if (existing && existing.status !== trade.status) {
         activeTradesTableBody.removeChild(existing.tr);
         activeTradesRowsMap.delete(trade.id);
       }
-      
       // === PENDING/ERROR/CLOSING TRADE ROW LOGIC: merge Buffer and B/M into one cell ===
       if (["pending", "error", "closing"].includes(trade.status)) {
         let rowObj = activeTradesRowsMap.get(trade.id);
@@ -3429,23 +3405,15 @@ async function fetchAndRenderTrades() {
       const prevAsk = previousClosePrices[trade.id];
       if (closeButtonSpan) {
         if (prevAsk !== askPrice) {
-          // Instead of recreating the entire button, just update the text content
-          let existingCloseSpan = rowObj.closeTd.querySelector('span.price-box');
-          if (!existingCloseSpan) {
-            // Create the button only if it doesn't exist
-            existingCloseSpan = closeButtonSpan.cloneNode(true);
-            existingCloseSpan.classList.remove('disabled');
-            existingCloseSpan.style.opacity = '';
-            existingCloseSpan.style.pointerEvents = '';
-            existingCloseSpan.style.cursor = 'pointer';
-            existingCloseSpan.dataset.tradeId = trade.id;
-            existingCloseSpan.dataset.action = 'close';
-            rowObj.closeTd.innerHTML = '';
-            rowObj.closeTd.appendChild(existingCloseSpan);
-          } else {
-            // Just update the text content of the existing button
-            existingCloseSpan.textContent = closeButtonSpan.textContent;
-          }
+          rowObj.closeTd.innerHTML = '';
+          const clonedSpan = closeButtonSpan.cloneNode(true);
+          clonedSpan.classList.remove('disabled');
+          clonedSpan.style.opacity = '';
+          clonedSpan.style.pointerEvents = '';
+          clonedSpan.style.cursor = 'pointer';
+          clonedSpan.dataset.tradeId = trade.id;
+          clonedSpan.dataset.action = 'close';
+          rowObj.closeTd.appendChild(clonedSpan);
           previousClosePrices[trade.id] = askPrice;
         }
       } else {
@@ -3479,31 +3447,19 @@ async function fetchAndRenderTrades() {
         return 0;
       }
       let momentumScore = getCurrentMomentumScoreForArrow();
-      let arrow = '';
       // SVGs for straight arrows (no margin)
       const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
       const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-      const svgUpDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 2l4 4M8 2l-4 4M8 14l4-4M8 14l-4-4" stroke="#aaa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-      const absMomentum = Math.abs(momentumScore);
       let arrowBlock = '';
-      if (momentumScore === 0) {
-        arrowBlock = svgUpDown;
-      } else if (momentumScore > 0) {
-        if (absMomentum <= 10) {
-          arrowBlock = svgDown;
-        } else if (absMomentum <= 20) {
-          arrowBlock = svgDown + svgDown;
-        } else {
-          arrowBlock = svgDown + svgDown + svgDown;
-        }
-      } else if (momentumScore < 0) {
-        if (absMomentum <= 10) {
-          arrowBlock = svgUp;
-        } else if (absMomentum <= 20) {
-          arrowBlock = svgUp + svgUp;
-        } else {
-          arrowBlock = svgUp + svgUp + svgUp;
-        }
+      const absMomentum = Math.abs(momentumScore);
+      if (absMomentum < 5) {
+        arrowBlock = '-';
+      } else if (absMomentum < 10) {
+        arrowBlock = momentumScore > 0 ? svgDown : svgUp;
+      } else if (absMomentum < 20) {
+        arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(2);
+      } else {
+        arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(3);
       }
       spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
       spannerRow.appendChild(spannerTd);
@@ -3512,29 +3468,10 @@ async function fetchAndRenderTrades() {
       tradeRows.splice(spannerIndex, 0, spannerRow);
     }
 
-    // Instead of clearing and rebuilding, update the table structure in place
-    const existingRows = Array.from(activeTradesTableBody.children);
-    const existingTradeRows = existingRows.filter(row => !row.classList.contains('spanner-row'));
-    
-    // Remove rows that are no longer needed
-    existingTradeRows.forEach((row, index) => {
-      if (index >= tradeRows.length) {
-        activeTradesTableBody.removeChild(row);
-      }
-    });
-    
-    // Update or add rows as needed
-    tradeRows.forEach((newRow, index) => {
-      if (index < existingTradeRows.length) {
-        // Replace existing row
-        const existingRow = existingTradeRows[index];
-        if (existingRow !== newRow) {
-          activeTradesTableBody.replaceChild(newRow, existingRow);
-        }
-      } else {
-        // Add new row
-        activeTradesTableBody.appendChild(newRow);
-      }
+    // Clear the table body and append all rows in the correct order
+    activeTradesTableBody.innerHTML = '';
+    tradeRows.forEach(row => {
+      activeTradesTableBody.appendChild(row);
     });
   } catch (err) {
     console.error('Error fetching trades:', err);
@@ -3797,31 +3734,19 @@ activeTradesTableBody.addEventListener('click', (event) => {
         const spannerTd = spannerRow.querySelector('td');
         if (!spannerTd) return;
         const val = parseFloat(momentumEl.textContent.replace(/[^\d\.\-]/g, ''));
-        let arrow = '';
         // SVGs for straight arrows (no margin)
         const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
         const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-        const svgUpDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 2l4 4M8 2l-4 4M8 14l4-4M8 14l-4-4" stroke="#aaa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-        const absMomentum = Math.abs(val);
         let arrowBlock = '';
-        if (val === 0) {
-          arrowBlock = svgUpDown;
-        } else if (val > 0) {
-          if (absMomentum <= 10) {
-            arrowBlock = svgDown;
-          } else if (absMomentum <= 20) {
-            arrowBlock = svgDown + svgDown;
-          } else {
-            arrowBlock = svgDown + svgDown + svgDown;
-          }
-        } else if (val < 0) {
-          if (absMomentum <= 10) {
-            arrowBlock = svgUp;
-          } else if (absMomentum <= 20) {
-            arrowBlock = svgUp + svgUp;
-          } else {
-            arrowBlock = svgUp + svgUp + svgUp;
-          }
+        const absMomentum = Math.abs(val);
+        if (absMomentum < 5) {
+          arrowBlock = '-';
+        } else if (absMomentum < 10) {
+          arrowBlock = val > 0 ? svgDown : svgUp;
+        } else if (absMomentum < 20) {
+          arrowBlock = (val > 0 ? svgDown : svgUp).repeat(2);
+        } else {
+          arrowBlock = (val > 0 ? svgDown : svgUp).repeat(3);
         }
         // Extract the price from the current text
         const match = spannerTd.textContent.match(/Current Price: \$[\d,]+/);

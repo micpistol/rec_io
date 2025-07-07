@@ -495,13 +495,6 @@ sync_balance()
 app = Flask(__name__)
 CORS(app)
 
-# --- DEBUGGING: View last outbound status payload to trade manager ---
-last_status_payload = {}
-
-@app.get("/debug/last_status_message")
-def debug_last_status_message():
-    return jsonify(last_status_payload)
-
 # --- Market order helper for /trigger_trade ---
 def place_market_order(ticker, side, count):
     method = "POST"
