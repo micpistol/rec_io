@@ -1774,6 +1774,45 @@ function updateWatchlistDisplay() {
       const rowObj = watchlistRowsMap.get(strike);
       if (!rowObj) return;
       
+      // Update buffer, B/M, adj, and risk cells with live data from market row
+      const bufferCell = rowObj.tr.children[1];
+      const bmCell = rowObj.tr.children[2];
+      const adjCell = rowObj.tr.children[3];
+      const riskCell = rowObj.tr.children[4];
+      
+      if (bufferCell && marketRow.children[1]) {
+        const oldBuffer = bufferCell.textContent;
+        const newBuffer = marketRow.children[1].textContent;
+        if (oldBuffer !== newBuffer) {
+          console.log(`Watchlist: Updating buffer for strike ${strike} from ${oldBuffer} to ${newBuffer}`);
+          bufferCell.textContent = newBuffer;
+        }
+      }
+      if (bmCell && marketRow.children[2]) {
+        const oldBm = bmCell.textContent;
+        const newBm = marketRow.children[2].textContent;
+        if (oldBm !== newBm) {
+          console.log(`Watchlist: Updating B/M for strike ${strike} from ${oldBm} to ${newBm}`);
+          bmCell.textContent = newBm;
+        }
+      }
+      if (adjCell && marketRow.children[3]) {
+        const oldAdj = adjCell.textContent;
+        const newAdj = marketRow.children[3].textContent;
+        if (oldAdj !== newAdj) {
+          console.log(`Watchlist: Updating Adj for strike ${strike} from ${oldAdj} to ${newAdj}`);
+          adjCell.textContent = newAdj;
+        }
+      }
+      if (riskCell && marketRow.children[4]) {
+        const oldRisk = riskCell.textContent;
+        const newRisk = marketRow.children[4].textContent;
+        if (oldRisk !== newRisk) {
+          console.log(`Watchlist: Updating Risk for strike ${strike} from ${oldRisk} to ${newRisk}`);
+          riskCell.textContent = newRisk;
+        }
+      }
+      
       // Update YES/NO buttons in place (only if prices changed)
       [5, 6].forEach(idx => {
         const marketCell = marketRow.children[idx];
