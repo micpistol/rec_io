@@ -322,7 +322,7 @@
       <div class="user-section">
         <a href="/tabs/user_config.html" class="nav-item" data-page="user-config" data-tooltip="eric@ewedit.com">
           <span class="nav-icon">
-            <img src="/images/icons/user_icon.png" alt="User" style="width: 25px; height: 25px; object-fit: contain;">
+            <img src="/images/icons/user_icon.png" alt="User" style="width: 25px; height: px; object-fit: contain;">
           </span>
           <span class="nav-label">eric@ewedit.com</span>
         </a>
@@ -378,6 +378,21 @@
         contentFrame.src = href + '?v=' + Date.now();
       });
     });
+  </script>
+
+  <script>
+  let lastFrontendChange = null;
+  async function checkFrontendChanges() {
+    try {
+      const res = await fetch('/frontend-changes');
+      const data = await res.json();
+      if (lastFrontendChange && data.last_modified > lastFrontendChange) {
+        location.reload();
+      }
+      lastFrontendChange = data.last_modified;
+    } catch (e) {}
+  }
+  setInterval(checkFrontendChanges, 10000);
   </script>
 </body>
 </html>

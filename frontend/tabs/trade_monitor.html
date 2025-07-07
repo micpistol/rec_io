@@ -2474,14 +2474,13 @@ document.addEventListener('DOMContentLoaded', () => {
         <table id="recentTradesTable" class="panel-table" style="width: 100%; border-collapse: collapse;">
           <thead>
             <tr>
+              <th>Date</th>
               <th>Time</th>
               <th>Contract</th>
               <th>Strike</th>
               <th>Side</th>
-              <th>Buy</th>
-              <th>Sell</th>
-              <th>Pos</th>
-              <th>Closed</th>
+              <th>Count</th>
+              <th>Price</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -3551,40 +3550,80 @@ async function closeTradeById(tradeId, sellPrice) {
   */
 }
 
-// === Recent Trades Panel ===
+// === Recent Trades Panel (now using fills.db) ===
 async function fetchAndRenderRecentTrades() {
   try {
-    // Fetch all closed trades
-    const res = await fetch('/trades?status=closed', { cache: 'no-store' });
-    if (!res.ok) throw new Error("Failed to fetch recent trades");
-    const trades = await res.json();
-    console.log("Recent trades response:", trades);
-    // Show the 5 most recently closed trades in descending order by closed_at
-    const recentFive = trades
-      .filter(trade => trade.closed_at)
-      .sort((a, b) => new Date(b.closed_at) - new Date(a.closed_at))
-      .slice(0, 5);
+    // Fetch fills data from the fills.db
+    const res = await fetch('/api/db/fills', { cache: 'no-store' });
+    if (!res.ok) throw new Error("Failed to fetch recent fills");
+    const data = await res.json();
+    const fills = data.fills || [];
+    // Show the 5 most recent fills
+    const recentFive = fills.slice(0, 5);
+    const recentTradesTableBody = document.querySelector('#recentTradesTable tbody');
+    if (!recentTradesTableBody) return;
     recentTradesTableBody.innerHTML = '';
-    recentFive.forEach(trade => {
-      // Show raw time field from the database for Time column
-      let timeCell = trade.time || '—';
-      // Raw closed time cell display
-      let closedCell = trade.closed_at || '—';
+    recentFive.forEach(fill => {
+      // Parse the created_time to extract date and time
+      const createdTime = new Date(fill.created_time);
+      const dateCell = createdTime.toLocaleDateString();
+      const timeCell = createdTime.toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: false 
+      });
+      // Contract: extract the part before '-T', then last two digits as hour
+      let contract = '';
+      if (fill.ticker) {
+        const tickerMain = fill.ticker.split('-T')[0];
+        const hourMatch = tickerMain.match(/(\d{2})$/);
+        if (hourMatch) {
+          const hour = parseInt(hourMatch[1], 10);
+          const ampm = hour >= 12 ? 'pm' : 'am';
+          const displayHour = hour === 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+          contract = `BTC ${displayHour}${ampm}`;
+        } else {
+          contract = fill.ticker;
+        }
+      }
+      
+      // Strike: extract number after "-T" at the end of the string
+      let strike = '';
+      if (fill.ticker) {
+        // Find the number after "-T" at the end
+        const strikeMatch = fill.ticker.match(/-T(\d+\.?\d*)$/);
+        if (strikeMatch) {
+          const strikeValue = Math.round(parseFloat(strikeMatch[1]));
+          strike = `$${strikeValue.toLocaleString()}`;
+        }
+      }
+      // Side: force display as 'Y' for YES and 'N' for NO, and use original for Buy
+      let side = '';
+      let buy = '';
+      if (fill.side) {
+        const s = fill.side.toUpperCase();
+        side = s === 'YES' ? 'Y' : (s === 'NO' ? 'N' : s);
+        buy = s === 'YES'
+          ? (fill.yes_price != null ? fill.yes_price.toFixed(2) : '')
+          : (s === 'NO' ? (fill.no_price != null ? fill.no_price.toFixed(2) : '') : '');
+      }
+      // Pos: count
+      const pos = fill.count != null ? fill.count : '';
       const tr = document.createElement('tr');
       tr.innerHTML = `
+        <td>${dateCell}</td>
         <td>${timeCell}</td>
-        <td>${trade.contract || ''}</td>
-        <td>${trade.strike}</td>
-        <td>${trade.side}</td>
-        <td>${trade.buy_price.toFixed(2)}</td>
-        <td>${trade.sell_price !== undefined && trade.sell_price !== null ? (trade.sell_price).toFixed(2) : '—'}</td>
-        <td>${trade.position}</td>
-        <td>${closedCell}</td>
+        <td>${contract}</td>
+        <td>${strike}</td>
+        <td>${side}</td>
+        <td>${pos}</td>
+        <td>${buy}</td>
       `;
       recentTradesTableBody.appendChild(tr);
     });
   } catch (err) {
-    console.error('Error fetching recent trades:', err);
+    console.error('Error fetching recent fills for trades table:', err);
   }
 }
 

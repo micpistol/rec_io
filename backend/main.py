@@ -1246,3 +1246,18 @@ async def ping_handler(request: Request):
     print(f"Received ping for ticket {ticket_id} with status {status}")
     
     return {"message": "Ping received"}
+
+@app.get("/frontend-changes")
+def frontend_changes():
+    import os
+    latest = 0
+    for root, dirs, files in os.walk("frontend"):
+        for f in files:
+            path = os.path.join(root, f)
+            try:
+                mtime = os.path.getmtime(path)
+                if mtime > latest:
+                    latest = mtime
+            except Exception:
+                pass
+    return {"last_modified": latest}
