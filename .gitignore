@@ -33,3 +33,4 @@ backend/api/coinbase-api/coinbase-btc/data/btc_logger_heartbeat.txt
 backend/api/coinbase-api/coinbase-btc/data/btc_price_log.txt
 backend/api/kalshi-api/data/latest_market_snapshot.json
 backend/api/kalshi-api/data/kalshi_logger_heartbeat.txt
+logs/main_app.out.log.1
