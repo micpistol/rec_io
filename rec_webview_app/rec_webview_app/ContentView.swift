@@ -1,24 +1,46 @@
-//
-//  ContentView.swift
-//  rec_webview_app
-//
-//  Created by Eric Wais on 7/7/25.
-//
-
 import SwiftUI
+import WebKit
 
-struct ContentView: View {
-    var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+struct WebView: UIViewRepresentable {
+    let url: URL
+
+    func makeUIView(context: Context) -> WKWebView {
+        let webView = WKWebView()
+        webView.navigationDelegate = context.coordinator
+        webView.scrollView.bounces = false
+        webView.scrollView.isScrollEnabled = false
+        webView.translatesAutoresizingMaskIntoConstraints = false
+        return webView
+    }
+
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        let request = URLRequest(url: url)
+        uiView.load(request)
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    class Coordinator: NSObject, WKNavigationDelegate {
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            print("Navigation error: \(error.localizedDescription)")
         }
-        .padding()
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            print("Provisional navigation error: \(error.localizedDescription)")
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            print("✅ Finished loading URL: \(webView.url?.absoluteString ?? "unknown")")
+        }
     }
 }
 
-#Preview {
-    ContentView()
+struct ContentView: View {
+    var body: some View {
+        WebView(url: URL(string: "http://192.168.86.42:5001/")!)
+            .ignoresSafeArea()
+            
+    }
 }

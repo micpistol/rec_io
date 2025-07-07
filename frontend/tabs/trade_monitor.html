@@ -13,6 +13,7 @@
   body {
     display: flex;
     flex-direction: row;
+    overflow: hidden;
   }
 
   .column {
@@ -2468,9 +2469,9 @@ document.addEventListener('DOMContentLoaded', () => {
           <tbody></tbody>
         </table>
       </div>
-      <!-- Recent Trades Panel -->
+      <!-- Recent Fills Panel -->
       <div class="panel-container" style="min-height: 100px;" id="recentTradesPanel">
-        <div class="panel-header">Recent Trades</div>
+        <div class="panel-header">Recent Fills</div>
         <table id="recentTradesTable" class="panel-table" style="width: 100%; border-collapse: collapse;">
           <thead>
             <tr>

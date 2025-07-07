@@ -1113,6 +1113,35 @@ def get_composite_volatility_score():
     except Exception as e:
         return {"error": str(e)}
 
+def get_main_app_port():
+    return int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5000)))
+
+@app.post("/ping")
+async def ping_handler(request: Request):
+    data = await request.json()
+    ticket_id = data.get("ticket_id")
+    status = data.get("status")
+    
+    # Simple ping handler - just acknowledge receipt
+    print(f"Received ping for ticket {ticket_id} with status {status}")
+    
+    return {"message": "Ping received"}
+
+@app.get("/frontend-changes")
+def frontend_changes():
+    import os
+    latest = 0
+    for root, dirs, files in os.walk("frontend"):
+        for f in files:
+            path = os.path.join(root, f)
+            try:
+                mtime = os.path.getmtime(path)
+                if mtime > latest:
+                    latest = mtime
+            except Exception:
+                pass
+    return {"last_modified": latest}
+
 if __name__ == "__main__":
     import threading
     import os
@@ -1232,32 +1261,3 @@ async def watch_trades():
 # Helper function to notify trade DB update
 def notify_trade_update():
     trade_db_event.set()
-
-def get_main_app_port():
-    return int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5000)))
-
-@app.post("/ping")
-async def ping_handler(request: Request):
-    data = await request.json()
-    ticket_id = data.get("ticket_id")
-    status = data.get("status")
-    
-    # Simple ping handler - just acknowledge receipt
-    print(f"Received ping for ticket {ticket_id} with status {status}")
-    
-    return {"message": "Ping received"}
-
-@app.get("/frontend-changes")
-def frontend_changes():
-    import os
-    latest = 0
-    for root, dirs, files in os.walk("frontend"):
-        for f in files:
-            path = os.path.join(root, f)
-            try:
-                mtime = os.path.getmtime(path)
-                if mtime > latest:
-                    latest = mtime
-            except Exception:
-                pass
-    return {"last_modified": latest}
