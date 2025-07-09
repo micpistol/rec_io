@@ -188,7 +188,8 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
     // --- PATCH: Use model-based probability for Prob Touch (%) ---
     let prob = probMap && probMap.has(strike) ? probMap.get(strike) : null;
     if (prob !== null && prob !== undefined) {
-      probTd.textContent = prob.toFixed(1);
+      // Invert the probability for display
+      probTd.textContent = (100 - prob).toFixed(1);
       row.className = '';
     } else {
       probTd.textContent = '—';

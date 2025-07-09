@@ -56,7 +56,7 @@ def load_preferences():
                 return json.load(f)
         except Exception:
             pass
-    return {"auto_stop": True, "watchlist": [], "reco": False}
+    return {"auto_stop": True, "watchlist": [], "reco": False, "plus_minus_mode": False}
 
 def save_preferences(prefs):
     try:
@@ -681,6 +681,15 @@ async def set_reco(request: Request):
     data = await request.json()
     prefs = load_preferences()
     prefs["reco"] = bool(data.get("enabled", False))
+    save_preferences(prefs)
+    await broadcast_preferences_update()
+    return {"status": "ok"}
+
+@app.post("/api/set_plus_minus_mode")
+async def set_plus_minus_mode(request: Request):
+    data = await request.json()
+    prefs = load_preferences()
+    prefs["plus_minus_mode"] = bool(data.get("enabled", False))
     save_preferences(prefs)
     await broadcast_preferences_update()
     return {"status": "ok"}

@@ -448,6 +448,46 @@
 }
 </style>
 <style>
+#plusMinusToggle {
+  accent-color: #00ff00;
+  background-color: transparent;
+  border: none;
+  outline: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  position: relative;
+  cursor: pointer;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px white;
+  transition: outline 0.2s ease;
+}
+
+#plusMinusToggle:checked {
+  background-color: #00ff00;
+  box-shadow: none;
+}
+
+#plusMinusToggle:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+#plusMinusToggle:focus-visible {
+  outline: 2px solid #00ff00;
+  outline-offset: 2px;
+}
+</style>
+<style>
   /* === Multiplier Button Styles === */
   .multiplier-btn {
     background-color: transparent;
@@ -602,6 +642,13 @@
         <div id="strikePanelTTC" style="font-size: 27px; font-weight: bold; text-align: right;">&nbsp;</div>
       </div>
       <div class="panel-container" style="min-height: 200px; " id="strikePanelContainer">
+        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Market</span>
+          <label style="font-size: 12px; user-select: none; color: white; display: flex; align-items: center; gap: 6px; margin: 0;">
+            + / -
+            <input type="checkbox" id="plusMinusToggle" />
+          </label>
+        </div>
         <table id="strikePanelTable" style="width: 100%; height: 100%; ">
           <tbody>
             <!-- Market title and TTC clock row removed -->
@@ -625,7 +672,7 @@
                 <th>BUFFER</th>
                 <th>B/M</th>
                 <th>Adj</th>
-                <th>Prob Touch (%)</th>
+                <th>Prob</th>
                 <th>YES</th>
                 <th>NO</th>
               </tr>
@@ -951,7 +998,10 @@ async function cancelTrade(dbId, ticketId) {
 }
 
 // === Track last Yes/No button states ===
-const lastButtonStates = new Map();
+if (typeof window.lastButtonStates === 'undefined') {
+  window.lastButtonStates = new Map();
+}
+let lastButtonStates = window.lastButtonStates;
 
 // Debounce helper function (moved to top-level for reuse)
 function debounce(func, wait) {
@@ -1215,8 +1265,12 @@ window.CurrentMarketTitleRaw = "";
 // TTC polling intervals moved to live-data.js
 
 // === WATCHLIST FUNCTIONALITY ===
+if (typeof window.ignoreWsUpdates === 'undefined') {
+  window.ignoreWsUpdates = false;
+}
+let ignoreWsUpdates = window.ignoreWsUpdates;
+// If you still get redeclaration errors, check for duplicate <script src="strike-table.js"> or similar tags in your HTML.
 let watchlistData = [];
-let ignoreWsUpdates = false; // Move to global scope
 let watchlistRowsMap = new Map(); // Persistent watchlist rows
 
 // Load watchlist from preferences on page load
@@ -1872,12 +1926,30 @@ function updateClickHandlersForReco() {
 <script>
 // === Unified Preferences: AUTO STOP, Position Size, Multiplier with WebSocket sync (improved) ===
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('DOMContentLoaded - Starting preferences setup');
+  
   const autoStopToggle = document.getElementById('autoStopToggle');
   const positionInput = document.getElementById('position-size');
   const multiplierButtons = document.querySelectorAll('.multiplier-btn');
   const recoToggle = document.getElementById('recoToggle');
+  const plusMinusToggle = document.getElementById('plusMinusToggle');
+  
+  console.log('Elements found:', {
+    autoStopToggle: !!autoStopToggle,
+    positionInput: !!positionInput,
+    multiplierButtons: multiplierButtons.length,
+    recoToggle: !!recoToggle,
+    plusMinusToggle: !!plusMinusToggle
+  });
+  
   let currentMultiplier = null;
   // Remove: let ignoreWsUpdates = false; (now global)
+  
+  // Define ignoreWsUpdates for this scope
+  if (typeof window.ignoreWsUpdates === 'undefined') {
+    window.ignoreWsUpdates = false;
+  }
+  let ignoreWsUpdates = window.ignoreWsUpdates;
 
   function updatePositionDisplay() {
     const baseValue = parseInt(positionInput.value, 10) || 0;
@@ -1913,6 +1985,10 @@ document.addEventListener('DOMContentLoaded', () => {
             updateClickHandlersForReco(); // Enable click handlers
           }, 1000); // Delay to ensure strike table is loaded
         }
+      }
+      if (plusMinusToggle && data.plus_minus_mode !== undefined) {
+        plusMinusToggle.checked = data.plus_minus_mode;
+        window.plusMinusMode = data.plus_minus_mode;
       }
       if (positionInput && data.position_size !== undefined) {
         positionInput.value = data.position_size;
@@ -1995,6 +2071,14 @@ document.addEventListener('DOMContentLoaded', () => {
         ignoreWsUpdates = false;
       }
 
+      if (plusMinusToggle && data.plus_minus_mode !== undefined && document.activeElement !== plusMinusToggle) {
+        ignoreWsUpdates = true;
+        console.log('Received plus_minus_mode update via WebSocket:', data.plus_minus_mode);
+        plusMinusToggle.checked = data.plus_minus_mode;
+        window.plusMinusMode = data.plus_minus_mode;
+        ignoreWsUpdates = false;
+      }
+
       if (positionInput && data.position_size !== undefined && document.activeElement !== positionInput) {
         ignoreWsUpdates = true;
         positionInput.value = data.position_size;
@@ -2035,8 +2119,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (recoToggle) {
+    console.log('Adding RECO event listener');
     recoToggle.addEventListener('change', () => {
-      if (ignoreWsUpdates) return;
+      console.log('RECO event handler triggered, ignoreWsUpdates:', ignoreWsUpdates);
+      if (ignoreWsUpdates) {
+        console.log('Ignoring RECO change due to WebSocket update');
+        return;
+      }
       const value = recoToggle.checked;
       console.log('RECO toggle changed to:', value);
       window.recoEnabled = value;
@@ -2044,15 +2133,46 @@ document.addEventListener('DOMContentLoaded', () => {
       // If RECO is being turned ON, apply filtering immediately
       if (value) {
         console.log('RECO enabled - applying automatic filtering');
-        updateWatchlistBasedOnReco();
-        updateClickHandlersForReco(); // Disable click handlers
+        try {
+          updateWatchlistBasedOnReco();
+          updateClickHandlersForReco(); // Disable click handlers
+        } catch (e) {
+          console.error('Error in RECO enable functions:', e);
+        }
       } else {
         // If RECO is being turned OFF, re-enable click handlers
         console.log('RECO disabled - re-enabling click handlers');
-        updateClickHandlersForReco(); // Re-enable click handlers
+        try {
+          updateClickHandlersForReco(); // Re-enable click handlers
+        } catch (e) {
+          console.error('Error in RECO disable functions:', e);
+        }
       }
       
+      console.log('Sending RECO update to backend:', { enabled: value });
       fetch(window.location.origin + '/api/set_reco', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: value })
+      }).then(response => {
+        console.log('RECO backend response:', response.status);
+        return response.json();
+      }).then(data => {
+        console.log('RECO backend data:', data);
+      }).catch(error => {
+        console.error('RECO backend error:', error);
+      });
+    });
+  }
+
+  if (plusMinusToggle) {
+    plusMinusToggle.addEventListener('change', () => {
+      if (ignoreWsUpdates) return;
+      const value = plusMinusToggle.checked;
+      console.log('Plus/Minus toggle changed to:', value);
+      window.plusMinusMode = value;
+      
+      fetch(window.location.origin + '/api/set_plus_minus_mode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: value })
@@ -2074,11 +2194,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   multiplierButtons.forEach(btn => {
+    console.log('Adding event listener to multiplier button:', btn.dataset.multiplier);
     btn.addEventListener('click', () => {
-      if (ignoreWsUpdates) return;
+      console.log('Multiplier button clicked:', btn.dataset.multiplier);
+      if (ignoreWsUpdates) {
+        console.log('Ignoring due to WebSocket update');
+        return;
+      }
       multiplierButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentMultiplier = parseInt(btn.dataset.multiplier, 10);
+      console.log('Setting currentMultiplier to:', currentMultiplier);
       updatePositionDisplay();
       fetch(window.location.origin + '/api/set_multiplier', {
         method: 'POST',
