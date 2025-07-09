@@ -4,6 +4,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="../styles/global.css">
+<script src="../js/live-data.js"></script>
+<script src="../js/strike-table.js"></script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Trade Monitor</title>
@@ -623,7 +625,7 @@
                 <th>BUFFER</th>
                 <th>B/M</th>
                 <th>Adj</th>
-                <th>RISK</th>
+                <th>Prob Touch (%)</th>
                 <th>YES</th>
                 <th>NO</th>
               </tr>
@@ -658,7 +660,7 @@
                 <th>BUFFER</th>
                 <th>B/M</th>
                 <th>Adj</th>
-                <th>RISK</th>
+                <th>Prob Touch (%)</th>
                 <th>YES</th>
                 <th>NO</th>
               </tr>
@@ -1000,7 +1002,7 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
 }
 
 // === STRIKE TABLE REFACTOR: persistent rows and in-place update ===
-const strikeRowsMap = new Map();
+window.strikeRowsMap = new Map();
 
 function buildStrikeTableRows(basePrice) {
   const step = 250;
@@ -1143,34 +1145,11 @@ function updateStrikeTable(coreData, latestKalshiMarkets) {
       row.classList.add('high-risk');
     }
 
-    // Active row border highlight
-    const lowerBound = strike;
-    const upperBound = strike + 249.9999;
-    const isActiveRow = centerPrice >= lowerBound && centerPrice <= upperBound;
-    /*
-    if (isActiveRow) {
-      [cells.row.children[0], bufferTd, bmTd, adjBmTd, riskTd, yesSpan.parentElement, noSpan.parentElement].forEach(cell => {
-        cell.style.borderTop = "3px solid #444";
-        cell.style.borderBottom = "3px solid #444";
-      });
-    } else {
-      [cells.row.children[0], bufferTd, bmTd, adjBmTd, riskTd, yesSpan.parentElement, noSpan.parentElement].forEach(cell => {
-        cell.style.borderTop = "";
-        cell.style.borderBottom = "";
-      });
-    }
-    */
-
     // Find markets for yes/no asks - use more flexible matching
     const matchingMarket = latestKalshiMarkets.find(m => {
       const marketStrike = Math.round(m.floor_strike);
       return marketStrike === strike || Math.abs(marketStrike - strike) <= 1;
     });
-    
-    // Debug logging for first few strikes
-    if (strike >= 107000 && strike <= 109000 && !matchingMarket) {
-      console.log(`No market found for strike ${strike}. Available strikes in range:`, latestKalshiMarkets.filter(m => m.floor_strike >= 107000 && m.floor_strike <= 109000).map(m => Math.round(m.floor_strike)));
-    }
     
     // Extract the corresponding ticker value from the same matchingMarket object
     const ticker = matchingMarket ? matchingMarket.ticker : null;
@@ -1186,203 +1165,6 @@ function updateStrikeTable(coreData, latestKalshiMarkets) {
     // Update position indicator (subtle background tint)
     updatePositionIndicator(cells.row.children[0], strike);
   });
-
-  // Insert spanner row at the correct position
-  if (strikeRows.length > 0) {
-    // Build the spanner row
-    const spannerRow = document.createElement("tr");
-    spannerRow.className = "spanner-row";
-    const spannerTd = document.createElement("td");
-    spannerTd.colSpan = 7;
-
-    // --- Add arrow icons based on momentum score ---
-    // Helper to get current momentum score from DOM
-    function getCurrentMomentumScoreForArrow() {
-      const el = document.getElementById('momentum-score-value');
-      if (el && el.textContent) {
-        const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
-        return isNaN(val) ? 0 : val;
-      }
-      return 0;
-    }
-    let momentumScore = getCurrentMomentumScoreForArrow();
-    // SVGs for straight arrows (no margin)
-    const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    let arrowBlock = '';
-    const absMomentum = Math.abs(momentumScore);
-    if (absMomentum < 5) {
-      arrowBlock = '-';
-    } else if (absMomentum < 10) {
-      arrowBlock = momentumScore > 0 ? svgDown : svgUp;
-    } else if (absMomentum < 20) {
-      arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(2);
-    } else {
-      arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(3);
-    }
-    spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>Current Price: $${Math.round(centerPrice).toLocaleString()}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
-    spannerRow.appendChild(spannerTd);
-
-    // Insert the spanner row at the correct index
-    if (spannerIndex < strikeRows.length) {
-      strikeTableBody.insertBefore(spannerRow, strikeRows[spannerIndex]);
-    } else {
-      strikeTableBody.appendChild(spannerRow);
-    }
-  }
-  
-  // Update momentum heat band
-  updateMomentumHeatBandSegmented();
-  // Also update the watchlist to keep it in sync with the strike table
-  updateWatchlistDisplay();
-}
-
-// Function to update momentum heat band
-function updateMomentumHeatBandSegmented() {
-  const momentumScore = getCurrentMomentumScore();
-  const heatBand = document.getElementById('momentum-heat-gradient');
-  const strikeTable = document.getElementById('strike-table');
-  if (!heatBand || !strikeTable) return;
-
-  // Parse momentum score
-  const score = typeof momentumScore === 'string' ? parseFloat(momentumScore) : momentumScore;
-  if (isNaN(score)) {
-    heatBand.innerHTML = '';
-    heatBand.style.background = 'none';
-    return;
-  }
-
-  // Get all strike rows
-  const rows = strikeTable.querySelectorAll('tbody tr');
-  if (!rows.length) return;
-
-  // Find ATM row (the one with border highlight)
-  let atmIndex = -1;
-  rows.forEach((row, idx) => {
-    if (row.children[0].style.borderTop && row.children[0].style.borderTop.includes('3px')) {
-      atmIndex = idx;
-    }
-  });
-  if (atmIndex === -1) atmIndex = Math.floor(rows.length / 2); // fallback
-
-  // Clear previous
-  heatBand.innerHTML = '';
-  heatBand.style.display = 'flex';
-  heatBand.style.flexDirection = 'column';
-  heatBand.style.justifyContent = 'center';
-  heatBand.style.background = 'none';
-  heatBand.style.height = strikeTable.offsetHeight + 'px';
-
-  // Always create the center neutral segment
-  const centerSeg = document.createElement('div');
-  centerSeg.style.flex = '1 1 0';
-  centerSeg.style.width = '100%';
-  centerSeg.style.margin = '0';
-  centerSeg.style.padding = '0';
-  centerSeg.style.background = 'rgba(120,120,120,0.3)';
-  centerSeg.style.border = '1px solid rgba(120,120,120,0.5)';
-
-  // If momentum is zero, only show the center segment
-  if (score === 0) {
-    // Fill above and below with empty space to keep center centered
-    for (let i = 0; i < atmIndex; ++i) {
-      const empty = document.createElement('div');
-      empty.style.flex = '1 1 0';
-      heatBand.appendChild(empty);
-    }
-    heatBand.appendChild(centerSeg);
-    for (let i = atmIndex + 1; i < rows.length; ++i) {
-      const empty = document.createElement('div');
-      empty.style.flex = '1 1 0';
-      heatBand.appendChild(empty);
-    }
-    return;
-  }
-
-  // Otherwise, build the heatmap
-  // The length of the bars is proportional to |momentum| (maxes at ±50)
-  const maxMomentum = 50;
-  const absScore = Math.min(Math.abs(score), maxMomentum);
-  const barLength = Math.round((rows.length - 1) / 2 * (absScore / maxMomentum));
-
-  // Helper to get color for a segment (gradient)
-  function getGradientColor(baseColor, relIdx, totalLen, intensity) {
-    // relIdx: 0 (closest to center) to totalLen-1 (farthest)
-    // intensity: 0-1
-    let alpha = 0.15 + 0.7 * ((relIdx + 1) / totalLen) * intensity;
-    if (baseColor === 'green') return `rgba(69, 211, 74, ${alpha})`;
-    if (baseColor === 'red') return `rgba(220, 53, 69, ${alpha})`;
-    return 'rgba(120,120,120,0.18)';
-  }
-
-  // Build segments above (upwards from center)
-  for (let i = 0; i < atmIndex; ++i) {
-    const seg = document.createElement('div');
-    seg.style.flex = '1 1 0';
-    seg.style.width = '100%';
-    seg.style.margin = '0';
-    seg.style.padding = '0';
-    // Only color if within barLength from center
-    const relIdx = atmIndex - 1 - i;
-    if (relIdx < barLength) {
-      // For positive momentum: red up, negative: green up
-      const color = score > 0 ? 'red' : 'green';
-      seg.style.background = getGradientColor(color, relIdx, barLength, absScore / maxMomentum);
-    }
-    heatBand.appendChild(seg);
-  }
-  // Center
-  heatBand.appendChild(centerSeg);
-  // Build segments below (downwards from center)
-  for (let i = atmIndex + 1; i < rows.length; ++i) {
-    const seg = document.createElement('div');
-    seg.style.flex = '1 1 0';
-    seg.style.width = '100%';
-    seg.style.margin = '0';
-    seg.style.padding = '0';
-    // Only color if within barLength from center
-    const relIdx = i - (atmIndex + 1);
-    if (relIdx < barLength) {
-      // For positive momentum: green down, negative: red down
-      const color = score > 0 ? 'green' : 'red';
-      seg.style.background = getGradientColor(color, relIdx, barLength, absScore / maxMomentum);
-    }
-    heatBand.appendChild(seg);
-  }
-}
-
-// Helper function to create gradient bars
-function createGradientBar(container, direction, color, intensity, length) {
-  const bar = document.createElement('div');
-  bar.style.flex = `${length} 1 0`;
-  bar.style.width = '100%';
-  bar.style.margin = '0';
-  bar.style.padding = '0';
-  bar.style.position = 'relative';
-  bar.style.overflow = 'hidden';
-  
-  // Create gradient effect
-  const gradient = document.createElement('div');
-  gradient.style.width = '100%';
-  gradient.style.height = '100%';
-  gradient.style.position = 'absolute';
-  gradient.style.top = '0';
-  gradient.style.left = '0';
-  
-  if (color === 'green') {
-    gradient.style.background = `linear-gradient(${direction === 'down' ? 'to bottom' : 'to top'}, 
-      rgba(69, 211, 74, ${0.2 + 0.4 * intensity}) 0%, 
-      rgba(69, 211, 74, ${0.4 + 0.6 * intensity}) 50%, 
-      rgba(69, 211, 74, ${0.6 + 0.4 * intensity}) 100%)`;
-  } else {
-    gradient.style.background = `linear-gradient(${direction === 'down' ? 'to bottom' : 'to top'}, 
-      rgba(220, 53, 69, ${0.2 + 0.4 * intensity}) 0%, 
-      rgba(220, 53, 69, ${0.4 + 0.6 * intensity}) 50%, 
-      rgba(220, 53, 69, ${0.6 + 0.4 * intensity}) 100%)`;
-  }
-  
-  bar.appendChild(gradient);
-  container.appendChild(bar);
 }
 
 // Function to update position indicator
@@ -1420,155 +1202,17 @@ async function updatePositionIndicator(strikeCell, strike) {
 }
 
 // --- Main periodic fetcher for strike table ---
-async function fetchAndUpdate() {
-  try {
-    const [coreRes, marketsRes] = await Promise.all([fetch('/core'), fetch('/kalshi_market_snapshot')]);
-    if (!coreRes.ok || !marketsRes.ok) return;
-    const coreData = await coreRes.json();
-    const marketsData = await marketsRes.json();
-    const latestKalshiMarkets = Array.isArray(marketsData.markets) ? marketsData.markets : [];
-
-    if (!strikeRowsMap.size) {
-      const base = Math.round(coreData.btc_price / 250) * 250;
-      initializeStrikeTable(base);
-    }
-    updateStrikeTable(coreData, latestKalshiMarkets);
-
-    // --- PATCH: Force heat band height to match strike table ---
-    setTimeout(() => {
-      const strikeTable = document.getElementById('strike-table');
-      const heatBand = document.getElementById('momentum-heat-band');
-      if (strikeTable && heatBand) {
-        heatBand.style.height = strikeTable.offsetHeight + 'px';
-      }
-      updateMomentumHeatBandSegmented(); // Always update after table render
-    }, 0);
-
-    // Check if ATM strike has drifted more than 2 rows from center
-    const currentCenterStrike = Math.round(coreData.btc_price / 250) * 250;
-    const strikeList = Array.from(strikeRowsMap.keys()).sort((a, b) => a - b);
-    const centerIndex = Math.floor(strikeList.length / 2);
-    const currentCenter = strikeList[centerIndex];
-
-    const drift = currentCenterStrike - currentCenter;
-
-    // If ATM strike is more than 2 rows from center (rows 5-9), shift table one row in that direction
-    if (drift >= 500 || drift <= -500) {
-      const newBase = currentCenter + (drift > 0 ? 250 : -250);
-      initializeStrikeTable(newBase);
-    }
-  } catch (e) {
-    console.error("Error fetching or updating strike table:", e);
-  }
-}
-
-// setInterval(fetchAndUpdate, 1000); // Replaced by staggered polling below
-document.addEventListener('DOMContentLoaded', fetchAndUpdate);
+// fetchAndUpdate() moved to live-data.js
 
 // === Market Title Raw Fetch and UI Update (NEW LOGIC) ===
 // Global raw data holder for market title
 window.CurrentMarketTitleRaw = "";
 
-// Fetch the raw market title from backend
-async function fetchMarketTitleRaw() {
-  try {
-    const res = await fetch('/market_title');
-    const data = await res.json();
-    window.CurrentMarketTitleRaw = data.title || "";
-  } catch (e) {
-    window.CurrentMarketTitleRaw = "";
-    console.error("Error fetching market title:", e);
-  }
-}
-
-// Update the strike panel market title display with formatting
-function updateStrikePanelMarketTitle() {
-  const cell = document.getElementById('strikePanelMarketTitleCell');
-  if (!cell || !window.CurrentMarketTitleRaw) return;
-
-  const timeMatch = window.CurrentMarketTitleRaw.match(/at\s(.*)\?/i);
-  const timeStr = timeMatch ? timeMatch[1] : "";
-  cell.textContent = `Bitcoin price today at ${timeStr}?`;
-  cell.style.color = "white";
-}
-
-// Initial calls and interval
-fetchMarketTitleRaw();
-updateStrikePanelMarketTitle();
-setInterval(fetchMarketTitleRaw, 5000);
-setInterval(updateStrikePanelMarketTitle, 5000);
-
+// fetchMarketTitleRaw() and updateStrikePanelMarketTitle() moved to live-data.js
 
 // TTC clock for strike panel right cell (NEW IMPLEMENTATION)
-let cachedTTC = null;
-let lastFetchTimestamp = 0;
-
-function formatTTC(seconds) {
-  if (seconds === null || seconds === undefined || isNaN(seconds)) {
-    return '--:--';
-  }
-  const m = String(Math.floor(seconds / 60)).padStart(2, '0');
-  const s = String(seconds % 60).padStart(2, '0');
-  return `${m}:${s}`;
-}
-
-function updateClockDisplay() {
-  const ttcEl = document.getElementById('strikePanelTTC');
-  if (!ttcEl || cachedTTC === null) return;
-
-  ttcEl.textContent = formatTTC(cachedTTC);
-
-  ttcEl.style.backgroundColor = '';
-  ttcEl.style.color = '';
-  ttcEl.style.borderRadius = '';
-  ttcEl.style.padding = '';
-
-  if (cachedTTC >= 0 && cachedTTC <= 180) {
-    ttcEl.style.backgroundColor = '#d2372b';
-    ttcEl.style.color = '#fff';
-    ttcEl.style.borderRadius = '6px';
-    ttcEl.style.padding = '0 10px';
-  } else if (cachedTTC <= 300) {
-    ttcEl.style.backgroundColor = '#ffc107';
-    ttcEl.style.color = '#fff';
-    ttcEl.style.borderRadius = '6px';
-    ttcEl.style.padding = '0 10px';
-  } else if (cachedTTC <= 720) {
-    ttcEl.style.backgroundColor = '#45d34a';
-    ttcEl.style.color = '#fff';
-    ttcEl.style.borderRadius = '6px';
-    ttcEl.style.padding = '0 10px';
-  } else if (cachedTTC <= 900) {
-    ttcEl.style.backgroundColor = '#ffc107';
-    ttcEl.style.color = '#fff';
-    ttcEl.style.borderRadius = '6px';
-    ttcEl.style.padding = '0 10px';
-  }
-}
-
-async function fetchAndCacheTTC() {
-  try {
-    const res = await fetch('/core');
-    const data = await res.json();
-    cachedTTC = data.ttc_seconds;
-    lastFetchTimestamp = Date.now();
-  } catch {
-    cachedTTC = null;
-  }
-}
-
-setInterval(() => {
-  if (cachedTTC !== null) {
-    cachedTTC = Math.max(0, cachedTTC - 1);
-  }
-  updateClockDisplay();
-
-  if (Date.now() - lastFetchTimestamp > 10000) {
-    fetchAndCacheTTC();
-  }
-}, 1000);
-
-fetchAndCacheTTC();
+// formatTTC(), updateClockDisplay(), fetchAndCacheTTC() moved to live-data.js
+// TTC polling intervals moved to live-data.js
 
 // === WATCHLIST FUNCTIONALITY ===
 let watchlistData = [];
@@ -2625,33 +2269,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    function fetchCore() {
-      fetch('/core')
-        .then(response => response.json())
-        .then(data => {
-          window.momentumData.deltas['1m'] = data.delta_1m;
-          window.momentumData.deltas['2m'] = data.delta_2m;
-          window.momentumData.deltas['3m'] = data.delta_3m;
-          window.momentumData.deltas['4m'] = data.delta_4m;
-          window.momentumData.deltas['15m'] = data.delta_15m;
-          window.momentumData.deltas['30m'] = data.delta_30m;
-
-          window.momentumData.weightedScore = (
-            window.momentumData.deltas['1m'] * 0.3 +
-            window.momentumData.deltas['2m'] * 0.25 +
-            window.momentumData.deltas['3m'] * 0.2 +
-            window.momentumData.deltas['4m'] * 0.15 +
-            window.momentumData.deltas['15m'] * 0.05 +
-            window.momentumData.deltas['30m'] * 0.05
-          );
-
-          updateMomentumPanel();
-        })
-        .catch(console.error);
-    }
-
-    fetchCore();
-    // setInterval(fetchCore, 1000); // Replaced by staggered polling below
+    // fetchCore() moved to live-data.js
 
     // Draw rolling momentum chart in the third table
     function drawRollingMomentumChart() {

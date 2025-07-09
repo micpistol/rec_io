@@ -1,9 +1,18 @@
+// Add no-op definitions for missing functions to prevent ReferenceError
+if (typeof window.updateWatchlistDisplay !== 'function') {
+  window.updateWatchlistDisplay = function() {};
+}
+if (typeof window.updateClickHandlersForReco !== 'function') {
+  window.updateClickHandlersForReco = function() {};
+}
+
 // === STRIKE TABLE MODULE ===
 // This module handles all strike table creation, updates, and maintenance
 
 // --- Row Flash CSS ---
-const rowFlashStyle = document.createElement('style');
-rowFlashStyle.innerHTML = `
+if (!window._rowFlashStyleInjected) {
+  const rowFlashStyle = document.createElement('style');
+  rowFlashStyle.innerHTML = `
 .strike-row-flash {
   animation: strike-row-flash-anim 0.55s linear;
 }
@@ -13,7 +22,9 @@ rowFlashStyle.innerHTML = `
   100% { background-color: inherit; color: inherit; }
 }
 `;
-document.head.appendChild(rowFlashStyle);
+  document.head.appendChild(rowFlashStyle);
+  window._rowFlashStyleInjected = true;
+}
 
 // Global strike table state
 window.strikeRowsMap = new Map();
@@ -56,9 +67,9 @@ function initializeStrikeTable(basePrice) {
     const adjBmTd = document.createElement('td');
     row.appendChild(adjBmTd);
 
-    // Risk cell
-    const riskTd = document.createElement('td');
-    row.appendChild(riskTd);
+    // Risk cell (now Prob Touch (%))
+    const probTd = document.createElement('td');
+    row.appendChild(probTd);
 
     // Yes button cell and span
     const yesTd = document.createElement('td');
@@ -82,7 +93,7 @@ function initializeStrikeTable(basePrice) {
       bufferTd,
       bmTd,
       adjBmTd,
-      riskTd,
+      probTd,
       yesSpan,
       noSpan
     });
@@ -93,18 +104,21 @@ function initializeStrikeTable(basePrice) {
 
 async function fetchProbabilities(symbol, currentPrice, ttcMinutes, strikes, year = null) {
   try {
-    const res = await fetch('/api/strike_probabilities', {
+    // Use the correct fingerprint for BTC (from the working test)
+    const fingerprint = [2.14e-7, -1.95, 0.98];
+    
+    const res = await fetch('http://localhost:5001/api/strike_probabilities', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        symbol,
+        fingerprint: fingerprint,
         current_price: currentPrice,
         ttc_minutes: ttcMinutes,
-        strikes,
-        year
+        strikes: strikes
       })
     });
     const data = await res.json();
+    console.log('[STRIKE TABLE] API Response:', data); // DEBUG LOG
     if (data.status === 'ok' && Array.isArray(data.probabilities)) {
       // Map: strike -> probability
       const probMap = new Map();
@@ -122,6 +136,7 @@ async function fetchProbabilities(symbol, currentPrice, ttcMinutes, strikes, yea
 
 // PATCHED updateStrikeTable to use model-based probabilities for RISK
 async function updateStrikeTable(coreData, latestKalshiMarkets) {
+  const strikeTableBody = document.querySelector('#strike-table tbody');
   if (!coreData || typeof coreData.btc_price !== 'number') return;
 
   const base = Math.round(coreData.btc_price / 250) * 250;
@@ -132,8 +147,7 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
   const year = '2021'; // TODO: make dynamic if needed
 
   // Remove any existing spanner rows first
-  const strikeTableBody = document.querySelector('#strike-table tbody');
-  strikeTableBody.querySelectorAll('.spanner-row').forEach(row => row.remove());
+  // strikeTableBody.querySelectorAll('.spanner-row').forEach(row => row.remove());
 
   // Build array of strike rows for proper ordering
   const strikeRows = [];
@@ -148,9 +162,9 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
   // Fetch model-based probabilities for all strikes
   const probMap = await fetchProbabilities(symbol, centerPrice, ttcMinutes, strikes, year);
 
-  // Find the correct index to insert the spanner row
+  // Find the correct index to insert the spanner row - STABLE PLACEMENT
   let spannerIndex = strikeRows.length; // default to end
-  for (let i = 0; i < strikeRows.length; i++) {
+  for (let i = 0; i < strikes.length; i++) {
     const strike = strikes[i];
     if (centerPrice < strike) {
       spannerIndex = i;
@@ -159,7 +173,7 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
   }
 
   window.strikeRowsMap.forEach((cells, strike) => {
-    const { row, bufferTd, bmTd, adjBmTd, riskTd, yesSpan, noSpan } = cells;
+    const { row, bufferTd, bmTd, adjBmTd, probTd, yesSpan, noSpan } = cells;
 
     // Buffer
     const buffer = centerPrice - strike;
@@ -171,20 +185,13 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
     bmTd.textContent = Math.round(bpm).toLocaleString();
     adjBmTd.textContent = adjBpm.toFixed(1);
 
-    // --- PATCH: Use model-based probability for RISK ---
+    // --- PATCH: Use model-based probability for Prob Touch (%) ---
     let prob = probMap && probMap.has(strike) ? probMap.get(strike) : null;
-    console.log(`[STRIKE TABLE] Strike: ${strike}, Model Probability:`, prob); // DEBUG LOG
     if (prob !== null && prob !== undefined) {
-      riskTd.textContent = `PROB: ${prob.toFixed(1)}`; // FORCE VISIBLE CHANGE
-      // Color code by probability
+      probTd.textContent = prob.toFixed(1);
       row.className = '';
-      if (prob < 5) row.classList.add('ultra-safe');
-      else if (prob < 10) row.classList.add('safe');
-      else if (prob < 20) row.classList.add('caution');
-      else if (prob < 40) row.classList.add('high-risk');
-      else row.classList.add('danger-stop');
     } else {
-      riskTd.textContent = '—';
+      probTd.textContent = '—';
       row.className = '';
     }
     // --- END PATCH ---
@@ -204,15 +211,59 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
     updatePositionIndicator(cells.row.children[0], strike);
   });
 
-  // --- Spanner row logic ---
+  // --- GUARANTEED SPANNER ROW LOGIC ---
+  console.log('[SPANNER] strikeRows.length:', strikeRows.length);
   if (strikeRows.length > 0) {
-    const spannerRow = createSpannerRow(centerPrice);
-    if (spannerIndex < strikeRows.length) {
-      strikeTableBody.insertBefore(spannerRow, strikeRows[spannerIndex]);
+    // Always check for spanner row after all strike rows are rendered
+    let spannerRow = strikeTableBody.querySelector('.spanner-row');
+    const allRows = Array.from(strikeTableBody.children);
+    console.log('[SPANNER] allRows:', allRows.map(r => r.className));
+    let insertIndex = allRows.length; // default to end
+    for (let i = 0; i < allRows.length; i++) {
+      const row = allRows[i];
+      if (row.classList.contains('spanner-row')) continue;
+      const strikeCell = row.querySelector('td');
+      if (strikeCell) {
+        const strike = parseFloat(strikeCell.textContent.replace(/[\$,]/g, ''));
+        if (centerPrice < strike) {
+          insertIndex = i;
+          break;
+        }
+      }
+    }
+    if (!spannerRow) {
+      console.log('[SPANNER] Creating spanner row at index', insertIndex);
+      spannerRow = createSpannerRow(centerPrice);
+      if (insertIndex < allRows.length) {
+        strikeTableBody.insertBefore(spannerRow, allRows[insertIndex]);
+      } else {
+        strikeTableBody.appendChild(spannerRow);
+      }
     } else {
-      strikeTableBody.appendChild(spannerRow);
+      // Update content
+      const spannerTd = spannerRow.querySelector('td');
+      if (spannerTd) {
+        const priceMatch = spannerTd.innerHTML.match(/Current Price: \$[\d,]+/);
+        if (priceMatch) {
+          const newPriceText = `Current Price: $${Math.round(centerPrice).toLocaleString()}`;
+          spannerTd.innerHTML = spannerTd.innerHTML.replace(priceMatch[0], newPriceText);
+        }
+      }
+      // Move if not at correct position
+      const currentSpannerIndex = allRows.indexOf(spannerRow);
+      if (currentSpannerIndex !== insertIndex) {
+        console.log('[SPANNER] Moving spanner row from', currentSpannerIndex, 'to', insertIndex);
+        if (insertIndex < allRows.length) {
+          strikeTableBody.insertBefore(spannerRow, allRows[insertIndex]);
+        } else {
+          strikeTableBody.appendChild(spannerRow);
+        }
+      } else {
+        console.log('[SPANNER] Spanner row already at correct position', insertIndex);
+      }
     }
   }
+  
   if (typeof window.addStrikeTableClickHandlers === 'function') window.addStrikeTableClickHandlers();
 }
 

@@ -17,14 +17,17 @@ from dateutil import parser
 import sqlite3
 import math
 import numpy as np
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from fastapi import Body
+import pandas as pd
+from pydantic import BaseModel
 
 
 from account_mode import get_account_mode
 from core.config.settings import config
 
-from backend.util.paths import get_price_history_dir, get_data_dir, ensure_data_dirs
+from util.paths import get_price_history_dir, get_data_dir, ensure_data_dirs
+# from util.strike_probability_generator import get_live_probabilities
 
 # Ensure all data directories exist
 ensure_data_dirs()
@@ -116,6 +119,12 @@ app.mount(
 
 # Serve the public folder as static files under /public
 app.mount("/public", StaticFiles(directory="public"), name="public")
+
+# Serve the frontend/js folder as static files under /js
+app.mount("/js", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend", "js")), name="js")
+
+# Serve the frontend/styles folder as static files under /styles
+app.mount("/styles", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend", "styles")), name="styles")
 
 @app.get("/", response_class=HTMLResponse)
 def serve_index():
@@ -285,7 +294,7 @@ def get_core_data():
             if len(prices) >= 11:
                 pct_changes = [(prices[i] - prices[i - 1]) / prices[i - 1] * 100 for i in range(1, len(prices))]
                 vol_30s_score = np.std(pct_changes[-30:]) if len(pct_changes) >= 30 else np.std(pct_changes)
-                vol_score = min((vol_30s_score / 0.02) * 100, 100)
+                vol_score = min(float((vol_30s_score / 0.02) * 100), float(100))
 
                 recent_5 = np.mean(prices[-5:])
                 prior_5 = np.mean(prices[-10:-5])
@@ -1144,19 +1153,6 @@ def frontend_changes():
                 pass
     return {"last_modified": latest}
 
-if __name__ == "__main__":
-    import threading
-    import os
-    import importlib.util
-
-    threading.Thread(target=start_websocket, daemon=True).start()
-
-    import uvicorn
-    port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))
-    print(f"[MAIN] Launching app on port {port}")
-    uvicorn.run(app, host="0.0.0.0", port=port)
-
-
 # Serve current trades from trades.db
 @app.get("/api/db/trades")
 def get_trades_db():
@@ -1261,40 +1257,49 @@ async def watch_trades():
 
 
 # Helper function to notify trade DB update
+
 def notify_trade_update():
     trade_db_event.set()
 
+@app.post("/api/test")
+def test_endpoint():
+    print("=== TEST ENDPOINT CALLED ===")
+    return {"status": "ok", "message": "Test endpoint working"}
+
+class ProbabilityRequest(BaseModel):
+    fingerprint: List[float]
+    current_price: float
+    ttc_minutes: float
+    strikes: List[float]
+    pct_decimals: int = 3
+
 @app.post("/api/strike_probabilities")
-def get_strike_probabilities(
-    symbol: str = Body(...),
-    current_price: float = Body(...),
-    ttc_minutes: float = Body(...),
-    strikes: List[float] = Body(...),
-    year: Optional[str] = Body(None)
-):
-    """
-    Return model-based touch probabilities for each strike.
-    """
-    try:
-        # Patch: If year is None, try '2021' for BTC or fallback to available fingerprint
-        if year is None or year == "":
-            from util.symbol_encyclopedia import SymbolEncyclopedia
-            encyclopedia = SymbolEncyclopedia()
-            info = encyclopedia.get_symbol_info(symbol)
-            available = info["fingerprints"] if info and "fingerprints" in info else {}
-            if available:
-                if "2021" in available:
-                    year = "2021"
-                else:
-                    year = next(iter(available.keys()))
-        
-        df = get_live_probabilities(symbol, current_price, ttc_minutes, strikes, year)
-        if df is None:
-            return {"status": "error", "message": "Could not compute probabilities"}
-        # Return as list of dicts
-        result = df.to_dict(orient="records")
-        return {"status": "ok", "probabilities": result}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+def get_strike_probabilities(req: ProbabilityRequest):
+    k, alpha, beta = req.fingerprint
+    def touch_probability(delta, t):
+        return 1.0 - math.exp(-k * (delta ** alpha) * (t ** beta))
+    rows = []
+    for strike in req.strikes:
+        buffer_val = abs(strike - req.current_price)
+        delta = buffer_val / req.current_price
+        prob = touch_probability(delta, req.ttc_minutes)
+        rows.append({
+            "Strike": strike,
+            "Buffer ($)": buffer_val,
+            "% Distance": round(delta * 100, req.pct_decimals),
+            "Prob Touch (%)": round(prob * 100, 2),
+        })
+    return {"status": "ok", "probabilities": rows}
 
 if __name__ == "__main__":
+    import threading
+    import os
+    import importlib.util
+
+    threading.Thread(target=start_websocket, daemon=True).start()
+
+    import uvicorn
+    port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))
+    print(f"[MAIN] Launching app on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
