@@ -189,13 +189,23 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
     let prob = probMap && probMap.has(strike) ? probMap.get(strike) : null;
     if (prob !== null && prob !== undefined) {
       // Invert the probability for display
-      probTd.textContent = (100 - prob).toFixed(1);
+      let displayProb = (100 - prob);
+      probTd.textContent = displayProb.toFixed(1);
       row.className = '';
+      // --- RISK COLOR PATCH (UPDATED BANDS, INVERTED) ---
+      row.classList.remove('ultra-safe', 'safe', 'caution', 'high-risk', 'danger-stop');
+      let riskClass = '';
+      if (displayProb >= 98) riskClass = 'ultra-safe'; // bright green
+      else if (displayProb >= 95) riskClass = 'safe'; // light green
+      else if (displayProb >= 80) riskClass = 'caution'; // yellow
+      else riskClass = 'high-risk'; // red
+      row.classList.add(riskClass);
+      // --- END PATCH ---
     } else {
       probTd.textContent = '—';
       row.className = '';
+      row.classList.remove('ultra-safe', 'safe', 'caution', 'high-risk', 'danger-stop');
     }
-    // --- END PATCH ---
 
     // Find markets for yes/no asks - use more flexible matching
     const matchingMarket = latestKalshiMarkets.find(m => {
@@ -290,9 +300,11 @@ async function updatePositionIndicator(strikeCell, strike) {
     
     // Update visual indicator
     if (hasPosition) {
+      console.log('[DEBUG] Setting background color for', strikeCell, 'to #1a2a1a');
       strikeCell.style.backgroundColor = '#1a2a1a'; // Very subtle green tint
       strikeCell.style.borderLeft = '3px solid #45d34a'; // Green left border
     } else {
+      console.log('[DEBUG] Clearing background color for', strikeCell);
       strikeCell.style.backgroundColor = '';
       strikeCell.style.borderLeft = '';
     }

@@ -690,7 +690,7 @@
           </label>
         </div>
         <div style="display: flex; flex-direction: row; align-items: stretch;">
-          <table id="strike-table" class="strike-table" style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
+          <table id="watchlist-table" class="strike-table" style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
             
             <colgroup>
               <col class="col-strike">
@@ -1265,21 +1265,43 @@ window.CurrentMarketTitleRaw = "";
 // TTC polling intervals moved to live-data.js
 
 // === WATCHLIST FUNCTIONALITY ===
-if (typeof window.ignoreWsUpdates === 'undefined') {
-  window.ignoreWsUpdates = false;
-}
-let ignoreWsUpdates = window.ignoreWsUpdates;
-// If you still get redeclaration errors, check for duplicate <script src="strike-table.js"> or similar tags in your HTML.
+console.log('=== WATCHLIST SCRIPT STARTING ===');
+console.log('Document ready state:', document.readyState);
+console.log('Strike table exists:', !!document.getElementById('strike-table'));
+console.log('All elements with "strike" in ID:', document.querySelectorAll('[id*="strike"]').length);
+
 let watchlistData = [];
+let ignoreWsUpdates = false; // Add missing variable declaration
 let watchlistRowsMap = new Map(); // Persistent watchlist rows
+
+// Immediate test to see if strike table exists
+console.log('=== WATCHLIST SCRIPT LOADED ===');
+setTimeout(() => {
+  const strikeTable = document.getElementById('strike-table');
+  console.log('Immediate strike table check:', !!strikeTable);
+  if (strikeTable) {
+    console.log('Strike table found, rows:', strikeTable.querySelectorAll('tbody tr').length);
+  }
+}, 100);
+
+// Manual test function - call this from console to test
+window.testWatchlistClickHandlers = function() {
+  console.log('Manual test: calling addStrikeTableClickHandlers');
+  addStrikeTableClickHandlers();
+};
 
 // Load watchlist from preferences on page load
 async function loadWatchlistFromPreferences() {
+  console.log('loadWatchlistFromPreferences called');
   try {
+    console.log('Fetching watchlist from /api/get_watchlist');
     const response = await fetch('/api/get_watchlist');
+    console.log('Watchlist response status:', response.status);
     const data = await response.json();
+    console.log('Watchlist response data:', data);
     watchlistData = data.watchlist || [];
     console.log('Loaded watchlist from preferences:', watchlistData);
+    console.log('Calling updateWatchlistDisplay');
     updateWatchlistDisplay();
   } catch (error) {
     console.error('Error loading watchlist from preferences:', error);
@@ -1336,11 +1358,21 @@ function removeFromWatchlist(strike) {
 
 // Function to update the watchlist display with persistent rows
 function updateWatchlistDisplay() {
+  console.log('updateWatchlistDisplay called with watchlistData:', watchlistData);
   const watchlistBody = document.getElementById('watchlist-body');
-  if (!watchlistBody) return;
+  console.log('watchlistBody found:', !!watchlistBody);
+  if (!watchlistBody) {
+    console.error('watchlist-body element not found');
+    return;
+  }
   const strikeTable = document.getElementById('strike-table');
-  if (!strikeTable) return;
+  console.log('strikeTable found:', !!strikeTable);
+  if (!strikeTable) {
+    console.error('strike-table element not found');
+    return;
+  }
   const strikeRows = Array.from(strikeTable.querySelectorAll('tbody tr'));
+  console.log('strikeRows found:', strikeRows.length);
 
   // Build a map of strike value to strike table row
   const strikeRowMap = new Map();
@@ -1621,31 +1653,22 @@ function createSpannerRow(currentPrice) {
 
 // Function to add click handlers to strike table rows
 function addStrikeTableClickHandlers() {
+  console.log('addStrikeTableClickHandlers called');
   const strikeTable = document.getElementById('strike-table');
-  if (!strikeTable) return;
+  console.log('strikeTable found:', !!strikeTable);
+  if (!strikeTable) {
+    console.error('strike-table element not found');
+    return;
+  }
   
   const rows = strikeTable.querySelectorAll('tbody tr');
-  rows.forEach(row => {
+  console.log('Found strike table rows:', rows.length);
+  rows.forEach((row, index) => {
+    console.log(`Adding click handler to row ${index}`);
     // Remove existing click handlers first
     row.removeEventListener('click', row._watchlistClickHandler);
     
-    // Check if RECO is enabled - if so, don't add click handlers
-    if (window.recoEnabled) {
-      row.style.cursor = 'default';
-      row.title = 'RECO mode - manual selection disabled';
-      Array.from(row.children).forEach((cell, idx) => {
-        if (idx >= 0 && idx <= 4) {
-          cell.style.cursor = 'default';
-          cell.title = 'RECO mode - manual selection disabled';
-        } else {
-          cell.style.cursor = 'default';
-          cell.title = '';
-        }
-      });
-      return; // Skip adding click handlers when RECO is enabled
-    }
-    
-    // RECO is disabled - add normal click handlers
+    // Always allow manual watchlist addition, regardless of RECO state
     row.style.cursor = '';
     row.title = '';
     Array.from(row.children).forEach((cell, idx) => {
@@ -1659,39 +1682,74 @@ function addStrikeTableClickHandlers() {
     });
     
     const clickHandler = (event) => {
+      console.log('Strike table row clicked:', event.target);
       // Only trigger if not clicking on YES or NO columns (6 or 7)
       const cell = event.target.closest('td');
-      if (!cell) return;
+      if (!cell) {
+        console.log('No cell found, returning');
+        return;
+      }
       const cellIndex = Array.from(row.children).indexOf(cell);
-      if (cellIndex === 5 || cellIndex === 6) return; // YES or NO columns
+      console.log('Cell index:', cellIndex);
+      if (cellIndex === 5 || cellIndex === 6) {
+        console.log('Clicked on YES/NO column, returning');
+        return; // YES or NO columns
+      }
+      console.log('Calling addToWatchlist with row:', row);
       addToWatchlist(row);
     };
     
     row._watchlistClickHandler = clickHandler;
     row.addEventListener('click', clickHandler);
+    console.log(`Click handler added to row ${index}`);
   });
+  console.log('addStrikeTableClickHandlers completed');
 }
 
 // Initialize watchlist functionality
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('Watchlist DOMContentLoaded event triggered');
+  
+  // Debug: Check if strike table exists
+  const strikeTable = document.getElementById('strike-table');
+  console.log('strike-table element found:', !!strikeTable);
+  if (strikeTable) {
+    console.log('strike-table innerHTML length:', strikeTable.innerHTML.length);
+    console.log('strike-table tbody rows:', strikeTable.querySelectorAll('tbody tr').length);
+  }
+  
+  // Debug: Log all elements with 'strike' in their ID or class
+  const allElements = document.querySelectorAll('*');
+  const strikeElements = Array.from(allElements).filter(el => 
+    (el.id && el.id.includes('strike')) || 
+    (el.className && el.className.includes('strike'))
+  );
+  console.log('Elements with "strike" in ID or class:', strikeElements.length);
+  strikeElements.forEach(el => console.log('Strike element:', el.id, el.className));
+  
   // Load watchlist from preferences on page load
   loadWatchlistFromPreferences();
   
   // Add click handlers to existing strike table rows
+  console.log('Calling addStrikeTableClickHandlers from DOMContentLoaded');
   addStrikeTableClickHandlers();
   
   // Also add handlers when strike table is updated
   const originalUpdateStrikeTable = window.updateStrikeTable;
   if (originalUpdateStrikeTable) {
+    console.log('Wrapping updateStrikeTable to add click handlers');
     window.updateStrikeTable = function(...args) {
       originalUpdateStrikeTable.apply(this, args);
       setTimeout(() => {
+        console.log('updateStrikeTable completed, adding click handlers');
         addStrikeTableClickHandlers();
         updateWatchlistDisplay(); // Update watchlist after strike table updates
         updateWatchlistBasedOnReco(); // Apply RECO filtering if enabled
         updateClickHandlersForReco(); // Update click handlers based on RECO state
       }, 100); // Small delay to ensure rows are rendered
     };
+  } else {
+    console.log('originalUpdateStrikeTable not found');
   }
 });
 

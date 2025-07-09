@@ -75,7 +75,7 @@ function removeFromWatchlist(strike) {
 function updateWatchlistDisplay() {
   const watchlistBody = document.getElementById('watchlist-body');
   if (!watchlistBody) return;
-  const strikeTable = document.getElementById('strike-table');
+  const strikeTable = document.getElementById('watchlist-table');
   if (!strikeTable) return;
   const strikeRows = Array.from(strikeTable.querySelectorAll('tbody tr'));
 
