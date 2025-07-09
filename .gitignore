@@ -1,9 +1,25 @@
 # Global file ignore
 
+# Database files
 *.db
+*.sqlite
+*.sqlite3
+
+# Log files
 *.log
 *.log.*
-**/*.json
+logs/
+**/logs/
+
+# Data files
+**/data/
+backend/data/
+backend/data/kalshi/
+backend/data/price_history/
+backend/data/markets/
+
+# Large CSV files
+*.csv
 
 # Virtual environments
 venv/
@@ -18,19 +34,20 @@ __pycache__/
 # Mac system files
 .DS_Store
 
-# Data files
-**/data/*
-
 # Kalshi credentials and private info
 backend/api/kalshi-api/kalshi-credentials/
 *.pem
 .env
 
 # Log and debug files
-*.log
 *.sqlite3
 backend/api/coinbase-api/coinbase-btc/data/btc_logger_heartbeat.txt
 backend/api/coinbase-api/coinbase-btc/data/btc_price_log.txt
 backend/api/kalshi-api/data/latest_market_snapshot.json
 backend/api/kalshi-api/data/kalshi_logger_heartbeat.txt
 logs/main_app.out.log.1
+
+# Temporary files
+*.tmp
+*.temp
+changes.patch
