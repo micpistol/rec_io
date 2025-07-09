@@ -175,7 +175,7 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
     let prob = probMap && probMap.has(strike) ? probMap.get(strike) : null;
     console.log(`[STRIKE TABLE] Strike: ${strike}, Model Probability:`, prob); // DEBUG LOG
     if (prob !== null && prob !== undefined) {
-      riskTd.textContent = prob.toFixed(1); // Show probability as a decimal
+      riskTd.textContent = `PROB: ${prob.toFixed(1)}`; // FORCE VISIBLE CHANGE
       // Color code by probability
       row.className = '';
       if (prob < 5) row.classList.add('ultra-safe');
