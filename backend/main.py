@@ -17,6 +17,8 @@ from dateutil import parser
 import sqlite3
 import math
 import numpy as np
+from typing import List, Optional
+from fastapi import Body
 
 
 from account_mode import get_account_mode
@@ -1261,3 +1263,38 @@ async def watch_trades():
 # Helper function to notify trade DB update
 def notify_trade_update():
     trade_db_event.set()
+
+@app.post("/api/strike_probabilities")
+def get_strike_probabilities(
+    symbol: str = Body(...),
+    current_price: float = Body(...),
+    ttc_minutes: float = Body(...),
+    strikes: List[float] = Body(...),
+    year: Optional[str] = Body(None)
+):
+    """
+    Return model-based touch probabilities for each strike.
+    """
+    try:
+        # Patch: If year is None, try '2021' for BTC or fallback to available fingerprint
+        if year is None or year == "":
+            from util.symbol_encyclopedia import SymbolEncyclopedia
+            encyclopedia = SymbolEncyclopedia()
+            info = encyclopedia.get_symbol_info(symbol)
+            available = info["fingerprints"] if info and "fingerprints" in info else {}
+            if available:
+                if "2021" in available:
+                    year = "2021"
+                else:
+                    year = next(iter(available.keys()))
+        
+        df = get_live_probabilities(symbol, current_price, ttc_minutes, strikes, year)
+        if df is None:
+            return {"status": "error", "message": "Could not compute probabilities"}
+        # Return as list of dicts
+        result = df.to_dict(orient="records")
+        return {"status": "ok", "probabilities": result}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+if __name__ == "__main__":

@@ -1,0 +1,33 @@
+{
+  "fingerprint": {
+    "k": 2.1379154382551622e-07,
+    "alpha": -1.9500290227220016,
+    "beta": 0.9793682424805904
+  },
+  "metadata": {
+    "source_file": "composite_strike_touch_probabilities_excl_2021.csv",
+    "created": "2025-07-09T11:02:03.782210",
+    "data_points": 64,
+    "ttc_range": {
+      "min": 1,
+      "max": 15
+    },
+    "delta_range": {
+      "min": 0.0025,
+      "max": 0.0125
+    },
+    "probability_range": {
+      "min": 0.002,
+      "max": 0.29
+    }
+  },
+  "fit_statistics": {
+    "r_squared": 0.9956968354663674,
+    "mse": 2.5824618296009358e-05,
+    "mae": 0.004361176118718741
+  },
+  "model": {
+    "equation": "P_touch = 1 - exp(-k * delta^alpha * t^beta)",
+    "description": "Generalized exponential model for touch probability"
+  }
+}
