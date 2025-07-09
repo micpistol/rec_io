@@ -173,8 +173,9 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
 
     // --- PATCH: Use model-based probability for RISK ---
     let prob = probMap && probMap.has(strike) ? probMap.get(strike) : null;
+    console.log(`[STRIKE TABLE] Strike: ${strike}, Model Probability:`, prob); // DEBUG LOG
     if (prob !== null && prob !== undefined) {
-      riskTd.textContent = prob.toFixed(1); // Removed % symbol
+      riskTd.textContent = prob.toFixed(1); // Show probability as a decimal
       // Color code by probability
       row.className = '';
       if (prob < 5) row.classList.add('ultra-safe');
