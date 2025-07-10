@@ -154,6 +154,7 @@ function updateWatchlistDisplay() {
             cell.style.cursor = 'pointer';
             cell.title = 'Click to remove from watchlist';
             cell.onclick = () => removeFromWatchlist(strike);
+            cell.classList.add('center'); // Ensure border/gridline class
           } else {
             cell.textContent = '—';
           }
@@ -169,6 +170,7 @@ function updateWatchlistDisplay() {
             newCell.style.cursor = 'pointer';
             newCell.title = 'Click to remove from watchlist';
             newCell.onclick = () => removeFromWatchlist(strike);
+            newCell.classList.add('center'); // Ensure border/gridline class
           } else {
             newCell.style.cursor = '';
             newCell.title = '';
