@@ -135,7 +135,7 @@
     user-select: none;
     border: 1px solid #ccc;
     transition: background-color 0.2s ease;
-    cursor: default;
+    cursor: pointer !important;
   }
   .price-box:hover {
     background-color: rgba(0, 0, 0, 0.1);
@@ -249,7 +249,7 @@
     user-select: none;
     border: 1px solid #ccc;
     transition: background-color 0.2s ease;
-    cursor: default;
+    cursor: pointer;
   }
 
   .price-box:hover {
@@ -337,6 +337,16 @@
     font-style: italic;
     height: 25px;
     padding: 2px 4px;
+  }
+  
+  /* Ensure clickable elements show pointer cursor */
+  .clickable, [onclick], [data-clickable="true"] {
+    cursor: pointer !important;
+  }
+  
+  /* Ensure nav items show pointer cursor */
+  .nav-item {
+    cursor: pointer !important;
   }
 </style>
 <style>
@@ -1669,9 +1679,24 @@ function addStrikeTableClickHandlers() {
     // Remove existing click handlers first
     row.removeEventListener('click', row._watchlistClickHandler);
     
-    // Always allow manual watchlist addition, regardless of RECO state
-    row.style.cursor = '';
-    row.title = '';
+    // Check if RECO is enabled - if so, don't add click handlers
+    if (window.recoEnabled) {
+      row.style.cursor = 'default';
+      row.title = 'RECO mode - manual selection disabled';
+      Array.from(row.children).forEach((cell, idx) => {
+        if (idx >= 0 && idx <= 4) {
+          cell.style.cursor = 'default';
+          cell.title = 'RECO mode - manual selection disabled';
+        } else {
+          cell.style.cursor = 'default';
+          cell.title = '';
+        }
+      });
+      return; // Skip adding click handlers when RECO is enabled
+    }
+    // RECO is disabled - add normal click handlers
+    row.style.cursor = 'pointer';
+    row.title = 'Click to add to watchlist';
     Array.from(row.children).forEach((cell, idx) => {
       if (idx >= 0 && idx <= 4) {
         cell.style.cursor = 'pointer';
