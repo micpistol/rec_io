@@ -276,6 +276,10 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
   }
   
   if (typeof window.addStrikeTableClickHandlers === 'function') window.addStrikeTableClickHandlers();
+  // PATCH: Force full watchlist rebuild after table is fully rendered, after all DOM updates
+  if (typeof window.rebuildWatchlistFromStrikeTable === 'function') setTimeout(window.rebuildWatchlistFromStrikeTable, 0);
+  // PATCH: Only load and render the watchlist after the strike table is fully rendered
+  if (typeof window.loadWatchlistFromPreferences === 'function') setTimeout(window.loadWatchlistFromPreferences, 0);
 }
 
 // === POSITION INDICATOR ===
@@ -633,12 +637,34 @@ function createSpannerRow(currentPrice) {
 
 // === Add-to-Watchlist Click Handlers ===
 function addStrikeTableClickHandlers() {
+  console.log('[DEBUG] addStrikeTableClickHandlers called');
   const strikeTable = document.getElementById('strike-table');
-  if (!strikeTable) return;
+  if (!strikeTable) {
+    console.log('[DEBUG] Strike table not found');
+    return;
+  }
+  
+  // Add a test click handler to the table itself to see if any clicks are being captured
+  strikeTable.addEventListener('click', (event) => {
+    console.log('[DEBUG] Table click captured:', event.target);
+  });
+  
+  // Add a document-level click handler to see if clicks are being captured at all
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('#strike-table')) {
+      console.log('[DEBUG] Document click captured for strike table:', event.target);
+    }
+  });
+  
   const rows = strikeTable.querySelectorAll('tbody tr');
+  console.log('[DEBUG] Found', rows.length, 'strike rows to attach handlers to');
   rows.forEach(row => {
     // Remove existing click handlers first
     row.removeEventListener('click', row._watchlistClickHandler);
+    
+    // Debug RECO state
+    console.log('[DEBUG] RECO enabled state:', window.recoEnabled);
+    
     // Check if RECO is enabled - if so, don't add click handlers
     if (window.recoEnabled) {
       row.style.cursor = 'default';
@@ -667,17 +693,52 @@ function addStrikeTableClickHandlers() {
       }
     });
     const clickHandler = (event) => {
+      console.log('[DEBUG] Click handler triggered for row:', row);
+      console.log('[DEBUG] Event target:', event.target);
+      console.log('[DEBUG] Event type:', event.type);
+      console.log('[DEBUG] Event bubbles:', event.bubbles);
+      console.log('[DEBUG] Event cancelable:', event.cancelable);
+      console.log('[DEBUG] Event defaultPrevented:', event.defaultPrevented);
+      
       // Only trigger if not clicking on YES or NO columns (6 or 7)
       const cell = event.target.closest('td');
-      if (!cell) return;
+      if (!cell) {
+        console.log('[DEBUG] No cell found, returning');
+        return;
+      }
       const cellIndex = Array.from(row.children).indexOf(cell);
-      if (cellIndex === 5 || cellIndex === 6) return; // YES or NO columns
-      if (typeof window.addToWatchlist === 'function') window.addToWatchlist(row);
+      console.log('[DEBUG] Cell index:', cellIndex);
+      if (cellIndex === 5 || cellIndex === 6) {
+        console.log('[DEBUG] Clicked on YES/NO column, returning');
+        return; // YES or NO columns
+      }
+      console.log('[DEBUG] Strike row clicked:', row, 'cellIndex:', cellIndex);
+      console.log('[DEBUG] addToWatchlist function exists:', typeof window.addToWatchlist === 'function');
+      if (typeof window.addToWatchlist === 'function') {
+        console.log('[DEBUG] Calling addToWatchlist...');
+        window.addToWatchlist(row);
+      } else {
+        console.error('[DEBUG] addToWatchlist function not found!');
+      }
     };
     row._watchlistClickHandler = clickHandler;
     row.addEventListener('click', clickHandler);
+    console.log('[DEBUG] Click handler attached to row:', row);
+    
+    // Test if the handler is actually attached
+    console.log('[DEBUG] Row event listeners after attachment:', row.onclick, row._watchlistClickHandler);
+    
+    // Test manual click trigger
+    setTimeout(() => {
+      console.log('[DEBUG] Testing manual click trigger on row:', row);
+      const clickEvent = new Event('click', { bubbles: true, cancelable: true });
+      row.dispatchEvent(clickEvent);
+    }, 1000);
   });
 }
 window.addStrikeTableClickHandlers = addStrikeTableClickHandlers;
 
 // === WATCHLIST FUNCTIONS moved to watchlist.js === 
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof window.addStrikeTableClickHandlers === 'function') window.addStrikeTableClickHandlers();
+}); 

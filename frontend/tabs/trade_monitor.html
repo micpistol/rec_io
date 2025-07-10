@@ -6,6 +6,7 @@
 <link rel="stylesheet" href="../styles/global.css">
 <script src="../js/live-data.js"></script>
 <script src="../js/strike-table.js"></script>
+<script src="../js/watchlist.js"></script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Trade Monitor</title>
@@ -1753,94 +1754,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// Function to apply RECO filtering criteria
-function applyRecoFilter(strikeRows) {
-  if (!window.recoEnabled) return []; // Return empty if RECO is off
-  
-  const filteredStrikes = [];
-  
-  strikeRows.forEach(row => {
-    const cells = Array.from(row.children);
-    if (cells.length < 7) return; // Need at least 7 columns
-    
-    // Get Adj B/M value (column 3, index 3)
-    const adjBmCell = cells[3];
-    const adjBmText = adjBmCell ? adjBmCell.textContent.trim() : '';
-    const adjBm = parseFloat(adjBmText.replace(/[^\d.-]/g, '')) || 0;
-    
-    // Get YES and NO prices (columns 5 and 6, indices 5 and 6)
-    const yesCell = cells[5];
-    const noCell = cells[6];
-    
-    let yesPrice = 0;
-    let noPrice = 0;
-    let yesActive = false;
-    let noActive = false;
-    
-    if (yesCell) {
-      const yesSpan = yesCell.querySelector('span');
-      if (yesSpan && !yesSpan.classList.contains('disabled')) {
-        yesPrice = parseFloat(yesSpan.textContent) || 0;
-        yesActive = true;
-      }
-    }
-    
-    if (noCell) {
-      const noSpan = noCell.querySelector('span');
-      if (noSpan && !noSpan.classList.contains('disabled')) {
-        noPrice = parseFloat(noSpan.textContent) || 0;
-        noActive = true;
-      }
-    }
-    
-    // Get the higher of the two active prices
-    const activePrice = Math.max(yesActive ? yesPrice : 0, noActive ? noPrice : 0);
-    
-    // Apply RECO criteria: Adj B/M > 25 AND active price ≤ 97
-    if (adjBm > 25 && activePrice <= 97 && activePrice > 0) {
-      // Get strike value from first column
-      const strikeCell = cells[0];
-      const strikeText = strikeCell ? strikeCell.textContent.trim() : '';
-      const strike = parseFloat(strikeText.replace(/[\$,]/g, '')) || 0;
-      
-      if (strike > 0) {
-        filteredStrikes.push(strike);
-      }
-    }
-  });
-  
-  console.log('RECO filter applied. Found', filteredStrikes.length, 'strikes meeting criteria');
-  return filteredStrikes;
-}
 
-// Function to update watchlist based on RECO state
-function updateWatchlistBasedOnReco() {
-  console.log('updateWatchlistBasedOnReco called, RECO enabled:', window.recoEnabled);
-  
-  if (window.recoEnabled) {
-    // RECO is ON - apply automatic filtering
-    console.log('Applying RECO filtering...');
-    const strikeTable = document.getElementById('strike-table');
-    if (!strikeTable) return;
-    
-    const strikeRows = Array.from(strikeTable.querySelectorAll('tbody tr'));
-    const filteredStrikes = applyRecoFilter(strikeRows);
-    
-    // Update watchlist with filtered strikes
-    watchlistData = filteredStrikes;
-    updateWatchlistDisplay();
-    saveWatchlistToPreferences();
-  } else {
-    // RECO is OFF - do absolutely nothing, don't touch the watchlist
-    console.log('RECO is OFF - leaving manual watchlist alone');
-  }
-}
 
-// Function to enable/disable click handlers based on RECO state
-function updateClickHandlersForReco() {
-  // Simply call addStrikeTableClickHandlers which now handles RECO state
-  addStrikeTableClickHandlers();
-}
+
+
 
 </script>
 

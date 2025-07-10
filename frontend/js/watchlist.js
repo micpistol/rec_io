@@ -28,7 +28,7 @@ async function saveWatchlistToPreferences() {
     return;
   }
   try {
-    console.log('Saving watchlist to preferences:', watchlistData);
+    console.log('About to POST to /api/set_watchlist with payload:', { watchlist: watchlistData });
     const response = await fetch('/api/set_watchlist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -37,6 +37,8 @@ async function saveWatchlistToPreferences() {
     console.log('Save response status:', response.status);
     if (!response.ok) {
       console.error('Save failed with status:', response.status);
+      const errorText = await response.text();
+      console.error('Error response body:', errorText);
     } else {
       console.log('Watchlist saved successfully');
     }
@@ -59,7 +61,9 @@ function addToWatchlist(strikeRow) {
   watchlistData.push(strike);
   console.log('Updated watchlistData:', watchlistData);
 
+  console.log('About to call updateWatchlistDisplay...');
   updateWatchlistDisplay();
+  console.log('About to call saveWatchlistToPreferences...');
   saveWatchlistToPreferences();
 }
 
@@ -75,9 +79,10 @@ function removeFromWatchlist(strike) {
 function updateWatchlistDisplay() {
   const watchlistBody = document.getElementById('watchlist-body');
   if (!watchlistBody) return;
-  const strikeTable = document.getElementById('watchlist-table');
-  if (!strikeTable) return;
-  const strikeRows = Array.from(strikeTable.querySelectorAll('tbody tr'));
+  // Always use the main strike table as the source
+  const mainStrikeTable = document.getElementById('strike-table');
+  if (!mainStrikeTable) return;
+  const strikeRows = Array.from(mainStrikeTable.querySelectorAll('tbody tr'));
 
   // Build a map of strike value to strike table row
   const strikeRowMap = new Map();
@@ -101,7 +106,6 @@ function updateWatchlistDisplay() {
   // Get current price for spanner row positioning
   const currentPriceEl = document.getElementById('btc-price-value');
   const currentPrice = currentPriceEl ? parseFloat(currentPriceEl.textContent.replace(/\$|,/g, '')) : 0;
-  console.log('Watchlist debug - currentPriceEl:', currentPriceEl, 'currentPrice:', currentPrice, 'watchlistData:', watchlistData);
   
   // Find the correct index to insert the spanner row
   let spannerIndex = watchlistData.length; // default to end
@@ -112,7 +116,6 @@ function updateWatchlistDisplay() {
       break;
     }
   }
-  console.log('Watchlist debug - spannerIndex:', spannerIndex);
   
   // Remove any existing spanner rows first
   watchlistBody.querySelectorAll('.spanner-row').forEach(row => row.remove());
@@ -138,46 +141,61 @@ function updateWatchlistDisplay() {
     
     watchlistData.forEach((strike, index) => {
       const marketRow = strikeRowMap.get(strike);
-      if (!marketRow) return;
-      
-      // Create new persistent row
-      const row = document.createElement('tr');
-      row.className = marketRow.className + ' watchlist-row';
-      row.dataset.strike = strike;
-      Array.from(marketRow.children).forEach((cell, cellIndex) => {
-        const newCell = cell.cloneNode(true);
-        if (cellIndex === 0) {
-          newCell.style.cursor = 'pointer';
-          newCell.title = 'Click to remove from watchlist';
-          newCell.onclick = () => removeFromWatchlist(strike);
-        } else {
-          newCell.style.cursor = '';
-          newCell.title = '';
+      let row;
+      if (!marketRow) {
+        // Create a placeholder row
+        row = document.createElement('tr');
+        row.className = 'watchlist-row placeholder-row';
+        row.dataset.strike = strike;
+        for (let i = 0; i < 7; i++) {
+          const cell = document.createElement('td');
+          if (i === 0) {
+            cell.textContent = '$' + strike.toLocaleString();
+            cell.style.cursor = 'pointer';
+            cell.title = 'Click to remove from watchlist';
+            cell.onclick = () => removeFromWatchlist(strike);
+          } else {
+            cell.textContent = '—';
+          }
+          row.appendChild(cell);
         }
-        row.appendChild(newCell);
-      });
-      
+      } else {
+        row = document.createElement('tr');
+        row.className = marketRow.className + ' watchlist-row';
+        row.dataset.strike = strike;
+        Array.from(marketRow.children).forEach((cell, cellIndex) => {
+          const newCell = cell.cloneNode(true);
+          if (cellIndex === 0) {
+            newCell.style.cursor = 'pointer';
+            newCell.title = 'Click to remove from watchlist';
+            newCell.onclick = () => removeFromWatchlist(strike);
+          } else {
+            newCell.style.cursor = '';
+            newCell.title = '';
+          }
+          row.appendChild(newCell);
+        });
+      }
       // Remove ATM border highlight from all cells in the watchlist row
       Array.from(row.children).forEach(cell => {
         cell.style.borderTop = '';
         cell.style.borderBottom = '';
       });
-      
-      // Store references to cells for in-place updates
-      const yesCell = row.children[5];
-      const noCell = row.children[6];
-      let yesSpan = yesCell.querySelector('span');
-      let noSpan = noCell.querySelector('span');
-      
-      if (!yesSpan) {
-        yesSpan = document.createElement('span');
-        yesCell.appendChild(yesSpan);
+      // Store references to cells for in-place updates (only if not placeholder)
+      let yesCell = row.children[5];
+      let noCell = row.children[6];
+      let yesSpan = yesCell ? yesCell.querySelector('span') : null;
+      let noSpan = noCell ? noCell.querySelector('span') : null;
+      if (marketRow) {
+        if (!yesSpan) {
+          yesSpan = document.createElement('span');
+          yesCell.appendChild(yesSpan);
+        }
+        if (!noSpan) {
+          noSpan = document.createElement('span');
+          noCell.appendChild(noSpan);
+        }
       }
-      if (!noSpan) {
-        noSpan = document.createElement('span');
-        noCell.appendChild(noSpan);
-      }
-      
       const rowObj = {
         tr: row,
         yesSpan: yesSpan,
@@ -185,17 +203,14 @@ function updateWatchlistDisplay() {
         strike: strike
       };
       watchlistRowsMap.set(strike, rowObj);
-      
       // Add to DOM
       watchlistBody.appendChild(row);
-      
       // Insert spanner row after this row if this is the correct position
       if (index === spannerIndex - 1) {
         const spannerRow = createSpannerRow(currentPrice);
         watchlistBody.appendChild(spannerRow);
       }
     });
-    
     // If spanner should be at the beginning, add it first
     if (spannerIndex === 0) {
       const spannerRow = createSpannerRow(currentPrice);
@@ -206,21 +221,17 @@ function updateWatchlistDisplay() {
     watchlistData.forEach(strike => {
       const marketRow = strikeRowMap.get(strike);
       if (!marketRow) return;
-      
       const rowObj = watchlistRowsMap.get(strike);
       if (!rowObj) return;
-      
       // Update buffer, B/M, adj, and risk cells with live data from market row
       const bufferCell = rowObj.tr.children[1];
       const bmCell = rowObj.tr.children[2];
       const adjCell = rowObj.tr.children[3];
       const riskCell = rowObj.tr.children[4];
-      
       if (bufferCell && marketRow.children[1]) {
         const oldBuffer = bufferCell.textContent;
         const newBuffer = marketRow.children[1].textContent;
         if (oldBuffer !== newBuffer) {
-          console.log(`Watchlist: Updating buffer for strike ${strike} from ${oldBuffer} to ${newBuffer}`);
           bufferCell.textContent = newBuffer;
         }
       }
@@ -228,7 +239,6 @@ function updateWatchlistDisplay() {
         const oldBm = bmCell.textContent;
         const newBm = marketRow.children[2].textContent;
         if (oldBm !== newBm) {
-          console.log(`Watchlist: Updating B/M for strike ${strike} from ${oldBm} to ${newBm}`);
           bmCell.textContent = newBm;
         }
       }
@@ -236,7 +246,6 @@ function updateWatchlistDisplay() {
         const oldAdj = adjCell.textContent;
         const newAdj = marketRow.children[3].textContent;
         if (oldAdj !== newAdj) {
-          console.log(`Watchlist: Updating Adj for strike ${strike} from ${oldAdj} to ${newAdj}`);
           adjCell.textContent = newAdj;
         }
       }
@@ -244,22 +253,18 @@ function updateWatchlistDisplay() {
         const oldRisk = riskCell.textContent;
         const newRisk = marketRow.children[4].textContent;
         if (oldRisk !== newRisk) {
-          console.log(`Watchlist: Updating Risk for strike ${strike} from ${oldRisk} to ${newRisk}`);
           riskCell.textContent = newRisk;
         }
       }
-      
       // Update YES/NO buttons in place (only if prices changed)
       [5, 6].forEach(idx => {
         const marketCell = marketRow.children[idx];
         if (!marketCell) return;
-        
         const marketSpan = marketCell.querySelector('span');
         let askPrice = marketSpan ? marketSpan.textContent : '';
         let isActive = marketSpan ? !marketSpan.classList.contains('disabled') : false;
         let ticker = marketSpan ? marketSpan.getAttribute('data-ticker') : null;
         const side = idx === 5 ? 'yes' : 'no';
-        
         if (idx === 5) {
           updateYesNoButton(rowObj.yesSpan, strike, side, askPrice, isActive, ticker);
         } else {
@@ -267,27 +272,20 @@ function updateWatchlistDisplay() {
         }
       });
     });
-    
     // Update or create spanner row
     let existingSpanner = watchlistBody.querySelector('.spanner-row');
-    console.log('Watchlist spanner debug - currentPrice:', currentPrice, 'existingSpanner:', !!existingSpanner);
-    
     if (existingSpanner) {
       const newSpanner = createSpannerRow(currentPrice);
       existingSpanner.replaceWith(newSpanner);
-      console.log('Replaced existing spanner row');
     } else {
       // Create spanner row if it doesn't exist
       const spannerRow = createSpannerRow(currentPrice);
-      
       // Find the correct position to insert the spanner row
       const rows = Array.from(watchlistBody.children);
       let insertIndex = rows.length; // default to end
-      
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         if (row.classList.contains('spanner-row')) continue;
-        
         const strikeCell = row.querySelector('td');
         if (strikeCell) {
           const strike = parseFloat(strikeCell.textContent.replace(/[\$,]/g, ''));
@@ -297,25 +295,28 @@ function updateWatchlistDisplay() {
           }
         }
       }
-      
-      console.log('Watchlist spanner debug - insertIndex:', insertIndex, 'rows.length:', rows.length);
-      
       if (insertIndex < rows.length) {
         watchlistBody.insertBefore(spannerRow, rows[insertIndex]);
-        console.log('Inserted spanner row at index:', insertIndex);
       } else {
         watchlistBody.appendChild(spannerRow);
-        console.log('Appended spanner row to end');
       }
     }
   }
-  
   // Clean up removed strikes from the persistent map
   for (const [strike, rowObj] of watchlistRowsMap.entries()) {
     if (!currentStrikes.has(strike)) {
       watchlistRowsMap.delete(strike);
     }
   }
+  // REVERT: Remove code that hides/shows the watchlist panel
+  // const watchlistPanel = document.getElementById('watchlistPanel');
+  // if (watchlistPanel) {
+  //   if (watchlistData.length > 0) {
+  //     watchlistPanel.style.display = '';
+  //   } else {
+  //     watchlistPanel.style.display = 'none';
+  //   }
+  // }
 }
 
 // === RECO FILTERING ===
@@ -418,7 +419,7 @@ function updateClickHandlersForReco() {
 // Initialize watchlist functionality when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   // Load watchlist from preferences on page load
-  loadWatchlistFromPreferences();
+  // loadWatchlistFromPreferences(); // Remove this automatic call
   
   // Add click handlers to existing strike table rows
   if (typeof window.addStrikeTableClickHandlers === 'function') {
@@ -428,15 +429,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // Also add handlers when strike table is updated
   const originalUpdateStrikeTable = window.updateStrikeTable;
   if (originalUpdateStrikeTable) {
+    console.log('[DEBUG] Wrapping updateStrikeTable function');
     window.updateStrikeTable = function(...args) {
+      console.log('[DEBUG] Wrapped updateStrikeTable called');
       originalUpdateStrikeTable.apply(this, args);
       setTimeout(() => {
+        console.log('[DEBUG] setTimeout callback - adding click handlers');
         if (typeof window.addStrikeTableClickHandlers === 'function') {
           window.addStrikeTableClickHandlers();
         }
         updateWatchlistDisplay(); // Update watchlist after strike table updates
         updateWatchlistBasedOnReco(); // Apply RECO filtering if enabled
         updateClickHandlersForReco(); // Update click handlers based on RECO state
+        loadWatchlistFromPreferences(); // Load watchlist from preferences after strike table updates
       }, 100); // Small delay to ensure rows are rendered
     };
   }
@@ -450,3 +455,20 @@ window.addToWatchlist = addToWatchlist;
 window.removeFromWatchlist = removeFromWatchlist;
 window.loadWatchlistFromPreferences = loadWatchlistFromPreferences;
 window.saveWatchlistToPreferences = saveWatchlistToPreferences; 
+window.rebuildWatchlistFromStrikeTable = function() {
+  const watchlistBody = document.getElementById('watchlist-body');
+  if (watchlistBody) watchlistBody.innerHTML = '';
+  updateWatchlistDisplay();
+}; 
+
+// On page load, fetch and store watchlistData, but do not draw the watchlist yet
+window.fetchWatchlistData = async function() {
+  try {
+    const response = await fetch('/api/get_watchlist');
+    const data = await response.json();
+    watchlistData = data.watchlist || [];
+    console.log('Fetched watchlistData:', watchlistData);
+  } catch (error) {
+    console.error('Error fetching watchlist data:', error);
+  }
+}; 
