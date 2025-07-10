@@ -27,6 +27,7 @@ from account_mode import get_account_mode
 from core.config.settings import config
 
 from util.paths import get_price_history_dir, get_data_dir, ensure_data_dirs
+from backend.util.probability_generator import calculate_strike_probabilities
 # from util.strike_probability_generator import get_live_probabilities
 
 # Ensure all data directories exist
@@ -1284,21 +1285,28 @@ class ProbabilityRequest(BaseModel):
 
 @app.post("/api/strike_probabilities")
 def get_strike_probabilities(req: ProbabilityRequest):
-    k, alpha, beta = req.fingerprint
-    def touch_probability(delta, t):
-        return 1.0 - math.exp(-k * (delta ** alpha) * (t ** beta))
-    rows = []
-    for strike in req.strikes:
-        buffer_val = abs(strike - req.current_price)
-        delta = buffer_val / req.current_price
-        prob = touch_probability(delta, req.ttc_minutes)
-        rows.append({
-            "Strike": strike,
-            "Buffer ($)": buffer_val,
-            "% Distance": round(delta * 100, req.pct_decimals),
-            "Prob Touch (%)": round(prob * 100, 2),
-        })
-    return {"status": "ok", "probabilities": rows}
+    # Use the fingerprint CSV for lookup
+    fingerprint_csv_path = "backend/data/symbol_fingerprints/btc_fingerprint_20250710.csv"  # TODO: make dynamic if needed
+    try:
+        probabilities = calculate_strike_probabilities(
+            fingerprint_csv_path,
+            req.current_price,
+            req.strikes,
+            int(round(req.ttc_minutes))
+        )
+        rows = []
+        for strike, prob in probabilities.items():
+            buffer_val = abs(strike - req.current_price)
+            delta = buffer_val / req.current_price
+            rows.append({
+                "Strike": strike,
+                "Buffer ($)": buffer_val,
+                "% Distance": round(delta * 100, 3),
+                "Prob Touch (%)": prob,
+            })
+        return {"status": "ok", "probabilities": rows}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     import threading
