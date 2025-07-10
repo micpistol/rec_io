@@ -2115,9 +2115,23 @@ document.addEventListener('DOMContentLoaded', () => {
           console.error('Error in RECO enable functions:', e);
         }
       } else {
-        // If RECO is being turned OFF, re-enable click handlers
-        console.log('RECO disabled - re-enabling click handlers');
+        // If RECO is being turned OFF, clear the watchlist and re-enable click handlers
+        console.log('RECO disabled - clearing watchlist and re-enabling click handlers');
         try {
+          // Clear the watchlist preferences JSON directly
+          fetch('/api/set_watchlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ watchlist: [] })
+          }).then(() => {
+            console.log('Watchlist preferences cleared');
+            // Reload the watchlist display to reflect the empty state
+            if (typeof window.loadWatchlistFromPreferences === 'function') {
+              window.loadWatchlistFromPreferences();
+            }
+          }).catch(error => {
+            console.error('Error clearing watchlist preferences:', error);
+          });
           updateClickHandlersForReco(); // Re-enable click handlers
         } catch (e) {
           console.error('Error in RECO disable functions:', e);
@@ -2207,7 +2221,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <th>Buy</th>
               <th>Pos</th>
               <th>Buffer</th>
-              <th>B/M</th>
+              <th>Prob</th>
               <th style="text-align: center;">Close</th>
             </tr>
           </thead>
@@ -3123,8 +3137,23 @@ async function fetchAndRenderTrades() {
         posTd.textContent = trade.position;
         const bufferTd = document.createElement('td');
         bufferTd.textContent = bufferDisplay;
+        // Get the Prob value from the strike table (column index 4, E)
+        let probDisplay = '—';
+        const strikeTableRows = document.querySelectorAll('#strike-table tbody tr');
+        for (const row of strikeTableRows) {
+          const firstTd = row.querySelector('td');
+          if (!firstTd) continue;
+          const firstTdText = firstTd.textContent.trim();
+          if (firstTdText === strikeFormatted) {
+            const tds = row.querySelectorAll('td');
+            if (tds.length > 4) {
+              probDisplay = tds[4].textContent.trim() || '—';
+            }
+            break;
+          }
+        }
         const bmTd = document.createElement('td');
-        bmTd.textContent = bmDisplay;
+        bmTd.textContent = probDisplay;
         const closeTd = document.createElement('td');
         closeTd.className = 'center';
         if (closeButtonSpan) {
@@ -3159,7 +3188,22 @@ async function fetchAndRenderTrades() {
         rowObj.status = trade.status;
       }
       if (rowObj.bufferTd.textContent !== bufferDisplay) rowObj.bufferTd.textContent = bufferDisplay;
-      if (rowObj.bmTd.textContent !== bmDisplay) rowObj.bmTd.textContent = bmDisplay;
+      // Update B/M cell with Prob value from strike table
+      let probDisplay = '—';
+      const strikeTableRowsForProb = document.querySelectorAll('#strike-table tbody tr');
+      for (const row of strikeTableRowsForProb) {
+        const firstTd = row.querySelector('td');
+        if (!firstTd) continue;
+        const firstTdText = firstTd.textContent.trim();
+        if (firstTdText === strikeFormatted) {
+          const tds = row.querySelectorAll('td');
+          if (tds.length > 4) {
+            probDisplay = tds[4].textContent.trim() || '—';
+          }
+          break;
+        }
+      }
+      if (rowObj.bmTd.textContent !== probDisplay) rowObj.bmTd.textContent = probDisplay;
       const prevAsk = previousClosePrices[trade.id];
       if (closeButtonSpan) {
         if (prevAsk !== askPrice) {
