@@ -3523,14 +3523,26 @@ activeTradesTableBody.addEventListener('click', (event) => {
   <script>
   (function setupMomentumArrowObserver() {
     const momentumEl = document.getElementById('momentum-score-value');
-    if (!momentumEl) return;
+    if (!momentumEl) {
+      console.log('[MOMENTUM OBSERVER] momentum-score-value element not found, retrying in 1 second...');
+      setTimeout(setupMomentumArrowObserver, 1000);
+      return;
+    }
+    console.log('[MOMENTUM OBSERVER] Found momentum element, setting up observer');
     const observer = new MutationObserver(() => {
       // Helper function to update spanner row arrows
       function updateSpannerArrows(tableSelector) {
         const spannerRow = document.querySelector(`${tableSelector} tr.spanner-row`);
-        if (!spannerRow) return;
+        if (!spannerRow) {
+          console.log(`[MOMENTUM OBSERVER] No spanner row found for ${tableSelector}`);
+          return;
+        }
         const spannerTd = spannerRow.querySelector('td');
-        if (!spannerTd) return;
+        if (!spannerTd) {
+          console.log(`[MOMENTUM OBSERVER] No spanner td found for ${tableSelector}`);
+          return;
+        }
+        console.log(`[MOMENTUM OBSERVER] Updating arrows for ${tableSelector}, momentum value:`, momentumEl.textContent);
         const val = parseFloat(momentumEl.textContent.replace(/[^\d\.\-]/g, ''));
         // SVGs for straight arrows (no margin)
         const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -3552,9 +3564,10 @@ activeTradesTableBody.addEventListener('click', (event) => {
         spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>${priceText}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
       }
       
-      // Update both active trades and watchlist spanner rows
+      // Update spanner rows in all tables
       updateSpannerArrows('#activeTradesTable');
       updateSpannerArrows('#watchlist-table');
+      updateSpannerArrows('#strike-table');
     });
     observer.observe(momentumEl, { childList: true, characterData: true, subtree: true });
   })();
