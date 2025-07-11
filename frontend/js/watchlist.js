@@ -456,8 +456,7 @@ window.updateClickHandlersForReco = updateClickHandlersForReco;
 window.addToWatchlist = addToWatchlist;
 window.removeFromWatchlist = removeFromWatchlist;
 window.loadWatchlistFromPreferences = loadWatchlistFromPreferences;
-window.saveWatchlistToPreferences = saveWatchlistToPreferences; 
-window.rebuildWatchlistFromStrikeTable = function() {
+window.saveWatchlistToPreferences = saveWatchlistToPreferences; window.rebuildWatchlistFromStrikeTable = function() {
   const watchlistBody = document.getElementById('watchlist-body');
   if (watchlistBody) watchlistBody.innerHTML = '';
   updateWatchlistDisplay();

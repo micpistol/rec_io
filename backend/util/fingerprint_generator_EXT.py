@@ -25,7 +25,7 @@ def main():
     df["year"] = df["timestamp"].dt.year
     df["weight"] = df["year"].map(year_weights).fillna(1)
 
-    thresholds = [round(x * 0.01, 4) for x in range(1, 201)]
+    thresholds = [0.25, 0.50, 0.75, 1.00, 1.25]
     max_lookahead = 60
 
     # Initialize counters: for each lookahead and threshold, store [successes, totals]
@@ -53,6 +53,8 @@ def main():
                 results[t][th][1] += weight  # weighted total
                 if percent_move >= th:
                     results[t][th][0] += weight  # weighted success
+                else:
+                    break
 
     print("Finished processing all rows.")
 
