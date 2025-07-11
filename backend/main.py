@@ -27,6 +27,7 @@ from account_mode import get_account_mode
 from core.config.settings import config
 
 from util.paths import get_price_history_dir, get_data_dir, ensure_data_dirs
+from util.probabilty_calculator import calculate_strike_probabilities, start_live_probability_writer, stop_live_probability_writer
 
 
 # Ensure all data directories exist
@@ -1272,6 +1273,114 @@ async def watch_trades():
 def notify_trade_update():
     trade_db_event.set()
 
+@app.post("/api/strike_probabilities")
+async def get_strike_probabilities(request: Request):
+    """
+    Calculate strike probabilities using the fingerprint-based calculator.
+    
+    Expected JSON payload:
+    {
+        "current_price": float,
+        "ttc_seconds": float,
+        "strikes": [float, ...]
+    }
+    
+    Returns:
+    {
+        "status": "ok",
+        "probabilities": [
+            {
+                "strike": float,
+                "buffer": float,
+                "move_percent": float,
+                "prob_beyond": float,
+                "prob_within": float
+            },
+            ...
+        ]
+    }
+    """
+    try:
+        data = await request.json()
+        current_price = data.get("current_price")
+        ttc_seconds = data.get("ttc_seconds")
+        strikes = data.get("strikes")
+        
+        if not all([current_price, ttc_seconds, strikes]):
+            return {"status": "error", "message": "Missing required parameters"}
+        
+        # Calculate probabilities
+        probabilities = calculate_strike_probabilities(
+            current_price=float(current_price),
+            ttc_seconds=float(ttc_seconds),
+            strikes=strikes
+        )
+        
+        return {
+            "status": "ok",
+            "probabilities": probabilities
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/api/live_probabilities")
+def get_live_probabilities():
+    """
+    Get the current live probability data from the JSON file.
+    """
+    try:
+        live_prob_path = os.path.join(
+            os.path.dirname(__file__), 
+            'data', 'live_probabilities.json'
+        )
+        
+        if os.path.exists(live_prob_path):
+            with open(live_prob_path, 'r') as f:
+                data = json.load(f)
+            return data
+        else:
+            return {"status": "error", "message": "Live probability file not found"}
+            
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/api/debug/strikes")
+def get_debug_strikes():
+    """
+    Debug endpoint to show what strikes would be calculated for current BTC price.
+    """
+    try:
+        # Get current BTC price
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            current_price = float(row[0])
+            base_price = round(current_price / 250) * 250
+            step = 250
+            strikes = []
+            for i in range(base_price - 6 * step, base_price + 6 * step + 1, step):
+                strikes.append(i)
+            
+            return {
+                "current_price": current_price,
+                "base_price": base_price,
+                "strikes": strikes,
+                "total_strikes": len(strikes)
+            }
+        else:
+            return {"status": "error", "message": "No BTC price data found"}
+            
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 @app.post("/api/test")
 def test_endpoint():
     print("=== TEST ENDPOINT CALLED ===")
@@ -1285,6 +1394,35 @@ if __name__ == "__main__":
     import importlib.util
 
     threading.Thread(target=start_websocket, daemon=True).start()
+
+    # Start live probability writer
+    def get_current_price():
+        """Get current BTC price from database."""
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
+            row = cursor.fetchone()
+            conn.close()
+            return float(row[0]) if row else 50000.0
+        except:
+            return 50000.0
+    
+    def get_current_ttc():
+        """Get current TTC in seconds."""
+        try:
+            # This would need to be implemented based on your TTC calculation
+            # For now, return a default value
+            return 300.0  # 5 minutes
+        except:
+            return 300.0
+    
+    # Start the live probability writer
+    start_live_probability_writer(
+        update_interval=10,  # Update every 10 seconds
+        current_price_getter=get_current_price,
+        ttc_getter=get_current_ttc
+    )
 
     import uvicorn
     port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))

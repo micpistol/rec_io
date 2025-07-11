@@ -104,26 +104,30 @@ function initializeStrikeTable(basePrice) {
 
 async function fetchProbabilities(symbol, currentPrice, ttcMinutes, strikes, year = null) {
   try {
-    // Use the correct fingerprint for BTC (from the working test)
-    const fingerprint = [2.14e-7, -1.95, 0.98];
+    const ttcSeconds = ttcMinutes * 60;
+    
+    console.log('[STRIKE TABLE] Fetching probabilities for:', {
+      currentPrice,
+      ttcSeconds,
+      strikes: strikes.slice(0, 5) + '...' + strikes.slice(-5) // Show first and last 5 strikes
+    });
     
     const res = await fetch('http://localhost:5001/api/strike_probabilities', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        fingerprint: fingerprint,
         current_price: currentPrice,
-        ttc_minutes: ttcMinutes,
+        ttc_seconds: ttcSeconds,
         strikes: strikes
       })
     });
     const data = await res.json();
     console.log('[STRIKE TABLE] API Response:', data); // DEBUG LOG
     if (data.status === 'ok' && Array.isArray(data.probabilities)) {
-      // Map: strike -> probability
+      // Map: strike -> probability (using prob_within for display)
       const probMap = new Map();
       data.probabilities.forEach(row => {
-        probMap.set(Math.round(row['Strike']), row['Prob Touch (%)']);
+        probMap.set(Math.round(row.strike), row.prob_within);
       });
       return probMap;
     }
@@ -188,11 +192,11 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
     // --- PATCH: Use model-based probability for Prob Touch (%) ---
     let prob = probMap && probMap.has(strike) ? probMap.get(strike) : null;
     if (prob !== null && prob !== undefined) {
-      // Invert the probability for display
-      let displayProb = (100 - prob);
+      // Use the probability directly (already prob_within from API)
+      let displayProb = prob;
       probTd.textContent = displayProb.toFixed(1);
       row.className = '';
-      // --- RISK COLOR PATCH (UPDATED BANDS, INVERTED) ---
+      // --- RISK COLOR PATCH (UPDATED BANDS) ---
       row.classList.remove('ultra-safe', 'safe', 'caution', 'high-risk', 'danger-stop');
       let riskClass = '';
       if (displayProb >= 98) riskClass = 'ultra-safe'; // bright green
