@@ -1409,13 +1409,19 @@ if __name__ == "__main__":
             return 50000.0
     
     def get_current_ttc():
-        """Get current TTC in seconds."""
+        """Get current TTC in seconds from the /core endpoint."""
         try:
-            # This would need to be implemented based on your TTC calculation
-            # For now, return a default value
-            return 300.0  # 5 minutes
-        except:
-            return 300.0
+            resp = requests.get("http://localhost:5001/core", timeout=2)
+            if resp.status_code == 200:
+                data = resp.json()
+                ttc = float(data.get("ttc_seconds", 0))
+                if ttc > 0:
+                    return ttc
+            print("[LiveProbWriter] Could not get valid ttc_seconds from /core.")
+            return None
+        except Exception as e:
+            print(f"[LiveProbWriter] Error fetching ttc_seconds from /core: {e}")
+            return None
     
     # Start the live probability writer
     start_live_probability_writer(

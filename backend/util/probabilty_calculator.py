@@ -232,20 +232,27 @@ def start_live_probability_writer(
         while _live_writer_running:
             try:
                 # Get current price and TTC
-                current_price = 50000.0  # Default fallback
-                ttc_seconds = 300.0  # Default 5 minutes
+                current_price = None
+                ttc_seconds = None
                 
                 if current_price_getter:
                     try:
                         current_price = current_price_getter()
-                    except:
-                        pass
+                    except Exception as e:
+                        print(f"[LiveProbWriter] Error getting current price: {e}")
+                        current_price = None
                 
                 if ttc_getter:
                     try:
                         ttc_seconds = ttc_getter()
-                    except:
-                        pass
+                    except Exception as e:
+                        print(f"[LiveProbWriter] Error getting ttc_seconds: {e}")
+                        ttc_seconds = None
+                
+                if current_price is None or ttc_seconds is None:
+                    print(f"[LiveProbWriter] Skipping update: current_price={current_price}, ttc_seconds={ttc_seconds}")
+                    time.sleep(update_interval)
+                    continue
                 
                 # Calculate strikes based on current price (same logic as frontend)
                 base_price = round(current_price / 250) * 250
