@@ -683,7 +683,7 @@ function addStrikeTableClickHandlers() {
     row.style.cursor = '';
     row.title = '';
     Array.from(row.children).forEach((cell, idx) => {
-      if (idx >= 0 && idx <= 4) {
+      if (idx >= 0 && idx <= 3) { // PATCHED: Only first 4 columns clickable
         cell.style.cursor = 'pointer';
         cell.title = 'Click to add to watchlist';
       } else {
@@ -692,33 +692,12 @@ function addStrikeTableClickHandlers() {
       }
     });
     const clickHandler = (event) => {
-      console.log('[DEBUG] Click handler triggered for row:', row);
-      console.log('[DEBUG] Event target:', event.target);
-      console.log('[DEBUG] Event type:', event.type);
-      console.log('[DEBUG] Event bubbles:', event.bubbles);
-      console.log('[DEBUG] Event cancelable:', event.cancelable);
-      console.log('[DEBUG] Event defaultPrevented:', event.defaultPrevented);
-      
-      // Only trigger if not clicking on YES or NO columns (6 or 7)
+      // Only trigger if not clicking on YES or NO columns (4 or 5)
       const cell = event.target.closest('td');
-      if (!cell) {
-        console.log('[DEBUG] No cell found, returning');
-        return;
-      }
+      if (!cell) return;
       const cellIndex = Array.from(row.children).indexOf(cell);
-      console.log('[DEBUG] Cell index:', cellIndex);
-      if (cellIndex === 4 || cellIndex === 5) {
-        console.log('[DEBUG] Clicked on YES/NO column, returning');
-        return; // YES or NO columns
-      }
-      console.log('[DEBUG] Strike row clicked:', row, 'cellIndex:', cellIndex);
-      console.log('[DEBUG] addToWatchlist function exists:', typeof window.addToWatchlist === 'function');
-      if (typeof window.addToWatchlist === 'function') {
-        console.log('[DEBUG] Calling addToWatchlist...');
-        window.addToWatchlist(row);
-      } else {
-        console.error('[DEBUG] addToWatchlist function not found!');
-      }
+      if (cellIndex === 4 || cellIndex === 5) return; // YES/NO columns not clickable
+      if (typeof window.addToWatchlist === 'function') window.addToWatchlist(row);
     };
     row._watchlistClickHandler = clickHandler;
     row.addEventListener('click', clickHandler);
