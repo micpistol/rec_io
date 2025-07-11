@@ -63,9 +63,7 @@ function initializeStrikeTable(basePrice) {
     const bmTd = document.createElement('td');
     row.appendChild(bmTd);
 
-    // Adj B/M cell
-    const adjBmTd = document.createElement('td');
-    row.appendChild(adjBmTd);
+    
 
     // Risk cell (now Prob Touch (%))
     const probTd = document.createElement('td');
@@ -92,7 +90,6 @@ function initializeStrikeTable(basePrice) {
       row,
       bufferTd,
       bmTd,
-      adjBmTd,
       probTd,
       yesSpan,
       noSpan
@@ -176,18 +173,16 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
     }
   }
 
-  window.strikeRowsMap.forEach((cells, strike) => {
-    const { row, bufferTd, bmTd, adjBmTd, probTd, yesSpan, noSpan } = cells;
+      window.strikeRowsMap.forEach((cells, strike) => {
+      const { row, bufferTd, bmTd, probTd, yesSpan, noSpan } = cells;
 
     // Buffer
     const buffer = centerPrice - strike;
     bufferTd.textContent = Math.abs(buffer).toLocaleString(undefined, {maximumFractionDigits: 0});
 
-    // B/M and Adj B/M
-    const bpm = Math.abs(buffer) / ttcMinutes;
-    const adjBpm = bpm * Math.sqrt(ttcMinutes / 15);
-    bmTd.textContent = Math.round(bpm).toLocaleString();
-    adjBmTd.textContent = adjBpm.toFixed(1);
+          // B/M
+      const bpm = Math.abs(buffer) / ttcMinutes;
+      bmTd.textContent = Math.round(bpm).toLocaleString();
 
     // --- PATCH: Use model-based probability for Prob Touch (%) ---
     let prob = probMap && probMap.has(strike) ? probMap.get(strike) : null;
@@ -432,12 +427,12 @@ function openTrade(target) {
           }
           // Determine side by column index
           const tds = Array.from(row2.children);
-          for (let i = 0; i < tds.length; ++i) {
-            if (tds[i].contains(btn)) {
-              if (i === 5) side = 'yes';
-              if (i === 6) side = 'no';
+                      for (let i = 0; i < tds.length; ++i) {
+              if (tds[i].contains(btn)) {
+                if (i === 4) side = 'yes';
+                if (i === 5) side = 'no';
+              }
             }
-          }
         }
         // Fallback: try to get from btn.dataset
         if (!strike && btn.dataset.strike) strike = parseFloat(btn.dataset.strike);
@@ -609,7 +604,7 @@ function createSpannerRow(currentPrice) {
   const spannerRow = document.createElement("tr");
   spannerRow.className = "spanner-row";
   const spannerTd = document.createElement("td");
-  spannerTd.colSpan = 7;
+  spannerTd.colSpan = 6; // PATCHED: match actual number of columns
   // SVGs for straight arrows (no margin)
   const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -712,7 +707,7 @@ function addStrikeTableClickHandlers() {
       }
       const cellIndex = Array.from(row.children).indexOf(cell);
       console.log('[DEBUG] Cell index:', cellIndex);
-      if (cellIndex === 5 || cellIndex === 6) {
+      if (cellIndex === 4 || cellIndex === 5) {
         console.log('[DEBUG] Clicked on YES/NO column, returning');
         return; // YES or NO columns
       }

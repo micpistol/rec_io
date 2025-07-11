@@ -147,7 +147,7 @@ function updateWatchlistDisplay() {
         row = document.createElement('tr');
         row.className = 'watchlist-row placeholder-row';
         row.dataset.strike = strike;
-        for (let i = 0; i < 7; i++) {
+        for (let i = 0; i < 6; i++) { // PATCHED: 6 columns, not 7
           const cell = document.createElement('td');
           if (i === 0) {
             cell.textContent = '$' + strike.toLocaleString();
@@ -184,8 +184,8 @@ function updateWatchlistDisplay() {
         cell.style.borderBottom = '';
       });
       // Store references to cells for in-place updates (only if not placeholder)
-      let yesCell = row.children[5];
-      let noCell = row.children[6];
+      let yesCell = row.children[4]; // PATCHED: YES is col 4
+      let noCell = row.children[5];  // PATCHED: NO is col 5
       let yesSpan = yesCell ? yesCell.querySelector('span') : null;
       let noSpan = noCell ? noCell.querySelector('span') : null;
       if (marketRow) {
@@ -259,15 +259,15 @@ function updateWatchlistDisplay() {
         }
       }
       // Update YES/NO buttons in place (only if prices changed)
-      [5, 6].forEach(idx => {
+      [4, 5].forEach(idx => { // PATCHED: YES is col 4, NO is col 5
         const marketCell = marketRow.children[idx];
         if (!marketCell) return;
         const marketSpan = marketCell.querySelector('span');
         let askPrice = marketSpan ? marketSpan.textContent : '';
         let isActive = marketSpan ? !marketSpan.classList.contains('disabled') : false;
         let ticker = marketSpan ? marketSpan.getAttribute('data-ticker') : null;
-        const side = idx === 5 ? 'yes' : 'no';
-        if (idx === 5) {
+        const side = idx === 4 ? 'yes' : 'no'; // PATCHED: YES is col 4, NO is col 5
+        if (idx === 4) {
           updateYesNoButton(rowObj.yesSpan, strike, side, askPrice, isActive, ticker);
         } else {
           updateYesNoButton(rowObj.noSpan, strike, side, askPrice, isActive, ticker);

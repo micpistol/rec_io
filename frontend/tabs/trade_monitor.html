@@ -109,13 +109,13 @@
   .strike-table td.center {
     text-align: center;
   }
-  .strike-table td:nth-child(5) {
-    text-align: center;
-  }
-  .strike-table td:nth-child(6),
-  .strike-table td:nth-child(7) {
-    text-align: center;
-  }
+      .strike-table td:nth-child(4) {
+      text-align: center;
+    }
+    .strike-table td:nth-child(5),
+    .strike-table td:nth-child(6) {
+      text-align: center;
+    }
 
   /* Hide the header row in the watchlist table but preserve column widths */
   #watchlist-table thead {
@@ -153,14 +153,13 @@
   .high-risk { background-color: #a07777 !important; }
   .danger-stop { background-color: #ec3434 !important; }
 
-  /* Column width classes */
-  .col-strike { width: 60px; }
-  .col-buffer { width: 40px; }
-  .col-bm { width: 40px; }
-  .col-adj { width: 40px; }
-  .col-risk { width: 40px; }
-  .col-yes { width: 60px; }
-  .col-no { width: 60px; }
+      /* Column width classes */
+    .col-strike { width: 60px; }
+    .col-buffer { width: 50px; }
+    .col-bm { width: 50px; }
+    .col-risk { width: 50px; }
+    .col-yes { width: 60px; }
+    .col-no { width: 60px; }
 
   /* === ACTIVE TRADES TABLE STYLES === */
   #activeTradesTable {
@@ -208,13 +207,13 @@
     padding: 4px 6px;
   }
 
-  #watchlist-table td:nth-child(5) {
-    text-align: center;
-  }
-  #watchlist-table td:nth-child(6),
-  #watchlist-table td:nth-child(7) {
-    text-align: center;
-  }
+      #watchlist-table td:nth-child(4) {
+      text-align: center;
+    }
+    #watchlist-table td:nth-child(5),
+    #watchlist-table td:nth-child(6) {
+      text-align: center;
+    }
   
   #watchlist-table td:first-child {
     text-align: center;
@@ -672,7 +671,6 @@
               <col class="col-strike">
               <col class="col-buffer">
               <col class="col-bm">
-              <col class="col-adj">
               <col class="col-risk">
               <col class="col-yes">
               <col class="col-no">
@@ -682,7 +680,6 @@
                 <th>STRIKE</th>
                 <th>BUFFER</th>
                 <th>B/M</th>
-                <th>Adj</th>
                 <th>Prob</th>
                 <th>YES</th>
                 <th>NO</th>
@@ -707,7 +704,6 @@
               <col class="col-strike">
               <col class="col-buffer">
               <col class="col-bm">
-              <col class="col-adj">
               <col class="col-risk">
               <col class="col-yes">
               <col class="col-no">
@@ -717,7 +713,6 @@
                 <th>STRIKE</th>
                 <th>BUFFER</th>
                 <th>B/M</th>
-                <th>Adj</th>
                 <th>Prob Touch (%)</th>
                 <th>YES</th>
                 <th>NO</th>
@@ -808,8 +803,8 @@ function openTrade(target) {
           const tds = Array.from(row2.children);
           for (let i = 0; i < tds.length; ++i) {
             if (tds[i].contains(btn)) {
-              if (i === 5) side = 'yes';
-              if (i === 6) side = 'no';
+              if (i === 4) side = 'yes';
+              if (i === 5) side = 'no';
             }
           }
         }
