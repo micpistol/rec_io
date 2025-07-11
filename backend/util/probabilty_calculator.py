@@ -27,7 +27,7 @@ class ProbabilityCalculator:
             fingerprint_path = os.path.join(
                 os.path.dirname(__file__), 
                 '..', 'data', 'symbol_fingerprints', 
-                'btc_fingerprint_20250710.csv'
+                'btc_fingerprint_20250711.csv'
             )
         
         self.fingerprint_path = fingerprint_path

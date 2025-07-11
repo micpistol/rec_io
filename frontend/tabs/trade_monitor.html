@@ -2071,6 +2071,13 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Received plus_minus_mode update via WebSocket:', data.plus_minus_mode);
         plusMinusToggle.checked = data.plus_minus_mode;
         window.plusMinusMode = data.plus_minus_mode;
+        
+        // Immediately redraw all YES/NO buttons when DIF mode changes via WebSocket
+        if (typeof window.redrawYesNoButtonsForDIFMode === 'function') {
+          console.log('Immediately redrawing YES/NO buttons for DIF mode change via WebSocket');
+          window.redrawYesNoButtonsForDIFMode();
+        }
+        
         ignoreWsUpdates = false;
       }
 
@@ -2186,6 +2193,12 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: value })
       });
+      
+      // Immediately redraw all YES/NO buttons when DIF mode changes
+      if (typeof window.redrawYesNoButtonsForDIFMode === 'function') {
+        console.log('Immediately redrawing YES/NO buttons for DIF mode change');
+        window.redrawYesNoButtonsForDIFMode();
+      }
     });
   }
 

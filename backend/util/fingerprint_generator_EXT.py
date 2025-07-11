@@ -25,12 +25,11 @@ def main():
     df["year"] = df["timestamp"].dt.year
     df["weight"] = df["year"].map(year_weights).fillna(1)
 
-    thresholds = [round(x * 0.05, 2) for x in range(1, 41)]  # 0.05% to 2.00%
-    max_lookahead = 3590  # step every 10s for test run
+    thresholds = [round(x * 0.01, 4) for x in range(1, 201)]
+    max_lookahead = 60
 
-    # Only use every 10-second interval
-    t_values = [t for t in range(10, max_lookahead + 1, 10)]
-    results = {t: {th: [0, 0] for th in thresholds} for t in t_values}
+    # Initialize counters: for each lookahead and threshold, store [successes, totals]
+    results = {t: {th: [0, 0] for th in thresholds} for t in range(1, max_lookahead + 1)}
 
     total_rows = len(df)
     print(f"Starting processing {total_rows} rows...")
@@ -42,26 +41,24 @@ def main():
         close_i = df.at[i, 'close']
         weight = df.at[i, 'weight']
 
-        for t in t_values:
+        for t in range(1, max_lookahead + 1):
             j = i + t
             if j >= total_rows:
                 continue
 
             close_j = df.at[j, 'close']
-            percent_move = ((close_j - close_i) / close_i) * 100
+            percent_move = abs((close_j - close_i) / close_i) * 100
 
             for th in thresholds:
                 results[t][th][1] += weight  # weighted total
                 if percent_move >= th:
                     results[t][th][0] += weight  # weighted success
-                else:
-                    break  # early exit for sorted thresholds
 
     print("Finished processing all rows.")
 
     # Prepare output DataFrame
     output_data = []
-    for t in t_values:
+    for t in range(1, max_lookahead + 1):
         row = []
         for th in thresholds:
             successes, totals = results[t][th]
@@ -71,13 +68,13 @@ def main():
 
     columns = [f">= {th:.2f}%" for th in thresholds]
     output_df = pd.DataFrame(output_data, columns=columns)
-    output_df.index = [f"{t}s TTC" for t in t_values]
+    output_df.index = [f"{t}m TTC" for t in range(1, max_lookahead + 1)]
 
     output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'symbol_fingerprints'))
     os.makedirs(output_dir, exist_ok=True)
     symbol = os.path.basename(csv_path).split('_')[0].lower()
     date_str = datetime.now().strftime('%Y%m%d')
-    output_filename = f"{symbol}_fingerprint_{date_str}_TEST.csv"
+    output_filename = f"{symbol}_fingerprint_{date_str}_EXT.csv"
     output_path = os.path.join(output_dir, output_filename)
     output_df.to_csv(output_path)
     print(f"Output saved to {output_path}")

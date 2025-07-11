@@ -173,16 +173,16 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
     }
   }
 
-      window.strikeRowsMap.forEach((cells, strike) => {
-      const { row, bufferTd, bmTd, probTd, yesSpan, noSpan } = cells;
+  window.strikeRowsMap.forEach((cells, strike) => {
+    const { row, bufferTd, bmTd, probTd, yesSpan, noSpan } = cells;
 
     // Buffer
     const buffer = centerPrice - strike;
     bufferTd.textContent = Math.abs(buffer).toLocaleString(undefined, {maximumFractionDigits: 0});
 
-          // B/M
-      const bpm = Math.abs(buffer) / ttcMinutes;
-      bmTd.textContent = Math.round(bpm).toLocaleString();
+    // B/M
+    const bpm = Math.abs(buffer) / ttcMinutes;
+    bmTd.textContent = Math.round(bpm).toLocaleString();
 
     // --- PATCH: Use model-based probability for Prob Touch (%) ---
     let prob = probMap && probMap.has(strike) ? probMap.get(strike) : null;
@@ -214,10 +214,94 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
     const ticker = matchingMarket ? matchingMarket.ticker : null;
     const yesAsk = matchingMarket && typeof matchingMarket.yes_ask === "number" ? Math.round(matchingMarket.yes_ask) : 0;
     const noAsk = matchingMarket && typeof matchingMarket.no_ask === "number" ? Math.round(matchingMarket.no_ask) : 0;
-    const isYesActive = yesAsk > noAsk && yesAsk < 99 && yesAsk >= 40;
-    const isNoActive = noAsk > yesAsk && noAsk < 99 && noAsk >= 40;
-    updateYesNoButton(yesSpan, strike, "yes", yesAsk, isYesActive, ticker);
-    updateYesNoButton(noSpan, strike, "no", noAsk, isNoActive, ticker);
+    const volume = matchingMarket && typeof matchingMarket.volume === "number" ? matchingMarket.volume : 0;
+
+    // --- VOLUME-BASED DISABLING LOGIC ---
+    // If volume < 50, both buttons are disabled regardless of mode
+    if (volume < 50) {
+      yesSpan.textContent = yesAsk > 0 ? yesAsk : '—';
+      noSpan.textContent = noAsk > 0 ? noAsk : '—';
+      yesSpan.className = 'price-box disabled';
+      noSpan.className = 'price-box disabled';
+      yesSpan.style.cursor = 'default';
+      noSpan.style.cursor = 'default';
+      yesSpan.onclick = null;
+      noSpan.onclick = null;
+      // Set data attributes for reference
+      if (ticker) {
+        yesSpan.setAttribute('data-ticker', ticker);
+        noSpan.setAttribute('data-ticker', ticker);
+      }
+      yesSpan.setAttribute('data-strike', strike);
+      yesSpan.setAttribute('data-side', 'yes');
+      noSpan.setAttribute('data-strike', strike);
+      noSpan.setAttribute('data-side', 'no');
+    } else {
+      // --- DIF MODE PATCH ---
+      if (window.plusMinusMode) {
+        // Below the money line: YES button shows diff, NO is blank
+        // Above the money line: NO button shows diff, YES is blank
+        // At the money: both blank
+        let prob = probMap && probMap.has(strike) ? probMap.get(strike) : null;
+        let yesDisplay = '—';
+        let noDisplay = '—';
+        if (prob !== null && prob !== undefined) {
+          if (strike < centerPrice) {
+            // YES: Prob - yesAsk
+            if (yesAsk > 0) {
+              const diff = Math.round(prob - yesAsk);
+              yesDisplay = (diff >= 0 ? '+' : '') + diff;
+            }
+          } else if (strike > centerPrice) {
+            // NO: Prob - noAsk
+            if (noAsk > 0) {
+              const diff = Math.round(prob - noAsk);
+              noDisplay = (diff >= 0 ? '+' : '') + diff;
+            }
+          }
+          // At the money: both remain '—'
+        }
+        yesSpan.textContent = yesDisplay;
+        noSpan.textContent = noDisplay;
+        
+        // Apply same ask price validation logic as normal mode
+        const isYesActive = yesAsk > noAsk && yesAsk < 99 && yesAsk >= 40;
+        const isNoActive = noAsk > yesAsk && noAsk < 99 && noAsk >= 40;
+        
+        yesSpan.className = isYesActive ? 'price-box' : 'price-box disabled';
+        noSpan.className = isNoActive ? 'price-box' : 'price-box disabled';
+        yesSpan.style.cursor = isYesActive ? 'pointer' : 'default';
+        noSpan.style.cursor = isNoActive ? 'pointer' : 'default';
+        
+        // Set data attributes for openTrade
+        if (ticker) {
+          yesSpan.setAttribute('data-ticker', ticker);
+          noSpan.setAttribute('data-ticker', ticker);
+        }
+        yesSpan.setAttribute('data-strike', strike);
+        yesSpan.setAttribute('data-side', 'yes');
+        noSpan.setAttribute('data-strike', strike);
+        noSpan.setAttribute('data-side', 'no');
+        
+        // Only add click handlers if buttons are active
+        if (isYesActive) {
+          yesSpan.onclick = debounce(function(event) { openTrade(yesSpan); }, 300);
+        } else {
+          yesSpan.onclick = null;
+        }
+        if (isNoActive) {
+          noSpan.onclick = debounce(function(event) { openTrade(noSpan); }, 300);
+        } else {
+          noSpan.onclick = null;
+        }
+      } else {
+        // Normal PRICE mode
+        const isYesActive = yesAsk > noAsk && yesAsk < 99 && yesAsk >= 40;
+        const isNoActive = noAsk > yesAsk && noAsk < 99 && noAsk >= 40;
+        updateYesNoButton(yesSpan, strike, "yes", yesAsk, isYesActive, ticker);
+        updateYesNoButton(noSpan, strike, "no", noAsk, isNoActive, ticker);
+      }
+    }
     updatePositionIndicator(cells.row.children[0], strike);
   });
 
@@ -336,10 +420,10 @@ function debounce(func, wait) {
 }
 
 // Helper function to update Yes/No button with conditional redraw
-function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = null) {
+function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = null, forceRefresh = false) {
   const key = `${strike}-${side}`;
   const prev = lastButtonStates.get(key);
-  if (prev && prev.askPrice === askPrice && prev.isActive === isActive) {
+  if (!forceRefresh && !window.forceButtonRefresh && prev && prev.askPrice === askPrice && prev.isActive === isActive) {
     // No change; skip update
     return;
   }
@@ -518,6 +602,99 @@ function openTrade(target) {
   }, 0);
 }
 
+// === IMMEDIATE DIF MODE REDRAW ===
+
+// Global flag to force refresh on mode changes
+window.forceButtonRefresh = false;
+
+// Function to immediately redraw all YES/NO buttons when DIF mode changes
+function redrawYesNoButtonsForDIFMode() {
+  console.log('FORCE REDRAWING ALL YES/NO BUTTONS for DIF mode change to:', window.plusMinusMode);
+  
+  // Set global flag to force refresh
+  window.forceButtonRefresh = true;
+  
+  // Clear the button state cache to force full redraw
+  if (window.lastButtonStates) {
+    window.lastButtonStates.clear();
+  }
+  
+  // Force immediate redraw of all buttons using current data
+  if (window.strikeRowsMap && window.strikeRowsMap.size > 0) {
+    // Get current data from the page
+    const btcPriceEl = document.getElementById('btc-price');
+    const centerPrice = btcPriceEl ? parseFloat(btcPriceEl.textContent.replace(/[^\d.-]/g, '')) : null;
+    
+    if (centerPrice) {
+      // Create minimal core data object
+      const coreData = { btc_price: centerPrice, ttc_seconds: 60 };
+      
+      // Reconstruct market data from current DOM state
+      const latestKalshiMarkets = [];
+      window.strikeRowsMap.forEach((cells, strike) => {
+        const { yesSpan, noSpan } = cells;
+        const ticker = yesSpan.getAttribute('data-ticker') || noSpan.getAttribute('data-ticker');
+        
+        if (ticker) {
+          // Extract current values and reconstruct original prices
+          let yesAsk = 0;
+          let noAsk = 0;
+          
+          const yesText = yesSpan.textContent;
+          const noText = noSpan.textContent;
+          
+          // If switching FROM DIF mode, reconstruct original prices from differences
+          if (!window.plusMinusMode) {
+            const probCell = cells.probTd;
+            const probText = probCell ? probCell.textContent : '—';
+            const prob = probText !== '—' ? parseFloat(probText) : null;
+            
+            if (prob !== null && !isNaN(prob)) {
+              if (strike < centerPrice && yesText !== '—' && yesText.includes('+')) {
+                const diff = parseFloat(yesText.replace(/[^\d.-]/g, ''));
+                if (!isNaN(diff)) {
+                  yesAsk = Math.round(prob - diff);
+                }
+              } else if (strike > centerPrice && noText !== '—' && noText.includes('+')) {
+                const diff = parseFloat(noText.replace(/[^\d.-]/g, ''));
+                if (!isNaN(diff)) {
+                  noAsk = Math.round(prob - diff);
+                }
+              }
+            }
+          } else {
+            // If switching TO DIF mode, current values should be prices
+            if (yesText && yesText !== '—' && !yesText.includes('+') && !yesText.includes('-')) {
+              yesAsk = parseFloat(yesText) || 0;
+            }
+            if (noText && noText !== '—' && !noText.includes('+') && !noText.includes('-')) {
+              noAsk = parseFloat(noText) || 0;
+            }
+          }
+          
+          latestKalshiMarkets.push({
+            ticker: ticker,
+            floor_strike: strike,
+            yes_ask: yesAsk,
+            no_ask: noAsk
+          });
+        }
+      });
+      
+      // Call updateStrikeTable with reconstructed data
+      if (typeof updateStrikeTable === 'function') {
+        console.log('Calling updateStrikeTable with reconstructed data to force complete redraw');
+        updateStrikeTable(coreData, latestKalshiMarkets);
+      }
+      
+      // Reset the force refresh flag after a short delay
+      setTimeout(() => {
+        window.forceButtonRefresh = false;
+      }, 100);
+    }
+  }
+}
+
 // === UTILITY FUNCTIONS ===
 
 // Utility function to get selected symbol from ticker panel
@@ -598,6 +775,7 @@ window.updateStrikeTable = updateStrikeTable;
 window.openTrade = openTrade;
 window.updateYesNoButton = updateYesNoButton;
 window.updatePositionIndicator = updatePositionIndicator;
+window.redrawYesNoButtonsForDIFMode = redrawYesNoButtonsForDIFMode;
 
 // === Spanner Row Helper ===
 function createSpannerRow(currentPrice) {

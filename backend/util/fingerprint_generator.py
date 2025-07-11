@@ -47,7 +47,7 @@ def main():
                 continue
 
             close_j = df.at[j, 'close']
-            percent_move = ((close_j - close_i) / close_i) * 100
+            percent_move = abs((close_j - close_i) / close_i) * 100
 
             for th in thresholds:
                 results[t][th][1] += weight  # weighted total
