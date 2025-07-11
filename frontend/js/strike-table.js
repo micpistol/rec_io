@@ -812,56 +812,49 @@ function createSpannerRow(currentPrice) {
   return spannerRow;
 }
 
-// === Add-to-Watchlist Click Handlers ===
-function addStrikeTableClickHandlers() {
-  console.log('[DEBUG] addStrikeTableClickHandlers called');
-  const strikeTable = document.getElementById('strike-table');
-  if (!strikeTable) {
-    console.log('[DEBUG] Strike table not found');
-    return;
+// === STRIKE TABLE ROW CLICK HANDLERS ===
+// Global watchlist state (like the old watchlist.js)
+let strikeTableWatchlistData = [];
+
+// Load current watchlist on page load
+async function loadStrikeTableWatchlist() {
+  try {
+    const response = await fetch('/api/get_watchlist');
+    const data = await response.json();
+    strikeTableWatchlistData = data.watchlist || [];
+    console.log('Loaded watchlist for strike table:', strikeTableWatchlistData);
+  } catch (error) {
+    console.error('Error loading watchlist for strike table:', error);
   }
-  
-  // Add a test click handler to the table itself to see if any clicks are being captured
-  strikeTable.addEventListener('click', (event) => {
-    console.log('[DEBUG] Table click captured:', event.target);
-  });
-  
-  // Add a document-level click handler to see if clicks are being captured at all
-  document.addEventListener('click', (event) => {
-    if (event.target.closest('#strike-table')) {
-      console.log('[DEBUG] Document click captured for strike table:', event.target);
+}
+
+// Save watchlist to preferences (like the old watchlist.js)
+async function saveStrikeTableWatchlist() {
+  try {
+    console.log('Saving watchlist from strike table:', strikeTableWatchlistData);
+    const response = await fetch('/api/set_watchlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ watchlist: strikeTableWatchlistData })
+    });
+    if (!response.ok) {
+      console.error('Failed to save watchlist:', response.status);
+    } else {
+      console.log('Watchlist saved successfully from strike table');
     }
-  });
-  
+  } catch (error) {
+    console.error('Error saving watchlist from strike table:', error);
+  }
+}
+
+function addStrikeTableRowClickHandlers() {
+  const strikeTable = document.getElementById('strike-table');
+  if (!strikeTable) return;
   const rows = strikeTable.querySelectorAll('tbody tr');
-  console.log('[DEBUG] Found', rows.length, 'strike rows to attach handlers to');
   rows.forEach(row => {
-    // Remove existing click handlers first
-    row.removeEventListener('click', row._watchlistClickHandler);
-    
-    // Debug RECO state
-    console.log('[DEBUG] RECO enabled state:', window.recoEnabled);
-    
-    // Check if RECO is enabled - if so, don't add click handlers
-    if (window.recoEnabled) {
-      row.style.cursor = 'default';
-      row.title = 'RECO mode - manual selection disabled';
-      Array.from(row.children).forEach((cell, idx) => {
-        if (idx >= 0 && idx <= 4) {
-          cell.style.cursor = 'default';
-          cell.title = 'RECO mode - manual selection disabled';
-        } else {
-          cell.style.cursor = 'default';
-          cell.title = '';
-        }
-      });
-      return; // Skip adding click handlers when RECO is enabled
-    }
-    // RECO is disabled - add normal click handlers
-    row.style.cursor = '';
-    row.title = '';
+    // Set pointer cursor and title for first 4 columns
     Array.from(row.children).forEach((cell, idx) => {
-      if (idx >= 0 && idx <= 3) { // PATCHED: Only first 4 columns clickable
+      if (idx >= 0 && idx <= 3) {
         cell.style.cursor = 'pointer';
         cell.title = 'Click to add to watchlist';
       } else {
@@ -869,32 +862,58 @@ function addStrikeTableClickHandlers() {
         cell.title = '';
       }
     });
+    // Remove any previous click handler
+    row.removeEventListener('click', row._strikeTableClickHandler);
+    // Attach new click handler
     const clickHandler = (event) => {
-      // Only trigger if not clicking on YES or NO columns (4 or 5)
       const cell = event.target.closest('td');
       if (!cell) return;
       const cellIndex = Array.from(row.children).indexOf(cell);
-      if (cellIndex === 4 || cellIndex === 5) return; // YES/NO columns not clickable
-      if (typeof window.addToWatchlist === 'function') window.addToWatchlist(row);
+      if (cellIndex >= 0 && cellIndex <= 3) {
+        const strikeCell = row.children[0];
+        if (!strikeCell) return;
+        const strike = parseFloat(strikeCell.textContent.replace(/[$,]/g, ''));
+        if (!isNaN(strike)) {
+          // Add to local watchlist array (like the old watchlist.js)
+          if (!strikeTableWatchlistData.includes(strike)) {
+            strikeTableWatchlistData.push(strike);
+            console.log('Added strike to watchlist:', strike);
+            console.log('Updated watchlist:', strikeTableWatchlistData);
+            
+            // Visual feedback - flash the row
+            row.classList.add('strike-row-flash');
+            setTimeout(() => {
+              row.classList.remove('strike-row-flash');
+            }, 550);
+            
+            // Save the entire updated array to backend
+            saveStrikeTableWatchlist();
+          } else {
+            console.log('Strike already in watchlist:', strike);
+          }
+        }
+      }
     };
-    row._watchlistClickHandler = clickHandler;
+    row._strikeTableClickHandler = clickHandler;
     row.addEventListener('click', clickHandler);
-    console.log('[DEBUG] Click handler attached to row:', row);
-    
-    // Test if the handler is actually attached
-    console.log('[DEBUG] Row event listeners after attachment:', row.onclick, row._watchlistClickHandler);
-    
-    // Test manual click trigger
-    setTimeout(() => {
-      console.log('[DEBUG] Testing manual click trigger on row:', row);
-      const clickEvent = new Event('click', { bubbles: true, cancelable: true });
-      row.dispatchEvent(clickEvent);
-    }, 1000);
   });
 }
-window.addStrikeTableClickHandlers = addStrikeTableClickHandlers;
 
-// === WATCHLIST FUNCTIONS moved to watchlist.js === 
-document.addEventListener('DOMContentLoaded', () => {
-  if (typeof window.addStrikeTableClickHandlers === 'function') window.addStrikeTableClickHandlers();
-}); 
+// Attach handlers after table is rendered
+if (typeof window !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', async () => {
+    // Load current watchlist first
+    await loadStrikeTableWatchlist();
+    addStrikeTableRowClickHandlers();
+    // Also re-attach after every update
+    const originalUpdateStrikeTable = window.updateStrikeTable;
+    if (originalUpdateStrikeTable) {
+      window.updateStrikeTable = function(...args) {
+        originalUpdateStrikeTable.apply(this, args);
+        setTimeout(() => {
+          addStrikeTableRowClickHandlers();
+        }, 100);
+      };
+    }
+  });
+} 
