@@ -217,8 +217,8 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
     const volume = matchingMarket && typeof matchingMarket.volume === "number" ? matchingMarket.volume : 0;
 
     // --- VOLUME-BASED DISABLING LOGIC ---
-    // If volume < 50, both buttons are disabled regardless of mode
-    if (volume < 50) {
+    // If volume < 1000, both buttons are disabled regardless of mode
+    if (volume < 1000) {
       yesSpan.textContent = yesAsk > 0 ? yesAsk : '—';
       noSpan.textContent = noAsk > 0 ? noAsk : '—';
       yesSpan.className = 'price-box disabled';
@@ -236,71 +236,75 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
       yesSpan.setAttribute('data-side', 'yes');
       noSpan.setAttribute('data-strike', strike);
       noSpan.setAttribute('data-side', 'no');
-    } else {
-      // --- DIF MODE PATCH ---
-      if (window.plusMinusMode) {
-        // Below the money line: YES button shows diff, NO is blank
-        // Above the money line: NO button shows diff, YES is blank
-        // At the money: both blank
-        let prob = probMap && probMap.has(strike) ? probMap.get(strike) : null;
-        let yesDisplay = '—';
-        let noDisplay = '—';
-        if (prob !== null && prob !== undefined) {
-          if (strike < centerPrice) {
-            // YES: Prob - yesAsk
-            if (yesAsk > 0) {
-              const diff = Math.round(prob - yesAsk);
-              yesDisplay = (diff >= 0 ? '+' : '') + diff;
-            }
-          } else if (strike > centerPrice) {
-            // NO: Prob - noAsk
-            if (noAsk > 0) {
-              const diff = Math.round(prob - noAsk);
-              noDisplay = (diff >= 0 ? '+' : '') + diff;
-            }
-          }
-          // At the money: both remain '—'
-        }
-        yesSpan.textContent = yesDisplay;
-        noSpan.textContent = noDisplay;
-        
-        // Apply same ask price validation logic as normal mode
-        const isYesActive = yesAsk > noAsk && yesAsk < 99 && yesAsk >= 40;
-        const isNoActive = noAsk > yesAsk && noAsk < 99 && noAsk >= 40;
-        
-        yesSpan.className = isYesActive ? 'price-box' : 'price-box disabled';
-        noSpan.className = isNoActive ? 'price-box' : 'price-box disabled';
-        yesSpan.style.cursor = isYesActive ? 'pointer' : 'default';
-        noSpan.style.cursor = isNoActive ? 'pointer' : 'default';
-        
-        // Set data attributes for openTrade
-        if (ticker) {
-          yesSpan.setAttribute('data-ticker', ticker);
-          noSpan.setAttribute('data-ticker', ticker);
-        }
-        yesSpan.setAttribute('data-strike', strike);
-        yesSpan.setAttribute('data-side', 'yes');
-        noSpan.setAttribute('data-strike', strike);
-        noSpan.setAttribute('data-side', 'no');
-        
-        // Only add click handlers if buttons are active
-        if (isYesActive) {
-          yesSpan.onclick = debounce(function(event) { openTrade(yesSpan); }, 300);
+    } else if (window.plusMinusMode) {
+      // DIFF mode
+      let prob = probMap && probMap.has(strike) ? probMap.get(strike) : null;
+      let yesDisplay = '—';
+      let noDisplay = '—';
+      let yesEdge = null;
+      let noEdge = null;
+      if (prob !== null && prob !== undefined) {
+        if (strike < centerPrice) {
+          // BELOW money line
+          yesEdge = prob - yesAsk;
+          noEdge = 100 - prob - noAsk;
+        } else if (strike > centerPrice) {
+          // ABOVE money line
+          yesEdge = 100 - prob - yesAsk;
+          noEdge = prob - noAsk;
         } else {
-          yesSpan.onclick = null;
+          // At the money
+          yesEdge = prob - yesAsk;
+          noEdge = 100 - prob - noAsk;
         }
-        if (isNoActive) {
-          noSpan.onclick = debounce(function(event) { openTrade(noSpan); }, 300);
-        } else {
-          noSpan.onclick = null;
+        if (yesAsk > 0) {
+          let val = Math.round(yesEdge);
+          yesDisplay = (val > 0 ? '+' : '') + val;
         }
-      } else {
-        // Normal PRICE mode
-        const isYesActive = yesAsk > noAsk && yesAsk < 99 && yesAsk >= 40;
-        const isNoActive = noAsk > yesAsk && noAsk < 99 && noAsk >= 40;
-        updateYesNoButton(yesSpan, strike, "yes", yesAsk, isYesActive, ticker);
-        updateYesNoButton(noSpan, strike, "no", noAsk, isNoActive, ticker);
+        if (noAsk > 0) {
+          let val = Math.round(noEdge);
+          noDisplay = (val > 0 ? '+' : '') + val;
+        }
       }
+      yesSpan.textContent = yesDisplay;
+      noSpan.textContent = noDisplay;
+
+      // In DIFF mode, both buttons are independently active if their own ask/volume is valid and ask != 100
+      const isYesActive = (volume >= 1000) && (yesAsk !== 100);
+      const isNoActive = (volume >= 1000) && (noAsk !== 100);
+
+      yesSpan.className = isYesActive ? 'price-box' : 'price-box disabled';
+      noSpan.className = isNoActive ? 'price-box' : 'price-box disabled';
+      yesSpan.style.cursor = isYesActive ? 'pointer' : 'default';
+      noSpan.style.cursor = isNoActive ? 'pointer' : 'default';
+
+      // Set data attributes for openTrade
+      if (ticker) {
+        yesSpan.setAttribute('data-ticker', ticker);
+        noSpan.setAttribute('data-ticker', ticker);
+      }
+      yesSpan.setAttribute('data-strike', strike);
+      yesSpan.setAttribute('data-side', 'yes');
+      noSpan.setAttribute('data-strike', strike);
+      noSpan.setAttribute('data-side', 'no');
+
+      // Attach click handlers if active
+      if (isYesActive) {
+        yesSpan.onclick = debounce(function(event) { openTrade(yesSpan); }, 300);
+      } else {
+        yesSpan.onclick = null;
+      }
+      if (isNoActive) {
+        noSpan.onclick = debounce(function(event) { openTrade(noSpan); }, 300);
+      } else {
+        noSpan.onclick = null;
+      }
+    } else {
+      // PRICE mode
+      const isYesActive = (volume >= 1000) && yesAsk > noAsk && yesAsk < 99 && yesAsk >= 40;
+      const isNoActive = (volume >= 1000) && noAsk > yesAsk && noAsk < 99 && noAsk >= 40;
+      updateYesNoButton(yesSpan, strike, "yes", yesAsk, isYesActive, ticker);
+      updateYesNoButton(noSpan, strike, "no", noAsk, isNoActive, ticker);
     }
     updatePositionIndicator(cells.row.children[0], strike);
   });
