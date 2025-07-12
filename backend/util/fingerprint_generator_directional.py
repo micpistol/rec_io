@@ -4,9 +4,10 @@ import sys
 import pandas as pd
 import argparse
 
-def generate_fingerprint(df, momentum_value=None, description=""):
+def generate_directional_fingerprint(df, momentum_value=None, description=""):
     """
-    Generate a fingerprint matrix for the given dataframe.
+    Generate a directional fingerprint matrix for the given dataframe.
+    Tracks both positive and negative price movements relative to ATM line.
     If momentum_value is not None, only use rows with that momentum as the baseline,
     but lookahead is always over the full dataset.
     """
@@ -25,8 +26,8 @@ def generate_fingerprint(df, momentum_value=None, description=""):
     thresholds = [0.25, 0.50, 0.75, 1.00, 1.25]  # in percent
     max_lookahead = 15
 
-    # Initialize counters: for each lookahead and threshold, store [successes, totals]
-    results = {t: {th: [0, 0] for th in thresholds} for t in range(1, max_lookahead + 1)}
+    # Initialize counters: for each lookahead and threshold, store [positive_successes, negative_successes, totals]
+    results = {t: {th: [0, 0, 0] for th in thresholds} for t in range(1, max_lookahead + 1)}
 
     total_rows = len(df)
     print(f"Processing {total_rows} rows for {description}...")
@@ -49,26 +50,40 @@ def generate_fingerprint(df, momentum_value=None, description=""):
                 continue
 
             close_j = df.at[j, 'close']
-            percent_move = abs((close_j - close_i) / close_i) * 100
+            percent_move = ((close_j - close_i) / close_i) * 100  # Keep sign for direction
 
             for th in thresholds:
-                results[t][th][1] += weight  # weighted total
+                results[t][th][2] += weight  # weighted total
+                
+                # Track positive movements (above ATM)
                 if percent_move >= th:
-                    results[t][th][0] += weight  # weighted success
+                    results[t][th][0] += weight  # positive successes
+                
+                # Track negative movements (below ATM)
+                if percent_move <= -th:
+                    results[t][th][1] += weight  # negative successes
 
     print(f"Finished processing for {description}.")
 
-    # Prepare output DataFrame
+    # Prepare output DataFrame with both positive and negative columns
     output_data = []
     for t in range(1, max_lookahead + 1):
         row = []
         for th in thresholds:
-            successes, totals = results[t][th]
-            rate = (successes / totals * 100) if totals > 0 else 0.0
-            row.append(round(rate, 2))
+            positive_successes, negative_successes, totals = results[t][th]
+            
+            # Calculate positive and negative rates
+            positive_rate = (positive_successes / totals * 100) if totals > 0 else 0.0
+            negative_rate = (negative_successes / totals * 100) if totals > 0 else 0.0
+            
+            row.extend([round(positive_rate, 2), round(negative_rate, 2)])
         output_data.append(row)
 
-    columns = [f">= {th:.2f}%" for th in thresholds]
+    # Create column names for both positive and negative
+    columns = []
+    for th in thresholds:
+        columns.extend([f">= +{th:.2f}%", f"<= -{th:.2f}%"])
+
     output_df = pd.DataFrame(output_data, columns=columns, dtype=float)
     output_df.index = [f"{t}m TTC" for t in range(1, max_lookahead + 1)]
     
@@ -76,21 +91,21 @@ def generate_fingerprint(df, momentum_value=None, description=""):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate fingerprint matrices for price data with optional momentum-based analysis.",
+        description="Generate directional fingerprint matrices tracking both positive and negative price movements.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Generate baseline fingerprint only
-  python fingerprint_generator.py data.csv --baseline-only
+  python fingerprint_generator_directional.py data.csv --baseline-only
   
   # Generate momentum fingerprints only (requires momentum column)
-  python fingerprint_generator.py data.csv --momentum-only
+  python fingerprint_generator_directional.py data.csv --momentum-only
   
   # Generate both baseline and momentum fingerprints (default)
-  python fingerprint_generator.py data.csv
+  python fingerprint_generator_directional.py data.csv
   
   # Generate momentum fingerprints for specific range
-  python fingerprint_generator.py data.csv --momentum-only --momentum-range -10 10
+  python fingerprint_generator_directional.py data.csv --momentum-only --momentum-range -10 10
         """
     )
     parser.add_argument("csv_path", help="Path to input CSV file with price data")
@@ -137,17 +152,17 @@ Examples:
 
     # Generate baseline fingerprint
     if generate_baseline:
-        print("Generating baseline fingerprint...")
-        baseline_df = generate_fingerprint(df, description="baseline")
+        print("Generating baseline directional fingerprint...")
+        baseline_df = generate_directional_fingerprint(df, description="baseline")
         if baseline_df is not None:
-            baseline_filename = f"{symbol}_fingerprint_baseline.csv"
+            baseline_filename = f"{symbol}_fingerprint_directional_baseline.csv"
             baseline_path = os.path.join(output_dir, baseline_filename)
             baseline_df.to_csv(baseline_path)
-            print(f"Baseline fingerprint saved to {baseline_path}")
+            print(f"Baseline directional fingerprint saved to {baseline_path}")
 
     # Generate momentum-bucket fingerprints
     if generate_momentum:
-        print("Generating momentum-bucket fingerprints...")
+        print("Generating momentum-bucket directional fingerprints...")
         
         # Determine momentum range
         if args.momentum_range:
@@ -160,16 +175,16 @@ Examples:
         
         for momentum_value in momentum_buckets:
             print(f"Processing momentum bucket: {momentum_value}")
-            bucket_df = generate_fingerprint(df, momentum_value, f"momentum {momentum_value}")
+            bucket_df = generate_directional_fingerprint(df, momentum_value, f"momentum {momentum_value}")
             
             if bucket_df is not None:
                 # Create filename with momentum value (no date)
-                momentum_filename = f"{symbol}_fingerprint_momentum_{momentum_value:03d}.csv"
+                momentum_filename = f"{symbol}_fingerprint_directional_momentum_{momentum_value:03d}.csv"
                 momentum_path = os.path.join(output_dir, momentum_filename)
                 bucket_df.to_csv(momentum_path)
-                print(f"Momentum {momentum_value} fingerprint saved to {momentum_path}")
+                print(f"Momentum {momentum_value} directional fingerprint saved to {momentum_path}")
 
-    print("All fingerprint generation complete!")
+    print("All directional fingerprint generation complete!")
 
 if __name__ == "__main__":
-    main()
+    main() 

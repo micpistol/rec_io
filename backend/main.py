@@ -23,11 +23,11 @@ import pandas as pd
 from pydantic import BaseModel
 
 
-from account_mode import get_account_mode
+from backend.account_mode import get_account_mode
 from core.config.settings import config
 
 from util.paths import get_price_history_dir, get_data_dir, ensure_data_dirs
-from util.probabilty_calculator import calculate_strike_probabilities, start_live_probability_writer, stop_live_probability_writer
+from util.probability_calculator_directional import calculate_directional_strike_probabilities
 
 
 # Ensure all data directories exist
@@ -1276,13 +1276,15 @@ def notify_trade_update():
 @app.post("/api/strike_probabilities")
 async def get_strike_probabilities(request: Request):
     """
-    Calculate strike probabilities using the fingerprint-based calculator.
+    Calculate strike probabilities using the directional fingerprint-based calculator.
+    Now supports momentum-aware fingerprint selection.
     
     Expected JSON payload:
     {
         "current_price": float,
         "ttc_seconds": float,
-        "strikes": [float, ...]
+        "strikes": [float, ...],
+        "momentum_score": float (optional)
     }
     
     Returns:
@@ -1305,20 +1307,35 @@ async def get_strike_probabilities(request: Request):
         current_price = data.get("current_price")
         ttc_seconds = data.get("ttc_seconds")
         strikes = data.get("strikes")
+        momentum_score = data.get("momentum_score")  # Get from frontend
         
         if not all([current_price, ttc_seconds, strikes]):
             return {"status": "error", "message": "Missing required parameters"}
         
-        # Calculate probabilities
-        probabilities = calculate_strike_probabilities(
+        # Convert momentum_score to float if provided
+        if momentum_score is not None:
+            try:
+                momentum_score = float(momentum_score)
+            except (ValueError, TypeError):
+                print(f"Warning: Invalid momentum_score provided: {momentum_score}")
+                momentum_score = None
+        print("API momentum_score received:", momentum_score)  # DEBUG
+        # Calculate directional probabilities with momentum awareness
+        probabilities = calculate_directional_strike_probabilities(
             current_price=float(current_price),
             ttc_seconds=float(ttc_seconds),
-            strikes=strikes
+            strikes=strikes,
+            momentum_score=momentum_score
         )
         
+        # Only return the original fields
+        filtered_probabilities = [
+            {k: row[k] for k in ['strike', 'buffer', 'move_percent', 'prob_beyond', 'prob_within']}
+            for row in probabilities
+        ]
         return {
             "status": "ok",
-            "probabilities": probabilities
+            "probabilities": filtered_probabilities
         }
         
     except Exception as e:
@@ -1387,6 +1404,103 @@ def test_endpoint():
     return {"status": "ok", "message": "Test endpoint working"}
 
 
+@app.get("/api/test_fingerprint")
+def test_fingerprint():
+    """
+    Test endpoint to trigger a calculation and verify fingerprint tracking.
+    """
+    try:
+        from backend.util.probability_calculator_directional import get_directional_calculator
+        calculator = get_directional_calculator()
+        
+        # Trigger a calculation with a known momentum score
+        test_price = 50000.0
+        test_ttc = 3600.0  # 1 hour
+        test_strikes = [45000, 50000, 55000]
+        test_momentum = 5.0
+        
+        print(f"Testing fingerprint with momentum score: {test_momentum}")
+        result = calculator.calculate_directional_strike_probabilities(
+            current_price=test_price,
+            ttc_seconds=test_ttc,
+            strikes=test_strikes,
+            momentum_score=test_momentum
+        )
+        
+        # Get the current fingerprint info
+        current_bucket = getattr(calculator, 'last_used_momentum_bucket', None)
+        if current_bucket is None:
+            current_bucket = calculator.current_momentum_bucket
+            
+        if current_bucket is not None:
+            fingerprint_name = f"btc_fingerprint_directional_momentum_{current_bucket:03d}.csv"
+            return {
+                "status": "success",
+                "message": f"Calculation completed with momentum {test_momentum}",
+                "fingerprint": fingerprint_name,
+                "bucket": current_bucket,
+                "available_buckets": list(calculator.momentum_fingerprints.keys())
+            }
+        else:
+            return {
+                "status": "error", 
+                "message": "Calculation completed but no fingerprint bucket was set",
+                "available_buckets": list(calculator.momentum_fingerprints.keys())
+            }
+            
+    except Exception as e:
+        return {"status": "error", "message": f"Test failed: {str(e)}"}
+
+
+@app.get("/api/current_fingerprint")
+def get_current_fingerprint():
+    """
+    Get information about the current fingerprint being used by the calculator.
+    Always returns the most recent fingerprint, even after restart, by reading the log if needed.
+    """
+    try:
+        from backend.util.probability_calculator_directional import get_directional_calculator
+        calculator = get_directional_calculator()
+        # Use last_used_momentum_bucket if available, else current_momentum_bucket
+        bucket = getattr(calculator, 'last_used_momentum_bucket', None)
+        if bucket is None:
+            bucket = calculator.current_momentum_bucket
+        if bucket is not None:
+            fingerprint_name = f"btc_fingerprint_directional_momentum_{int(bucket):03d}.csv"
+            return {
+                "status": "ok",
+                "fingerprint": fingerprint_name,
+                "bucket": bucket,
+                "total_loaded": len(calculator.momentum_fingerprints)
+            }
+        # If no bucket in memory, read the last line of the log
+        log_path = os.path.join(os.path.dirname(__file__), 'data', 'fingerprint_debug.log')
+        if os.path.exists(log_path):
+            with open(log_path, 'r') as f:
+                lines = f.readlines()
+                for line in reversed(lines):
+                    if 'fingerprint=' in line:
+                        parts = line.strip().split(',')
+                        bucket_part = [p for p in parts if p.strip().startswith('bucket=')]
+                        fp_part = [p for p in parts if p.strip().startswith('fingerprint=')]
+                        if bucket_part and fp_part:
+                            bucket_val = bucket_part[0].split('=')[1].strip()
+                            fp_val = fp_part[0].split('=')[1].strip()
+                            try:
+                                bucket_val = int(bucket_val)
+                            except Exception:
+                                pass
+                            return {
+                                "status": "ok",
+                                "fingerprint": fp_val,
+                                "bucket": bucket_val,
+                                "source": "logfile"
+                            }
+        return {"status": "error", "message": "No momentum bucket is currently loaded or used!"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 
 if __name__ == "__main__":
     import threading
@@ -1424,11 +1538,11 @@ if __name__ == "__main__":
             return None
     
     # Start the live probability writer
-    start_live_probability_writer(
-        update_interval=10,  # Update every 10 seconds
-        current_price_getter=get_current_price,
-        ttc_getter=get_current_ttc
-    )
+    # start_live_probability_writer( # This line is removed as per the edit hint
+    #     update_interval=10,  # Update every 10 seconds
+    #     current_price_getter=get_current_price,
+    #     ttc_getter=get_current_ttc
+    # )
 
     import uvicorn
     port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))

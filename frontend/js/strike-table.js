@@ -103,9 +103,13 @@ async function fetchProbabilities(symbol, currentPrice, ttcMinutes, strikes, yea
   try {
     const ttcSeconds = ttcMinutes * 60;
     
+    // Get current momentum score from the UI
+    const momentumScore = getCurrentMomentumScore();
+    
     console.log('[STRIKE TABLE] Fetching probabilities for:', {
       currentPrice,
       ttcSeconds,
+      momentumScore,
       strikes: strikes.slice(0, 5) + '...' + strikes.slice(-5) // Show first and last 5 strikes
     });
     
@@ -115,7 +119,8 @@ async function fetchProbabilities(symbol, currentPrice, ttcMinutes, strikes, yea
       body: JSON.stringify({
         current_price: currentPrice,
         ttc_seconds: ttcSeconds,
-        strikes: strikes
+        strikes: strikes,
+        momentum_score: momentumScore
       })
     });
     const data = await res.json();

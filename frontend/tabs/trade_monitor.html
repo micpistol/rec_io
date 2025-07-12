@@ -611,6 +611,10 @@
               <!-- momentum delta indicator removed -->
             </div>
           </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 8px 4px 8px;">
+            <div id="fingerprint-display" style="font-size: 11px; color: #888; font-family: monospace;">Fingerprint: —</div>
+            <div></div>
+          </div>
           <div style="display: flex; gap: 10px;">
             <div style="width: 30%; height: 180px; background-color: #1e2733; display: flex; align-items: center; justify-content: center;">
               <canvas id="momentumBarChartCanvas" style="width: 100%; height: 100%;"></canvas>
@@ -2370,6 +2374,60 @@ document.addEventListener('DOMContentLoaded', () => {
 
       renderMomentumBarChart(deltas);
       drawRollingMomentumChart();
+      
+      // Update fingerprint display
+      updateFingerprintDisplay();
+    }
+    
+    // Function to update the fingerprint display
+    async function updateFingerprintDisplay() {
+      const fingerprintEl = document.getElementById('fingerprint-display');
+      if (!fingerprintEl) return;
+      
+      try {
+        // Get current momentum score
+        const momentumScore = getCurrentMomentumScore();
+        if (momentumScore === "") {
+          fingerprintEl.textContent = "Fingerprint: —";
+          return;
+        }
+        
+        // Get current BTC price and TTC for the API call
+        const btcPriceEl = document.getElementById('btc-price-value');
+        const ttcEl = document.getElementById('strikePanelTTC');
+        
+        if (!btcPriceEl || !ttcEl) {
+          fingerprintEl.textContent = "Fingerprint: —";
+          return;
+        }
+        
+        const btcPrice = parseFloat(btcPriceEl.textContent.replace(/[$,]/g, ''));
+        const ttcText = ttcEl.textContent.trim();
+        const ttcMinutes = parseInt(ttcText.split(':')[0]) * 60 + parseInt(ttcText.split(':')[1]);
+        
+        if (isNaN(btcPrice) || isNaN(ttcMinutes)) {
+          fingerprintEl.textContent = "Fingerprint: —";
+          return;
+        }
+        
+        // Get current fingerprint information from backend
+        const response = await fetch('http://localhost:5001/api/current_fingerprint');
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'ok') {
+            fingerprintEl.textContent = `Fingerprint: ${data.fingerprint}`;
+          } else {
+            fingerprintEl.textContent = "Fingerprint: error";
+          }
+        } else {
+          fingerprintEl.textContent = "Fingerprint: —";
+        }
+        
+      } catch (error) {
+        console.error('Error updating fingerprint display:', error);
+        fingerprintEl.textContent = "Fingerprint: —";
+      }
     }
 
     // Chart.js-based momentum bar chart (flicker-free: update data in place)
