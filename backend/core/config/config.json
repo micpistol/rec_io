@@ -39,6 +39,13 @@
       "enabled": true,
       "update_interval": 30.0,
       "providers": ["kalshi"]
+    },
+    "data_updater": {
+      "enabled": true,
+      "schedule_time": "23:59:59",
+      "schedule_day": "saturday",
+      "symbols": ["BTC/USD"],
+      "update_interval": 60.0
     }
   },
   "data": {

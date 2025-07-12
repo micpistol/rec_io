@@ -41,6 +41,10 @@ class EventType(Enum):
     AGENT_STOPPED = "agent_stopped"
     AGENT_ERROR = "agent_error"
     SYSTEM_HEALTH_UPDATE = "system_health_update"
+    SYSTEM_STARTUP = "system_startup"
+    
+    # Data events
+    DATA_UPDATE = "data_update"
     
     # Indicator events
     INDICATOR_UPDATE = "indicator_update"
