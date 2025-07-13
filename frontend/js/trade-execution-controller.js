@@ -157,6 +157,164 @@ window.executeTrade = async function(tradeData) {
   }
 };
 
+// === CENTRALIZED CLOSE TRADE FUNCTION ===
+// This is the ONLY function that should close trades
+window.closeTrade = async function(tradeId, sellPrice, event) {
+  // Prevent multiple simultaneous executions
+  if (window.TRADE_STATE.isExecuting) {
+    console.warn('Close trade execution blocked: Another trade is currently executing');
+    return { success: false, error: 'Trade already executing' };
+  }
+
+  // Validate inputs
+  if (!tradeId || !sellPrice) {
+    console.error('Invalid close trade parameters:', { tradeId, sellPrice });
+    return { success: false, error: 'Invalid close trade parameters' };
+  }
+
+  // Generate unique ticket ID
+  const ticket_id = 'TICKET-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+  
+  // Add to pending trades
+  window.TRADE_STATE.pendingTrades.add(ticket_id);
+  window.TRADE_STATE.isExecuting = true;
+
+  try {
+    // Fetch trade details to construct the close ticket
+    const tradeRes = await fetch(`/trades/${tradeId}`);
+    if (!tradeRes.ok) throw new Error('Failed to fetch trade for closing');
+    const trade = await tradeRes.json();
+
+    // === Immediately log the close ticket creation ===
+    await fetch('/api/log_event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ticket_id: ticket_id,
+        message: "MONITOR: CLOSE TICKET INITIATED — CONFIRMED"
+      })
+    });
+
+    // === Prune old trade logs (keep file size sane) ===
+    await fetch('/api/prune_trade_logs', { method: 'POST' });
+
+    // === Get the ACTUAL position count from the trade data ===
+    let count = trade.position;
+    
+    // Validate that we have a valid position count
+    if (count === null || count === undefined || isNaN(count) || count <= 0) {
+      console.error('Invalid position count for trade:', tradeId, 'position:', count);
+      throw new Error(`Invalid position count: ${count}. Trade ID: ${tradeId}`);
+    }
+
+    // Invert side
+    let invertedSide = null;
+    if (trade.side === 'Y' || trade.side === 'YES') invertedSide = 'N';
+    else if (trade.side === 'N' || trade.side === 'NO') invertedSide = 'Y';
+    else invertedSide = trade.side;
+
+    // Use current BTC price for symbol_close
+    const symbolClose = typeof getCurrentBTCTickerPrice === 'function' ? getCurrentBTCTickerPrice() : null;
+
+    // Compose payload to match open ticket, plus intent: 'close'
+    const payload = {
+      ticket_id:        ticket_id,
+      intent:           'close',
+      ticker:           trade.ticker,
+      side:             invertedSide,
+      count:            count,
+      action:           'close',
+      type:             'market',
+      time_in_force:    'IOC',
+      buy_price:        sellPrice,
+      symbol_close:     symbolClose
+    };
+
+    console.log('Close trade execution payload:', payload);
+
+    // === DEMO MODE CHECK ===
+    if (window.TRADE_CONFIG.DEMO_MODE) {
+      // No popup, just log
+      if (window.TRADE_CONFIG.ENABLE_SOUNDS && typeof playSound === 'function') {
+        playSound('close');
+      }
+      window.TRADE_STATE.executedTrades.add(ticket_id);
+      window.TRADE_STATE.lastTradeId = ticket_id;
+      return { 
+        success: true, 
+        ticket_id: ticket_id, 
+        demo: true,
+        message: 'Demo close trade created successfully'
+      };
+    }
+
+    // === LIVE TRADING MODE ===
+    if (window.TRADE_CONFIG.REQUIRE_CONFIRMATION) {
+      const confirmMessage = `CONFIRM CLOSE TRADE\n\n\n` +
+        `Trade ID: ${tradeId}\n` +
+        `Original Side: ${trade.side}\n` +
+        `Position: ${count}\n` +
+        `Sell Price: $${sellPrice}\n` +
+        `Current BTC: $${symbolClose || 'Unknown'}\n\n\n` +
+        `⚠️  This will execute a REAL CLOSE TRADE with REAL MONEY\n\n` +
+        `Are you sure you want to proceed?`;
+
+      const confirmed = confirm(confirmMessage);
+      if (!confirmed) {
+        console.log('Close trade cancelled by user');
+        return { success: false, error: 'Close trade cancelled by user' };
+      }
+    }
+
+    // Execute the actual close trade
+    const response = await fetch('/trades', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Close trade execution failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    // Add to executed trades
+    window.TRADE_STATE.executedTrades.add(ticket_id);
+    window.TRADE_STATE.lastTradeId = ticket_id;
+
+    // Play sound if enabled
+    if (window.TRADE_CONFIG.ENABLE_SOUNDS && typeof playSound === 'function') {
+      playSound('close');
+    }
+
+    // Show popup if enabled
+    if (window.TRADE_CONFIG.ENABLE_POPUPS && typeof showTradeClosedPopup === 'function') {
+      showTradeClosedPopup();
+    }
+
+    console.log('Close trade executed successfully:', result);
+    return { 
+      success: true, 
+      ticket_id: ticket_id, 
+      demo: false,
+      result: result
+    };
+
+  } catch (error) {
+    console.error('Close trade execution failed:', error);
+    return { 
+      success: false, 
+      error: error.message,
+      ticket_id: ticket_id
+    };
+  } finally {
+    // Remove from pending trades
+    window.TRADE_STATE.pendingTrades.delete(ticket_id);
+    window.TRADE_STATE.isExecuting = false;
+  }
+};
+
 // === TRADE EXECUTION HELPER FUNCTIONS ===
 
 // Function to prepare trade data from button click

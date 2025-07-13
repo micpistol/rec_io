@@ -2140,7 +2140,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <th>Buy</th>
               <th>Pos</th>
               <th>Buffer</th>
-              <th>Prob</th>
+              <th style="width: 30px;"">Prob</th>
               <th style="text-align: center;">Close</th>
             </tr>
           </thead>
@@ -2878,6 +2878,7 @@ async function showPopup(strike, side, price) {
 // === Flicker-free Active Trades Table with persistent rows and in-place updates ===
 const activeTradesRowsMap = new Map();
 const previousClosePrices = {}; // Keyed by trade.id
+const lastCloseButtonStates = new Map(); // Keyed by trade.id
 
 async function fetchAndRenderTrades() {
   try {
@@ -3155,6 +3156,7 @@ async function fetchAndRenderTrades() {
         tr.appendChild(bufferTd);
         tr.appendChild(bmTd);
         tr.appendChild(closeTd);
+        tr.dataset.tradeId = trade.id; // Add trade ID to row for tracking
         rowObj = {
           tr, strikeTd, sideTd, priceTd, posTd, bufferTd, bmTd, closeTd,
           status: trade.status
@@ -3188,19 +3190,24 @@ async function fetchAndRenderTrades() {
           }
         }
         if (rowObj.bmTd.textContent !== probDisplay) rowObj.bmTd.textContent = probDisplay;
-        // Update CLOSE column
-        rowObj.closeTd.innerHTML = '';
-        if (closeButtonSpan) {
-          const clonedSpan = closeButtonSpan.cloneNode(true);
-          clonedSpan.classList.remove('disabled');
-          clonedSpan.style.opacity = '';
-          clonedSpan.style.pointerEvents = '';
-          clonedSpan.style.cursor = 'pointer';
-          clonedSpan.dataset.tradeId = trade.id;
-          clonedSpan.dataset.action = 'close';
-          rowObj.closeTd.appendChild(clonedSpan);
-        } else {
-          rowObj.closeTd.textContent = 'N/A';
+        // Update CLOSE column only if the button's display number changed
+        const currentButtonText = closeButtonSpan?.textContent || 'N/A';
+        const lastButtonText = lastCloseButtonStates.get(trade.id);
+        if (lastButtonText !== currentButtonText) {
+          rowObj.closeTd.innerHTML = '';
+          if (closeButtonSpan) {
+            const clonedSpan = closeButtonSpan.cloneNode(true);
+            clonedSpan.classList.remove('disabled');
+            clonedSpan.style.opacity = '';
+            clonedSpan.style.pointerEvents = '';
+            clonedSpan.style.cursor = 'pointer';
+            clonedSpan.dataset.tradeId = trade.id;
+            clonedSpan.dataset.action = 'close';
+            rowObj.closeTd.appendChild(clonedSpan);
+          } else {
+            rowObj.closeTd.textContent = 'N/A';
+          }
+          lastCloseButtonStates.set(trade.id, currentButtonText);
         }
       }
       if (!rowObj.tr.parentNode) {
@@ -3249,10 +3256,63 @@ async function fetchAndRenderTrades() {
       tradeRows.splice(spannerIndex, 0, spannerRow);
     }
 
-    // Clear the table body and append all rows in the correct order
-    activeTradesTableBody.innerHTML = '';
-    tradeRows.forEach(row => {
-      activeTradesTableBody.appendChild(row);
+    // Update table efficiently by only changing what's needed
+    const existingRows = Array.from(activeTradesTableBody.children);
+    
+    // Remove spanner rows first
+    existingRows.filter(row => row.classList.contains('spanner-row')).forEach(row => row.remove());
+    
+    // Update or add trade rows
+    tradeRows.forEach((newRow, index) => {
+      if (newRow.classList.contains('spanner-row')) {
+        // Insert spanner row at correct position
+        if (index < activeTradesTableBody.children.length) {
+          activeTradesTableBody.insertBefore(newRow, activeTradesTableBody.children[index]);
+        } else {
+          activeTradesTableBody.appendChild(newRow);
+        }
+      } else {
+        // For trade rows, find existing row by trade ID
+        const tradeId = newRow.querySelector('[data-trade-id]')?.dataset.tradeId;
+        const existingRow = existingRows.find(row => 
+          row.querySelector(`[data-trade-id="${tradeId}"]`)
+        );
+        
+        if (existingRow) {
+          // Update existing row content without recreating the row
+          const newCells = Array.from(newRow.children);
+          const existingCells = Array.from(existingRow.children);
+          
+          for (let i = 0; i < Math.min(newCells.length, existingCells.length); i++) {
+            if (existingCells[i].textContent !== newCells[i].textContent) {
+              existingCells[i].textContent = newCells[i].textContent;
+            }
+          }
+          
+          // Update row class if needed
+          if (existingRow.className !== newRow.className) {
+            existingRow.className = newRow.className;
+          }
+        } else {
+          // New row, append it
+          activeTradesTableBody.appendChild(newRow);
+        }
+      }
+    });
+    
+    // Remove any old rows that are no longer needed
+    const currentTradeIds = tradeRows
+      .filter(row => !row.classList.contains('spanner-row'))
+      .map(row => row.querySelector('[data-trade-id]')?.dataset.tradeId)
+      .filter(Boolean);
+    
+    existingRows.forEach(row => {
+      if (!row.classList.contains('spanner-row')) {
+        const rowTradeId = row.querySelector('[data-trade-id]')?.dataset.tradeId;
+        if (rowTradeId && !currentTradeIds.includes(rowTradeId)) {
+          row.remove();
+        }
+      }
     });
   } catch (err) {
     console.error('Error fetching trades:', err);
@@ -3465,8 +3525,12 @@ activeTradesTableBody.addEventListener('click', (event) => {
       alert('Invalid ASK price for closing trade');
       return;
     }
-    // Use new master closeTrade function instead of closeTradeById
-    closeTrade(tradeId, calculatedSellPrice, event);
+    // Use centralized closeTrade function from controller
+    if (typeof window.closeTrade === 'function') {
+      window.closeTrade(tradeId, calculatedSellPrice, event);
+    } else {
+      console.error('Centralized closeTrade function not available');
+    }
   }
 });
 
