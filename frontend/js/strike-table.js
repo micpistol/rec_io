@@ -303,12 +303,24 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
 
       // Attach click handlers if active
       if (isYesActive) {
-        yesSpan.onclick = debounce(function(event) { openTrade(yesSpan); }, 300);
+        yesSpan.onclick = debounce(function(event) {
+          const btn = yesSpan;
+          const tradeData = window.prepareTradeData ? window.prepareTradeData(btn) : null;
+          if (tradeData) {
+            window.executeTrade(tradeData);
+          }
+        }, 300);
       } else {
         yesSpan.onclick = null;
       }
       if (isNoActive) {
-        noSpan.onclick = debounce(function(event) { openTrade(noSpan); }, 300);
+        noSpan.onclick = debounce(function(event) {
+          const btn = noSpan;
+          const tradeData = window.prepareTradeData ? window.prepareTradeData(btn) : null;
+          if (tradeData) {
+            window.executeTrade(tradeData);
+          }
+        }, 300);
       } else {
         noSpan.onclick = null;
       }
@@ -468,7 +480,15 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
 
   if (isActive) {
     spanEl.onclick = debounce(function(event) {
-      openTrade(spanEl);
+      // Use centralized trade controller
+      if (typeof window.prepareTradeData === 'function' && typeof window.executeTrade === 'function') {
+        const tradeData = window.prepareTradeData(spanEl);
+        if (tradeData) {
+          window.executeTrade(tradeData);
+        }
+      } else {
+        console.error('Centralized trade controller not available');
+      }
     }, 300);
   } else {
     spanEl.onclick = null;
@@ -478,151 +498,9 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
 }
 
 // === TRADE EXECUTION ===
-
-function openTrade(target) {
-  // Play sound and popup immediately
-  playSound('open');
-  showTradeOpenedPopup();
-
-  const btn = target;
-  if (btn?.disabled) return;
-  btn.disabled = true;
-
-  // --- Visual feedback: row flash highlight ---
-  let row = btn.closest('tr');
-  if (row) {
-    row.classList.add('strike-row-flash');
-    setTimeout(() => row.classList.remove('strike-row-flash'), 600);
-  }
-
-  // --- Immediately trigger trade table update (no debounce, no delay, no backend wait) ---
-  fetchAndRenderTrades();
-
-  // Defer backend logic to next tick to decouple from UI thread
-  setTimeout(() => {
-    (async () => {
-      try {
-        const now = new Date();
-        const btnText = btn?.textContent?.trim() || '';
-        // Convert prices like 96 to 0.96
-        const buy_price = parseFloat((parseFloat(btnText) / 100).toFixed(2));
-
-        const posInput = document.getElementById('position-size');
-        const rawBasePos = posInput ? parseInt(posInput.value, 10) : NaN;
-        const validBase = Number.isFinite(rawBasePos) && rawBasePos > 0 ? rawBasePos : null;
-
-        const multiplierBtn = document.querySelector('.multiplier-btn.active');
-        const multiplier = multiplierBtn ? parseInt(multiplierBtn.dataset.multiplier, 10) : 1;
-
-        const position = validBase !== null ? validBase * multiplier : null;
-
-        const symbol = getSelectedSymbol();
-        const contract = getTruncatedMarketTitle();
-        // Get the strike and side from data attributes on the parent td or span
-        let strike = null;
-        let side = null;
-        // Attempt to find strike and side from parent td or span
-        // Find the row
-        let row2 = btn.closest('tr');
-        if (row2) {
-          // First td is strike cell
-          const strikeCell = row2.querySelector('td');
-          if (strikeCell) {
-            // Remove $ and commas, parse as number
-            strike = parseFloat(strikeCell.textContent.replace(/\$|,/g, ''));
-          }
-          // Determine side by column index
-          const tds = Array.from(row2.children);
-                      for (let i = 0; i < tds.length; ++i) {
-              if (tds[i].contains(btn)) {
-                if (i === 4) side = 'yes';
-                if (i === 5) side = 'no';
-              }
-            }
-        }
-        // Fallback: try to get from btn.dataset
-        if (!strike && btn.dataset.strike) strike = parseFloat(btn.dataset.strike);
-        if (!side && btn.dataset.side) side = btn.dataset.side;
-        // Get ticker from data-ticker attribute (on td or span)
-        let kalshiTicker = btn.dataset.ticker || null;
-        if (!kalshiTicker && btn.parentElement && btn.parentElement.dataset.ticker) {
-          kalshiTicker = btn.parentElement.dataset.ticker;
-        }
-        // Fallback: try to find from latestKalshiMarkets if available
-        if (!kalshiTicker && window.latestKalshiMarkets && Array.isArray(window.latestKalshiMarkets) && strike != null) {
-          const match = window.latestKalshiMarkets.find(m => Math.round(m.floor_strike) === strike);
-          if (match) kalshiTicker = match.ticker;
-        }
-        const symbol_open = getCurrentBTCTickerPrice();
-        const momentum = getCurrentMomentumScore();
-        // Use window.coreData for volatility if present
-        const volatility = window.coreData?.volatility_score != null
-          ? parseFloat(window.coreData.volatility_score.toFixed(2))
-          : null;
-
-        // === Generate unique ticket ID just before payload definition ===
-        const ticket_id = 'TICKET-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
-
-        // === Immediately log the initial entry to backend ===
-        fetch('/api/log_event', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ticket_id: ticket_id,
-            message: "MONITOR: TICKET INITIATED — CONFIRMED"
-          })
-        });
-        // === Prune old trade logs right after logging event ===
-        fetch('/api/prune_trade_logs', { method: 'POST' });
-
-        // === Construct new payload as specified ===
-        const payload = {
-          ticket_id:         ticket_id,
-          status:            "pending",
-          date:              now.toISOString().split("T")[0],
-          time:              now.toLocaleTimeString('en-US', { hour12: false }),
-          symbol:            symbol,
-          market:            "Kalshi",
-          trade_strategy:    "Hourly HTC",
-          contract:          contract,
-          strike:            `$${Number(strike).toLocaleString()}`,
-          side:              side && side.toUpperCase() === 'YES' ? 'Y' : (side && side.toUpperCase() === 'NO' ? 'N' : (side ? side[0].toUpperCase() : null)),
-          ticker:            kalshiTicker,
-          buy_price:         buy_price,
-          // position will be set below if valid
-          symbol_open:       symbol_open,
-          symbol_close:      null,
-          momentum:          momentum,
-          momentum_delta:    null,
-          volatility:        volatility,
-          volatility_delta:  null,
-          win_loss:          null
-        };
-        if (position !== null) {
-          payload.position = position;
-        }
-
-        // 🔍 Log to console for now — we'll send this to backend and executor in next step
-        console.log("Prepared trade payload:", payload);
-
-        fetch('/trades', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        })
-        .then(() => {
-          // (Optionally, trigger another refresh here, but already done above)
-          fetchAndRenderRecentTrades();
-        })
-        .catch(err => console.error('Failed to open trade:', err))
-        .finally(() => setTimeout(() => (btn.disabled = false), 500));
-      } catch (err) {
-        console.error('Failed to open trade:', err);
-        setTimeout(() => (btn.disabled = false), 500);
-      }
-    })();
-  }, 0);
-}
+// Remove legacy openTrade and ticket logic. All trade tickets must go through the centralized controller.
+// Remove function openTrade and any code that builds or sends tickets directly.
+// Only keep UI logic and event handlers that call window.executeTrade and window.prepareTradeData from trade-execution-controller.js.
 
 // === IMMEDIATE DIF MODE REDRAW ===
 
@@ -794,7 +672,7 @@ function showTradeOpenedPopup() {
 // Make functions available globally for other modules to use
 window.initializeStrikeTable = initializeStrikeTable;
 window.updateStrikeTable = updateStrikeTable;
-window.openTrade = openTrade;
+// window.openTrade = openTrade; // Removed
 window.updateYesNoButton = updateYesNoButton;
 window.updatePositionIndicator = updatePositionIndicator;
 window.redrawYesNoButtonsForDIFMode = redrawYesNoButtonsForDIFMode;

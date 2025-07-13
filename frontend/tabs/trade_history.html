@@ -212,6 +212,13 @@
         tr.style.borderTop = isNewGroup ? '2px solid #666' : '';
         // Assign group-odd or group-even class based on groupIndex
         tr.classList.add(groupIndex % 2 === 1 ? 'group-odd' : 'group-even');
+        // Helper to format numbers with + sign for positive values, no decimals
+        function plusSign(val) {
+          if (val === null || val === undefined || val === '') return '';
+          const num = Number(val);
+          if (isNaN(num)) return val;
+          return (num > 0 ? '+' : '') + Math.round(num);
+        }
         tr.innerHTML = `
           <td>${trade.id !== null ? trade.id : ''}</td>
           <td>${trade.status !== null ? trade.status : ''}</td>
@@ -222,19 +229,19 @@
           <td>${trade.contract !== null ? trade.contract : ''}</td>
           <td>${trade.strike !== null ? trade.strike : ''}</td>
           <td>${trade.side === 'Yes' || trade.side === 'Y' ? 'Y' : trade.side === 'No' || trade.side === 'N' ? 'N' : ''}</td>
-          <td>${trade.prob !== null ? (Number(trade.prob) / 100).toFixed(2) : ''}</td>
-          <td>${trade.diff !== null ? trade.diff : ''}</td>
+          <td>${trade.prob !== null && trade.prob !== undefined && trade.prob !== '' ? (Number(trade.prob) / 100).toFixed(2) : ''}</td>
+          <td>${plusSign(trade.diff)}</td>
           <td>${trade.buy_price !== null ? Number(trade.buy_price).toFixed(2) : ''}</td>
           <td>${trade.sell_price !== null ? Number(trade.sell_price).toFixed(2) : ''}</td>
           <td>${trade.position !== null ? trade.position : ''}</td>
           <td>${trade.fees !== null ? Number(trade.fees).toFixed(2) : ''}</td>
-          <td>${displayPnL(trade)}</td>
+          <td>${plusSign(trade.pnl)}</td>
           <td>${trade.closed_at !== null ? trade.closed_at : ''}</td>
           <td>${trade.symbol_open !== null ? '$' + Math.round(trade.symbol_open).toLocaleString() : ''}</td>
           <td>${trade.symbol_close !== null ? '$' + Math.round(trade.symbol_close).toLocaleString() : ''}</td>
-          <td>${trade.momentum !== null ? trade.momentum : ''}</td>
-          <td>${trade.volatility !== null ? Number(trade.volatility).toFixed(2) : ''}</td>
-          <td>${trade.win_loss !== null ? trade.win_loss : ''}</td>
+          <td>${plusSign(trade.momentum)}</td>
+          <td>${plusSign(trade.volatility)}</td>
+          <td>${plusSign(trade.win_loss)}</td>
         `;
         tbody.appendChild(tr);
       }
