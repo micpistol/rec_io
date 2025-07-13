@@ -74,6 +74,11 @@ def generate_fingerprint(df, momentum_value=None, description=""):
     
     return output_df
 
+def get_fingerprint_dir(symbol):
+    """Return the directory for a given symbol's fingerprints."""
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'symbol_fingerprints'))
+    return os.path.join(base_dir, symbol.lower())
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate fingerprint matrices for price data with optional momentum-based analysis.",
@@ -127,9 +132,9 @@ Examples:
     elif not args.baseline_only:
         print("Warning: No 'momentum' column found. Generating baseline fingerprint only.")
 
-    output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'symbol_fingerprints'))
-    os.makedirs(output_dir, exist_ok=True)
     symbol = os.path.basename(args.csv_path).split('_')[0].lower()
+    output_dir = get_fingerprint_dir(symbol)
+    os.makedirs(output_dir, exist_ok=True)
 
     # Determine what to generate
     generate_baseline = not args.momentum_only

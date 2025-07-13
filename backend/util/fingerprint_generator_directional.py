@@ -89,6 +89,18 @@ def generate_directional_fingerprint(df, momentum_value=None, description=""):
     
     return output_df
 
+def get_fingerprint_dir(symbol):
+    """Return the directory for a given symbol's fingerprints."""
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'symbol_fingerprints'))
+    return os.path.join(base_dir, symbol.lower())
+
+def get_fingerprint_filename(symbol, bucket):
+    """Return the full path for a given symbol and momentum bucket."""
+    return os.path.join(get_fingerprint_dir(symbol), f"{symbol.lower()}_fingerprint_directional_momentum_{int(bucket):03d}.csv")
+
+def get_baseline_fingerprint_filename(symbol):
+    return os.path.join(get_fingerprint_dir(symbol), f"{symbol.lower()}_fingerprint_directional_baseline.csv")
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate directional fingerprint matrices tracking both positive and negative price movements.",

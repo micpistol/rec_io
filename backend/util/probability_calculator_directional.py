@@ -9,20 +9,22 @@ from scipy.interpolate import griddata
 from datetime import datetime
 import pytz
 import glob
+from .fingerprint_generator_directional import get_fingerprint_dir, get_fingerprint_filename
 
 
 class DirectionalProbabilityCalculator:
     """
-    Calculates BTC strike probabilities using directional fingerprint data interpolation.
+    Calculates strike probabilities using directional fingerprint data interpolation.
     Handles both positive and negative price movements separately.
     Supports momentum-based fingerprint hot-swapping.
     """
     
-    def __init__(self):
+    def __init__(self, symbol="btc"):
         """
         Initialize the calculator with momentum-based directional fingerprint data only.
         Raises an error if no momentum fingerprints are found.
         """
+        self.symbol = symbol.lower()
         self.momentum_fingerprints = {}
         self.current_momentum_bucket = None
         self.load_momentum_fingerprints = True
@@ -33,19 +35,13 @@ class DirectionalProbabilityCalculator:
     def _load_all_momentum_fingerprints(self):
         """Load all momentum-based directional fingerprints for hot-swapping."""
         try:
-            fingerprint_dir = os.path.join(
-                os.path.dirname(__file__), 
-                '..', 'data', 'symbol_fingerprints'
-            )
-            
-            # Find all momentum fingerprint files
-            pattern = os.path.join(fingerprint_dir, 'btc_fingerprint_directional_momentum_*.csv')
+            fingerprint_dir = get_fingerprint_dir(self.symbol)
+            pattern = os.path.join(fingerprint_dir, f'{self.symbol}_fingerprint_directional_momentum_*.csv')
             momentum_files = glob.glob(pattern)
             
-            print(f"Found {len(momentum_files)} momentum fingerprint files")
+            print(f"Found {len(momentum_files)} momentum fingerprint files for {self.symbol.upper()}")
             
             for file_path in momentum_files:
-                # Extract momentum bucket from filename
                 filename = os.path.basename(file_path)
                 if 'momentum_' in filename:
                     momentum_str = filename.split('momentum_')[1].split('.csv')[0]
@@ -57,7 +53,7 @@ class DirectionalProbabilityCalculator:
                         print(f"Could not parse momentum bucket from {filename}")
                         continue
             
-            print(f"Successfully loaded {len(self.momentum_fingerprints)} momentum fingerprints")
+            print(f"Successfully loaded {len(self.momentum_fingerprints)} momentum fingerprints for {self.symbol.upper()}")
             
         except Exception as e:
             raise RuntimeError(f"Failed to load momentum fingerprints: {e}")
@@ -254,7 +250,7 @@ class DirectionalProbabilityCalculator:
         try:
             log_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'fingerprint_debug.log')
             with open(log_path, 'a') as f:
-                f.write(f"momentum_score={momentum_score}, bucket={self.current_momentum_bucket}, fingerprint=btc_fingerprint_directional_momentum_{self.current_momentum_bucket:03d}.csv\n")
+                f.write(f"symbol={self.symbol}, momentum_score={momentum_score}, bucket={self.current_momentum_bucket}, fingerprint={self.symbol}_fingerprint_directional_momentum_{self.current_momentum_bucket:03d}.csv\n")
         except Exception as e:
             print(f"[Fingerprint Debug Log] Error: {e}")
         results = []
@@ -295,6 +291,10 @@ def get_directional_calculator() -> DirectionalProbabilityCalculator:
     if _directional_calculator_instance is None:
         _directional_calculator_instance = DirectionalProbabilityCalculator()
     return _directional_calculator_instance
+
+
+def get_directional_calculator(symbol="btc"):
+    return DirectionalProbabilityCalculator(symbol)
 
 
 def calculate_directional_strike_probabilities(

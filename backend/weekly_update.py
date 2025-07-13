@@ -14,20 +14,22 @@ if PROJECT_ROOT not in sys.path:
 
 from util.symbol_data_fetch import update_existing_csv
 from util.momentum_generator import fill_missing_momentum_inplace
-from util.fingerprint_generator_directional import generate_directional_fingerprint
+from util.fingerprint_generator_directional import generate_directional_fingerprint, get_fingerprint_dir, get_fingerprint_filename
 import pandas as pd
 
-def weekly_update_btc():
-    """Single weekly update for BTC master file - prices + momentum + fingerprints."""
-    print("=== Weekly BTC Update ===")
+def weekly_update(symbol="btc"):
+    """Single weekly update for a symbol's master file - prices + momentum + fingerprints."""
+    print(f"=== Weekly {symbol.upper()} Update ===")
     print(f"Started at: {datetime.now()}")
     
-    csv_path = os.path.join(PROJECT_ROOT, 'backend', 'data', 'price_history', 'btc', 'btc_1m_master_5y.csv')
+    csv_path = os.path.join(PROJECT_ROOT, 'backend', 'data', 'price_history', symbol.lower(), f'{symbol.lower()}_1m_master_5y.csv')
+    fingerprint_dir = get_fingerprint_dir(symbol)
+    os.makedirs(fingerprint_dir, exist_ok=True)
     
     try:
         # Step 1: Update prices (rolling window)
         print("Updating prices...")
-        output_path, rows_fetched = update_existing_csv('BTC/USD', csv_path)
+        output_path, rows_fetched = update_existing_csv(f'{symbol.upper()}/USD', csv_path)
         print(f"✓ Added {rows_fetched} new price rows")
         
         # Step 2: Fill missing momentum for new rows
@@ -47,9 +49,7 @@ def weekly_update_btc():
         for bucket in momentum_buckets:
             print(f"  Generating fingerprint for momentum bucket {bucket}...")
             fingerprint_data = generate_directional_fingerprint(df, momentum_value=bucket, description=f"momentum_{bucket}")
-            
-            # Save to the existing symbol_fingerprints directory
-            fingerprint_path = os.path.join(PROJECT_ROOT, 'backend', 'data', 'symbol_fingerprints', f'btc_fingerprint_directional_momentum_{bucket:03d}.csv')
+            fingerprint_path = get_fingerprint_filename(symbol, bucket)
             fingerprint_data.to_csv(fingerprint_path, index=True)
             print(f"  ✓ Saved fingerprint: {fingerprint_path}")
             fingerprints_generated += 1
@@ -66,5 +66,5 @@ def weekly_update_btc():
         return False
 
 if __name__ == "__main__":
-    success = weekly_update_btc()
+    success = weekly_update()
     sys.exit(0 if success else 1) 

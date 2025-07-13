@@ -8,28 +8,27 @@ from typing import List, Dict, Tuple, Optional, Union, Sequence, Callable
 from scipy.interpolate import griddata
 from datetime import datetime
 import pytz
+from .fingerprint_generator_directional import get_fingerprint_dir
 
 
 class ProbabilityCalculator:
     """
-    Calculates BTC strike probabilities using fingerprint data interpolation.
+    Calculates strike probabilities using fingerprint data interpolation.
     """
     
-    def __init__(self, fingerprint_path: Optional[str] = None):
+    def __init__(self, symbol="btc", fingerprint_path: Optional[str] = None):
         """
         Initialize the calculator with fingerprint data.
-        
         Args:
-            fingerprint_path: Path to the fingerprint CSV file. If None, uses default path.
+            symbol: The symbol to use (e.g., 'btc', 'eth').
+            fingerprint_path: Path to the fingerprint CSV file. If None, uses default path for the symbol.
         """
+        self.symbol = symbol.lower()
         if fingerprint_path is None:
-            # Default path to the BTC fingerprint file
             fingerprint_path = os.path.join(
-                os.path.dirname(__file__), 
-                '..', 'data', 'symbol_fingerprints', 
-                'btc_fingerprint_20250711.csv'
+                get_fingerprint_dir(self.symbol),
+                f'{self.symbol}_fingerprint_20250711.csv'
             )
-        
         self.fingerprint_path = fingerprint_path
         self.fingerprint_data = None
         self._load_fingerprint()

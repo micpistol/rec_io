@@ -28,6 +28,8 @@ from core.config.settings import config
 
 from util.paths import get_price_history_dir, get_data_dir, ensure_data_dirs
 from util.probability_calculator_directional import calculate_directional_strike_probabilities
+from backend.util.probability_calculator_directional import get_directional_calculator
+from backend.util.fingerprint_generator_directional import get_fingerprint_filename
 
 
 # Ensure all data directories exist
@@ -1410,8 +1412,8 @@ def test_fingerprint():
     Test endpoint to trigger a calculation and verify fingerprint tracking.
     """
     try:
-        from backend.util.probability_calculator_directional import get_directional_calculator
-        calculator = get_directional_calculator()
+        symbol = "btc"  # TODO: Make this dynamic if needed
+        calculator = get_directional_calculator(symbol)
         
         # Trigger a calculation with a known momentum score
         test_price = 50000.0
@@ -1433,7 +1435,7 @@ def test_fingerprint():
             current_bucket = calculator.current_momentum_bucket
             
         if current_bucket is not None:
-            fingerprint_name = f"btc_fingerprint_directional_momentum_{current_bucket:03d}.csv"
+            fingerprint_name = f"{symbol}_fingerprint_directional_momentum_{current_bucket:03d}.csv"
             return {
                 "status": "success",
                 "message": f"Calculation completed with momentum {test_momentum}",
@@ -1459,14 +1461,14 @@ def get_current_fingerprint():
     Always returns the most recent fingerprint, even after restart, by reading the log if needed.
     """
     try:
-        from backend.util.probability_calculator_directional import get_directional_calculator
-        calculator = get_directional_calculator()
+        symbol = "btc"  # TODO: Make this dynamic if needed
+        calculator = get_directional_calculator(symbol)
         # Use last_used_momentum_bucket if available, else current_momentum_bucket
         bucket = getattr(calculator, 'last_used_momentum_bucket', None)
         if bucket is None:
             bucket = calculator.current_momentum_bucket
         if bucket is not None:
-            fingerprint_name = f"btc_fingerprint_directional_momentum_{int(bucket):03d}.csv"
+            fingerprint_name = f"{symbol}_fingerprint_directional_momentum_{int(bucket):03d}.csv"
             return {
                 "status": "ok",
                 "fingerprint": fingerprint_name,
