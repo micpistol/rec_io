@@ -176,6 +176,16 @@ async function fetchAndUpdate() {
     if (typeof updateStrikeTable === 'function') {
       updateStrikeTable(coreData, latestKalshiMarkets);
     }
+    
+    // RECO mode periodic updates disabled for now
+    // if (window.recoEnabled && typeof window.updateWatchlistBasedOnReco === 'function') {
+    //   // Update RECO watchlist every 30 seconds (every 24th update since fetchAndUpdate runs every 1.25s)
+    //   window.recoUpdateCount = (window.recoUpdateCount || 0) + 1;
+    //   if (window.recoUpdateCount % 24 === 0) {
+    //     console.log('[RECO] Periodic update triggered');
+    //     window.updateWatchlistBasedOnReco();
+    //   }
+    // }
 
     // Update heat band if function exists
     if (typeof updateMomentumHeatBandSegmented === 'function') {

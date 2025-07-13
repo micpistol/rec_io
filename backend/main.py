@@ -648,7 +648,7 @@ async def log_event(request: Request):
 
     log_line = f"[{timestamp}] Ticket {ticket_id}: {message}\n"
     # Directory for trade flow logs
-    log_dir = os.path.join("backend", "trade_history", "trade-flow")
+    log_dir = os.path.join("backend", "data", "trade_history", "tickets")
     # Use last 5 characters of ticket_id for log file name, fallback to full ticket_id if too short
     log_path = os.path.join(log_dir, f"trade_flow_{ticket_id[-5:] if len(ticket_id) >= 5 else ticket_id}.log")
 
@@ -1014,11 +1014,11 @@ async def broadcast_account_mode(mode: str):
             to_remove.add(client)
     connected_clients.difference_update(to_remove)
 
-# Serve trade flow logs from the trade-flow directory
+# Serve trade flow logs from the tickets directory
 @app.get("/api/trade_log/{ticket_id}")
 def get_trade_log(ticket_id: str):
     try:
-        log_dir = os.path.join("backend", "trade_history", "trade-flow")
+        log_dir = os.path.join("backend", "data", "trade_history", "tickets")
         log_filename = f"trade_flow_{ticket_id[-5:]}.log"
         log_path = os.path.join(log_dir, log_filename)
         if not os.path.exists(log_path):

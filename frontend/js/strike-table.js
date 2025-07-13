@@ -95,6 +95,14 @@ function initializeStrikeTable(basePrice) {
       noSpan
     });
   });
+  
+  // Update watchlist after strike table is initialized
+  if (window.updateWatchlistDisplay) {
+    console.log('[STRIKE TABLE] Strike table initialized, updating watchlist');
+    setTimeout(() => {
+      window.updateWatchlistDisplay();
+    }, 100);
+  }
 }
 
 // === STRIKE TABLE UPDATE LOGIC ===
@@ -368,10 +376,15 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
   }
   
   if (typeof window.addStrikeTableClickHandlers === 'function') window.addStrikeTableClickHandlers();
-  // PATCH: Force full watchlist rebuild after table is fully rendered, after all DOM updates
-  if (typeof window.rebuildWatchlistFromStrikeTable === 'function') setTimeout(window.rebuildWatchlistFromStrikeTable, 0);
-  // PATCH: Only load and render the watchlist after the strike table is fully rendered
-  if (typeof window.loadWatchlistFromPreferences === 'function') setTimeout(window.loadWatchlistFromPreferences, 0);
+  // Sync watchlist with live strike table data
+  if (typeof window.syncWatchlistWithStrikeTable === 'function') {
+    setTimeout(() => {
+      console.log('[STRIKE TABLE] Strike table updated, syncing watchlist');
+      window.syncWatchlistWithStrikeTable();
+    }, 100);
+  } else {
+    console.log('[STRIKE TABLE] syncWatchlistWithStrikeTable function not found');
+  }
 }
 
 // === POSITION INDICATOR ===
@@ -897,6 +910,16 @@ function addStrikeTableRowClickHandlers() {
             
             // Save the entire updated array to backend
             saveStrikeTableWatchlist();
+            
+            // Refresh the watchlist display
+            if (typeof window.refreshWatchlist === 'function') {
+              setTimeout(() => {
+                console.log('[STRIKE TABLE] Refreshing watchlist after adding strike');
+                window.refreshWatchlist();
+              }, 100);
+            } else {
+              console.log('[STRIKE TABLE] refreshWatchlist function not found');
+            }
           } else {
             console.log('Strike already in watchlist:', strike);
           }
@@ -926,3 +949,5 @@ if (typeof window !== 'undefined') {
     }
   });
 } 
+
+ 

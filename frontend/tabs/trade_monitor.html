@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="../styles/global.css">
 <script src="../js/live-data.js"></script>
 <script src="../js/strike-table.js"></script>
-<script src="../js/watchlist.js"></script>
+<script src="../js/watchlist_manager.js"></script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Trade Monitor</title>
@@ -576,8 +576,8 @@
     <div class="column" id="col1">
       <div class="panel-container" style="height: 50px; min-height: 50px; max-height: 50px; margin-bottom: 10px; display: flex; align-items: center; justify-content: flex-start;">
         <select id="ticker-picker" class="dropdown-picker" name="ticker">
-          <option value="BTC">BTC/USD</option>
-          <option value="ETH">ETH/USD</option>
+          <option value="BTC">BTC</option>
+          <option value="ETH">ETH</option>
         </select>
       </div>
       <div class="panel-container" style="min-height: 200px;" id="tickerPanelContainer">
@@ -832,6 +832,30 @@ function openTrade(target) {
           ? parseFloat(window.coreData.volatility_score.toFixed(2))
           : null;
 
+        // Get the PROB value from the strike table for this specific strike
+        let prob = null;
+        const strikeFormatted = '$' + Number(strike).toLocaleString();
+        const strikeTableRows = document.querySelectorAll('#strike-table tbody tr');
+        for (const row of strikeTableRows) {
+          const firstTd = row.querySelector('td');
+          if (!firstTd) continue;
+          const firstTdText = firstTd.textContent.trim();
+          if (firstTdText === strikeFormatted) {
+            const tds = row.querySelectorAll('td');
+            if (tds.length > 4) {
+              const probText = tds[4].textContent.trim();
+              if (probText && probText !== '—') {
+                prob = probText; // Keep as string (e.g., "97.6")
+              }
+            }
+            break;
+          }
+        }
+
+        // Get selected trade strategy from the dropdown
+        const tradeStrategyPicker = document.getElementById('trade-strategy-picker');
+        const tradeStrategy = tradeStrategyPicker ? tradeStrategyPicker.value : "Hourly HTC";
+
         // === Generate unique ticket ID just before payload definition ===
         const ticket_id = 'TICKET-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
 
@@ -855,7 +879,7 @@ function openTrade(target) {
           time:              now.toLocaleTimeString('en-US', { hour12: false }),
           symbol:            symbol,
           market:            "Kalshi",
-          trade_strategy:    "Hourly HTC",
+          trade_strategy:    tradeStrategy,
           contract:          contract,
           strike:            `$${Number(strike).toLocaleString()}`,
           side:              side && side.toUpperCase() === 'YES' ? 'Y' : (side && side.toUpperCase() === 'NO' ? 'N' : (side ? side[0].toUpperCase() : null)),
@@ -865,7 +889,7 @@ function openTrade(target) {
           symbol_open:       symbol_open,
           symbol_close:      null,
           momentum:          momentum,
-          momentum_delta:    null,
+          prob:              prob,
           volatility:        volatility,
           volatility_delta:  null,
           win_loss:          null
@@ -1803,6 +1827,15 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
       <div class="panel-container" id="buildTrade" style="min-height: 300px;">
         <div class="panel-header">Trade Builder</div>
+        <!-- Trade Strategy Picker -->
+        <div style="margin-bottom: 6px; font-size: 0.9rem; font-weight: bold; margin-bottom: 12px;">Trade Strategy</div>
+        <select id="trade-strategy-picker" class="dropdown-picker" name="trade-strategy">
+          <option value="Hourly HTC">Hourly HTC</option>
+        </select>
+
+        <div><br></div>
+
+        <!-- Position Size Picker -->
         <div style="font-weight: bold; margin-bottom: 6px; font-size: 0.9rem;">Position Size</div>
         <div id="positionSizeSelector" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
           <input type="number" id="position-size" min="1" style="width: 60px; padding: 6px; text-align: right; font-size: 1rem; border-radius: 4px; border: 1px solid #ccc;" />
@@ -2136,37 +2169,10 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('RECO toggle changed to:', value);
       window.recoEnabled = value;
       
-      // If RECO is being turned ON, apply filtering immediately
-      if (value) {
-        console.log('RECO enabled - applying automatic filtering');
-        try {
-          updateWatchlistBasedOnReco();
-          updateClickHandlersForReco(); // Disable click handlers
-        } catch (e) {
-          console.error('Error in RECO enable functions:', e);
-        }
-      } else {
-        // If RECO is being turned OFF, clear the watchlist and re-enable click handlers
-        console.log('RECO disabled - clearing watchlist and re-enabling click handlers');
-        try {
-          // Clear the watchlist preferences JSON directly
-          fetch('/api/set_watchlist', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ watchlist: [] })
-          }).then(() => {
-            console.log('Watchlist preferences cleared');
-            // Reload the watchlist display to reflect the empty state
-            if (typeof window.loadWatchlistFromPreferences === 'function') {
-              window.loadWatchlistFromPreferences();
-            }
-          }).catch(error => {
-            console.error('Error clearing watchlist preferences:', error);
-          });
-          updateClickHandlersForReco(); // Re-enable click handlers
-        } catch (e) {
-          console.error('Error in RECO disable functions:', e);
-        }
+      // Clear watchlist when RECO mode is toggled on or off
+      console.log('RECO mode changed to:', value, '- clearing watchlist');
+      if (typeof window.clearWatchlist === 'function') {
+        window.clearWatchlist();
       }
       
       console.log('Sending RECO update to backend:', { enabled: value });

@@ -535,7 +535,7 @@ def place_market_order(ticker, side, count):
 def log_event(ticket_id, message):
     """
     Write an event line to this ticket's rolling log inside
-    backend/trade_history/trade-flow/.
+    backend/data/trade_history/tickets/.
 
     A simple retention policy keeps only the 20 most‑recent
     ticket log files to avoid clutter.
@@ -544,8 +544,8 @@ def log_event(ticket_id, message):
         # File name based on the last 5 characters of the ticket ID
         log_filename = f"trade_flow_{ticket_id[-5:]}.log"
 
-        # Log directory (…/backend/trade_history/trade-flow/)
-        log_dir = Path(__file__).resolve().parents[2] / "trade_history" / "trade-flow"
+        # Log directory (…/backend/data/trade_history/tickets/)
+        log_dir = Path(__file__).resolve().parents[3] / "data" / "trade_history" / "tickets"
         log_dir.mkdir(parents=True, exist_ok=True)
 
         # Full path for this ticket's log file

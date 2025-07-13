@@ -95,6 +95,8 @@
           <th data-key="contract">Contract</th>
           <th data-key="strike">Strike</th>
           <th data-key="side">Side</th>
+          <th data-key="prob">Prob</th>
+          <th data-key="diff">Diff</th>
           <th data-key="buy_price">Buy</th>
           <th data-key="sell_price">Sell</th>
           <th data-key="position">Position</th>
@@ -135,7 +137,7 @@
         renderTrades(trades);
       } catch (error) {
         const tbody = document.querySelector('#trade-log-table tbody');
-        tbody.innerHTML = `<tr><td colspan="20" style="color:red;">Failed to load trades: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="22" style="color:red;">Failed to load trades: ${error.message}</td></tr>`;
       }
     }
 
@@ -158,7 +160,7 @@
         if (valB === null || valB === undefined) valB = '';
 
         // Try to parse as numbers for numeric fields
-        const numericKeys = ['id', 'strike', 'buy_price', 'sell_price', 'position', 'symbol_open', 'symbol_close', 'momentum', 'volatility', 'win_loss', 'pnl'];
+        const numericKeys = ['id', 'strike', 'buy_price', 'sell_price', 'position', 'symbol_open', 'symbol_close', 'momentum', 'volatility', 'win_loss', 'pnl', 'prob', 'diff'];
         if (numericKeys.includes(currentSort.key)) {
           valA = Number(valA);
           valB = Number(valB);
@@ -194,7 +196,7 @@
       const tbody = document.querySelector('#trade-log-table tbody');
       tbody.innerHTML = '';
       if (!Array.isArray(trades) || trades.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="20">No trades found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="22">No trades found.</td></tr>';
         return;
       }
 
@@ -220,6 +222,8 @@
           <td>${trade.contract !== null ? trade.contract : ''}</td>
           <td>${trade.strike !== null ? trade.strike : ''}</td>
           <td>${trade.side === 'Yes' || trade.side === 'Y' ? 'Y' : trade.side === 'No' || trade.side === 'N' ? 'N' : ''}</td>
+          <td>${trade.prob !== null ? (Number(trade.prob) / 100).toFixed(2) : ''}</td>
+          <td>${trade.diff !== null ? trade.diff : ''}</td>
           <td>${trade.buy_price !== null ? Number(trade.buy_price).toFixed(2) : ''}</td>
           <td>${trade.sell_price !== null ? Number(trade.sell_price).toFixed(2) : ''}</td>
           <td>${trade.position !== null ? trade.position : ''}</td>

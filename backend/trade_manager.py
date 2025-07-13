@@ -98,6 +98,29 @@ def finalize_trade(id: int, ticket_id: str) -> None:
 
             # ❶ If trade is still pending, finalize once position appears
             if current_status == "pending" and pos > 0 and exposure > 0:
+                # Calculate DIFF: PROB - BUY (formatted as whole integer)
+                # Get the prob value from the trade
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT prob FROM trades WHERE id = ?", (id,))
+                prob_row = cursor.fetchone()
+                conn.close()
+                
+                prob_value = prob_row[0] if prob_row and prob_row[0] is not None else None
+                diff_value = None
+                
+                if prob_value is not None:
+                    # Convert prob from percentage to decimal (96.7 -> 0.967)
+                    prob_decimal = float(prob_value) / 100
+                    # Calculate diff: prob_decimal - buy_price
+                    diff_decimal = prob_decimal - price
+                    # Convert to whole integer (0.02 -> +2, -0.03 -> -3)
+                    diff_value = int(round(diff_decimal * 100))
+                    # Format as string with sign
+                    diff_formatted = f"+{diff_value}" if diff_value >= 0 else f"{diff_value}"
+                else:
+                    diff_formatted = None
+                
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute("""
@@ -105,12 +128,13 @@ def finalize_trade(id: int, ticket_id: str) -> None:
                     SET status = 'open',
                         position = ?,
                         buy_price = ?,
-                        fees      = ?
+                        fees      = ?,
+                        diff      = ?
                     WHERE id = ?
-                """, (pos, price, round(fees_paid, 2), id))
+                """, (pos, price, round(fees_paid, 2), diff_formatted, id))
                 conn.commit()
                 conn.close()
-                log_event(ticket_id, f"MANAGER: FILL CONFIRMED — pos={pos}, price={price}, fees={fees}")
+                log_event(ticket_id, f"MANAGER: FILL CONFIRMED — pos={pos}, price={price}, fees={fees}, diff={diff_formatted}")
                 break
 
             # ❷ If trade is closing, wait until position is zero (row missing or pos == 0)
@@ -221,7 +245,7 @@ def log_event(ticket_id, message):
     try:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         trade_suffix = ticket_id[-5:] if len(ticket_id) >= 5 else ticket_id
-        log_path = os.path.join(base_dir, "backend", "trade_history", "trade-flow", f"trade_flow_{trade_suffix}.log")
+        log_path = os.path.join(base_dir, "backend", "data", "trade_history", "tickets", f"trade_flow_{trade_suffix}.log")
         timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
         log_line = f"[{timestamp}] Ticket {ticket_id[-5:]}: {message}\n"
         with open(log_path, "a") as f:
@@ -285,6 +309,9 @@ def init_trades_db():
     # Add pnl column if not present
     if "pnl" not in columns:
         cursor.execute("ALTER TABLE trades ADD COLUMN pnl REAL DEFAULT NULL")
+    # Add prob column if not present (replaces momentum_delta)
+    if "prob" not in columns:
+        cursor.execute("ALTER TABLE trades ADD COLUMN prob REAL DEFAULT NULL")
     # Additional columns to ensure exist
     additional_columns = {
         "symbol": "TEXT",
@@ -292,7 +319,7 @@ def init_trades_db():
         "trade_strategy": "TEXT",
         "symbol_open": "REAL",
         "momentum": "REAL",
-        "momentum_delta": "REAL",
+        "prob": "REAL",
         "volatility": "REAL",
         "volatility_delta": "REAL",
         "symbol_close": "REAL",
@@ -349,13 +376,13 @@ def insert_trade(trade):
         """INSERT INTO trades (
             date, time, strike, side, buy_price, position, status,
             contract, ticker, symbol, market, trade_strategy, symbol_open,
-            momentum, momentum_delta, volatility, volatility_delta, ticket_id
+            momentum, prob, volatility, volatility_delta, ticket_id
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             trade['date'], trade['time'], trade['strike'], trade['side'], trade['buy_price'],
             trade['position'], trade.get('status', 'open'), trade.get('contract'),
             trade.get('ticker'), trade.get('symbol'), trade.get('market'), trade.get('trade_strategy'),
-            trade.get('symbol_open'), trade.get('momentum'), trade.get('momentum_delta'),
+            trade.get('symbol_open'), trade.get('momentum'), trade.get('prob'),
             trade.get('volatility'), trade.get('volatility_delta'), trade.get('ticket_id')
         )
     )
