@@ -40,6 +40,11 @@ function updateWatchlistMirror() {
   // Sort strikes in ascending order
   const sortedStrikes = [...watchlistStrikes].sort((a, b) => a - b);
 
+  // If no strikes, do not render spanner row
+  if (sortedStrikes.length === 0) {
+    return;
+  }
+
   // Get current price for spanner row positioning
   const currentPriceEl = document.getElementById('btc-price-value');
   const currentPrice = currentPriceEl ? parseFloat(currentPriceEl.textContent.replace(/\$|,/g, '')) : 0;
@@ -134,3 +139,13 @@ window.refreshWatchlist = loadWatchlistStrikes;
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(loadWatchlistStrikes, 1000);
 }); 
+
+window.clearWatchlist = async function() {
+  watchlistStrikes = [];
+  await fetch('/api/set_watchlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ watchlist: [] })
+  });
+  updateWatchlistMirror();
+}; 
