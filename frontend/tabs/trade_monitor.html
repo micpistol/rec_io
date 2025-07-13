@@ -3234,8 +3234,9 @@ async function fetchAndRenderTrades() {
         posTd.textContent = trade.position;
         const bufferTd = document.createElement('td');
         bufferTd.textContent = bufferDisplay;
-        // Get the Prob value from the strike table (column index 4, E)
+        // Get the Prob value from the strike table (column index 3, D)
         let probDisplay = '—';
+        let closeAskPrice = null;
         const strikeTableRows = document.querySelectorAll('#strike-table tbody tr');
         for (const row of strikeTableRows) {
           const firstTd = row.querySelector('td');
@@ -3243,8 +3244,14 @@ async function fetchAndRenderTrades() {
           const firstTdText = firstTd.textContent.trim();
           if (firstTdText === strikeFormatted) {
             const tds = row.querySelectorAll('td');
-            if (tds.length > 4) {
-              probDisplay = tds[4].textContent.trim() || '—';
+            if (tds.length > 5) {
+              probDisplay = tds[3].textContent.trim() || '—';
+              // Determine which ask price to use for CLOSE column based on trade.side
+              if ((trade.side || '').toUpperCase() === 'Y') {
+                closeAskPrice = tds[5].querySelector('span')?.textContent.trim() || 'N/A'; // NO ask
+              } else {
+                closeAskPrice = tds[4].querySelector('span')?.textContent.trim() || 'N/A'; // YES ask
+              }
             }
             break;
           }
@@ -3262,10 +3269,8 @@ async function fetchAndRenderTrades() {
           clonedSpan.dataset.tradeId = trade.id;
           clonedSpan.dataset.action = 'close';
           closeTd.appendChild(clonedSpan);
-          previousClosePrices[trade.id] = askPrice;
         } else {
           closeTd.textContent = 'N/A';
-          previousClosePrices[trade.id] = null;
         }
         tr.appendChild(strikeTd);
         tr.appendChild(sideTd);
@@ -3283,28 +3288,33 @@ async function fetchAndRenderTrades() {
         if (rowObj.tr.className !== rowClass) rowObj.tr.className = rowClass;
         rowObj.tr.style.backgroundColor = "";
         rowObj.status = trade.status;
-      }
-      if (rowObj.bufferTd.textContent !== bufferDisplay) rowObj.bufferTd.textContent = bufferDisplay;
-      // Update B/M cell with Prob value from strike table
-      let probDisplay = '—';
-      const strikeTableRowsForProb = document.querySelectorAll('#strike-table tbody tr');
-      for (const row of strikeTableRowsForProb) {
-        const firstTd = row.querySelector('td');
-        if (!firstTd) continue;
-        const firstTdText = firstTd.textContent.trim();
-        if (firstTdText === strikeFormatted) {
-          const tds = row.querySelectorAll('td');
-          if (tds.length > 4) {
-            probDisplay = tds[4].textContent.trim() || '—';
+        // Update buffer
+        if (rowObj.bufferTd.textContent !== bufferDisplay) rowObj.bufferTd.textContent = bufferDisplay;
+        // Update PROB and CLOSE columns using the correct indices
+        let probDisplay = '—';
+        let closeButtonSpan = null;
+        const strikeTableRows = document.querySelectorAll('#strike-table tbody tr');
+        for (const row of strikeTableRows) {
+          const firstTd = row.querySelector('td');
+          if (!firstTd) continue;
+          const firstTdText = firstTd.textContent.trim();
+          if (firstTdText === strikeFormatted) {
+            const tds = row.querySelectorAll('td');
+            if (tds.length > 5) {
+              probDisplay = tds[3].textContent.trim() || '—';
+              if ((trade.side || '').toUpperCase() === 'Y') {
+                closeButtonSpan = tds[5].querySelector('span.price-box, span.price-box.disabled'); // NO ask
+              } else {
+                closeButtonSpan = tds[4].querySelector('span.price-box, span.price-box.disabled'); // YES ask
+              }
+            }
+            break;
           }
-          break;
         }
-      }
-      if (rowObj.bmTd.textContent !== probDisplay) rowObj.bmTd.textContent = probDisplay;
-      const prevAsk = previousClosePrices[trade.id];
-      if (closeButtonSpan) {
-        if (prevAsk !== askPrice) {
-          rowObj.closeTd.innerHTML = '';
+        if (rowObj.bmTd.textContent !== probDisplay) rowObj.bmTd.textContent = probDisplay;
+        // Update CLOSE column
+        rowObj.closeTd.innerHTML = '';
+        if (closeButtonSpan) {
           const clonedSpan = closeButtonSpan.cloneNode(true);
           clonedSpan.classList.remove('disabled');
           clonedSpan.style.opacity = '';
@@ -3313,12 +3323,8 @@ async function fetchAndRenderTrades() {
           clonedSpan.dataset.tradeId = trade.id;
           clonedSpan.dataset.action = 'close';
           rowObj.closeTd.appendChild(clonedSpan);
-          previousClosePrices[trade.id] = askPrice;
-        }
-      } else {
-        if (prevAsk !== null) {
+        } else {
           rowObj.closeTd.textContent = 'N/A';
-          previousClosePrices[trade.id] = null;
         }
       }
       if (!rowObj.tr.parentNode) {
