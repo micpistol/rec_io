@@ -5,7 +5,6 @@
 // Global configuration
 window.TRADE_CONFIG = {
   DEMO_MODE: false,  // Set to false for live trading
-  REQUIRE_CONFIRMATION: true,
   MAX_POSITION_SIZE: 1000,
   ENABLE_SOUNDS: true,
   ENABLE_POPUPS: true
@@ -91,26 +90,6 @@ window.executeTrade = async function(tradeData) {
         demo: true,
         message: 'Demo trade created successfully'
       };
-    }
-
-    // === LIVE TRADING MODE ===
-    if (window.TRADE_CONFIG.REQUIRE_CONFIRMATION) {
-      const confirmMessage = `CONFIRM LIVE TRADE\n\n\n` +
-        `Symbol: ${tradeData.symbol}\n` +
-        `Contract: ${tradeData.contract}\n` +
-        `Strike: ${tradeData.strike}\n` +
-        `Side: ${tradeData.side}\n` +
-        `Price: $${tradeData.buy_price}\n` +
-        `Position: ${tradeData.position || 'Not set'}\n` +
-        `Prob: ${tradeData.prob || 'Not available'}\n\n\n` +
-        `⚠️  This will execute a REAL TRADE with REAL MONEY\n\n` +
-        `Are you sure you want to proceed?`;
-
-      const confirmed = confirm(confirmMessage);
-      if (!confirmed) {
-        console.log('Trade cancelled by user');
-        return { success: false, error: 'Trade cancelled by user' };
-      }
     }
 
     // Execute the actual trade
@@ -248,24 +227,6 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
       };
     }
 
-    // === LIVE TRADING MODE ===
-    if (window.TRADE_CONFIG.REQUIRE_CONFIRMATION) {
-      const confirmMessage = `CONFIRM CLOSE TRADE\n\n\n` +
-        `Trade ID: ${tradeId}\n` +
-        `Original Side: ${trade.side}\n` +
-        `Position: ${count}\n` +
-        `Sell Price: $${sellPrice}\n` +
-        `Current BTC: $${symbolClose || 'Unknown'}\n\n\n` +
-        `⚠️  This will execute a REAL CLOSE TRADE with REAL MONEY\n\n` +
-        `Are you sure you want to proceed?`;
-
-      const confirmed = confirm(confirmMessage);
-      if (!confirmed) {
-        console.log('Close trade cancelled by user');
-        return { success: false, error: 'Close trade cancelled by user' };
-      }
-    }
-
     // Execute the actual close trade
     const response = await fetch('/trades', {
       method: 'POST',
@@ -397,7 +358,7 @@ window.prepareTradeData = function(target) {
   }
   console.log('PROB extraction for strike', strike, ':', prob);
   if (!prob) {
-    alert('ERROR: Could not find PROB value for this strike. No ticket created.');
+    console.error('Could not find PROB value for this strike. No ticket created.');
     return null;
   }
 
@@ -433,7 +394,7 @@ window.toggleDemoMode = function() {
     '🟢 DEMO MODE - No real trades will be executed' : 
     '🔴 LIVE MODE - Real trades will be executed';
   
-  alert(status);
+  console.log(status);
   return window.TRADE_CONFIG.DEMO_MODE;
 };
 
