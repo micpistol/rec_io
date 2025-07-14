@@ -829,17 +829,56 @@ if (typeof window !== 'undefined') {
   });
 } 
 
-// === STRIKE TABLE POLLING ===
-// Polling function for strike table updates
+// === STRIKE TABLE WEBSOCKET UPDATES ===
+// WebSocket connection for real-time database change notifications
+let dbChangeWebSocket = null;
+
+function connectDbChangeWebSocket() {
+  if (dbChangeWebSocket && dbChangeWebSocket.readyState === WebSocket.OPEN) {
+    return; // Already connected
+  }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}/ws/db_changes`;
+  
+  dbChangeWebSocket = new WebSocket(wsUrl);
+  
+  dbChangeWebSocket.onopen = function() {
+    console.log('[STRIKE TABLE] WebSocket connected for database changes');
+  };
+  
+  dbChangeWebSocket.onmessage = function(event) {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === 'db_change' && data.database === 'trades') {
+        console.log('[STRIKE TABLE] Received trades.db change notification, updating...');
+        fetchAndRenderStrikeTable();
+      }
+    } catch (error) {
+      console.error('[STRIKE TABLE] Error parsing WebSocket message:', error);
+    }
+  };
+  
+  dbChangeWebSocket.onclose = function() {
+    console.log('[STRIKE TABLE] WebSocket disconnected, attempting to reconnect...');
+    setTimeout(connectDbChangeWebSocket, 3000);
+  };
+  
+  dbChangeWebSocket.onerror = function(error) {
+    console.error('[STRIKE TABLE] WebSocket error:', error);
+  };
+}
+
+// Function to fetch and render strike table (called by WebSocket)
 function fetchAndRenderStrikeTable() {
   if (typeof window.fetchAndUpdate === 'function') {
     window.fetchAndUpdate();
   }
 }
 
-// Set up polling interval for strike table
+// Initialize WebSocket connection
 if (typeof window !== 'undefined') {
-  setInterval(fetchAndRenderStrikeTable, 1250); // Strike panel polling
+  connectDbChangeWebSocket();
 } 
 
  

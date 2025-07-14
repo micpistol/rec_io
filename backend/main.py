@@ -50,6 +50,9 @@ trade_db_event = asyncio.Event()
 # Global set of connected websocket clients for preferences
 connected_clients = set()
 
+# Global set of connected websocket clients for database changes
+db_change_clients = set()
+
 # Global auto_stop state
 PREFERENCES_PATH = os.path.join(get_data_dir(), "trade_preferences.json")
 
@@ -991,6 +994,16 @@ async def websocket_preferences(websocket: WebSocket):
     except WebSocketDisconnect:
         connected_clients.remove(websocket)
 
+@app.websocket("/ws/db_changes")
+async def websocket_db_changes(websocket: WebSocket):
+    await websocket.accept()
+    db_change_clients.add(websocket)
+    try:
+        while True:
+            await websocket.receive_text()  # Keep connection alive
+    except WebSocketDisconnect:
+        db_change_clients.remove(websocket)
+
 
 
 # Broadcast helper function for preferences updates
@@ -1014,6 +1027,22 @@ async def broadcast_account_mode(mode: str):
         except Exception:
             to_remove.add(client)
     connected_clients.difference_update(to_remove)
+
+# Broadcast helper function for database changes
+async def broadcast_db_change(db_name: str, change_data: dict):
+    message = json.dumps({
+        "type": "db_change",
+        "database": db_name,
+        "data": change_data,
+        "timestamp": datetime.now().isoformat()
+    })
+    to_remove = set()
+    for client in db_change_clients:
+        try:
+            await client.send_text(message)
+        except Exception:
+            to_remove.add(client)
+    db_change_clients.difference_update(to_remove)
 
 # Serve trade flow logs from the tickets directory
 @app.get("/api/trade_log/{ticket_id}")
@@ -1152,6 +1181,21 @@ async def ping_handler(request: Request):
     print(f"Received ping for ticket {ticket_id} with status {status}")
     
     return {"message": "Ping received"}
+
+@app.post("/api/db_change")
+async def notify_db_change(request: Request):
+    """Endpoint for db_poller to notify about database changes"""
+    try:
+        data = await request.json()
+        db_name = data.get("database")
+        change_data = data.get("change_data", {})
+        
+        # Broadcast the change to all connected websocket clients
+        await broadcast_db_change(db_name, change_data)
+        
+        return {"status": "ok", "message": f"Database change broadcast for {db_name}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @app.get("/frontend-changes")
 def frontend_changes():
