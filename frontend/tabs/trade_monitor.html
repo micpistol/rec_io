@@ -1482,7 +1482,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('DOMContentLoaded', () => {
       // Initial load of active trades
       fetchAndRenderTrades();
-      // TODO: Replace polling with real-time file change triggers or push-based updates
+      
+      // Active trades are now updated by the strike table loop in live-data.js
+      // No separate polling needed
     });
   </script>
   <script>

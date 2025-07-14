@@ -177,6 +177,11 @@ async function fetchAndUpdate() {
       updateStrikeTable(coreData, latestKalshiMarkets);
     }
     
+    // Update active trades after strike table update (since active trades depend on strike table data)
+    if (typeof window.fetchAndRenderTrades === 'function') {
+      window.fetchAndRenderTrades();
+    }
+    
     // RECO mode periodic updates disabled for now
     // if (window.recoEnabled && typeof window.updateWatchlistBasedOnReco === 'function') {
     //   // Update RECO watchlist every 30 seconds (every 24th update since fetchAndUpdate runs every 1.25s)
@@ -316,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchAndCacheTTC();
 
   // Set up staggered polling intervals
-  setInterval(fetchAndUpdate, 1250);           // Strike panel
+  setInterval(fetchAndUpdate, 1000);           // Strike panel
   setInterval(fetchOtherCoreData, 1450);       // BTC price and volatility
   setInterval(fetchCore, 1450);                // Momentum data
   setInterval(fetchBTCPriceChanges, 1450);     // BTC price changes

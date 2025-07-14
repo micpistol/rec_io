@@ -144,33 +144,103 @@ def finalize_trade(id: int, ticket_id: str) -> None:
                 closed_at = datetime.now(ZoneInfo("America/New_York")).strftime("%H:%M:%S")
                 
                 # Get trade data for PnL and win_loss calculation
-                cursor.execute("SELECT buy_price, sell_price, position FROM trades WHERE ticker = ? AND status = 'closing'", (expected_ticker,))
+                cursor.execute("SELECT buy_price, position, side, ticket_id FROM trades WHERE ticker = ? AND status = 'closing'", (expected_ticker,))
                 trade_row = cursor.fetchone()
                 if trade_row:
-                    buy_price, sell_price, position = trade_row
-                    # Calculate PnL
+                    buy_price, position, side, ticket_id = trade_row
+                    
+                    # Calculate actual sell price from fills.db
+                    actual_sell_price = None
+                    try:
+                        # fills.db is in the prod directory
+                        FILLS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "fills.db")
+                        
+                        if os.path.exists(FILLS_DB_PATH):
+                            conn_fills = sqlite3.connect(FILLS_DB_PATH, timeout=0.25)
+                            cursor_fills = conn_fills.cursor()
+                            
+                            # For closing trades: match by ticker and opposite side
+                            # YES trade closes by buying NO, NO trade closes by buying YES
+                            opposite_side = 'no' if side == 'Y' else 'yes'
+                            
+                            # Get fills in reverse chronological order (latest first)
+                            cursor_fills.execute("SELECT yes_price, no_price, count FROM fills WHERE ticker = ? AND side = ? AND action = 'buy' ORDER BY rowid DESC", (expected_ticker, opposite_side))
+                            fills = cursor_fills.fetchall()
+                            
+                            if fills:
+                                total_value = 0
+                                total_count = 0
+                                fills_used = []
+                                
+                                # Work backwards through fills until we have enough to match the original position
+                                for fill in fills:
+                                    yes_price, no_price, count = fill
+                                    # Use the opposite side's price
+                                    price = no_price if side == 'Y' else yes_price
+                                    
+                                    # Add this fill to our calculation
+                                    fills_used.append((price, count))
+                                    total_value += price * count
+                                    total_count += count
+                                    
+                                    # Stop when we have enough fills to match the original position
+                                    if total_count >= position:
+                                        break
+                                
+                                if total_count > 0:
+                                    actual_sell_price = total_value / total_count
+                                    log_event(ticket_id, f"MANAGER: Found {len(fills_used)} fills for closing trade (position={position}), calculated weighted average sell price: {actual_sell_price}")
+                                else:
+                                    log_event(ticket_id, f"MANAGER: No valid fills found for closing trade")
+                            else:
+                                log_event(ticket_id, f"MANAGER: No fills found for ticker={expected_ticker}, side={opposite_side}, action=buy")
+                            
+                            conn_fills.close()
+                        else:
+                            log_event(ticket_id, f"MANAGER: fills.db not found at {FILLS_DB_PATH}")
+                    except Exception as e:
+                        log_event(ticket_id, f"MANAGER: Error querying fills.db: {str(e)}")
+                    
+                    # Use actual sell price from fills if available, otherwise write NULL
+                    final_sell_price = actual_sell_price
+                    
+                    # Calculate PnL only if we have a valid sell price
                     pnl = None
                     win_loss = None
-                    if buy_price is not None and sell_price is not None and position is not None:
+                    if buy_price is not None and final_sell_price is not None and position is not None:
                         buy_value = buy_price * position
-                        sell_value = sell_price * position
+                        sell_value = final_sell_price * position
                         fees = round(fees_paid, 2) if fees_paid is not None else 0.0
                         pnl = round(sell_value - buy_value - fees, 2)
-                        win_loss = 'W' if sell_price > buy_price else 'L'
-                
-                cursor.execute("""
-                    UPDATE trades
-                    SET status    = 'closed',
-                        closed_at = ?,
-                        fees      = COALESCE(fees, 0) + ?,
-                        pnl       = ?,
-                        win_loss  = ?
-                    WHERE ticker = ? AND status = 'closing'
-                """, (closed_at, round(fees_paid, 2), pnl, win_loss, expected_ticker))
-                conn.commit()
-                conn.close()
-                log_event(ticket_id, f"MANAGER: TRADE FINALIZED — CLOSED (fees={round(fees_paid,2)}, pnl={pnl}, win_loss={win_loss})")
-                break
+                        win_loss = 'W' if final_sell_price > buy_price else 'L'
+                        
+                        if actual_sell_price is not None:
+                            log_event(ticket_id, f"MANAGER: Using fills-derived sell price {final_sell_price} for PnL calculation")
+                        else:
+                            log_event(ticket_id, f"MANAGER: No valid sell price from fills, PnL will be NULL")
+                    else:
+                        log_event(ticket_id, f"MANAGER: Missing required data for PnL calculation")
+                    
+                    # Use NULL for sell_price if no valid price found
+                    sell_price_for_db = final_sell_price if final_sell_price is not None else None
+                    
+                    cursor.execute("""
+                        UPDATE trades
+                        SET status    = 'closed',
+                            closed_at = ?,
+                            sell_price = ?,
+                            fees      = COALESCE(fees, 0) + ?,
+                            pnl       = ?,
+                            win_loss  = ?
+                        WHERE ticker = ? AND status = 'closing'
+                    """, (closed_at, sell_price_for_db, round(fees_paid, 2), pnl, win_loss, expected_ticker))
+                    
+                    conn.commit()
+                    conn.close()
+                    
+                    log_event(ticket_id, f"MANAGER: Trade finalized with sell_price={sell_price_for_db}, pnl={pnl}, win_loss={win_loss}")
+                else:
+                    log_event(ticket_id, f"MANAGER: No trade found for ticker {expected_ticker}")
         except Exception as e:
             log_event(ticket_id, f"MANAGER: FILL WATCH DB read error: {e}")
         time.sleep(1)
@@ -500,7 +570,7 @@ async def add_trade(request: Request):
             cursor = conn.cursor()
             sell_price = data.get("buy_price")
             symbol_close = data.get("symbol_close")
-            cursor.execute("UPDATE trades SET status = 'closing', sell_price = ?, symbol_close = ? WHERE ticker = ?", (sell_price, symbol_close, ticker))
+            cursor.execute("UPDATE trades SET status = 'closing', symbol_close = ? WHERE ticker = ?", (symbol_close, ticker))
             conn.commit()
             conn.close()
             log(f"[DEBUG] Trade status set to 'closing' for ticker: {ticker}")

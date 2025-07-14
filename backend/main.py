@@ -10,6 +10,7 @@ from sse_starlette.sse import EventSourceResponse
 import os
 import json
 import asyncio
+import time
 from datetime import datetime, timedelta
 import pytz
 import requests
@@ -1548,6 +1549,53 @@ def get_current_fingerprint():
         return {"status": "error", "message": "No momentum bucket is currently loaded or used!"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+
+if __name__ == "__main__":
+    import threading
+    import os
+    import importlib.util
+
+    threading.Thread(target=start_websocket, daemon=True).start()
+
+    # Start live probability writer
+    def get_current_price():
+        """Get current BTC price from database."""
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
+            row = cursor.fetchone()
+            conn.close()
+            return float(row[0]) if row else 50000.0
+        except:
+            return 50000.0
+    
+    def get_current_ttc():
+        """Get current TTC in seconds from the /core endpoint."""
+        try:
+            resp = requests.get("http://localhost:5001/core", timeout=2)
+            if resp.status_code == 200:
+                data = resp.json()
+                ttc = float(data.get("ttc_seconds", 0))
+                if ttc > 0:
+                    return ttc
+            print("[LiveProbWriter] Could not get valid ttc_seconds from /core.")
+            return None
+        except Exception as e:
+            print(f"[LiveProbWriter] Error fetching ttc_seconds from /core: {e}")
+            return None
+    
+    # Start the live probability writer
+    # start_live_probability_writer( # This line is removed as per the edit hint
+    #     update_interval=10,  # Update every 10 seconds
+    #     current_price_getter=get_current_price,
+    #     ttc_getter=get_current_ttc
+    # )
+
+
+
 
 
 

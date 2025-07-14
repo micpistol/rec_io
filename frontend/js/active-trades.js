@@ -45,6 +45,9 @@ async function fetchAndRenderTrades() {
     const marketsData = await marketsRes.json();
     const latestKalshiMarkets = Array.isArray(marketsData.markets) ? marketsData.markets : [];
 
+    // Small delay to ensure strike table DOM is updated before reading from it
+    await new Promise(resolve => setTimeout(resolve, 50));
+
     const ttcSeconds = coreData.ttc_seconds || 1;
     const ttcMinutes = ttcSeconds / 60;
 
