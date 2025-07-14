@@ -3294,8 +3294,27 @@ async function fetchAndRenderTrades() {
             existingRow.className = newRow.className;
           }
         } else {
-          // New row, append it
-          activeTradesTableBody.appendChild(newRow);
+          // New row, insert it at the correct sorted position
+          // Find the correct position to insert based on strike value
+          const newStrike = parseFloat(String(newRow.children[0].textContent).replace(/[^\d.-]/g, '')) || 0;
+          let insertIndex = activeTradesTableBody.children.length;
+          
+          for (let i = 0; i < activeTradesTableBody.children.length; i++) {
+            const row = activeTradesTableBody.children[i];
+            if (row.classList.contains('spanner-row')) continue;
+            
+            const existingStrike = parseFloat(String(row.children[0].textContent).replace(/[^\d.-]/g, '')) || 0;
+            if (newStrike < existingStrike) {
+              insertIndex = i;
+              break;
+            }
+          }
+          
+          if (insertIndex < activeTradesTableBody.children.length) {
+            activeTradesTableBody.insertBefore(newRow, activeTradesTableBody.children[insertIndex]);
+          } else {
+            activeTradesTableBody.appendChild(newRow);
+          }
         }
       }
     });
