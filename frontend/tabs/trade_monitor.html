@@ -1406,6 +1406,13 @@ function updateWatchlistDisplay() {
       watchlistBody.insertBefore(spannerRow, watchlistBody.firstChild);
     }
   } else {
+    // Check if watchlist is empty - if so, clear everything and return
+    if (watchlistData.length === 0) {
+      watchlistBody.innerHTML = '';
+      watchlistRowsMap.clear();
+      return;
+    }
+    
     // Just update existing rows in place
     watchlistData.forEach(strike => {
       const marketRow = strikeRowMap.get(strike);
@@ -1472,44 +1479,53 @@ function updateWatchlistDisplay() {
       });
     });
     
-    // Update or create spanner row
-    let existingSpanner = watchlistBody.querySelector('.spanner-row');
-    console.log('Watchlist spanner debug - currentPrice:', currentPrice, 'existingSpanner:', !!existingSpanner);
-    
-    if (existingSpanner) {
-      const newSpanner = createSpannerRow(currentPrice);
-      existingSpanner.replaceWith(newSpanner);
-      console.log('Replaced existing spanner row');
-    } else {
-      // Create spanner row if it doesn't exist
-      const spannerRow = createSpannerRow(currentPrice);
+    // Update or create spanner row only if there are strikes in the watchlist
+    if (watchlistData.length > 0) {
+      let existingSpanner = watchlistBody.querySelector('.spanner-row');
+      console.log('Watchlist spanner debug - currentPrice:', currentPrice, 'existingSpanner:', !!existingSpanner);
       
-      // Find the correct position to insert the spanner row
-      const rows = Array.from(watchlistBody.children);
-      let insertIndex = rows.length; // default to end
-      
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        if (row.classList.contains('spanner-row')) continue;
+      if (existingSpanner) {
+        const newSpanner = createSpannerRow(currentPrice);
+        existingSpanner.replaceWith(newSpanner);
+        console.log('Replaced existing spanner row');
+      } else {
+        // Create spanner row if it doesn't exist
+        const spannerRow = createSpannerRow(currentPrice);
         
-        const strikeCell = row.querySelector('td');
-        if (strikeCell) {
-          const strike = parseFloat(strikeCell.textContent.replace(/[\$,]/g, ''));
-          if (currentPrice < strike) {
-            insertIndex = i;
-            break;
+        // Find the correct position to insert the spanner row
+        const rows = Array.from(watchlistBody.children);
+        let insertIndex = rows.length; // default to end
+        
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          if (row.classList.contains('spanner-row')) continue;
+          
+          const strikeCell = row.querySelector('td');
+          if (strikeCell) {
+            const strike = parseFloat(strikeCell.textContent.replace(/[\$,]/g, ''));
+            if (currentPrice < strike) {
+              insertIndex = i;
+              break;
+            }
           }
         }
+        
+        console.log('Watchlist spanner debug - insertIndex:', insertIndex, 'rows.length:', rows.length);
+        
+        if (insertIndex < rows.length) {
+          watchlistBody.insertBefore(spannerRow, rows[insertIndex]);
+          console.log('Inserted spanner row at index:', insertIndex);
+        } else {
+          watchlistBody.appendChild(spannerRow);
+          console.log('Appended spanner row to end');
+        }
       }
-      
-      console.log('Watchlist spanner debug - insertIndex:', insertIndex, 'rows.length:', rows.length);
-      
-      if (insertIndex < rows.length) {
-        watchlistBody.insertBefore(spannerRow, rows[insertIndex]);
-        console.log('Inserted spanner row at index:', insertIndex);
-      } else {
-        watchlistBody.appendChild(spannerRow);
-        console.log('Appended spanner row to end');
+    } else {
+      // Remove any existing spanner row when watchlist is empty
+      const existingSpanner = watchlistBody.querySelector('.spanner-row');
+      if (existingSpanner) {
+        existingSpanner.remove();
+        console.log('Removed spanner row because watchlist is empty');
       }
     }
   }

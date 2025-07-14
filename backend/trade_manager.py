@@ -223,6 +223,18 @@ async def ping_settlement_watch():
         threading.Thread(target=finalize_trade, args=(id, ticket_id), daemon=True).start()
 
     return {"message": f"Triggered finalize_trade for {len(expired_trades)} expired trades"}
+
+@router.post("/api/manual_expiration_check")
+async def manual_expiration_check():
+    """
+    Manually trigger the expiration check - marks all open trades as expired
+    """
+    log("[MANUAL] Manual expiration check triggered")
+    
+    # Run the expiration check in a separate thread to avoid blocking
+    threading.Thread(target=check_expired_trades, daemon=True).start()
+    
+    return {"message": "Manual expiration check triggered"}
 import sqlite3
 import threading
 import time
@@ -778,7 +790,17 @@ def poll_settlements_for_matches(expired_tickers):
     # Track which tickers we've found settlements for
     found_tickers = set()
     
+    # Add timeout to prevent infinite polling (30 minutes max)
+    start_time = time.time()
+    timeout_seconds = 30 * 60  # 30 minutes
+    
     while len(found_tickers) < len(expired_tickers):
+        # Check timeout
+        if time.time() - start_time > timeout_seconds:
+            print(f"[SETTLEMENTS] Timeout reached after {timeout_seconds/60:.1f} minutes. Found {len(found_tickers)}/{len(expired_tickers)} settlements.")
+            print(f"[SETTLEMENTS] Remaining tickers: {set(expired_tickers) - found_tickers}")
+            break
+            
         try:
             conn = sqlite3.connect(SETTLEMENTS_DB_PATH, timeout=0.25)
             cursor = conn.cursor()
@@ -844,7 +866,7 @@ def poll_settlements_for_matches(expired_tickers):
 # APScheduler Setup for Hourly Expiration Checks
 # ------------------------------------------------------------------------------
 _scheduler = BackgroundScheduler(timezone=ZoneInfo("America/New_York"))
-_scheduler.add_job(check_expired_trades, CronTrigger(minute=0, second=0))
+_scheduler.add_job(check_expired_trades, CronTrigger(minute=0, second=0), max_instances=1, coalesce=True)
 
 from fastapi import FastAPI
 
