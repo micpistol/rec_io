@@ -155,7 +155,7 @@ def finalize_trade(id: int, ticket_id: str) -> None:
                         buy_value = buy_price * position
                         sell_value = sell_price * position
                         fees = round(fees_paid, 2) if fees_paid is not None else 0.0
-                        pnl = sell_value - buy_value - fees
+                        pnl = round(sell_value - buy_value - fees, 2)
                         win_loss = 'W' if sell_price > buy_price else 'L'
                 
                 cursor.execute("""
@@ -832,7 +832,7 @@ def poll_settlements_for_matches(expired_tickers):
                             buy_value = buy_price * position
                             sell_value = sell_price * position
                             fees = fees_paid if fees_paid is not None else 0.0
-                            pnl = sell_value - buy_value - fees
+                            pnl = round(sell_value - buy_value - fees, 2)
                     
                     cursor_trades.execute("""
                         UPDATE trades 
