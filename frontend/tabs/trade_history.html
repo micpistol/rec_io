@@ -10,7 +10,7 @@
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.8rem;
+      font-size: 0.7rem;
     }
     th, td {
       border: 1px solid #787878;
@@ -20,6 +20,8 @@
     th {
       background-color: #1f2530;
       font-weight: bold;
+      font-size: 0.7rem;
+
       cursor: pointer;
       position: relative;
     }
@@ -69,15 +71,31 @@
 </head>
 <body>
 
-  <div class="panel-container">
+  <div class="panel-container" style="width: 750px;">
 
     <div class="panel-header">Search</div>
 
   </div>
 
-  <div class="panel-container">
-    <div class="panel-header">
-      Market: Kalshi — <span id="account-mode-label">PROD</span>
+  <div class="panel-container" style="width: 750px;">
+    <div class="panel-header">Summary</div>
+    <div class="panel-content" id="summary-content" style="display: flex; justify-content: space-around; padding: 10px;">
+      <div style="text-align: center;">
+        <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">Trades</div>
+        <div id="trade-count" style="font-size: 18px; font-weight: bold; color: white;">0</div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">W/L %</div>
+        <div id="win-loss-percentage" style="font-size: 18px; font-weight: bold; color: white;">0%</div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">PnL %</div>
+        <div id="total-pnl-percentage" style="font-size: 18px; font-weight: bold; color: white;">0%</div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">PnL</div>
+        <div id="total-pnl" style="font-size: 18px; font-weight: bold; color: white;">$0.00</div>
+      </div>
     </div>
   </div>
 
@@ -192,11 +210,92 @@
       renderTrades(trades);
     }
 
+    function updateSummary(trades) {
+      const tradeCountEl = document.getElementById('trade-count');
+      const winLossEl = document.getElementById('win-loss-percentage');
+      const totalPnlPercentageEl = document.getElementById('total-pnl-percentage');
+      const totalPnlEl = document.getElementById('total-pnl');
+      
+      if (!Array.isArray(trades) || trades.length === 0) {
+        tradeCountEl.textContent = '0';
+        winLossEl.textContent = '0%';
+        totalPnlPercentageEl.textContent = '0%';
+        totalPnlEl.textContent = '$0.00';
+        return;
+      }
+      
+      // Count total trades
+      const tradeCount = trades.length;
+      
+      // Calculate win/loss percentage
+      let winCount = 0;
+      let totalTrades = 0;
+      
+      trades.forEach(trade => {
+        if (trade.win_loss !== null && trade.win_loss !== undefined && trade.win_loss !== '') {
+          // win_loss is stored as 'W' for win, 'L' for loss
+          if (trade.win_loss === 'W' || trade.win_loss === 'L') {
+            totalTrades++;
+            if (trade.win_loss === 'W') winCount++;
+          }
+        }
+      });
+      
+      const winPercentage = totalTrades > 0 ? Math.round((winCount / totalTrades) * 100) : 0;
+      
+      // Calculate total PnL and total investment
+      let totalPnl = 0;
+      let totalInvestment = 0;
+      trades.forEach(trade => {
+        if (trade.pnl !== null && trade.pnl !== undefined && trade.pnl !== '') {
+          const pnl = Number(trade.pnl);
+          if (!isNaN(pnl)) {
+            totalPnl += pnl;
+          }
+        }
+        // Calculate total investment for percentage
+        if (trade.buy_price !== null && trade.position !== null) {
+          const buyValue = Number(trade.buy_price) * Number(trade.position);
+          if (!isNaN(buyValue)) {
+            totalInvestment += buyValue;
+          }
+        }
+      });
+      
+      // Calculate PnL percentage
+      const pnlPercentage = totalInvestment > 0 ? (totalPnl / totalInvestment) * 100 : 0;
+      
+      // Update the display
+      tradeCountEl.textContent = tradeCount.toString();
+      winLossEl.textContent = `${winPercentage}%`;
+      totalPnlPercentageEl.textContent = `${pnlPercentage.toFixed(2)}%`;
+      totalPnlEl.textContent = `$${totalPnl.toFixed(2)}`;
+      
+      // Color coding for PnL percentage
+      if (pnlPercentage > 0) {
+        totalPnlPercentageEl.style.color = '#28a745'; // Green for positive
+      } else if (pnlPercentage < 0) {
+        totalPnlPercentageEl.style.color = '#dc3545'; // Red for negative
+      } else {
+        totalPnlPercentageEl.style.color = 'white'; // White for zero
+      }
+      
+      // Color coding for PnL
+      if (totalPnl > 0) {
+        totalPnlEl.style.color = '#28a745'; // Green for positive
+      } else if (totalPnl < 0) {
+        totalPnlEl.style.color = '#dc3545'; // Red for negative
+      } else {
+        totalPnlEl.style.color = 'white'; // White for zero
+      }
+    }
+
     function renderTrades(trades) {
       const tbody = document.querySelector('#trade-log-table tbody');
       tbody.innerHTML = '';
       if (!Array.isArray(trades) || trades.length === 0) {
         tbody.innerHTML = '<tr><td colspan="22">No trades found.</td></tr>';
+        updateSummary(trades); // Update summary even when no trades
         return;
       }
 
@@ -245,6 +344,9 @@
         `;
         tbody.appendChild(tr);
       }
+      
+      // Update summary statistics
+      updateSummary(trades);
     }
 
     fetch('/api/get_account_mode')
