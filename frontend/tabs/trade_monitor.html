@@ -2293,7 +2293,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Get current fingerprint information from backend
-        const response = await fetch('http://localhost:5001/api/current_fingerprint');
+        const response = await fetch(window.location.origin + '/api/current_fingerprint');
         
         if (response.ok) {
           const data = await response.json();

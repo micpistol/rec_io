@@ -121,7 +121,7 @@ async function fetchProbabilities(symbol, currentPrice, ttcMinutes, strikes, yea
       strikes: strikes.slice(0, 5) + '...' + strikes.slice(-5) // Show first and last 5 strikes
     });
     
-    const res = await fetch('http://localhost:5001/api/strike_probabilities', {
+    const res = await fetch(window.location.origin + '/api/strike_probabilities', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
