@@ -676,6 +676,7 @@ window.updateStrikeTable = updateStrikeTable;
 window.updateYesNoButton = updateYesNoButton;
 window.updatePositionIndicator = updatePositionIndicator;
 window.redrawYesNoButtonsForDIFMode = redrawYesNoButtonsForDIFMode;
+window.addStrikeTableRowClickHandlers = addStrikeTableRowClickHandlers;
 
 // === Spanner Row Helper ===
 function createSpannerRow(currentPrice) {
@@ -826,6 +827,19 @@ if (typeof window !== 'undefined') {
       };
     }
   });
+} 
+
+// === STRIKE TABLE POLLING ===
+// Polling function for strike table updates
+function fetchAndRenderStrikeTable() {
+  if (typeof window.fetchAndUpdate === 'function') {
+    window.fetchAndUpdate();
+  }
+}
+
+// Set up polling interval for strike table
+if (typeof window !== 'undefined') {
+  setInterval(fetchAndRenderStrikeTable, 1250); // Strike panel polling
 } 
 
  

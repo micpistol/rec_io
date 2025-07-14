@@ -65,7 +65,7 @@ class ConfigManager:
                     "enabled": True,
                     "update_interval": 30.0,
                     "providers": ["kalshi"]
-                }
+                },
             },
             "data": {
                 "base_path": "backend/data",

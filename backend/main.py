@@ -32,6 +32,8 @@ from backend.util.probability_calculator_directional import get_directional_calc
 from backend.util.fingerprint_generator_directional import get_fingerprint_filename
 
 
+
+
 # Ensure all data directories exist
 ensure_data_dirs()
 
@@ -47,7 +49,6 @@ trade_db_event = asyncio.Event()
 
 # Global set of connected websocket clients for preferences
 connected_clients = set()
-
 
 # Global auto_stop state
 PREFERENCES_PATH = os.path.join(get_data_dir(), "trade_preferences.json")
@@ -1406,6 +1407,8 @@ def test_endpoint():
     return {"status": "ok", "message": "Test endpoint working"}
 
 
+
+
 @app.get("/api/test_fingerprint")
 def test_fingerprint():
     """
@@ -1545,6 +1548,8 @@ if __name__ == "__main__":
     #     current_price_getter=get_current_price,
     #     ttc_getter=get_current_ttc
     # )
+
+
 
     import uvicorn
     port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))

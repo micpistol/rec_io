@@ -45,6 +45,7 @@ class EventType(Enum):
     
     # Data events
     DATA_UPDATE = "data_update"
+    DATABASE_CHANGE = "database_change"
     
     # Indicator events
     INDICATOR_UPDATE = "indicator_update"
