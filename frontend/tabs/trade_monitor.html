@@ -139,13 +139,16 @@
     transition: background-color 0.2s ease;
     cursor: pointer !important;
   }
+  .price-box:not(.disabled) {
+    cursor: pointer !important;
+  }
   .price-box:hover {
     background-color: rgba(0, 0, 0, 0.1);
   }
   .price-box.disabled {
     opacity: 0.1;
     pointer-events: none;
-    cursor: default;
+    cursor: default !important;
   }
 
   /* Risk color classes */

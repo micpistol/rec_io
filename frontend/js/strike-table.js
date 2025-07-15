@@ -261,8 +261,9 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
       const isYesActive = (volume >= 1000) && yesAsk > noAsk && yesAsk < 99 && yesAsk >= 40;
       const isNoActive = (volume >= 1000) && noAsk > yesAsk && noAsk < 99 && noAsk >= 40;
       
-      let yesValue = '—';
-      let noValue = '—';
+      // Always show actual ask prices unless there's a specific reason not to
+      let yesValue = yesAsk;
+      let noValue = noAsk;
       
       if (diffMode) {
         // DIFF MODE: Show probability - ask price difference in enabled button
@@ -271,22 +272,16 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
           if (isYesActive) {
             const diff = Math.round(prob - yesAsk);
             yesValue = diff > 0 ? `+${diff}` : `${diff}`;
-            noValue = '—';
+            // noValue stays as noAsk (actual price)
           } else if (isNoActive) {
             const diff = Math.round(prob - noAsk);
             noValue = diff > 0 ? `+${diff}` : `${diff}`;
-            yesValue = '—';
+            // yesValue stays as yesAsk (actual price)
           }
-        } else {
-          // No probability data, fall back to price display
-          yesValue = isYesActive ? yesAsk : '—';
-          noValue = isNoActive ? noAsk : '—';
         }
-      } else {
-        // PRICE MODE: Show actual ask prices
-        yesValue = isYesActive ? yesAsk : '—';
-        noValue = isNoActive ? noAsk : '—';
+        // If no probability data or neither button is active, both values stay as actual ask prices
       }
+      // In PRICE MODE, both values stay as actual ask prices
       
       updateYesNoButton(yesSpan, strike, "yes", yesValue, isYesActive, ticker);
       updateYesNoButton(noSpan, strike, "no", noValue, isNoActive, ticker);
@@ -427,6 +422,13 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
   spanEl.textContent = displayValue;
   spanEl.className = isActive ? 'price-box' : 'price-box disabled';
   spanEl.style.cursor = isActive ? 'pointer' : 'default';
+  
+  // Force cursor style with higher specificity
+  if (isActive) {
+    spanEl.style.setProperty('cursor', 'pointer', 'important');
+  } else {
+    spanEl.style.setProperty('cursor', 'default', 'important');
+  }
 
   // Set data-ticker on the YES/NO cell's parent td (for reference, if needed)
   if (spanEl.parentElement && ticker) {

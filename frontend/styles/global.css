@@ -54,4 +54,17 @@ body {
   text-align: left;
 }
 
+/* Ensure clickable elements show pointer cursor */
+a, button, input[type="button"], input[type="submit"], input[type="reset"], 
+.price-box:not(.disabled), .clickable, [onclick] {
+  cursor: pointer !important;
+}
+
+/* Force pointer cursor on all interactive elements */
+.price-box, .clickable, [onclick], button, a, .nav-item, .multiplier-btn {
+  cursor: pointer !important;
+}
+
+
+
 /* (Removed table column width classes; now page-specific) */
