@@ -1767,19 +1767,22 @@ document.addEventListener('DOMContentLoaded', () => {
       if (ignoreWsUpdates) return;
       const value = plusMinusToggle.checked;
       console.log('DIFF mode toggle changed to:', value);
+      
+      // Set local state for instant UI response
       window.diffMode = value;
       
+      // Force immediate strike table refresh using local state
+      if (typeof window.fetchAndUpdate === 'function') {
+        console.log('Forcing immediate strike table refresh with local diffMode:', value);
+        window.fetchAndUpdate();
+      }
+      
+      // Sync to backend in background
       fetch(window.location.origin + '/api/set_diff_mode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: value })
       });
-      
-      // Force refresh strike table to update display mode
-      if (typeof window.fetchAndUpdate === 'function') {
-        console.log('Forcing strike table refresh for DIFF mode change');
-        window.fetchAndUpdate();
-      }
     });
   }
 

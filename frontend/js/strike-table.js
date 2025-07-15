@@ -152,17 +152,24 @@ async function fetchProbabilities(symbol, currentPrice, ttcMinutes, strikes, yea
 
 // PATCHED updateStrikeTable to use model-based probabilities for RISK
 async function updateStrikeTable(coreData, latestKalshiMarkets) {
-  // Always fetch the latest DIFF mode from preferences
+  // Use local diffMode state if available, otherwise fetch from preferences
   let diffMode = false;
-  try {
-    const response = await fetch('/api/get_preferences');
-    const data = await response.json();
-    console.log('[STRIKE TABLE] /api/get_preferences response:', data); // DEBUG
-    diffMode = data.diff_mode || false;
-    console.log('[STRIKE TABLE] diffMode value:', diffMode); // DEBUG
-  } catch (e) {
-    console.error('[STRIKE TABLE] Error fetching preferences:', e);
-    diffMode = false;
+  if (window.diffMode !== undefined) {
+    // Use local state for instant response
+    diffMode = window.diffMode;
+    console.log('[STRIKE TABLE] Using local diffMode:', diffMode);
+  } else {
+    // Fallback to backend preferences
+    try {
+      const response = await fetch('/api/get_preferences');
+      const data = await response.json();
+      console.log('[STRIKE TABLE] /api/get_preferences response:', data); // DEBUG
+      diffMode = data.diff_mode || false;
+      console.log('[STRIKE TABLE] Using backend diffMode:', diffMode); // DEBUG
+    } catch (e) {
+      console.error('[STRIKE TABLE] Error fetching preferences:', e);
+      diffMode = false;
+    }
   }
 
   const strikeTableBody = document.querySelector('#strike-table tbody');
