@@ -209,8 +209,43 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                 # Get the total fees_paid from positions.db
                 total_fees_paid = float(fees_row[0]) if fees_row and fees_row[0] is not None else 0.0
                 
-                # For now, always record sell_price as 999
-                sell_price = 999
+                # Get the original trade side to determine which price to use
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT side FROM trades WHERE id = ?", (id,))
+                side_row = cursor.fetchone()
+                conn.close()
+                
+                original_side = side_row[0] if side_row else None
+                
+                # Get the actual sell price from fills.db
+                # Determine fills.db path based on demo mode
+                if DEMO_MODE:
+                    FILLS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "fills.db")
+                else:
+                    FILLS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "fills.db")
+                
+                sell_price = 999  # Default fallback
+                
+                if os.path.exists(FILLS_DB_PATH):
+                    conn_fills = sqlite3.connect(FILLS_DB_PATH, timeout=0.25)
+                    cursor_fills = conn_fills.cursor()
+                    
+                    # Get the most recent fill for this ticker
+                    cursor_fills.execute("SELECT yes_price, no_price, created_time FROM fills WHERE ticker = ? ORDER BY created_time DESC LIMIT 1", (expected_ticker,))
+                    fill_row = cursor_fills.fetchone()
+                    conn_fills.close()
+                    
+                    if fill_row and original_side:
+                        yes_price, no_price, fill_time = fill_row
+                        
+                        # Use the opposite side's price for the original position
+                        if original_side == 'Y':  # Original was YES, so use YES price
+                            sell_price = float(yes_price)
+                        elif original_side == 'N':  # Original was NO, so use NO price
+                            sell_price = float(no_price)
+                        
+                        log_event(ticket_id, f"MANAGER: Found fill at {fill_time} - yes_price={yes_price}, no_price={no_price}, using sell_price={sell_price}")
                 
                 # Get symbol_close from the trade record
                 conn = get_db_connection()
