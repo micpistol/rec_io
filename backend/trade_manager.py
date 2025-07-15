@@ -149,6 +149,124 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
     log_event(ticket_id, f"MANAGER: OPEN TRADE polling complete for ticker: {expected_ticker}")
 
 
+def confirm_close_trade(id: int, ticket_id: str) -> None:
+    """
+    Confirms a CLOSING trade has been closed in the market account.
+    Polls positions.db for matching ticker with zero position.
+    Updates trade status to 'closed' and fills in actual sell price and PnL.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT ticker FROM trades WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row:
+        log_event(ticket_id, f"MANAGER: No trade found for ID {id}")
+        return
+    
+    expected_ticker = row[0]
+    
+    # Determine positions.db path based on demo mode
+    demo_env = os.environ.get("DEMO_MODE", "false")
+    DEMO_MODE = demo_env.strip().lower() == "true"
+    if DEMO_MODE:
+        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "positions.db")
+    else:
+        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "positions.db")
+    
+    if not os.path.exists(POSITIONS_DB_PATH):
+        log_event(ticket_id, f"MANAGER: positions.db not found at {POSITIONS_DB_PATH}")
+        return
+    
+    # Poll for position to be zeroed out
+    max_attempts = 15  # 15 seconds
+    attempt = 0
+    
+    while attempt < max_attempts:
+        try:
+            conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
+            cursor_pos = conn_pos.cursor()
+            cursor_pos.execute("SELECT position FROM positions WHERE ticker = ?", (expected_ticker,))
+            row = cursor_pos.fetchone()
+            conn_pos.close()
+            
+            if row and row[0] == 0:
+                # Position has been zeroed out - confirm the close
+                log_event(ticket_id, f"MANAGER: POSITION ZEROED OUT for {expected_ticker}")
+                
+                # Get current time for closed_at
+                now_est = datetime.now(ZoneInfo("America/New_York"))
+                closed_at = now_est.strftime("%H:%M:%S")
+                
+                # Get fees_paid from positions.db for this ticker
+                conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
+                cursor_pos = conn_pos.cursor()
+                cursor_pos.execute("SELECT fees_paid FROM positions WHERE ticker = ?", (expected_ticker,))
+                fees_row = cursor_pos.fetchone()
+                conn_pos.close()
+                
+                # Get the total fees_paid from positions.db
+                total_fees_paid = float(fees_row[0]) if fees_row and fees_row[0] is not None else 0.0
+                
+                # For now, always record sell_price as 999
+                sell_price = 999
+                
+                # Get symbol_close from the trade record
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT symbol_close FROM trades WHERE id = ?", (id,))
+                symbol_close_row = cursor.fetchone()
+                conn.close()
+                
+                symbol_close = symbol_close_row[0] if symbol_close_row else None
+                
+                # Calculate PnL (simplified for now)
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT buy_price, position FROM trades WHERE id = ?", (id,))
+                trade_data = cursor.fetchone()
+                conn.close()
+                
+                if trade_data:
+                    buy_price, position = trade_data
+                    # Simple PnL calculation: (sell_price - buy_price) * position
+                    pnl = (sell_price - buy_price) * position
+                    
+                    # Determine win/loss
+                    win_loss = "win" if pnl > 0 else "loss" if pnl < 0 else "draw"
+                    
+                    # Update trade status to closed with updated fees
+                    update_trade_status(id, "closed", closed_at, sell_price, symbol_close, win_loss)
+                    
+                    # Update the FEES column in trades.db with total_fees_paid
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("UPDATE trades SET fees = ? WHERE id = ?", (total_fees_paid, id))
+                    conn.commit()
+                    conn.close()
+                    
+                    log_event(ticket_id, f"MANAGER: CLOSE TRADE CONFIRMED - PnL: {pnl}, W/L: {win_loss}, Fees: {total_fees_paid}")
+                    log(f"[✅ CLOSE TRADE CONFIRMED] id={id}, ticker={expected_ticker}, PnL={pnl}, W/L={win_loss}, Fees={total_fees_paid}")
+                    return
+                else:
+                    log_event(ticket_id, f"MANAGER: Could not get trade data for PnL calculation")
+                    return
+            else:
+                position_value = row[0] if row else "None"
+                log_event(ticket_id, f"MANAGER: Waiting for position to zero out... Current: {position_value}")
+                
+        except Exception as e:
+            log_event(ticket_id, f"MANAGER: Error checking position: {e}")
+        
+        attempt += 1
+        time.sleep(1)  # Wait 1 second before next check
+    
+    # If we get here, position was never zeroed out
+    log_event(ticket_id, f"MANAGER: TIMEOUT - Position never zeroed out for {expected_ticker}")
+    log(f"[❌ CLOSE TRADE TIMEOUT] id={id}, ticker={expected_ticker}")
+
+
 def finalize_trade(id: int, ticket_id: str) -> None:
     """
     Called only after executor says 'accepted'.
@@ -736,7 +854,7 @@ async def add_trade(request: Request):
             except Exception as e:
                 log(f"[CLOSE EXECUTOR ERROR] Failed to send close trade to executor: {e}")
 
-            # --- Ensure finalize_trade runs again after close ticket is sent ---
+            # --- Ensure confirm_close_trade runs after close ticket is sent ---
             ticker = data.get("ticker")
             conn = get_db_connection()
             cursor = conn.cursor()
@@ -746,9 +864,10 @@ async def add_trade(request: Request):
 
             if row:
                 trade_id = row[0]
-                threading.Thread(target=finalize_trade, args=(trade_id, data.get("ticket_id")), daemon=True).start()
+                log(f"[🧵 STARTING CONFIRM CLOSE TRADE THREAD] id={trade_id}, ticket_id={data.get('ticket_id')}")
+                threading.Thread(target=confirm_close_trade, args=(trade_id, data.get("ticket_id")), daemon=True).start()
             else:
-                log(f"[FINALIZE THREAD ERROR] Could not find trade id for ticker: {ticker}")
+                log(f"[CONFIRM CLOSE THREAD ERROR] Could not find trade id for ticker: {ticker}")
 
         return {"message": "Close ticket received and ignored"}
     log("✅ /trades POST route triggered successfully")
@@ -875,7 +994,7 @@ async def positions_change_api(request: Request):
         change_data = data.get("change_data", {})
         print(f"[🔔 POSITIONS CHANGE DETECTED] Database: {db_name}")
         print(f"[📊 Change data: {change_data}]")
-        # Check for pending trades that might need confirmation
+        # Check for pending trades that might need confirmation (opening)
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT id, ticket_id FROM trades WHERE status = 'pending'")
@@ -883,6 +1002,26 @@ async def positions_change_api(request: Request):
         conn.close()
         for id, ticket_id in pending_trades:
             threading.Thread(target=confirm_open_trade, args=(id, ticket_id), daemon=True).start()
+        
+        # Check for closing trades that might need confirmation (closing)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, ticket_id FROM trades WHERE status = 'closing'")
+        closing_trades = cursor.fetchall()
+        conn.close()
+        
+        # Track which trades we've already started confirmation for
+        for id, ticket_id in closing_trades:
+            # Check if this trade is already being confirmed
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT status FROM trades WHERE id = ?", (id,))
+            current_status = cursor.fetchone()
+            conn.close()
+            
+            # Only start confirmation if still in 'closing' status
+            if current_status and current_status[0] == 'closing':
+                threading.Thread(target=confirm_close_trade, args=(id, ticket_id), daemon=True).start()
         return {"message": "positions_change received"}
     except Exception as e:
         log(f"[ERROR /api/positions_change] {e}")
