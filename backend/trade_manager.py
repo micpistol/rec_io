@@ -43,6 +43,112 @@ def _wait_for_fill(ticker: str, timeout: int = 10) -> tuple[int | None, float | 
     return None, None
 
 
+def confirm_open_trade(id: int, ticket_id: str) -> None:
+    """
+    Confirms a PENDING trade has been opened in the market account.
+    Polls positions.db for matching ticker with non-zero position.
+    Updates trade status to 'open' and fills in actual buy price and fees.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT ticker FROM trades WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row:
+        log_event(ticket_id, f"MANAGER: No trade found for ID {id}")
+        return
+    
+    expected_ticker = row[0]
+    
+    # Determine positions.db path based on demo mode
+    demo_env = os.environ.get("DEMO_MODE", "false")
+    DEMO_MODE = demo_env.strip().lower() == "true"
+    if DEMO_MODE:
+        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "positions.db")
+    else:
+        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "positions.db")
+    
+    if not os.path.exists(POSITIONS_DB_PATH):
+        log_event(ticket_id, f"MANAGER: Positions DB path not found: {POSITIONS_DB_PATH}")
+        return
+    
+    conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
+    cursor_pos = conn_pos.cursor()
+    deadline = time.time() + 15  # 15 second timeout
+    
+    while time.time() < deadline:
+        try:
+            cursor_pos.execute("SELECT position, market_exposure, fees_paid FROM positions WHERE ticker = ?", (expected_ticker,))
+            row = cursor_pos.fetchone()
+            
+            if row and row[0] is not None and row[1] is not None:
+                pos = abs(row[0])
+                exposure = abs(row[1])
+                fees_paid = float(row[2]) if row[2] is not None else 0.0
+                
+                # Calculate actual buy price and fees
+                price = round(float(exposure) / float(pos) / 100, 2) if pos > 0 else 0.0
+                fees = round(fees_paid / 100, 2)
+                
+                # Check if trade is still pending and position has appeared
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT status FROM trades WHERE id = ?", (id,))
+                status_row = cursor.fetchone()
+                current_status = status_row[0] if status_row else None
+                conn.close()
+                
+                if current_status == "pending" and pos > 0 and exposure > 0:
+                    # Calculate DIFF: PROB - BUY (formatted as whole integer)
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT prob FROM trades WHERE id = ?", (id,))
+                    prob_row = cursor.fetchone()
+                    conn.close()
+                    
+                    prob_value = prob_row[0] if prob_row and prob_row[0] is not None else None
+                    diff_value = None
+                    
+                    if prob_value is not None:
+                        # Convert prob from percentage to decimal (96.7 -> 0.967)
+                        prob_decimal = float(prob_value) / 100
+                        # Calculate diff: prob_decimal - buy_price
+                        diff_decimal = prob_decimal - price
+                        # Convert to whole integer (0.02 -> +2, -0.03 -> -3)
+                        diff_value = int(round(diff_decimal * 100))
+                        # Format as string with sign
+                        diff_formatted = f"+{diff_value}" if diff_value >= 0 else f"{diff_value}"
+                    else:
+                        diff_formatted = None
+                    
+                    # Update trade to OPEN status with actual data
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        UPDATE trades
+                        SET status = 'open',
+                            position = ?,
+                            buy_price = ?,
+                            fees = ?,
+                            diff = ?
+                        WHERE id = ?
+                    """, (pos, price, round(fees_paid, 2), diff_formatted, id))
+                    conn.commit()
+                    conn.close()
+                    
+                    log_event(ticket_id, f"MANAGER: OPEN TRADE CONFIRMED — pos={pos}, price={price}, fees={fees}, diff={diff_formatted}")
+                    break
+                    
+        except Exception as e:
+            log_event(ticket_id, f"MANAGER: OPEN TRADE WATCH DB read error: {e}")
+        
+        time.sleep(1)
+    
+    conn_pos.close()
+    log_event(ticket_id, f"MANAGER: OPEN TRADE polling complete for ticker: {expected_ticker}")
+
+
 def finalize_trade(id: int, ticket_id: str) -> None:
     """
     Called only after executor says 'accepted'.
@@ -740,11 +846,11 @@ async def update_trade_status_api(request: Request):
 
     if new_status == "accepted":
         # spawn background thread so response is immediate
-        log(f"[🧵 STARTING FINALIZE TRADE THREAD] id={id}, ticket_id={ticket_id}")
+        log(f"[🧵 STARTING CONFIRM OPEN TRADE THREAD] id={id}, ticket_id={ticket_id}")
         threading.Thread(
-            target=finalize_trade, args=(id, ticket_id), daemon=True
+            target=confirm_open_trade, args=(id, ticket_id), daemon=True
         ).start()
-        return {"message": "Trade accepted – finalizing", "id": id}
+        return {"message": "Trade accepted – confirming open", "id": id}
 
     elif new_status == "error":
         update_trade_status(id, "error")
