@@ -902,40 +902,10 @@ function debounce(func, wait) {
 }
 
 // Helper function to update Yes/No button with conditional redraw
-function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = null) {
-  const key = `${strike}-${side}`;
-  const prev = lastButtonStates.get(key);
-  if (prev && prev.askPrice === askPrice && prev.isActive === isActive) {
-    // No change; skip update
-    return;
-  }
-
-  spanEl.textContent = askPrice > 0 ? askPrice : '—';
-  spanEl.className = isActive ? 'price-box' : 'price-box disabled';
-  spanEl.style.cursor = isActive ? 'pointer' : 'default';
-
-  // Set data-ticker on the YES/NO cell's parent td (for reference, if needed)
-  if (spanEl.parentElement && ticker) {
-    spanEl.parentElement.setAttribute('data-ticker', ticker);
-  }
-  // Also set data-ticker directly on spanEl for easier access in openTrade
-  if (ticker) {
-    spanEl.setAttribute('data-ticker', ticker);
-  }
-  // Set data-strike and data-side for easier retrieval in openTrade
-  spanEl.setAttribute('data-strike', strike);
-  spanEl.setAttribute('data-side', side);
-
-  if (isActive) {
-    spanEl.onclick = debounce(function(event) {
-      openTrade(spanEl);
-    }, 300);
-  } else {
-    spanEl.onclick = null;
-  }
-
-  lastButtonStates.set(key, { askPrice, isActive });
-}
+// REMOVED: This function is now handled by strike-table.js
+// function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = null) {
+//   // ... removed duplicate function
+// }
 
 // === STRIKE TABLE FUNCTIONS MOVED TO strike-table.js ===
 
@@ -1623,9 +1593,9 @@ document.addEventListener('DOMContentLoaded', () => {
           }, 1000); // Delay to ensure strike table is loaded
         }
       }
-      if (plusMinusToggle && data.plus_minus_mode !== undefined) {
-        plusMinusToggle.checked = data.plus_minus_mode;
-        window.plusMinusMode = data.plus_minus_mode;
+              if (plusMinusToggle && data.diff_mode !== undefined) {
+          plusMinusToggle.checked = data.diff_mode;
+          window.diffMode = data.diff_mode;
       }
       if (positionInput && data.position_size !== undefined) {
         positionInput.value = data.position_size;
@@ -1708,17 +1678,13 @@ document.addEventListener('DOMContentLoaded', () => {
         ignoreWsUpdates = false;
       }
 
-      if (plusMinusToggle && data.plus_minus_mode !== undefined && document.activeElement !== plusMinusToggle) {
+      if (plusMinusToggle && data.diff_mode !== undefined && document.activeElement !== plusMinusToggle) {
         ignoreWsUpdates = true;
-        console.log('Received plus_minus_mode update via WebSocket:', data.plus_minus_mode);
-        plusMinusToggle.checked = data.plus_minus_mode;
-        window.plusMinusMode = data.plus_minus_mode;
+        console.log('Received diff_mode update via WebSocket:', data.diff_mode);
+        plusMinusToggle.checked = data.diff_mode;
+        window.diffMode = data.diff_mode;
         
-        // Immediately redraw all YES/NO buttons when DIF mode changes via WebSocket
-        if (typeof window.redrawYesNoButtonsForDIFMode === 'function') {
-          console.log('Immediately redrawing YES/NO buttons for DIF mode change via WebSocket');
-          window.redrawYesNoButtonsForDIFMode();
-        }
+        // DIFF mode toggle updated via WebSocket
         
         ignoreWsUpdates = false;
       }
@@ -1800,19 +1766,19 @@ document.addEventListener('DOMContentLoaded', () => {
     plusMinusToggle.addEventListener('change', () => {
       if (ignoreWsUpdates) return;
       const value = plusMinusToggle.checked;
-      console.log('Plus/Minus toggle changed to:', value);
-      window.plusMinusMode = value;
+      console.log('DIFF mode toggle changed to:', value);
+      window.diffMode = value;
       
-      fetch(window.location.origin + '/api/set_plus_minus_mode', {
+      fetch(window.location.origin + '/api/set_diff_mode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: value })
       });
       
-      // Immediately redraw all YES/NO buttons when DIF mode changes
-      if (typeof window.redrawYesNoButtonsForDIFMode === 'function') {
-        console.log('Immediately redrawing YES/NO buttons for DIF mode change');
-        window.redrawYesNoButtonsForDIFMode();
+      // Force refresh strike table to update display mode
+      if (typeof window.fetchAndUpdate === 'function') {
+        console.log('Forcing strike table refresh for DIFF mode change');
+        window.fetchAndUpdate();
       }
     });
   }

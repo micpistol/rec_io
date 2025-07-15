@@ -61,10 +61,16 @@ def load_preferences():
     if os.path.exists(PREFERENCES_PATH):
         try:
             with open(PREFERENCES_PATH, "r") as f:
-                return json.load(f)
+                prefs = json.load(f)
+                # Migrate old plus_minus_mode to diff_mode if needed
+                if "plus_minus_mode" in prefs and "diff_mode" not in prefs:
+                    prefs["diff_mode"] = prefs.pop("plus_minus_mode")
+                    # Save the migrated preferences
+                    save_preferences(prefs)
+                return prefs
         except Exception:
             pass
-    return {"auto_stop": True, "watchlist": [], "reco": False, "plus_minus_mode": False}
+    return {"auto_stop": True, "watchlist": [], "reco": False, "diff_mode": False}
 
 def save_preferences(prefs):
     try:
@@ -693,11 +699,11 @@ async def set_reco(request: Request):
     await broadcast_preferences_update()
     return {"status": "ok"}
 
-@app.post("/api/set_plus_minus_mode")
-async def set_plus_minus_mode(request: Request):
+@app.post("/api/set_diff_mode")
+async def set_diff_mode(request: Request):
     data = await request.json()
     prefs = load_preferences()
-    prefs["plus_minus_mode"] = bool(data.get("enabled", False))
+    prefs["diff_mode"] = bool(data.get("enabled", False))
     save_preferences(prefs)
     await broadcast_preferences_update()
     return {"status": "ok"}
