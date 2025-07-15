@@ -845,12 +845,10 @@ async def update_trade_status_api(request: Request):
         ticket_id = row[0] if row else None
 
     if new_status == "accepted":
-        # spawn background thread so response is immediate
-        log(f"[🧵 STARTING CONFIRM OPEN TRADE THREAD] id={id}, ticket_id={ticket_id}")
-        threading.Thread(
-            target=confirm_open_trade, args=(id, ticket_id), daemon=True
-        ).start()
-        return {"message": "Trade accepted – confirming open", "id": id}
+        # Trade accepted by executor - just log it, confirmation will come from db_poller
+        log(f"[✅ TRADE ACCEPTED BY EXECUTOR] id={id}, ticket_id={ticket_id}")
+        log(f"[⏳ WAITING FOR POSITION CONFIRMATION FROM DB_POLLER]")
+        return {"message": "Trade accepted – waiting for position confirmation", "id": id}
 
     elif new_status == "error":
         update_trade_status(id, "error")
@@ -860,6 +858,35 @@ async def update_trade_status_api(request: Request):
 
     else:
         raise HTTPException(status_code=400, detail=f"Unrecognized status value: '{new_status}'")
+
+@router.post("/api/positions_change")
+async def positions_change_api(request: Request):
+    """Endpoint for db_poller to notify about positions.db changes"""
+    # Log every hit with method, headers, and body
+    log(f"[🔔 /api/positions_change HIT] method={request.method} headers={dict(request.headers)}")
+    try:
+        body = await request.body()
+        log(f"[🔔 /api/positions_change BODY] {body}")
+    except Exception as e:
+        log(f"[🔔 /api/positions_change BODY ERROR] {e}")
+    try:
+        data = await request.json()
+        db_name = data.get("database")
+        change_data = data.get("change_data", {})
+        print(f"[🔔 POSITIONS CHANGE DETECTED] Database: {db_name}")
+        print(f"[📊 Change data: {change_data}]")
+        # Check for pending trades that might need confirmation
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, ticket_id FROM trades WHERE status = 'pending'")
+        pending_trades = cursor.fetchall()
+        conn.close()
+        for id, ticket_id in pending_trades:
+            threading.Thread(target=confirm_open_trade, args=(id, ticket_id), daemon=True).start()
+        return {"message": "positions_change received"}
+    except Exception as e:
+        log(f"[ERROR /api/positions_change] {e}")
+        return {"error": str(e)}
 
 # Background trade monitoring thread
 

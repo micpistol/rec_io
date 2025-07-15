@@ -21,13 +21,22 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.account_mode import get_account_mode
 from backend.util.paths import get_data_dir, get_accounts_data_dir
+from backend.core.config.settings import config
 
 class DatabasePoller:
     def __init__(self):
         self.poll_interval = 0.5  # Poll twice per second
         self.last_hashes = {}
         self.db_paths = {}
-        self.main_app_url = "http://localhost:5001"  # Main app URL
+        # Get main app host and port from config
+        main_host = config.get("agents.main.host", "localhost")
+        main_port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))
+        self.main_app_url = f"http://{main_host}:{main_port}"
+        
+        # Get trade manager host and port from config
+        trade_manager_host = config.get("agents.trade_manager.host", "localhost")
+        trade_manager_port = int(os.environ.get("TRADE_MANAGER_PORT", config.get("agents.trade_manager.port", 5003)))
+        self.trade_manager_url = f"http://{trade_manager_host}:{trade_manager_port}"
         self.setup_database_paths()
         
     def setup_database_paths(self):
@@ -135,6 +144,10 @@ class DatabasePoller:
         # Notify main app about the change
         self.notify_main_app(db_name, change_data)
         
+        # If positions.db changed, also notify trade manager
+        if db_name == "positions":
+            self.notify_trade_manager(db_name, change_data)
+        
         if "error" in old_info or "error" in new_info:
             print(f"⚠️  Error reading database: {old_info.get('error', new_info.get('error'))}")
             return
@@ -188,6 +201,22 @@ class DatabasePoller:
                 print(f"⚠️  Failed to notify main app: {response.status_code}")
         except Exception as e:
             print(f"❌ Error notifying main app: {e}")
+    
+    def notify_trade_manager(self, db_name: str, change_data: Dict[str, Any]):
+        """Notify trade manager about database changes via HTTP"""
+        try:
+            url = f"{self.trade_manager_url}/api/positions_change"
+            payload = {
+                "database": db_name,
+                "change_data": change_data
+            }
+            response = requests.post(url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print(f"✅ Notified trade manager about {db_name} change")
+            else:
+                print(f"⚠️  Failed to notify trade manager: {response.status_code}")
+        except Exception as e:
+            print(f"❌ Error notifying trade manager: {e}")
     
     def poll_databases(self):
         """Main polling loop"""
