@@ -144,20 +144,17 @@ def fetch_strike_table_data(core_data: Dict, markets_data: Dict) -> Dict:
         for i in range(base - 6 * step, base + 7 * step, step):
             strikes.append(i)
         
-        # Get probabilities from the same endpoint Active Trades uses
+        # Get probabilities from the SAME SOURCE as Active Trades - /api/strike_probabilities
         prob_map = {}
         try:
-            # Get current momentum score
-            momentum_score = core_data.get("momentum_score", 0)
-            
-            # Call the same probability endpoint that Active Trades uses
+            # Call the SAME endpoint that Active Trades uses
             prob_response = requests.post(
                 f"http://localhost:{MAIN_APP_PORT}/api/strike_probabilities",
                 json={
                     "current_price": btc_price,
                     "ttc_seconds": ttc_seconds,
                     "strikes": strikes,
-                    "momentum_score": momentum_score
+                    "momentum_score": 0  # Use 0 as default, same as Active Trades
                 },
                 timeout=10
             )
@@ -167,7 +164,7 @@ def fetch_strike_table_data(core_data: Dict, markets_data: Dict) -> Dict:
                     strike_key = round(prob_row["strike"])
                     prob_map[strike_key] = prob_row["prob_within"]
         except Exception as e:
-            print(f"[TRADE SUPERVISOR] Error fetching probabilities: {e}")
+            print(f"Error fetching probabilities: {e}")
         
         # Get markets data for each strike
         markets = markets_data.get("markets", [])
@@ -187,9 +184,13 @@ def fetch_strike_table_data(core_data: Dict, markets_data: Dict) -> Dict:
                 if floor_strike and abs(floor_strike - strike) < 1:  # Allow small floating point differences
                     yes_ask = market.get("yes_ask", "N/A")
                     no_ask = market.get("no_ask", "N/A")
-                    # Use probability from the API if available
+                    # Use probability from the API - EXACT SAME AS ACTIVE TRADES
                     prob_key = round(strike)
-                    prob = prob_map.get(prob_key, "—")
+                    prob_value = prob_map.get(prob_key)
+                    if prob_value is not None:
+                        prob = f"{prob_value:.1f}"  # Format exactly like Active Trades
+                    else:
+                        prob = "—"
                     break
             
             strike_rows.append({
@@ -255,15 +256,25 @@ def calculate_trade_row_data(trade: Dict, live_data: Dict) -> Dict:
         else:
             row_class = "danger-stop"
         
-        # Get Prob and Close values from strike table data - EXACT SAME LOGIC AS FRONTEND
+        # Get probability from strike table data - EXACT SAME AS ACTIVE TRADES
         prob_display = "—"
         close_ask_price = "N/A"
         strike_formatted = f"${strike_num:,.0f}"
+        
+        # Get probability from strike table data - EXACT SAME AS ACTIVE TRADES
         for row in strike_table_data.get("rows", []):
-            # Check if floor_strike matches (convert to int for comparison)
             floor_strike = row.get("floor_strike")
-            if floor_strike and abs(floor_strike - strike_num) < 1:  # Allow small floating point differences
-                prob_display = row.get("prob", "—")
+            if floor_strike and abs(floor_strike - strike_num) < 1:
+                prob_value = row.get("prob")
+                if prob_value and prob_value != "—":
+                    try:
+                        prob_display = f"{float(prob_value):.1f}"  # Format exactly like Active Trades
+                    except:
+                        prob_display = "—"
+                else:
+                    prob_display = "—"
+                
+                # Get Close prices from strike table data (market prices are fine for this)
                 if is_yes:
                     close_ask_price = row.get("no_ask", "N/A")  # NO ask for YES trade
                 else:
