@@ -9,7 +9,7 @@
 
         <script src="../js/active-trades.js"></script>
         <script src="../js/trade-execution-controller.js"></script>
-        <script src="../js/trade-supervisor-popup.js"></script>
+      
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Trade Monitor</title>
@@ -2224,35 +2224,7 @@ document.addEventListener('DOMContentLoaded', () => {
   <div id="tradePopup" class="trade-popup">Trade Opened</div>
   <div id="tradeClosedPopup" class="trade-closed-popup">Trade Closed</div>
 
-  <!-- Trade Supervisor Popup -->
-  <div id="trade-supervisor-popup" style="display: none; position: fixed; bottom: 20px; left: 20px; background: #2c3e50; color: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 10000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; font-weight: 500; transition: all 0.3s ease; border-left: 4px solid #27ae60; max-width: 800px; max-height: 600px; overflow-y: auto;">
-    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-      <div style="background: #27ae60; width: 12px; height: 12px; border-radius: 50%;"></div>
-      <div>
-        <div style="font-weight: 600; margin-bottom: 2px;">Trade Supervisor Active</div>
-        <div style="font-size: 12px; opacity: 0.8;" id="trade-supervisor-count">0 open trades</div>
-      </div>
-    </div>
-    
-    <!-- Trade Table -->
-    <div id="trade-supervisor-table-container" style="display: none;">
-      <table id="trade-supervisor-table" style="width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px;">
-        <thead>
-          <tr style="background-color: #222c3c; font-weight: bold; text-align: center;">
-            <th style="padding: 4px 6px; border: 1px solid #888; font-size: 11px;">Strike</th>
-            <th style="padding: 4px 6px; border: 1px solid #888; font-size: 11px;">Side</th>
-            <th style="padding: 4px 6px; border: 1px solid #888; font-size: 11px;">Buy</th>
-            <th style="padding: 4px 6px; border: 1px solid #888; font-size: 11px;">Pos</th>
-            <th style="padding: 4px 6px; border: 1px solid #888; font-size: 11px;">Buffer</th>
-            <th style="padding: 4px 6px; border: 1px solid #888; font-size: 11px;">Prob</th>
-            <th style="padding: 4px 6px; border: 1px solid #888; font-size: 11px;">Close</th>
-          </tr>
-        </thead>
-        <tbody id="trade-supervisor-table-body">
-        </tbody>
-      </table>
-    </div>
-  </div>
+
 
   <!-- Preload audio for trade open/close confirmations -->
   <audio id="openTradeSound" preload="auto">
@@ -2321,165 +2293,5 @@ document.addEventListener('DOMContentLoaded', () => {
   })();
   </script>
 
-  <!-- Trade Supervisor JavaScript -->
-  <script>
-    // Trade Supervisor functionality
-    let tradeSupervisorSocket = null;
-    let tradeSupervisorPopup = null;
 
-    function initializeTradeSupervisor() {
-      console.log('[TRADE SUPERVISOR] Initializing trade supervisor...');
-      
-      // Get the popup element
-      tradeSupervisorPopup = document.getElementById('trade-supervisor-popup');
-      
-      // Connect to trade supervisor WebSocket
-      connectTradeSupervisorWebSocket();
-    }
-
-    function connectTradeSupervisorWebSocket() {
-      if (tradeSupervisorSocket) {
-        tradeSupervisorSocket.close();
-      }
-      
-      const wsUrl = `ws://localhost:5004/ws/trade_supervisor`;
-      console.log('[TRADE SUPERVISOR] Connecting to WebSocket:', wsUrl);
-      tradeSupervisorSocket = new WebSocket(wsUrl);
-      
-      tradeSupervisorSocket.onopen = function() {
-        console.log('[TRADE SUPERVISOR] WebSocket connected successfully');
-      };
-      
-      tradeSupervisorSocket.onmessage = function(event) {
-        try {
-          console.log('[TRADE SUPERVISOR] Received message:', event.data);
-          const data = JSON.parse(event.data);
-          
-          if (data.type === 'trade_supervisor_popup') {
-            console.log('[TRADE SUPERVISOR] Processing popup data:', data);
-            updateTradeSupervisorPopup(data);
-          }
-        } catch (e) {
-          console.error('[TRADE SUPERVISOR] Error parsing message:', e);
-        }
-      };
-      
-      tradeSupervisorSocket.onclose = function(event) {
-        console.log('[TRADE SUPERVISOR] WebSocket disconnected, code:', event.code, 'reason:', event.reason);
-        setTimeout(connectTradeSupervisorWebSocket, 5000);
-      };
-      
-      tradeSupervisorSocket.onerror = function(error) {
-        console.error('[TRADE SUPERVISOR] WebSocket error:', error);
-      };
-    }
-
-    function updateTradeSupervisorPopup(data) {
-      if (!tradeSupervisorPopup) {
-        tradeSupervisorPopup = document.getElementById('trade-supervisor-popup');
-      }
-      
-      // Use the trade_rows data from the backend (exact replica of Active Trades panel)
-      const tradeRows = data.trade_rows || [];
-      
-      // Show popup if there are active trades
-      if (data.show_popup && tradeRows.length > 0) {
-        tradeSupervisorPopup.style.display = 'block';
-        
-        // Update count
-        const countElement = document.getElementById('trade-supervisor-count');
-        if (countElement) {
-          countElement.textContent = `${tradeRows.length} open trade${tradeRows.length !== 1 ? 's' : ''}`;
-        }
-        
-        // Show table container
-        const tableContainer = document.getElementById('trade-supervisor-table-container');
-        if (tableContainer) {
-          tableContainer.style.display = 'block';
-        }
-        
-        // Update table body with exact same structure as Active Trades panel
-        const tableBody = document.getElementById('trade-supervisor-table-body');
-        if (tableBody) {
-          tableBody.innerHTML = '';
-          
-          for (const tradeRow of tradeRows) {
-            const row = document.createElement('tr');
-            
-            // Apply same row class as Active Trades panel
-            if (tradeRow.row_class) {
-              row.className = tradeRow.row_class;
-            }
-            
-            // Strike
-            const strikeTd = document.createElement('td');
-            strikeTd.textContent = tradeRow.strike;
-            strikeTd.style.padding = '4px 6px';
-            strikeTd.style.border = '1px solid #888';
-            strikeTd.style.fontSize = '11px';
-            row.appendChild(strikeTd);
-            
-            // Side
-            const sideTd = document.createElement('td');
-            sideTd.textContent = tradeRow.side;
-            sideTd.style.padding = '4px 6px';
-            sideTd.style.border = '1px solid #888';
-            sideTd.style.fontSize = '11px';
-            row.appendChild(sideTd);
-            
-            // Buy (price)
-            const buyTd = document.createElement('td');
-            buyTd.textContent = typeof tradeRow.buy_price === 'number' ? tradeRow.buy_price.toFixed(2) : tradeRow.buy_price;
-            buyTd.style.padding = '4px 6px';
-            buyTd.style.border = '1px solid #888';
-            buyTd.style.fontSize = '11px';
-            row.appendChild(buyTd);
-            
-            // Position
-            const posTd = document.createElement('td');
-            posTd.textContent = tradeRow.position;
-            posTd.style.padding = '4px 6px';
-            posTd.style.border = '1px solid #888';
-            posTd.style.fontSize = '11px';
-            row.appendChild(posTd);
-            
-            // Buffer
-            const bufferTd = document.createElement('td');
-            bufferTd.textContent = tradeRow.buffer_display;
-            bufferTd.style.padding = '4px 6px';
-            bufferTd.style.border = '1px solid #888';
-            bufferTd.style.fontSize = '11px';
-            row.appendChild(bufferTd);
-            
-            // Prob
-            const probTd = document.createElement('td');
-            probTd.textContent = tradeRow.prob_display;
-            probTd.style.padding = '4px 6px';
-            probTd.style.border = '1px solid #888';
-            probTd.style.fontSize = '11px';
-            row.appendChild(probTd);
-            
-            // Close
-            const closeTd = document.createElement('td');
-            closeTd.textContent = tradeRow.close_ask_price;
-            closeTd.style.padding = '4px 6px';
-            closeTd.style.border = '1px solid #888';
-            closeTd.style.fontSize = '11px';
-            closeTd.style.textAlign = 'center';
-            row.appendChild(closeTd);
-            
-            tableBody.appendChild(row);
-          }
-        }
-      } else {
-        tradeSupervisorPopup.style.display = 'none';
-      }
-    }
-
-    // Initialize trade supervisor when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-      // Small delay to ensure page is fully loaded
-      setTimeout(initializeTradeSupervisor, 1000);
-    });
-  </script>
 </html>

@@ -647,12 +647,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initial fetch
   fetchAndRenderTrades();
   
-  // Check trade supervisor popup on load
-  setTimeout(() => {
-    if (typeof checkAndShowTradeSupervisorPopup === 'function') {
-      checkAndShowTradeSupervisorPopup();
-    }
-  }, 1000); // Wait 1 second for initial data to load
+
 });
 
 // Export functions for use by other modules
