@@ -2224,6 +2224,17 @@ document.addEventListener('DOMContentLoaded', () => {
   <div id="tradePopup" class="trade-popup">Trade Opened</div>
   <div id="tradeClosedPopup" class="trade-closed-popup">Trade Closed</div>
 
+  <!-- Trade Supervisor Popup -->
+  <div id="trade-supervisor-popup" style="display: none; position: fixed; bottom: 20px; left: 20px; background: #2c3e50; color: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 10000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; font-weight: 500; transition: all 0.3s ease; border-left: 4px solid #27ae60; max-width: 300px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="background: #27ae60; width: 12px; height: 12px; border-radius: 50%;"></div>
+      <div>
+        <div style="font-weight: 600; margin-bottom: 2px;">Trade Supervisor Active</div>
+        <div style="font-size: 12px; opacity: 0.8;" id="trade-supervisor-count">0 open trades</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Preload audio for trade open/close confirmations -->
   <audio id="openTradeSound" preload="auto">
     <source src="/audio/sfx/open_trade_confirmation.wav" type="audio/wav">
@@ -2289,5 +2300,81 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     observer.observe(momentumEl, { childList: true, characterData: true, subtree: true });
   })();
+  </script>
+
+  <!-- Trade Supervisor JavaScript -->
+  <script>
+    // Trade Supervisor functionality
+    let tradeSupervisorSocket = null;
+    let tradeSupervisorPopup = null;
+
+    function initializeTradeSupervisor() {
+      console.log('[TRADE SUPERVISOR] Initializing trade supervisor...');
+      
+      // Get the popup element
+      tradeSupervisorPopup = document.getElementById('trade-supervisor-popup');
+      
+      // Connect to trade supervisor WebSocket
+      connectTradeSupervisorWebSocket();
+    }
+
+    function connectTradeSupervisorWebSocket() {
+      if (tradeSupervisorSocket) {
+        tradeSupervisorSocket.close();
+      }
+      
+      const wsUrl = `ws://localhost:5004/ws/trade_supervisor`;
+      tradeSupervisorSocket = new WebSocket(wsUrl);
+      
+      tradeSupervisorSocket.onopen = function() {
+        console.log('[TRADE SUPERVISOR] WebSocket connected');
+      };
+      
+      tradeSupervisorSocket.onmessage = function(event) {
+        try {
+          const data = JSON.parse(event.data);
+          
+          if (data.type === 'trade_supervisor_popup') {
+            updateTradeSupervisorPopup(data);
+          }
+        } catch (e) {
+          console.error('[TRADE SUPERVISOR] Error parsing message:', e);
+        }
+      };
+      
+      tradeSupervisorSocket.onclose = function() {
+        console.log('[TRADE SUPERVISOR] WebSocket disconnected, reconnecting in 5 seconds...');
+        setTimeout(connectTradeSupervisorWebSocket, 5000);
+      };
+      
+      tradeSupervisorSocket.onerror = function(error) {
+        console.error('[TRADE SUPERVISOR] WebSocket error:', error);
+      };
+    }
+
+    function updateTradeSupervisorPopup(data) {
+      if (!tradeSupervisorPopup) {
+        tradeSupervisorPopup = document.getElementById('trade-supervisor-popup');
+      }
+      
+      const countElement = document.getElementById('trade-supervisor-count');
+      if (countElement) {
+        countElement.textContent = `${data.active_trades_count} open trade${data.active_trades_count !== 1 ? 's' : ''}`;
+      }
+      
+      if (data.show_popup) {
+        tradeSupervisorPopup.style.display = 'block';
+        console.log(`[TRADE SUPERVISOR] Showing popup with ${data.active_trades_count} active trades`);
+      } else {
+        tradeSupervisorPopup.style.display = 'none';
+        console.log('[TRADE SUPERVISOR] Hiding popup - no active trades');
+      }
+    }
+
+    // Initialize trade supervisor when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+      // Small delay to ensure page is fully loaded
+      setTimeout(initializeTradeSupervisor, 1000);
+    });
   </script>
 </html>

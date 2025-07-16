@@ -35,6 +35,8 @@ from backend.util.fingerprint_generator_directional import get_fingerprint_filen
 
 
 
+
+
 # Ensure all data directories exist
 ensure_data_dirs()
 
@@ -1561,6 +1563,8 @@ def get_earliest_trade_date():
         return {"earliest_date": earliest_date}
     except Exception as e:
         return {"error": str(e), "earliest_date": None}
+
+
 
 
 if __name__ == "__main__":
