@@ -1379,6 +1379,87 @@ async def get_strike_probabilities(request: Request):
         return {"status": "error", "message": str(e)}
 
 
+@app.get("/api/strike_table")
+def get_strike_table():
+    """
+    Get the current strike table data in the format used by the frontend.
+    This provides the exact data that the frontend uses for Prob and Close values.
+    """
+    try:
+        # Get current core data
+        core_data = get_core_data()
+        current_price = core_data.get("btc_price", 0)
+        ttc_seconds = core_data.get("ttc_seconds", 1)
+        
+        # Get Kalshi markets data
+        markets_data = kalshi_market_snapshot()
+        markets = markets_data.get("markets", [])
+        
+        # Calculate strike table rows
+        strike_table_rows = []
+        
+        for market in markets:
+            try:
+                # Extract strike from ticker (e.g., "KXBTCD-25JUL1617-T119499.99" -> 119499.99)
+                ticker = market.get("ticker", "")
+                if "-T" in ticker:
+                    strike_str = ticker.split("-T")[-1]
+                    strike = float(strike_str)
+                else:
+                    continue
+                
+                # Format strike for display
+                strike_formatted = f"${strike:,.0f}"
+                
+                # Calculate buffer
+                buffer = current_price - strike
+                buffer_display = f"{buffer:,.0f}"
+                
+                # Get probability from yes_ask
+                yes_ask = market.get("yes_ask", 0)
+                prob_display = f"{yes_ask:.1f}" if yes_ask > 0 else "—"
+                
+                # Get ask prices
+                yes_ask_display = str(market.get("yes_ask", "N/A"))
+                no_ask_display = str(market.get("no_ask", "N/A"))
+                
+                # Determine row class based on buffer
+                abs_buffer = abs(buffer)
+                if abs_buffer >= 300:
+                    row_class = "ultra-safe"
+                elif abs_buffer >= 200:
+                    row_class = "safe"
+                elif abs_buffer >= 100:
+                    row_class = "caution"
+                elif abs_buffer >= 50:
+                    row_class = "high-risk"
+                else:
+                    row_class = "danger-stop"
+                
+                strike_table_rows.append({
+                    "strike": strike_formatted,
+                    "buffer": buffer_display,
+                    "prob": prob_display,
+                    "yes_ask": yes_ask_display,
+                    "no_ask": no_ask_display,
+                    "row_class": row_class,
+                    "ticker": ticker
+                })
+                
+            except Exception as e:
+                print(f"Error processing market {market.get('ticker', 'unknown')}: {e}")
+                continue
+        
+        return {
+            "status": "ok",
+            "rows": strike_table_rows,
+            "current_price": current_price,
+            "ttc_seconds": ttc_seconds
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.get("/api/live_probabilities")
 def get_live_probabilities():
     """
