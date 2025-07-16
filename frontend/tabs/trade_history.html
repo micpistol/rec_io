@@ -21,7 +21,6 @@
       background-color: #1f2530;
       font-weight: bold;
       font-size: 0.7rem;
-
       cursor: pointer;
       position: relative;
     }
@@ -72,27 +71,39 @@
 <body>
 
   <div style="display: flex; gap: 10px;">
-    <div class="panel-container" style="width: 50%; height: 100px;">
+    <div class="panel-container" style="width: 50%; height: 110px;">
       <div class="panel-header">Search</div>
       <div style="margin-top: 10px;">
         <select id="date-filter-picker" class="dropdown-picker" style="width: 160px;">
-          <option value="ALL">ALL</option>
-          <option value="TODAY">TODAY</option>
-          <option value="YESTERDAY">YESTERDAY</option>
-          <option value="WEEK">WEEK</option>
-          <option value="MONTH">MONTH</option>
+          <option value="ALL">All</option>
+          <option value="WEEK">Week</option>
+          <option value="TODAY">- Today</option>
+          <option value="DAY-1">- Tuesday</option>
+          <option value="DAY-2">- Monday</option>
+          <option value="DAY-3">- Sunday</option>
+          <option value="DAY-4">- Saturday</option>
+          <option value="DAY-5">- Friday</option>
+          <option value="DAY-6">- Thursday</option>
+          <option value="MONTH">Month</option>
+          <option value="PREV_30">Prev 30</option>
           <option value="YTD">YTD</option>
-          <option value="YEAR">YEAR</option>
+          <option value="PREV_YEAR">Prev Year</option>
+          <option value="CUSTOM">Custom</option>
         </select>
+        <div id="date-range-display" style="margin-top: 10px; margin-left: 10px;font-size: 12px; color: #ccc;"></div>
       </div>
     </div>
 
-    <div class="panel-container" style="width: 50%; height: 100px;">
+    <div class="panel-container" style="width: 50%; height: 110px;">
       <div class="panel-header">Summary</div>
       <div class="panel-content" id="summary-content" style="display: flex; justify-content: space-around; padding: 10px;">
         <div style="text-align: center;">
           <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">Trades</div>
           <div id="trade-count" style="font-size: 18px; font-weight: bold; color: white;">0</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">Avg Prob</div>
+          <div id="avg-prob" style="font-size: 18px; font-weight: bold; color: white;">0.00</div>
         </div>
         <div style="text-align: center;">
           <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">W/L %</div>
@@ -110,7 +121,7 @@
     </div>
   </div>
 
-  <div class="panel-container" style="height: calc(100vh - 140px); display: flex; flex-direction: column;">
+  <div class="panel-container" style="height: calc(100vh - 130px); display: flex; flex-direction: column;">
     <div class="panel-header">Results</div>
     <div style="flex: 1; overflow-y: auto;">
       <table id="trade-log-table" aria-label="Trade Log Table" style="position: relative;">
@@ -135,8 +146,8 @@
             <th data-key="closed_at">Closed</th>
             <th data-key="symbol_open">Symbol Open</th>
             <th data-key="symbol_close">Symbol Close</th>
-            <th data-key="momentum">Momentum</th>
-            <th data-key="volatility">Volatility</th>
+            <th data-key="momentum">Mom</th>
+            <th data-key="volatility">Vol</th>
             <th data-key="win_loss">W/L</th>
           </tr>
         </thead>
@@ -172,45 +183,77 @@
         switch (filter) {
           case 'TODAY':
             return trade.date === today;
-          case 'YESTERDAY':
-            const yesterday = new Date(now);
-            yesterday.setDate(now.getDate() - 1);
-            const yesterdayYear = yesterday.getFullYear();
-            const yesterdayMonth = String(yesterday.getMonth() + 1).padStart(2, '0');
-            const yesterdayDay = String(yesterday.getDate()).padStart(2, '0');
-            const yesterdayStr = `${yesterdayYear}-${yesterdayMonth}-${yesterdayDay}`;
-            return trade.date === yesterdayStr;
+          case 'DAY-1':
+            const day1 = new Date(now);
+            day1.setDate(now.getDate() - 1);
+            const day1Str = formatDate(day1);
+            return trade.date === day1Str;
+          case 'DAY-2':
+            const day2 = new Date(now);
+            day2.setDate(now.getDate() - 2);
+            const day2Str = formatDate(day2);
+            return trade.date === day2Str;
+          case 'DAY-3':
+            const day3 = new Date(now);
+            day3.setDate(now.getDate() - 3);
+            const day3Str = formatDate(day3);
+            return trade.date === day3Str;
+          case 'DAY-4':
+            const day4 = new Date(now);
+            day4.setDate(now.getDate() - 4);
+            const day4Str = formatDate(day4);
+            return trade.date === day4Str;
+          case 'DAY-5':
+            const day5 = new Date(now);
+            day5.setDate(now.getDate() - 5);
+            const day5Str = formatDate(day5);
+            return trade.date === day5Str;
+          case 'DAY-6':
+            const day6 = new Date(now);
+            day6.setDate(now.getDate() - 6);
+            const day6Str = formatDate(day6);
+            return trade.date === day6Str;
+          case 'DAY-7':
+            const day7 = new Date(now);
+            day7.setDate(now.getDate() - 7);
+            const day7Str = formatDate(day7);
+            return trade.date === day7Str;
           case 'WEEK':
             const weekAgo = new Date(now);
             weekAgo.setDate(now.getDate() - 7);
-            const weekAgoYear = weekAgo.getFullYear();
-            const weekAgoMonth = String(weekAgo.getMonth() + 1).padStart(2, '0');
-            const weekAgoDay = String(weekAgo.getDate()).padStart(2, '0');
-            const weekAgoStr = `${weekAgoYear}-${weekAgoMonth}-${weekAgoDay}`;
+            const weekAgoStr = formatDate(weekAgo);
             return trade.date >= weekAgoStr;
           case 'MONTH':
-            const monthAgo = new Date(now);
-            monthAgo.setMonth(now.getMonth() - 1);
-            const monthAgoYear = monthAgo.getFullYear();
-            const monthAgoMonth = String(monthAgo.getMonth() + 1).padStart(2, '0');
-            const monthAgoDay = String(monthAgo.getDate()).padStart(2, '0');
-            const monthAgoStr = `${monthAgoYear}-${monthAgoMonth}-${monthAgoDay}`;
-            return trade.date >= monthAgoStr;
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            const monthStartStr = formatDate(monthStart);
+            return trade.date >= monthStartStr;
+          case 'PREV_30':
+            const prev30 = new Date(now);
+            prev30.setDate(now.getDate() - 30);
+            const prev30Str = formatDate(prev30);
+            return trade.date >= prev30Str;
           case 'YTD':
             const ytdStr = `${year}-01-01`;
             return trade.date >= ytdStr;
-          case 'YEAR':
-            const yearAgo = new Date(now);
-            yearAgo.setFullYear(now.getFullYear() - 1);
-            const yearAgoYear = yearAgo.getFullYear();
-            const yearAgoMonth = String(yearAgo.getMonth() + 1).padStart(2, '0');
-            const yearAgoDay = String(yearAgo.getDate()).padStart(2, '0');
-            const yearAgoStr = `${yearAgoYear}-${yearAgoMonth}-${yearAgoDay}`;
-            return trade.date >= yearAgoStr;
+          case 'PREV_YEAR':
+            const prevYear = new Date(now);
+            prevYear.setFullYear(now.getFullYear() - 1);
+            const prevYearStr = formatDate(prevYear);
+            return trade.date >= prevYearStr;
+          case 'CUSTOM':
+            return true;
           default:
             return true;
         }
       });
+    }
+    
+    // Helper function to format date as YYYY-MM-DD
+    function formatDate(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
 
     function applyCurrentSort() {
@@ -266,12 +309,14 @@
 
     function updateSummary(trades) {
       const tradeCountEl = document.getElementById('trade-count');
+      const avgProbEl = document.getElementById('avg-prob');
       const winLossEl = document.getElementById('win-loss-percentage');
       const totalPnlPercentageEl = document.getElementById('total-pnl-percentage');
       const totalPnlEl = document.getElementById('total-pnl');
       
       if (!Array.isArray(trades) || trades.length === 0) {
         tradeCountEl.textContent = '0';
+        avgProbEl.textContent = '0.00';
         winLossEl.textContent = '0%';
         totalPnlPercentageEl.textContent = '0%';
         totalPnlEl.textContent = '$0.00';
@@ -280,6 +325,20 @@
       
       // Count total trades
       const tradeCount = trades.length;
+      
+      // Calculate average probability
+      let totalProb = 0;
+      let probCount = 0;
+      trades.forEach(trade => {
+        if (trade.prob !== null && trade.prob !== undefined && trade.prob !== '') {
+          const prob = Number(trade.prob);
+          if (!isNaN(prob)) {
+            totalProb += prob;
+            probCount++;
+          }
+        }
+      });
+      const avgProb = probCount > 0 ? (totalProb / probCount) : 0; // Keep as percentage
       
       // Calculate win/loss percentage
       let winCount = 0;
@@ -295,7 +354,7 @@
         }
       });
       
-      const winPercentage = totalTrades > 0 ? Math.round((winCount / totalTrades) * 100) : 0;
+      const winPercentage = totalTrades > 0 ? ((winCount / totalTrades) * 100) : 0;
       
       // Calculate total PnL and total investment
       let totalPnl = 0;
@@ -321,7 +380,8 @@
       
       // Update the display
       tradeCountEl.textContent = tradeCount.toString();
-      winLossEl.textContent = `${winPercentage}%`;
+      avgProbEl.textContent = `${avgProb.toFixed(1)}%`;
+      winLossEl.textContent = `${winPercentage.toFixed(1)}%`;
       totalPnlPercentageEl.textContent = `${pnlPercentage.toFixed(2)}%`;
       totalPnlEl.textContent = `$${totalPnl.toFixed(2)}`;
       
@@ -433,10 +493,127 @@
       });
     }
 
+
+
+    // Update day names in dropdown based on current date
+    function updateDayNames() {
+      const dayOptions = document.querySelectorAll('#date-filter-picker option[value^="DAY-"]');
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      
+      dayOptions.forEach((option, index) => {
+        const daysAgo = index + 1;
+        const date = new Date();
+        date.setDate(date.getDate() - daysAgo);
+        const dayName = dayNames[date.getDay()];
+        option.textContent = `- ${dayName}`;
+      });
+    }
+    
+    // Update date range display
+    async function updateDateRangeDisplay() {
+      const filterPicker = document.getElementById('date-filter-picker');
+      const display = document.getElementById('date-range-display');
+      if (!filterPicker || !display) return;
+      
+      const selectedValue = filterPicker.value;
+      const now = new Date();
+      
+      let rangeText = '';
+      
+      switch (selectedValue) {
+        case 'ALL':
+          // Get the earliest date from the backend
+          try {
+            const response = await fetch('/api/earliest_trade_date');
+            if (response.ok) {
+              const data = await response.json();
+              if (data.earliest_date) {
+                const todayStr = formatDate(now);
+                rangeText = `${data.earliest_date} to ${todayStr}`;
+              } else {
+                rangeText = '';
+              }
+            } else {
+              rangeText = '';
+            }
+          } catch (error) {
+            console.error('Error fetching earliest trade date:', error);
+            rangeText = '';
+          }
+          break;
+        case 'TODAY':
+          const today = formatDate(now);
+          rangeText = today;
+          break;
+        case 'DAY-1':
+        case 'DAY-2':
+        case 'DAY-3':
+        case 'DAY-4':
+        case 'DAY-5':
+        case 'DAY-6':
+        case 'DAY-7':
+          const daysAgo = parseInt(selectedValue.split('-')[1]);
+          const pastDate = new Date(now);
+          pastDate.setDate(now.getDate() - daysAgo);
+          const pastDateStr = formatDate(pastDate);
+          rangeText = pastDateStr;
+          break;
+        case 'WEEK':
+          const weekAgo = new Date(now);
+          weekAgo.setDate(now.getDate() - 7);
+          const weekAgoStr = formatDate(weekAgo);
+          const todayStr = formatDate(now);
+          rangeText = `${weekAgoStr} to ${todayStr}`;
+          break;
+        case 'MONTH':
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          const monthStartStr = formatDate(monthStart);
+          const todayStr2 = formatDate(now);
+          rangeText = `${monthStartStr} to ${todayStr2}`;
+          break;
+        case 'PREV_30':
+          const prev30 = new Date(now);
+          prev30.setDate(now.getDate() - 30);
+          const prev30Str = formatDate(prev30);
+          const todayStr3 = formatDate(now);
+          rangeText = `${prev30Str} to ${todayStr3}`;
+          break;
+        case 'YTD':
+          const ytdStart = `${now.getFullYear()}-01-01`;
+          const todayStr4 = formatDate(now);
+          rangeText = `${ytdStart} to ${todayStr4}`;
+          break;
+        case 'PREV_YEAR':
+          const prevYear = new Date(now);
+          prevYear.setFullYear(now.getFullYear() - 1);
+          const prevYearStr = formatDate(prevYear);
+          const todayStr5 = formatDate(now);
+          rangeText = `${prevYearStr} to ${todayStr5}`;
+          break;
+        case 'CUSTOM':
+          rangeText = '';
+          break;
+        default:
+          rangeText = '';
+      }
+      
+      display.textContent = rangeText;
+    }
+
     // On initial load, show filtered trades
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
+      updateDayNames(); // Update day names
+      await updateDateRangeDisplay(); // Update date range display
       fetchAllTrades();
       setInterval(fetchAllTrades, 1000);
+
+      // Add event listener for dropdown changes
+      const filterPicker = document.getElementById('date-filter-picker');
+      if (filterPicker) {
+        filterPicker.addEventListener('change', () => {
+          updateDateRangeDisplay();
+        });
+      }
 
       const headers = document.querySelectorAll('#trade-log-table thead th');
       headers.forEach(th => {

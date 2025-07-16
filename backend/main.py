@@ -1418,94 +1418,10 @@ def get_live_probabilities():
         return {"status": "error", "message": str(e)}
 
 
-@app.get("/api/debug/strikes")
-def get_debug_strikes():
-    """
-    Debug endpoint to show what strikes would be calculated for current BTC price.
-    """
-    try:
-        # Get current BTC price
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
-        row = cursor.fetchone()
-        conn.close()
-        
-        if row:
-            current_price = float(row[0])
-            base_price = round(current_price / 250) * 250
-            step = 250
-            strikes = []
-            for i in range(base_price - 6 * step, base_price + 6 * step + 1, step):
-                strikes.append(i)
-            
-            return {
-                "current_price": current_price,
-                "base_price": base_price,
-                "strikes": strikes,
-                "total_strikes": len(strikes)
-            }
-        else:
-            return {"status": "error", "message": "No BTC price data found"}
-            
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-@app.post("/api/test")
-def test_endpoint():
-    print("=== TEST ENDPOINT CALLED ===")
-    return {"status": "ok", "message": "Test endpoint working"}
 
 
 
 
-@app.get("/api/test_fingerprint")
-def test_fingerprint():
-    """
-    Test endpoint to trigger a calculation and verify fingerprint tracking.
-    """
-    try:
-        symbol = "btc"  # TODO: Make this dynamic if needed
-        calculator = get_directional_calculator(symbol)
-        
-        # Trigger a calculation with a known momentum score
-        test_price = 50000.0
-        test_ttc = 3600.0  # 1 hour
-        test_strikes = [45000, 50000, 55000]
-        test_momentum = 5.0
-        
-        print(f"Testing fingerprint with momentum score: {test_momentum}")
-        result = calculator.calculate_directional_strike_probabilities(
-            current_price=test_price,
-            ttc_seconds=test_ttc,
-            strikes=test_strikes,
-            momentum_score=test_momentum
-        )
-        
-        # Get the current fingerprint info
-        current_bucket = getattr(calculator, 'last_used_momentum_bucket', None)
-        if current_bucket is None:
-            current_bucket = calculator.current_momentum_bucket
-            
-        if current_bucket is not None:
-            fingerprint_name = f"{symbol}_fingerprint_directional_momentum_{current_bucket:03d}.csv"
-            return {
-                "status": "success",
-                "message": f"Calculation completed with momentum {test_momentum}",
-                "fingerprint": fingerprint_name,
-                "bucket": current_bucket,
-                "available_buckets": list(calculator.momentum_fingerprints.keys())
-            }
-        else:
-            return {
-                "status": "error", 
-                "message": "Calculation completed but no fingerprint bucket was set",
-                "available_buckets": list(calculator.momentum_fingerprints.keys())
-            }
-            
-    except Exception as e:
-        return {"status": "error", "message": f"Test failed: {str(e)}"}
 
 
 @app.get("/api/current_fingerprint")
@@ -1648,6 +1564,65 @@ if __name__ == "__main__":
     # )
 
 
+
+# New endpoint to get earliest trade date
+@app.get("/api/earliest_trade_date")
+def get_earliest_trade_date():
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "data", "trade_history", "trades.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT MIN(date) FROM trades WHERE date IS NOT NULL")
+        result = cursor.fetchone()
+        conn.close()
+        
+        earliest_date = result[0] if result and result[0] else None
+        return {"earliest_date": earliest_date}
+    except Exception as e:
+        return {"error": str(e), "earliest_date": None}
+
+
+if __name__ == "__main__":
+    import threading
+    import os
+    import importlib.util
+
+    threading.Thread(target=start_websocket, daemon=True).start()
+
+    # Start live probability writer
+    def get_current_price():
+        """Get current BTC price from database."""
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
+            row = cursor.fetchone()
+            conn.close()
+            return float(row[0]) if row else 50000.0
+        except:
+            return 50000.0
+    
+    def get_current_ttc():
+        """Get current TTC in seconds from the /core endpoint."""
+        try:
+            resp = requests.get("http://localhost:5001/core", timeout=2)
+            if resp.status_code == 200:
+                data = resp.json()
+                ttc = float(data.get("ttc_seconds", 0))
+                if ttc > 0:
+                    return ttc
+            print("[LiveProbWriter] Could not get valid ttc_seconds from /core.")
+            return None
+        except Exception as e:
+            print(f"[LiveProbWriter] Error fetching ttc_seconds from /core: {e}")
+            return None
+    
+    # Start the live probability writer
+    # start_live_probability_writer( # This line is removed as per the edit hint
+    #     update_interval=10,  # Update every 10 seconds
+    #     current_price_getter=get_current_price,
+    #     ttc_getter=get_current_ttc
+    # )
 
     import uvicorn
     port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))
