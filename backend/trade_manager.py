@@ -265,8 +265,11 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                 
                 if trade_data:
                     buy_price, position = trade_data
-                    # Simple PnL calculation: (sell_price - buy_price) * position
-                    pnl = (sell_price - buy_price) * position
+                    # Calculate PnL with fees: (sell_price - buy_price) * position - fees
+                    buy_value = buy_price * position
+                    sell_value = sell_price * position
+                    fees = total_fees_paid if total_fees_paid is not None else 0.0
+                    pnl = round(sell_value - buy_value - fees, 2)
                     
                     # Determine win/loss
                     win_loss = "win" if pnl > 0 else "loss" if pnl < 0 else "draw"
