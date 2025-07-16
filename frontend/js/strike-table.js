@@ -1,7 +1,4 @@
 // Add no-op definitions for missing functions to prevent ReferenceError
-if (typeof window.updateWatchlistDisplay !== 'function') {
-  window.updateWatchlistDisplay = function() {};
-}
 if (typeof window.updateClickHandlersForReco !== 'function') {
   window.updateClickHandlersForReco = function() {};
 }
@@ -98,13 +95,7 @@ function initializeStrikeTable(basePrice) {
     });
   });
   
-  // Update watchlist after strike table is initialized
-  if (window.updateWatchlistDisplay) {
-    console.log('[STRIKE TABLE] Strike table initialized, updating watchlist');
-    setTimeout(() => {
-      window.updateWatchlistDisplay();
-    }, 100);
-  }
+
 }
 
 // === STRIKE TABLE UPDATE LOGIC ===
@@ -115,13 +106,6 @@ async function fetchProbabilities(symbol, currentPrice, ttcMinutes, strikes, yea
     
     // Get current momentum score from the UI
     const momentumScore = getCurrentMomentumScore();
-    
-    console.log('[STRIKE TABLE] Fetching probabilities for:', {
-      currentPrice,
-      ttcSeconds,
-      momentumScore,
-      strikes: strikes.slice(0, 5) + '...' + strikes.slice(-5) // Show first and last 5 strikes
-    });
     
     const res = await fetch(window.location.origin + '/api/strike_probabilities', {
       method: 'POST',
@@ -134,7 +118,6 @@ async function fetchProbabilities(symbol, currentPrice, ttcMinutes, strikes, yea
       })
     });
     const data = await res.json();
-    console.log('[STRIKE TABLE] API Response:', data); // DEBUG LOG
     if (data.status === 'ok' && Array.isArray(data.probabilities)) {
       // Map: strike -> probability (using prob_within for display)
       const probMap = new Map();
@@ -145,7 +128,6 @@ async function fetchProbabilities(symbol, currentPrice, ttcMinutes, strikes, yea
     }
     return null;
   } catch (e) {
-    console.error('Probability fetch error:', e);
     return null;
   }
 }
@@ -157,17 +139,13 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
   if (window.diffMode !== undefined) {
     // Use local state for instant response
     diffMode = window.diffMode;
-    console.log('[STRIKE TABLE] Using local diffMode:', diffMode);
   } else {
     // Fallback to backend preferences
     try {
       const response = await fetch('/api/get_preferences');
       const data = await response.json();
-      console.log('[STRIKE TABLE] /api/get_preferences response:', data); // DEBUG
       diffMode = data.diff_mode || false;
-      console.log('[STRIKE TABLE] Using backend diffMode:', diffMode); // DEBUG
     } catch (e) {
-      console.error('[STRIKE TABLE] Error fetching preferences:', e);
       diffMode = false;
     }
   }
@@ -252,6 +230,7 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
     const volume = matchingMarket && typeof matchingMarket.volume === "number" ? matchingMarket.volume : 0;
 
     // --- VOLUME-BASED DISABLING LOGIC ---
+    
     // If volume < 1000, both buttons are disabled regardless of mode
     if (volume < 1000) {
       updateYesNoButton(yesSpan, strike, "yes", yesAsk, false, ticker);
@@ -290,12 +269,10 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
   });
 
   // --- GUARANTEED SPANNER ROW LOGIC ---
-  console.log('[SPANNER] strikeRows.length:', strikeRows.length);
   if (strikeRows.length > 0) {
     // Always check for spanner row after all strike rows are rendered
     let spannerRow = strikeTableBody.querySelector('.spanner-row');
     const allRows = Array.from(strikeTableBody.children);
-    console.log('[SPANNER] allRows:', allRows.map(r => r.className));
     let insertIndex = allRows.length; // default to end
     for (let i = 0; i < allRows.length; i++) {
       const row = allRows[i];
@@ -310,7 +287,6 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
       }
     }
     if (!spannerRow) {
-      console.log('[SPANNER] Creating spanner row at index', insertIndex);
       spannerRow = createSpannerRow(centerPrice);
       if (insertIndex < allRows.length) {
         strikeTableBody.insertBefore(spannerRow, allRows[insertIndex]);
@@ -330,28 +306,17 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
       // Move if not at correct position
       const currentSpannerIndex = allRows.indexOf(spannerRow);
       if (currentSpannerIndex !== insertIndex) {
-        console.log('[SPANNER] Moving spanner row from', currentSpannerIndex, 'to', insertIndex);
         if (insertIndex < allRows.length) {
           strikeTableBody.insertBefore(spannerRow, allRows[insertIndex]);
         } else {
           strikeTableBody.appendChild(spannerRow);
         }
-      } else {
-        console.log('[SPANNER] Spanner row already at correct position', insertIndex);
       }
     }
   }
   
   if (typeof window.addStrikeTableClickHandlers === 'function') window.addStrikeTableClickHandlers();
-  // Sync watchlist with live strike table data
-  if (typeof window.syncWatchlistWithStrikeTable === 'function') {
-    setTimeout(() => {
-      console.log('[STRIKE TABLE] Strike table updated, syncing watchlist');
-      window.syncWatchlistWithStrikeTable();
-    }, 100);
-  } else {
-    console.log('[STRIKE TABLE] syncWatchlistWithStrikeTable function not found');
-  }
+
 }
 
 // === POSITION INDICATOR ===
@@ -376,16 +341,13 @@ async function updatePositionIndicator(strikeCell, strike) {
     
     // Update visual indicator
     if (hasPosition) {
-      console.log('[DEBUG] Setting background color for', strikeCell, 'to #1a2a1a');
       strikeCell.style.backgroundColor = '#1a2a1a'; // Very subtle green tint
       strikeCell.style.borderLeft = '3px solid #45d34a'; // Green left border
     } else {
-      console.log('[DEBUG] Clearing background color for', strikeCell);
       strikeCell.style.backgroundColor = '';
       strikeCell.style.borderLeft = '';
     }
   } catch (e) {
-    console.error('Error updating position indicator:', e);
     strikeCell.style.backgroundColor = '';
     strikeCell.style.borderLeft = '';
   }
@@ -412,6 +374,7 @@ function debounce(func, wait) {
 function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = null, forceRefresh = false) {
   const key = `${strike}-${side}`;
   const prev = lastButtonStates.get(key);
+  
   if (!forceRefresh && !window.forceButtonRefresh && prev && prev.askPrice === askPrice && prev.isActive === isActive) {
     // No change; skip update
     return;
@@ -444,14 +407,13 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
 
   if (isActive) {
     spanEl.onclick = debounce(function(event) {
+      
       // Use centralized trade controller
       if (typeof window.prepareTradeData === 'function' && typeof window.executeTrade === 'function') {
         const tradeData = window.prepareTradeData(spanEl);
         if (tradeData) {
           window.executeTrade(tradeData);
         }
-      } else {
-        console.error('Centralized trade controller not available');
       }
     }, 300);
   } else {
@@ -524,7 +486,7 @@ function playSound(type) {
 
   const clone = original.cloneNode(true); // Allow overlapping playback
   clone.volume = type === 'open' ? 0.1 : 0.2; // Set volume inline
-  clone.play().catch(err => console.error(`Failed to play sound clone:`, err));
+  clone.play().catch(err => {});
 }
 
 function showTradeOpenedPopup() {
@@ -590,96 +552,16 @@ function createSpannerRow(currentPrice) {
 }
 
 // === STRIKE TABLE ROW CLICK HANDLERS ===
-// Global watchlist state (like the old watchlist.js)
-let strikeTableWatchlistData = [];
-
-// Load current watchlist on page load
-async function loadStrikeTableWatchlist() {
-  try {
-    const response = await fetch('/api/get_watchlist');
-    const data = await response.json();
-    strikeTableWatchlistData = data.watchlist || [];
-    console.log('Loaded watchlist for strike table:', strikeTableWatchlistData);
-  } catch (error) {
-    console.error('Error loading watchlist for strike table:', error);
-  }
-}
-
-// Save watchlist to preferences (like the old watchlist.js)
-async function saveStrikeTableWatchlist() {
-  try {
-    console.log('Saving watchlist from strike table:', strikeTableWatchlistData);
-    const response = await fetch('/api/set_watchlist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ watchlist: strikeTableWatchlistData })
-    });
-    if (!response.ok) {
-      console.error('Failed to save watchlist:', response.status);
-    } else {
-      console.log('Watchlist saved successfully from strike table');
-    }
-  } catch (error) {
-    console.error('Error saving watchlist from strike table:', error);
-  }
-}
-
 function addStrikeTableRowClickHandlers() {
   const strikeTable = document.getElementById('strike-table');
   if (!strikeTable) return;
   const rows = strikeTable.querySelectorAll('tbody tr');
   rows.forEach(row => {
-    // Set pointer cursor and title for first 4 columns
-    Array.from(row.children).forEach((cell, idx) => {
-      if (idx >= 0 && idx <= 3) {
-        cell.style.cursor = 'pointer';
-        cell.title = 'Click to add to watchlist';
-      } else {
-        cell.style.cursor = 'default';
-        cell.title = '';
-      }
-    });
     // Remove any previous click handler
     row.removeEventListener('click', row._strikeTableClickHandler);
-    // Attach new click handler
+    // Attach new click handler (currently no-op, can be extended later)
     const clickHandler = (event) => {
-      const cell = event.target.closest('td');
-      if (!cell) return;
-      const cellIndex = Array.from(row.children).indexOf(cell);
-      if (cellIndex >= 0 && cellIndex <= 3) {
-        const strikeCell = row.children[0];
-        if (!strikeCell) return;
-        const strike = parseFloat(strikeCell.textContent.replace(/[$,]/g, ''));
-        if (!isNaN(strike)) {
-          // Add to local watchlist array (like the old watchlist.js)
-          if (!strikeTableWatchlistData.includes(strike)) {
-            strikeTableWatchlistData.push(strike);
-            console.log('Added strike to watchlist:', strike);
-            console.log('Updated watchlist:', strikeTableWatchlistData);
-            
-            // Visual feedback - flash the row
-            row.classList.add('strike-row-flash');
-            setTimeout(() => {
-              row.classList.remove('strike-row-flash');
-            }, 550);
-            
-            // Save the entire updated array to backend
-            saveStrikeTableWatchlist();
-            
-            // Refresh the watchlist display
-            if (typeof window.refreshWatchlist === 'function') {
-              setTimeout(() => {
-                console.log('[STRIKE TABLE] Refreshing watchlist after adding strike');
-                window.refreshWatchlist();
-              }, 100);
-            } else {
-              console.log('[STRIKE TABLE] refreshWatchlist function not found');
-            }
-          } else {
-            console.log('Strike already in watchlist:', strike);
-          }
-        }
-      }
+      // Click handler removed - no functionality
     };
     row._strikeTableClickHandler = clickHandler;
     row.addEventListener('click', clickHandler);
@@ -692,9 +574,7 @@ async function loadDiffModeFromPreferences() {
     const response = await fetch('/api/get_preferences');
     const data = await response.json();
     window.diffMode = data.diff_mode || false;
-    console.log('[STRIKE TABLE] Loaded DIFF mode from preferences:', window.diffMode);
   } catch (error) {
-    console.error('[STRIKE TABLE] Error loading DIFF mode from preferences:', error);
     window.diffMode = false;
   }
 }
@@ -725,28 +605,22 @@ function connectDbChangeWebSocket() {
   dbChangeWebSocket = new WebSocket(wsUrl);
   
   dbChangeWebSocket.onopen = function() {
-    console.log('[STRIKE TABLE] WebSocket connected for database changes');
   };
   
   dbChangeWebSocket.onmessage = function(event) {
     try {
       const data = JSON.parse(event.data);
       if (data.type === 'db_change' && data.database === 'trades') {
-        console.log('[STRIKE TABLE] Received trades.db change notification, updating...');
         fetchAndRenderStrikeTable();
       }
     } catch (error) {
-      console.error('[STRIKE TABLE] Error parsing WebSocket message:', error);
     }
   };
   
   dbChangeWebSocket.onclose = function() {
-    console.log('[STRIKE TABLE] WebSocket disconnected, attempting to reconnect...');
-    setTimeout(connectDbChangeWebSocket, 3000);
   };
   
   dbChangeWebSocket.onerror = function(error) {
-    console.error('[STRIKE TABLE] WebSocket error:', error);
   };
 }
 

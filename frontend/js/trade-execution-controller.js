@@ -23,19 +23,16 @@ window.TRADE_STATE = {
 window.executeTrade = async function(tradeData) {
   // Prevent multiple simultaneous executions
   if (window.TRADE_STATE.isExecuting) {
-    console.warn('Trade execution blocked: Another trade is currently executing');
     return { success: false, error: 'Trade already executing' };
   }
 
   // Validate trade data
   if (!tradeData || !tradeData.symbol || !tradeData.side || !tradeData.buy_price) {
-    console.error('Invalid trade data:', tradeData);
     return { success: false, error: 'Invalid trade data' };
   }
 
   // Check position size limits
   if (tradeData.position && tradeData.position > window.TRADE_CONFIG.MAX_POSITION_SIZE) {
-    console.error('Position size exceeds limit:', tradeData.position);
     return { success: false, error: 'Position size too large' };
   }
 
@@ -66,15 +63,13 @@ window.executeTrade = async function(tradeData) {
       momentum: tradeData.momentum,
       prob: tradeData.prob,
       volatility: tradeData.volatility,
-      volatility_delta: null,
+      
       win_loss: null
     };
 
     if (tradeData.position !== null) {
       payload.position = tradeData.position;
     }
-
-    console.log('Trade execution payload:', payload);
 
     // === DEMO MODE CHECK ===
     if (window.TRADE_CONFIG.DEMO_MODE) {
@@ -114,7 +109,6 @@ window.executeTrade = async function(tradeData) {
       playSound('open');
     }
 
-    console.log('Trade executed successfully:', result);
     return { 
       success: true, 
       ticket_id: ticket_id, 
@@ -123,7 +117,6 @@ window.executeTrade = async function(tradeData) {
     };
 
   } catch (error) {
-    console.error('Trade execution failed:', error);
     return { 
       success: false, 
       error: error.message,
@@ -141,13 +134,11 @@ window.executeTrade = async function(tradeData) {
 window.closeTrade = async function(tradeId, sellPrice, event) {
   // Prevent multiple simultaneous executions
   if (window.TRADE_STATE.isExecuting) {
-    console.warn('Close trade execution blocked: Another trade is currently executing');
     return { success: false, error: 'Trade already executing' };
   }
 
   // Validate inputs
   if (!tradeId || !sellPrice) {
-    console.error('Invalid close trade parameters:', { tradeId, sellPrice });
     return { success: false, error: 'Invalid close trade parameters' };
   }
 
@@ -174,15 +165,13 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
       })
     });
 
-    // === Prune old trade logs (keep file size sane) ===
-    await fetch('/api/prune_trade_logs', { method: 'POST' });
+
 
     // === Get the ACTUAL position count from the trade data ===
     let count = trade.position;
     
     // Validate that we have a valid position count
     if (count === null || count === undefined || isNaN(count) || count <= 0) {
-      console.error('Invalid position count for trade:', tradeId, 'position:', count);
       throw new Error(`Invalid position count: ${count}. Trade ID: ${tradeId}`);
     }
 
@@ -208,8 +197,6 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
       buy_price:        sellPrice,
       symbol_close:     symbolClose
     };
-
-    console.log('Close trade execution payload:', payload);
 
     // === DEMO MODE CHECK ===
     if (window.TRADE_CONFIG.DEMO_MODE) {
@@ -254,7 +241,6 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
       showTradeClosedPopup();
     }
 
-    console.log('Close trade executed successfully:', result);
     return { 
       success: true, 
       ticket_id: ticket_id, 
@@ -263,7 +249,6 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
     };
 
   } catch (error) {
-    console.error('Close trade execution failed:', error);
     return { 
       success: false, 
       error: error.message,
@@ -356,9 +341,7 @@ window.prepareTradeData = function(target) {
       }
     }
   }
-  console.log('PROB extraction for strike', strike, ':', prob);
   if (!prob) {
-    console.error('Could not find PROB value for this strike. No ticket created.');
     return null;
   }
 
@@ -387,14 +370,6 @@ window.prepareTradeData = function(target) {
 // Function to toggle demo mode
 window.toggleDemoMode = function() {
   window.TRADE_CONFIG.DEMO_MODE = !window.TRADE_CONFIG.DEMO_MODE;
-  console.log('Demo mode:', window.TRADE_CONFIG.DEMO_MODE ? 'ON' : 'OFF');
-  
-  // Show status
-  const status = window.TRADE_CONFIG.DEMO_MODE ? 
-    '🟢 DEMO MODE - No real trades will be executed' : 
-    '🔴 LIVE MODE - Real trades will be executed';
-  
-  console.log(status);
   return window.TRADE_CONFIG.DEMO_MODE;
 };
 
@@ -409,6 +384,4 @@ window.getTradeState = function() {
   };
 };
 
-// Initialize the controller
-console.log('Trade Execution Controller initialized');
-console.log('Demo mode:', window.TRADE_CONFIG.DEMO_MODE ? 'ON' : 'OFF'); 
+// Initialize the controller 

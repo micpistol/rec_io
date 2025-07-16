@@ -108,9 +108,9 @@ class DirectionalProbabilityCalculator:
             
             for i, ttc_idx in enumerate(ttc_sorted_indices):
                 for j, pos_idx in enumerate(positive_sorted_indices):
-                    positive_probability_matrix[i, j] = float(positive_data[ttc_idx, pos_idx])
+                    positive_probability_matrix[i, j] = float(positive_data[ttc_idx][pos_idx])
                 for j, neg_idx in enumerate(negative_sorted_indices):
-                    negative_probability_matrix[i, j] = float(negative_data[ttc_idx, neg_idx])
+                    negative_probability_matrix[i, j] = float(negative_data[ttc_idx][neg_idx])
             
             # Create interpolation points for positive and negative
             positive_interp_points = []

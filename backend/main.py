@@ -11,7 +11,7 @@ import os
 import json
 import asyncio
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pytz
 import requests
 from dateutil import parser
@@ -70,7 +70,7 @@ def load_preferences():
                 return prefs
         except Exception:
             pass
-    return {"auto_stop": True, "watchlist": [], "reco": False, "diff_mode": False}
+    return {"auto_stop": True, "reco": False, "diff_mode": False}
 
 def save_preferences(prefs):
     try:
@@ -130,6 +130,11 @@ app.mount(
     StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend", "styles")),
     name="styles"
 )
+
+# Serve the logs folder as static files under /logs
+app.mount("/logs", StaticFiles(directory="logs"), name="logs")
+
+
 
 # Serve the public folder as static files under /public
 app.mount("/public", StaticFiles(directory="public"), name="public")
@@ -733,24 +738,7 @@ async def set_multiplier(request: Request):
         print(f"[Set Multiplier Error] {e}")
     return {"status": "ok"}
 
-@app.post("/api/set_watchlist")
-async def set_watchlist(request: Request):
-    data = await request.json()
-    print('[DEBUG] Received set_watchlist:', data)
-    prefs = load_preferences()
-    try:
-        prefs["watchlist"] = data.get("watchlist", [])
-        print('[DEBUG] Updated prefs before save:', prefs)
-        save_preferences(prefs)
-        await broadcast_preferences_update()
-    except Exception as e:
-        print(f"[Set Watchlist Error] {e}")
-    return {"status": "ok"}
 
-@app.get("/api/get_watchlist")
-async def get_watchlist():
-    prefs = load_preferences()
-    return {"watchlist": prefs.get("watchlist", [])}
 
 # New route: update position size and multiplier preferences
 @app.post("/api/update_preferences")
@@ -773,12 +761,7 @@ async def update_preferences(request: Request):
         except Exception as e:
             print(f"[Invalid Multiplier] {e}")
 
-    if "watchlist" in data:
-        try:
-            prefs["watchlist"] = data["watchlist"]
-            updated = True
-        except Exception as e:
-            print(f"[Invalid Watchlist] {e}")
+
 
     if updated:
         save_preferences(prefs)
@@ -1231,7 +1214,7 @@ def get_trades_db():
             SELECT id, date, time, strike, side, buy_price, position, status, 
                    symbol, market, trade_strategy, market_id,
                    symbol_open, symbol_close, momentum, momentum_delta, 
-                   volatility, volatility_delta, win_loss 
+                   volatility, win_loss 
             FROM trades 
             ORDER BY id DESC
         """)
@@ -1256,8 +1239,7 @@ def get_trades_db():
                 "momentum": row[14],
                 "momentum_delta": row[15],
                 "volatility": row[16],
-                "volatility_delta": row[17],
-                "win_loss": row[18],
+                "win_loss": row[17],
             }
             for row in rows
         ]
@@ -1277,7 +1259,7 @@ def get_trades():
             SELECT id, date, time, strike, side, buy_price, position, status, 
                    symbol, market, trade_strategy, market_id,
                    symbol_open, symbol_close, momentum, momentum_delta, 
-                   volatility, volatility_delta, win_loss 
+                   volatility, win_loss 
             FROM trades 
             ORDER BY id DESC
         """)
@@ -1302,8 +1284,7 @@ def get_trades():
                 "momentum": row[14],
                 "momentum_delta": row[15],
                 "volatility": row[16],
-                "volatility_delta": row[17],
-                "win_loss": row[18],
+                "win_loss": row[17],
             }
             for row in rows
         ]
@@ -1583,47 +1564,6 @@ def get_earliest_trade_date():
 
 
 if __name__ == "__main__":
-    import threading
-    import os
-    import importlib.util
-
-    threading.Thread(target=start_websocket, daemon=True).start()
-
-    # Start live probability writer
-    def get_current_price():
-        """Get current BTC price from database."""
-        try:
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
-            row = cursor.fetchone()
-            conn.close()
-            return float(row[0]) if row else 50000.0
-        except:
-            return 50000.0
-    
-    def get_current_ttc():
-        """Get current TTC in seconds from the /core endpoint."""
-        try:
-            resp = requests.get("http://localhost:5001/core", timeout=2)
-            if resp.status_code == 200:
-                data = resp.json()
-                ttc = float(data.get("ttc_seconds", 0))
-                if ttc > 0:
-                    return ttc
-            print("[LiveProbWriter] Could not get valid ttc_seconds from /core.")
-            return None
-        except Exception as e:
-            print(f"[LiveProbWriter] Error fetching ttc_seconds from /core: {e}")
-            return None
-    
-    # Start the live probability writer
-    # start_live_probability_writer( # This line is removed as per the edit hint
-    #     update_interval=10,  # Update every 10 seconds
-    #     current_price_getter=get_current_price,
-    #     ttc_getter=get_current_ttc
-    # )
-
     import uvicorn
     port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))
     print(f"[MAIN] Launching app on port {port}")

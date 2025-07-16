@@ -256,7 +256,7 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                 
                 symbol_close = symbol_close_row[0] if symbol_close_row else None
                 
-                # Calculate PnL (simplified for now)
+                # Calculate PnL with fees included
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute("SELECT buy_price, position FROM trades WHERE id = ?", (id,))
@@ -272,10 +272,23 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                     pnl = round(sell_value - buy_value - fees, 2)
                     
                     # Determine win/loss
-                    win_loss = "win" if pnl > 0 else "loss" if pnl < 0 else "draw"
+                    win_loss = "W" if pnl > 0 else "L" if pnl < 0 else "D"
                     
-                    # Update trade status to closed with updated fees
-                    update_trade_status(id, "closed", closed_at, sell_price, symbol_close, win_loss)
+                    # Update trade status to closed with correct PnL calculation
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        UPDATE trades 
+                        SET status = 'closed',
+                            closed_at = ?,
+                            sell_price = ?,
+                            symbol_close = ?,
+                            win_loss = ?,
+                            pnl = ?
+                        WHERE id = ?
+                    """, (closed_at, sell_price, symbol_close, win_loss, pnl, id))
+                    conn.commit()
+                    conn.close()
                     
                     # Update the FEES column in trades.db with total_fees_paid
                     conn = get_db_connection()
@@ -638,42 +651,22 @@ def init_trades_db():
         status TEXT NOT NULL DEFAULT 'open',
         closed_at TEXT DEFAULT NULL,
         contract TEXT DEFAULT NULL,
-        fees_paid REAL DEFAULT NULL
+        sell_price REAL DEFAULT NULL,
+        pnl REAL DEFAULT NULL,
+        symbol TEXT DEFAULT NULL,
+        market TEXT DEFAULT NULL,
+        trade_strategy TEXT DEFAULT NULL,
+        symbol_open REAL DEFAULT NULL,
+        momentum REAL DEFAULT NULL,
+        prob REAL DEFAULT NULL,
+        volatility REAL DEFAULT NULL,
+
+        symbol_close REAL DEFAULT NULL,
+        win_loss TEXT DEFAULT NULL,
+        ticker TEXT DEFAULT NULL,
+        fees REAL DEFAULT NULL
     )
     """)
-    # Check existing columns
-    cursor.execute("PRAGMA table_info(trades)")
-    columns = [info[1] for info in cursor.fetchall()]
-    # Check if sell_price column exists, add if not
-    if "sell_price" not in columns:
-        cursor.execute("ALTER TABLE trades ADD COLUMN sell_price REAL DEFAULT NULL")
-    # Add fees_paid column if not present
-    if "fees_paid" not in columns:
-        cursor.execute("ALTER TABLE trades ADD COLUMN fees_paid REAL DEFAULT NULL")
-    # Add pnl column if not present
-    if "pnl" not in columns:
-        cursor.execute("ALTER TABLE trades ADD COLUMN pnl REAL DEFAULT NULL")
-    # Add prob column if not present (replaces momentum_delta)
-    if "prob" not in columns:
-        cursor.execute("ALTER TABLE trades ADD COLUMN prob REAL DEFAULT NULL")
-    # Additional columns to ensure exist
-    additional_columns = {
-        "symbol": "TEXT",
-        "market": "TEXT",
-        "trade_strategy": "TEXT",
-        "symbol_open": "REAL",
-        "momentum": "REAL",
-        "prob": "REAL",
-        "volatility": "REAL",
-        "volatility_delta": "REAL",
-        "symbol_close": "REAL",
-        "win_loss": "TEXT",
-        "ticker": "TEXT"
-    }
-
-    for column, col_type in additional_columns.items():
-        if column not in columns:
-            cursor.execute(f"ALTER TABLE trades ADD COLUMN {column} {col_type}")
     conn.commit()
     conn.close()
 
@@ -720,14 +713,14 @@ def insert_trade(trade):
         """INSERT INTO trades (
             date, time, strike, side, buy_price, position, status,
             contract, ticker, symbol, market, trade_strategy, symbol_open,
-            momentum, prob, volatility, volatility_delta, ticket_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            momentum, prob, volatility, ticket_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             trade['date'], trade['time'], trade['strike'], trade['side'], trade['buy_price'],
             trade['position'], trade.get('status', 'open'), trade.get('contract'),
             trade.get('ticker'), trade.get('symbol'), trade.get('market'), trade.get('trade_strategy'),
             trade.get('symbol_open'), trade.get('momentum'), trade.get('prob'),
-            trade.get('volatility'), trade.get('volatility_delta'), trade.get('ticket_id')
+            trade.get('volatility'), trade.get('ticket_id')
         )
     )
     conn.commit()
@@ -735,7 +728,7 @@ def insert_trade(trade):
     conn.close()
     return last_id
 
-def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbol_close=None, win_loss=None):
+def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbol_close=None, win_loss=None, pnl=None):
     conn = get_db_connection()
     cursor = conn.cursor()
     if status == 'closed':
@@ -744,30 +737,34 @@ def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbo
             est_now = utc_now.astimezone(ZoneInfo("America/New_York"))
             closed_at = est_now.isoformat()
 
-        # Fetch trade data for PnL calculation
-        cursor.execute("SELECT buy_price, position, fees_paid FROM trades WHERE id = ?", (trade_id,))
-        row = cursor.fetchone()
-        buy_price = row[0] if row else None
-        position = row[1] if row else None
-        fees_paid = row[2] if row else 0.0
-
-        # Calculate win/loss
-        if buy_price is not None and sell_price is not None:
-            win_loss = 'W' if sell_price > buy_price else 'L'
+        # If PnL is already calculated and passed in, use it
+        if pnl is not None:
+            calculated_pnl = pnl
         else:
-            win_loss = None
+            # Fetch trade data for PnL calculation
+            cursor.execute("SELECT buy_price, position, fees FROM trades WHERE id = ?", (trade_id,))
+            row = cursor.fetchone()
+            buy_price = row[0] if row else None
+            position = row[1] if row else None
+            fees_paid = row[2] if row else 0.0
 
-        # Calculate PnL
-        pnl = None
-        if buy_price is not None and sell_price is not None and position is not None:
-            buy_value = buy_price * position
-            sell_value = sell_price * position
-            fees = fees_paid if fees_paid is not None else 0.0
-            pnl = sell_value - buy_value - fees
+            # Calculate win/loss
+            if buy_price is not None and sell_price is not None:
+                win_loss = 'W' if sell_price > buy_price else 'L'
+            else:
+                win_loss = None
+
+            # Calculate PnL with fees included
+            calculated_pnl = None
+            if buy_price is not None and sell_price is not None and position is not None:
+                buy_value = buy_price * position
+                sell_value = sell_price * position
+                fees = fees_paid if fees_paid is not None else 0.0
+                calculated_pnl = round(sell_value - buy_value - fees, 2)
 
         cursor.execute(
             "UPDATE trades SET status = ?, closed_at = ?, sell_price = ?, symbol_close = ?, win_loss = ?, pnl = ? WHERE id = ?",
-            (status, closed_at, sell_price, symbol_close, win_loss, pnl, trade_id)
+            (status, closed_at, sell_price, symbol_close, win_loss, calculated_pnl, trade_id)
         )
     else:
         cursor.execute("UPDATE trades SET status = ? WHERE id = ?", (status, trade_id))
@@ -1197,21 +1194,38 @@ def poll_settlements_for_matches(expired_tickers):
                     revenue = row[0]
                     sell_price = 1.00 if revenue > 0 else 0.00
                     
+                    # Get fees from positions.db for this ticker
+                    demo_env = os.environ.get("DEMO_MODE", "false")
+                    DEMO_MODE = demo_env.strip().lower() == "true"
+                    if DEMO_MODE:
+                        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "positions.db")
+                    else:
+                        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "positions.db")
+                    
+                    total_fees_paid = 0.0
+                    if os.path.exists(POSITIONS_DB_PATH):
+                        conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
+                        cursor_pos = conn_pos.cursor()
+                        cursor_pos.execute("SELECT fees_paid FROM positions WHERE ticker = ?", (ticker,))
+                        fees_row = cursor_pos.fetchone()
+                        conn_pos.close()
+                        total_fees_paid = float(fees_row[0]) if fees_row and fees_row[0] is not None else 0.0
+                    
                     # Update the expired trade to closed with PnL calculation
                     conn_trades = get_db_connection()
                     cursor_trades = conn_trades.cursor()
                     
                     # Get trade data for PnL calculation
-                    cursor_trades.execute("SELECT buy_price, position, fees_paid FROM trades WHERE ticker = ? AND status = 'expired'", (ticker,))
+                    cursor_trades.execute("SELECT buy_price, position FROM trades WHERE ticker = ? AND status = 'expired'", (ticker,))
                     trade_row = cursor_trades.fetchone()
                     if trade_row:
-                        buy_price, position, fees_paid = trade_row
-                        # Calculate PnL
+                        buy_price, position = trade_row
+                        # Calculate PnL with fees included
                         pnl = None
                         if buy_price is not None and sell_price is not None and position is not None:
                             buy_value = buy_price * position
                             sell_value = sell_price * position
-                            fees = fees_paid if fees_paid is not None else 0.0
+                            fees = total_fees_paid if total_fees_paid is not None else 0.0
                             pnl = round(sell_value - buy_value - fees, 2)
                     
                     cursor_trades.execute("""
@@ -1219,9 +1233,10 @@ def poll_settlements_for_matches(expired_tickers):
                         SET status = 'closed',
                             sell_price = ?,
                             win_loss = ?,
-                            pnl = ?
+                            pnl = ?,
+                            fees = ?
                         WHERE ticker = ? AND status = 'expired'
-                    """, (sell_price, 'W' if sell_price > 0 else 'L', pnl, ticker))
+                    """, (sell_price, 'W' if sell_price > 0 else 'L', pnl, total_fees_paid, ticker))
                     conn_trades.commit()
                     conn_trades.close()
                     
