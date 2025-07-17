@@ -1270,16 +1270,16 @@ def poll_settlements_for_matches(expired_tickers):
                     cursor_trades = conn_trades.cursor()
                     
                     # Get trade data for PnL calculation
-                    cursor_trades.execute("SELECT buy_price, position FROM trades WHERE ticker = ? AND status = 'expired'", (ticker,))
+                    cursor_trades.execute("SELECT buy_price, position, fees FROM trades WHERE ticker = ? AND status = 'expired'", (ticker,))
                     trade_row = cursor_trades.fetchone()
                     if trade_row:
-                        buy_price, position = trade_row
+                        buy_price, position, fees = trade_row
                         # Calculate PnL with fees included
                         pnl = None
                         if buy_price is not None and sell_price is not None and position is not None:
                             buy_value = buy_price * position
                             sell_value = sell_price * position
-                            fees = total_fees_paid if total_fees_paid is not None else 0.0
+                            fees = fees if fees is not None else 0.0
                             pnl = round(sell_value - buy_value - fees, 2)
                     
                     cursor_trades.execute("""
