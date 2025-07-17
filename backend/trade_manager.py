@@ -138,6 +138,10 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
                     conn.close()
                     
                     log_event(ticket_id, f"MANAGER: OPEN TRADE CONFIRMED — pos={pos}, price={price}, fees={fees}, diff={diff_formatted}")
+                    
+                    # Notify active trade supervisor about new open trade
+                    notify_active_trade_supervisor(id, ticket_id, "open")
+                    
                     break
                     
         except Exception as e:
@@ -231,21 +235,37 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                     conn_fills = sqlite3.connect(FILLS_DB_PATH, timeout=0.25)
                     cursor_fills = conn_fills.cursor()
                     
-                    # Get the most recent fill for this ticker
-                    cursor_fills.execute("SELECT yes_price, no_price, created_time FROM fills WHERE ticker = ? ORDER BY created_time DESC LIMIT 1", (expected_ticker,))
+                    # Look for fills with the OPPOSITE side of the original trade
+                    # YES trade closes by buying NO, NO trade closes by buying YES
+                    opposite_side = 'no' if original_side == 'Y' else 'yes'
+                    
+                    # Get fills for this ticker with the opposite side, ordered by most recent
+                    cursor_fills.execute("""
+                        SELECT yes_price, no_price, created_time, side 
+                        FROM fills 
+                        WHERE ticker = ? AND side = ? 
+                        ORDER BY created_time DESC 
+                        LIMIT 1
+                    """, (expected_ticker, opposite_side))
                     fill_row = cursor_fills.fetchone()
                     conn_fills.close()
                     
                     if fill_row and original_side:
-                        yes_price, no_price, fill_time = fill_row
+                        yes_price, no_price, fill_time, fill_side = fill_row
                         
-                        # Use the opposite side's price for the original position
-                        if original_side == 'Y':  # Original was YES, so use YES price
-                            sell_price = float(yes_price)
-                        elif original_side == 'N':  # Original was NO, so use NO price
+                        # Use the price for the opposite side (the side we're buying to close)
+                        if original_side == 'Y':  # Original was YES, so use NO price (we're buying NO to close)
                             sell_price = float(no_price)
+                        elif original_side == 'N':  # Original was NO, so use YES price (we're buying YES to close)
+                            sell_price = float(yes_price)
                         
-                        log_event(ticket_id, f"MANAGER: Found fill at {fill_time} - yes_price={yes_price}, no_price={no_price}, using sell_price={sell_price}")
+                        log_event(ticket_id, f"MANAGER: Found closing fill at {fill_time} - side={fill_side}, yes_price={yes_price}, no_price={no_price}, using sell_price={sell_price}")
+                    else:
+                        # If no opposite-side fill found, wait and retry
+                        log_event(ticket_id, f"MANAGER: No closing fill found for {opposite_side} side yet, waiting...")
+                        conn_fills.close()
+                        time.sleep(1)  # Wait 1 second before next check
+                        continue
                 
                 # Get symbol_close from the trade record
                 conn = get_db_connection()
@@ -299,6 +319,7 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                     
                     log_event(ticket_id, f"MANAGER: CLOSE TRADE CONFIRMED - PnL: {pnl}, W/L: {win_loss}, Fees: {total_fees_paid}")
                     log(f"[✅ CLOSE TRADE CONFIRMED] id={id}, ticker={expected_ticker}, PnL={pnl}, W/L={win_loss}, Fees={total_fees_paid}")
+                    notify_active_trade_supervisor(id, ticket_id, "closed")
                     return
                 else:
                     log_event(ticket_id, f"MANAGER: Could not get trade data for PnL calculation")
@@ -410,6 +431,10 @@ def finalize_trade(id: int, ticket_id: str) -> None:
                 conn.commit()
                 conn.close()
                 log_event(ticket_id, f"MANAGER: FILL CONFIRMED — pos={pos}, price={price}, fees={fees}, diff={diff_formatted}")
+                
+                # Notify active trade supervisor about new open trade
+                notify_active_trade_supervisor(id, ticket_id, "open")
+                
                 break
 
             # ❷ If trade is closing, wait until position is zero (row missing or pos == 0)
@@ -514,6 +539,7 @@ def finalize_trade(id: int, ticket_id: str) -> None:
                     conn.close()
                     
                     log_event(ticket_id, f"MANAGER: Trade finalized with sell_price={sell_price_for_db}, pnl={pnl}, win_loss={win_loss}")
+                    notify_active_trade_supervisor(id, ticket_id, "closed")
                 else:
                     log_event(ticket_id, f"MANAGER: No trade found for ticker {expected_ticker}")
         except Exception as e:
@@ -609,6 +635,30 @@ def log_event(ticket_id, message):
             f.write(log_line)
     except Exception as e:
         print(f"[LOG ERROR] Failed to write log: {message} — {e}")
+
+def notify_active_trade_supervisor(trade_id: int, ticket_id: str, status: str) -> None:
+    """
+    Notify the active trade supervisor about a trade status change.
+    Calls the active trade supervisor to add or remove the trade as needed.
+    """
+    try:
+        from active_trade_supervisor import add_new_active_trade, remove_closed_trade
+        if status == "open":
+            success = add_new_active_trade(trade_id, ticket_id)
+            if success:
+                log(f"✅ Notified active trade supervisor about new open trade: id={trade_id}, ticket_id={ticket_id}")
+            else:
+                log(f"⚠️ Failed to notify active trade supervisor about trade: id={trade_id}, ticket_id={ticket_id}")
+        elif status in ("closed", "expired"):
+            success = remove_closed_trade(trade_id)
+            if success:
+                log(f"✅ Notified active trade supervisor to remove closed/expired trade: id={trade_id}, ticket_id={ticket_id}")
+            else:
+                log(f"⚠️ Failed to notify active trade supervisor to remove trade: id={trade_id}, ticket_id={ticket_id}")
+    except ImportError:
+        log(f"⚠️ Active trade supervisor not available - skipping notification for trade: id={trade_id}")
+    except Exception as e:
+        log(f"❌ Error notifying active trade supervisor: {e}")
 
 def is_trade_expired(trade):
     contract = trade.get('contract', '')
@@ -1138,6 +1188,10 @@ def check_expired_trades():
         
         print(f"[EXPIRATION] Marked {len(open_trades)} trades as expired")
         
+        # Notify active_trade_supervisor for each expired trade
+        for id, ticker in open_trades:
+            notify_active_trade_supervisor(id, str(ticker), "expired")
+        
         # Step 3: Poll settlements.db for matches
         expired_tickers = [trade[1] for trade in open_trades]
         poll_settlements_for_matches(expired_tickers)
@@ -1233,10 +1287,9 @@ def poll_settlements_for_matches(expired_tickers):
                         SET status = 'closed',
                             sell_price = ?,
                             win_loss = ?,
-                            pnl = ?,
-                            fees = ?
+                            pnl = ?
                         WHERE ticker = ? AND status = 'expired'
-                    """, (sell_price, 'W' if sell_price > 0 else 'L', pnl, total_fees_paid, ticker))
+                    """, (sell_price, 'W' if sell_price > 0 else 'L', pnl, ticker))
                     conn_trades.commit()
                     conn_trades.close()
                     
