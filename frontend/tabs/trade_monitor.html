@@ -188,6 +188,30 @@
     padding: 4px 6px;
   }
 
+  /* === ACTIVE TRADE SUPERVISOR TABLE STYLES === */
+  #activeTradeSupervisorTable {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+  }
+  #activeTradeSupervisorTable th,
+  #activeTradeSupervisorTable td {
+    font-size: 14px;
+    border: 1px solid #888;
+    padding: 4px 6px;
+  }
+  /* Center all values (cells) in the Active Trade Supervisor table */
+  #activeTradeSupervisorTable td {
+    text-align: center;
+  }
+  #activeTradeSupervisorTable thead th {
+    font-size: 13px;
+    font-weight: bold;
+    text-align: center;
+    background-color: #222c3c;
+    padding: 4px 6px;
+  }
+
 
   .momentum-heat-band-spacer {
     width: 20px;
@@ -210,6 +234,14 @@
 
   /* Remove top, left, right, and interior borders from header row in Active Trades table */
   #activeTradesTable thead tr th {
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+  }
+
+  /* Remove top, left, right, and interior borders from header row in Active Trade Supervisor table */
+  #activeTradeSupervisorTable thead tr th {
     border-top: none;
     border-left: none;
     border-right: none;
@@ -349,6 +381,45 @@
 }
 
 #autoStopToggle:focus-visible {
+  outline: 2px solid #f00;
+  outline-offset: 2px;
+}
+
+#autoStopSupervisorToggle {
+  accent-color: red;
+  background-color: transparent;
+  border: none;
+  outline: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  position: relative;
+  cursor: pointer;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px white;
+  transition: outline 0.2s ease;
+}
+
+#autoStopSupervisorToggle:checked {
+  background-color: red;
+  box-shadow: none;
+}
+
+#autoStopSupervisorToggle:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+#autoStopSupervisorToggle:focus-visible {
   outline: 2px solid #f00;
   outline-offset: 2px;
 }
@@ -1031,6 +1102,7 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log('DOMContentLoaded - Starting preferences setup');
   
   const autoStopToggle = document.getElementById('autoStopToggle');
+  const autoStopSupervisorToggle = document.getElementById('autoStopSupervisorToggle');
   const positionInput = document.getElementById('position-size');
   const multiplierButtons = document.querySelectorAll('.multiplier-btn');
   const recoToggle = document.getElementById('recoToggle');
@@ -1069,6 +1141,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (autoStopToggle && data.auto_stop !== undefined) {
         autoStopToggle.checked = data.auto_stop;
         window.autoStopEnabled = data.auto_stop;
+      }
+      if (autoStopSupervisorToggle && data.auto_stop !== undefined) {
+        autoStopSupervisorToggle.checked = data.auto_stop;
       }
       if (recoToggle && data.reco !== undefined) {
         recoToggle.checked = data.reco;
@@ -1135,6 +1210,11 @@ document.addEventListener('DOMContentLoaded', () => {
         window.autoStopEnabled = data.auto_stop;
         ignoreWsUpdates = false;
       }
+      if (autoStopSupervisorToggle && data.auto_stop !== undefined && document.activeElement !== autoStopSupervisorToggle) {
+        ignoreWsUpdates = true;
+        autoStopSupervisorToggle.checked = data.auto_stop;
+        ignoreWsUpdates = false;
+      }
 
       if (recoToggle && data.reco !== undefined && document.activeElement !== recoToggle) {
         ignoreWsUpdates = true;
@@ -1196,6 +1276,20 @@ document.addEventListener('DOMContentLoaded', () => {
     autoStopToggle.addEventListener('change', () => {
       if (ignoreWsUpdates) return;
       const value = autoStopToggle.checked;
+      window.autoStopEnabled = value;
+      fetch(window.location.origin + '/api/set_auto_stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: value })
+      });
+    });
+  }
+
+  // Supervisor toggle - connected to same auto_stop preference
+  if (autoStopSupervisorToggle) {
+    autoStopSupervisorToggle.addEventListener('change', () => {
+      if (ignoreWsUpdates) return;
+      const value = autoStopSupervisorToggle.checked;
       window.autoStopEnabled = value;
       fetch(window.location.origin + '/api/set_auto_stop', {
         method: 'POST',
@@ -1317,6 +1411,17 @@ document.addEventListener('DOMContentLoaded', () => {
           </thead>
           <tbody></tbody>
         </table>
+      </div>
+      <!-- Active Trade Supervisor Panel -->
+      <div class="panel-container" style="min-height: 319px;" id="activeTradeSupervisorPanel">
+        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Active Trade Supervisor</span>
+          <label style="font-size: 12px; user-select: none; color: white; display: flex; align-items: center; gap: 6px; margin: 0;">
+            AUTO STOP
+            <input type="checkbox" id="autoStopSupervisorToggle" />
+          </label>
+        </div>
+        <!-- Panel content will be added later -->
       </div>
       <!-- Recent Fills Panel -->
       <div class="panel-container" style="min-height: 100px;" id="recentTradesPanel">
