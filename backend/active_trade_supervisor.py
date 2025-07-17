@@ -189,6 +189,18 @@ def remove_closed_trade(trade_id: int) -> bool:
         bool: True if successfully removed, False otherwise
     """
     try:
+        # Check if trade exists before trying to remove it
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM active_trades WHERE trade_id = ?", (trade_id,))
+        exists = cursor.fetchone()[0] > 0
+        conn.close()
+        
+        if not exists:
+            # Trade doesn't exist, no need to log this as an error
+            return True  # Consider this a successful "no-op"
+        
+        # Remove the trade
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM active_trades WHERE trade_id = ?", (trade_id,))
