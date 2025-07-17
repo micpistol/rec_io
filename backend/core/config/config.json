@@ -35,6 +35,11 @@
       "port": 5050,
       "host": "localhost"
     },
+    "active_trade_supervisor": {
+      "enabled": true,
+      "port": 5007,
+      "host": "localhost"
+    },
     "account_sync": {
       "enabled": true,
       "update_interval": 30.0,

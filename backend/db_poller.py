@@ -37,6 +37,12 @@ class DatabasePoller:
         trade_manager_host = config.get("agents.trade_manager.host", "localhost")
         trade_manager_port = int(os.environ.get("TRADE_MANAGER_PORT", config.get("agents.trade_manager.port", 5003)))
         self.trade_manager_url = f"http://{trade_manager_host}:{trade_manager_port}"
+        
+        # Get active trade supervisor host and port from config
+        active_trade_supervisor_host = config.get("agents.active_trade_supervisor.host", "localhost")
+        active_trade_supervisor_port = int(os.environ.get("ACTIVE_TRADE_SUPERVISOR_PORT", config.get("agents.active_trade_supervisor.port", 5007)))
+        self.active_trade_supervisor_url = f"http://{active_trade_supervisor_host}:{active_trade_supervisor_port}"
+        
         self.setup_database_paths()
         
     def setup_database_paths(self):
@@ -148,6 +154,10 @@ class DatabasePoller:
         if db_name == "positions":
             self.notify_trade_manager(db_name, change_data)
         
+        # If trades.db changed, notify active trade supervisor
+        if db_name == "trades":
+            self.notify_active_trade_supervisor(db_name, change_data)
+        
         if "error" in old_info or "error" in new_info:
             print(f"⚠️  Error reading database: {old_info.get('error', new_info.get('error'))}")
             return
@@ -217,6 +227,22 @@ class DatabasePoller:
                 print(f"⚠️  Failed to notify trade manager: {response.status_code}")
         except Exception as e:
             print(f"❌ Error notifying trade manager: {e}")
+    
+    def notify_active_trade_supervisor(self, db_name: str, change_data: Dict[str, Any]):
+        """Notify active trade supervisor about database changes via HTTP"""
+        try:
+            url = f"{self.active_trade_supervisor_url}/api/trades_db_change"
+            payload = {
+                "database": db_name,
+                "change_data": change_data
+            }
+            response = requests.post(url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print(f"✅ Notified active trade supervisor about {db_name} change")
+            else:
+                print(f"⚠️  Failed to notify active trade supervisor: {response.status_code}")
+        except Exception as e:
+            print(f"❌ Error notifying active trade supervisor: {e}")
     
     def poll_databases(self):
         """Main polling loop"""
