@@ -228,6 +228,8 @@ def init_active_trades_db():
         current_probability REAL DEFAULT NULL,
         buffer_from_entry REAL DEFAULT NULL,
         time_since_entry INTEGER DEFAULT NULL,  -- seconds
+        current_close_price REAL DEFAULT NULL,  -- Current closing price from Kalshi market snapshot
+        current_pnl TEXT DEFAULT NULL,  -- Current PnL as formatted string (e.g., "0.15" or "-0.08")
         last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         
         -- Status tracking
@@ -390,20 +392,69 @@ def remove_closed_trade(trade_id: int) -> bool:
         log(f"❌ Error removing closed trade {trade_id}: {e}")
         return False
 
-def get_current_btc_price() -> Optional[float]:
-    """Get current BTC price from the system"""
+# Removed get_current_btc_price() function - now using market ask prices from Kalshi snapshot
+
+def get_kalshi_market_snapshot() -> Optional[Dict[str, Any]]:
+    """Get the latest Kalshi market snapshot data"""
     try:
-        host = config.get("agents.main.host", "localhost")
-        port = config.get("agents.main.port", 5000)
-        url = f"http://{host}:{port}/core"
-        response = requests.get(url, timeout=5)
-        if response.ok:
-            data = response.json()
-            return data.get('btc_price')
+        snapshot_path = os.path.join(BASE_DIR, "backend", "data", "kalshi", "latest_market_snapshot.json")
+        if not os.path.exists(snapshot_path):
+            log("⚠️ Kalshi market snapshot file not found")
+            return None
+            
+        with open(snapshot_path, 'r') as f:
+            data = json.load(f)
+            return data
     except Exception as e:
-        log(f"Error getting BTC price: {e}")
+        log(f"Error reading Kalshi market snapshot: {e}")
+        return None
+
+def get_current_closing_price_for_trade(trade_ticker: str, trade_side: str) -> Optional[float]:
+    """
+    Get the current closing price for a specific trade from Kalshi market snapshot.
     
-    return None
+    Args:
+        trade_ticker: The ticker of the trade (e.g., "KXBTCD-25JUL1617-T119499.99")
+        trade_side: The side of the trade ("Y" for YES, "N" for NO)
+        
+    Returns:
+        The closing price as a decimal (e.g., 0.94 for 94 cents), or None if not found
+    """
+    try:
+        snapshot_data = get_kalshi_market_snapshot()
+        if not snapshot_data or "markets" not in snapshot_data:
+            return None
+            
+        markets = snapshot_data["markets"]
+        
+        # Find the market that matches the trade ticker
+        for market in markets:
+            if market.get("ticker") == trade_ticker:
+                # For YES trades, we want the NO_ASK (opposite side)
+                # For NO trades, we want the YES_ASK (opposite side)
+                if trade_side.upper() == "Y":  # YES trade
+                    closing_price_cents = market.get("no_ask")
+                elif trade_side.upper() == "N":  # NO trade
+                    closing_price_cents = market.get("yes_ask")
+                else:
+                    log(f"⚠️ Unknown trade side: {trade_side}")
+                    return None
+                
+                if closing_price_cents is not None:
+                    # Convert from cents to decimal (e.g., 94 -> 0.94)
+                    closing_price_decimal = closing_price_cents / 100.0
+                    log(f"📊 CLOSING PRICE: Found closing price for {trade_ticker} ({trade_side}): {closing_price_cents} cents = {closing_price_decimal}")
+                    return closing_price_decimal
+                else:
+                    log(f"⚠️ No closing price found for {trade_ticker} ({trade_side})")
+                    return None
+        
+        log(f"⚠️ Market not found for ticker: {trade_ticker}")
+        return None
+        
+    except Exception as e:
+        log(f"Error getting closing price for trade {trade_ticker}: {e}")
+        return None
 
 def get_current_probability(strike: float, current_price: float, ttc_seconds: float, momentum_score: Optional[float] = None) -> Optional[float]:
     """
@@ -434,25 +485,25 @@ def get_current_probability(strike: float, current_price: float, ttc_seconds: fl
 def update_active_trade_monitoring_data():
     """
     Update monitoring data for all active trades:
-    - Current price
+    - Current market ask prices from Kalshi snapshot
     - Buffer from strike (absolute value, negative when crossed)
     - Time since entry
     - Current probability (from probability API)
     """
     try:
-        # Get current BTC price
-        current_price = get_current_btc_price()
-        if not current_price:
-            log("⚠️ Could not get current BTC price, skipping monitoring update")
+        # Get Kalshi market snapshot
+        snapshot_data = get_kalshi_market_snapshot()
+        if not snapshot_data or "markets" not in snapshot_data:
+            log("⚠️ Could not get Kalshi market snapshot, skipping monitoring update")
             return
         
-        log(f"📊 MONITORING: Got current BTC price: ${current_price}")
+        log(f"📊 MONITORING: Got Kalshi market snapshot with {len(snapshot_data['markets'])} markets")
         
         # Get all active trades
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, trade_id, buy_price, prob, time, date, strike, side, momentum
+            SELECT id, trade_id, buy_price, prob, time, date, strike, side, momentum, ticker
             FROM active_trades 
             WHERE status = 'active'
         """)
@@ -465,21 +516,34 @@ def update_active_trade_monitoring_data():
         
         log(f"📊 MONITORING: Updating {len(active_trades)} active trades")
         
-        for (active_id, trade_id, buy_price, prob, time_str, date_str, strike, side, momentum) in active_trades:
+        for (active_id, trade_id, buy_price, prob, time_str, date_str, strike, side, momentum, ticker) in active_trades:
             try:
                 # Parse strike price - handle currency formatting
                 strike_clean = str(strike).replace('$', '').replace(',', '')
                 strike_price = float(strike_clean)
                 
-                # Calculate buffer using the same logic as trade_monitor
-                # For YES trades: positive when current_price >= strike, negative when crossed
-                # For NO trades: positive when current_price <= strike, negative when crossed
-                raw_buffer = current_price - strike_price
+                # Get current market ask price for this specific contract
+                current_market_price = get_current_closing_price_for_trade(ticker, side)
+                if current_market_price is None:
+                    log(f"⚠️ Could not get market price for trade {trade_id} ({ticker}), skipping")
+                    continue
                 
+                # Convert market price from decimal to cents for buffer calculation
+                # Market price is in decimal (e.g., 0.94), but we need to compare with strike in dollars
+                # For buffer calculation, we'll use the market price as a percentage of the strike
+                market_price_cents = current_market_price * 100  # Convert to cents
+                
+                # Calculate buffer using market ask prices
+                # For YES trades: positive when market_price >= 50 cents (at-the-money), negative when below
+                # For NO trades: positive when market_price <= 50 cents (at-the-money), negative when above
                 if side.upper() == 'Y':  # YES trade
-                    in_the_money = current_price >= strike_price
+                    # For YES trades, higher market price = more in-the-money
+                    raw_buffer = market_price_cents - 50.0
+                    in_the_money = market_price_cents >= 50.0
                 else:  # NO trade
-                    in_the_money = current_price <= strike_price
+                    # For NO trades, lower market price = more in-the-money
+                    raw_buffer = 50.0 - market_price_cents
+                    in_the_money = market_price_cents <= 50.0
                 
                 if in_the_money:
                     buffer_from_strike = abs(raw_buffer)
@@ -501,8 +565,22 @@ def update_active_trade_monitoring_data():
                 # Get momentum score if available
                 momentum_score = float(momentum) if momentum is not None else None
                 
-                # Get current probability from API
-                current_probability = get_current_probability(strike_price, current_price, ttc_seconds, momentum_score)
+                # For probability calculation, we need a BTC price reference
+                # Get current BTC price from the market snapshot if available
+                current_btc_price = None
+                if "current_btc_price" in snapshot_data:
+                    current_btc_price = snapshot_data["current_btc_price"]
+                
+                # Get current probability from API (use BTC price if available, otherwise skip)
+                current_probability = None
+                if current_btc_price is not None:
+                    current_probability = get_current_probability(strike_price, current_btc_price, ttc_seconds, momentum_score)
+                
+                # Calculate PnL: 1 - current_close_price - buy_price
+                # For YES trades: PnL = 1 - current_close_price - buy_price
+                # For NO trades: PnL = 1 - current_close_price - buy_price (same formula)
+                pnl = 1 - current_market_price - buy_price
+                pnl_formatted = f"{pnl:.2f}"  # Format as "0.15" or "-0.08"
                 
                 # Update the monitoring data
                 conn = get_db_connection()
@@ -513,12 +591,14 @@ def update_active_trade_monitoring_data():
                         current_probability = ?,
                         buffer_from_entry = ?,
                         time_since_entry = ?,
+                        current_close_price = ?,
+                        current_pnl = ?,
                         last_updated = CURRENT_TIMESTAMP
                     WHERE id = ?
-                """, (current_price, current_probability, buffer_from_strike, time_since_entry, active_id))
+                """, (current_market_price, current_probability, buffer_from_strike, time_since_entry, current_market_price, pnl_formatted, active_id))
                 conn.commit()
                 conn.close()
-                log(f"📊 MONITORING: Updated trade {trade_id} - price: {current_price}, buffer: {buffer_from_strike}, prob: {current_probability}")
+                log(f"📊 MONITORING: Updated trade {trade_id} - market_price: {current_market_price}, buffer: {buffer_from_strike}, prob: {current_probability}, pnl: {pnl_formatted}")
                 
             except Exception as e:
                 log(f"Error updating monitoring data for trade {trade_id}: {e}")
