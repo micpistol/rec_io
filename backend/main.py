@@ -1496,20 +1496,8 @@ def get_current_fingerprint():
     """
     try:
         symbol = "btc"  # TODO: Make this dynamic if needed
-        calculator = get_directional_calculator(symbol)
-        # Use last_used_momentum_bucket if available, else current_momentum_bucket
-        bucket = getattr(calculator, 'last_used_momentum_bucket', None)
-        if bucket is None:
-            bucket = calculator.current_momentum_bucket
-        if bucket is not None:
-            fingerprint_name = f"{symbol}_fingerprint_directional_momentum_{int(bucket):03d}.csv"
-            return {
-                "status": "ok",
-                "fingerprint": fingerprint_name,
-                "bucket": bucket,
-                "total_loaded": len(calculator.momentum_fingerprints)
-            }
-        # If no bucket in memory, read the last line of the log
+        
+        # First, try to read from the debug log to get the most recent bucket
         log_path = os.path.join(os.path.dirname(__file__), 'data', 'fingerprint_debug.log')
         if os.path.exists(log_path):
             with open(log_path, 'r') as f:
@@ -1532,6 +1520,22 @@ def get_current_fingerprint():
                                 "bucket": bucket_val,
                                 "source": "logfile"
                             }
+        
+        # If no log entry found, fall back to calculator instance
+        calculator = get_directional_calculator(symbol)
+        bucket = getattr(calculator, 'last_used_momentum_bucket', None)
+        if bucket is None:
+            bucket = calculator.current_momentum_bucket
+        if bucket is not None:
+            fingerprint_name = f"{symbol}_fingerprint_directional_momentum_{int(bucket):03d}.csv"
+            return {
+                "status": "ok",
+                "fingerprint": fingerprint_name,
+                "bucket": bucket,
+                "total_loaded": len(calculator.momentum_fingerprints),
+                "source": "calculator"
+            }
+        
         return {"status": "error", "message": "No momentum bucket is currently loaded or used!"}
     except Exception as e:
         return {"status": "error", "message": str(e)}

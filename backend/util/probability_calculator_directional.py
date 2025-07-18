@@ -31,6 +31,21 @@ class DirectionalProbabilityCalculator:
         self._load_all_momentum_fingerprints()
         if not self.momentum_fingerprints:
             raise RuntimeError("No momentum fingerprints found! The system cannot operate without them.")
+        
+        # Initialize with the lowest available fingerprint to ensure attributes are set
+        available_buckets = list(self.momentum_fingerprints.keys())
+        if available_buckets:
+            default_bucket = min(available_buckets)
+            fingerprint_data = self.momentum_fingerprints[default_bucket]
+            self.ttc_values = fingerprint_data['ttc_values']
+            self.positive_move_percentages = fingerprint_data['positive_move_percentages']
+            self.negative_move_percentages = fingerprint_data['negative_move_percentages']
+            self.positive_interp_points = fingerprint_data['positive_interp_points']
+            self.positive_interp_values = fingerprint_data['positive_interp_values']
+            self.negative_interp_points = fingerprint_data['negative_interp_points']
+            self.negative_interp_values = fingerprint_data['negative_interp_values']
+            self.current_momentum_bucket = default_bucket
+            self.last_used_momentum_bucket = default_bucket
     
     def _load_all_momentum_fingerprints(self):
         """Load all momentum-based directional fingerprints for hot-swapping."""
@@ -170,6 +185,7 @@ class DirectionalProbabilityCalculator:
         self.negative_interp_points = fingerprint_data['negative_interp_points']
         self.negative_interp_values = fingerprint_data['negative_interp_values']
         self.current_momentum_bucket = closest_bucket
+        self.last_used_momentum_bucket = closest_bucket
     
     def interpolate_directional_probability(self, ttc_seconds: float, move_percent: float, direction: str = 'both') -> Union[float, Tuple[float, float]]:
         """
@@ -285,16 +301,12 @@ class DirectionalProbabilityCalculator:
 _directional_calculator_instance = None
 
 
-def get_directional_calculator() -> DirectionalProbabilityCalculator:
+def get_directional_calculator(symbol="btc") -> DirectionalProbabilityCalculator:
     """Get or create the global directional calculator instance."""
     global _directional_calculator_instance
     if _directional_calculator_instance is None:
-        _directional_calculator_instance = DirectionalProbabilityCalculator()
+        _directional_calculator_instance = DirectionalProbabilityCalculator(symbol)
     return _directional_calculator_instance
-
-
-def get_directional_calculator(symbol="btc"):
-    return DirectionalProbabilityCalculator(symbol)
 
 
 def calculate_directional_strike_probabilities(

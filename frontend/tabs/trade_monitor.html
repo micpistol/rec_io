@@ -291,6 +291,16 @@
     height: 25px;
     padding: 2px 4px;
   }
+
+  #activeTradeSupervisorTable tr.spanner-row td {
+    background-color: #535668;
+    color: #c0c0c0;
+    text-align: center;
+    font-size: 12px;
+    font-style: italic;
+    height: 25px;
+    padding: 2px 4px;
+  }
 </style>
 <style>
   #strike-table tr.spanner-row td {
@@ -1412,6 +1422,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <tbody></tbody>
         </table>
       </div>
+
       <!-- Active Trade Supervisor Panel -->
       <div class="panel-container" style="min-height: 319px;" id="activeTradeSupervisorPanel">
         <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
@@ -1421,7 +1432,20 @@ document.addEventListener('DOMContentLoaded', () => {
             <input type="checkbox" id="autoStopSupervisorToggle" />
           </label>
         </div>
-        <!-- Panel content will be added later -->
+        <table id="activeTradeSupervisorTable" class="panel-table" style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th>Strike</th>
+              <th>Side</th>
+              <th>Buy</th>
+              <th>Pos</th>
+              <th>Buffer</th>
+              <th style="width: 40px;"">Prob</th>
+              <th style="text-align: center;">Close</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </div>
       <!-- Recent Fills Panel -->
       <div class="panel-container" style="min-height: 100px;" id="recentTradesPanel">
@@ -1569,7 +1593,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Get current fingerprint information from backend
-        const response = await fetch(window.location.origin + '/api/current_fingerprint');
+        const response = await fetch('http://localhost:5001/api/current_fingerprint');
         
         if (response.ok) {
           const data = await response.json();
