@@ -139,7 +139,7 @@ app.mount("/logs", StaticFiles(directory="logs"), name="logs")
 
 
 # Serve the public folder as static files under /public
-app.mount("/public", StaticFiles(directory="public"), name="public")
+app.mount("/public", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "public")), name="public")
 
 # Serve the frontend/js folder as static files under /js
 app.mount("/js", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend", "js")), name="js")
@@ -369,7 +369,7 @@ def get_core_data():
     
     # Add Kalshi market data to core response
     try:
-        with open("backend/data/kalshi/latest_market_snapshot.json", "r") as f:
+        with open("data/kalshi/latest_market_snapshot.json", "r") as f:
             kalshi_data = json.load(f)
             core_data["kalshi_markets"] = kalshi_data.get("markets", [])
     except Exception as e:
@@ -621,7 +621,7 @@ def get_feed_status():
 def kalshi_market_snapshot():
     import json
     try:
-        with open("backend/data/kalshi/latest_market_snapshot.json", "r") as f:
+        with open("data/kalshi/latest_market_snapshot.json", "r") as f:
             return json.load(f)
     except Exception:
         return {"markets": []}
@@ -785,7 +785,7 @@ async def get_auto_stop():
 def get_balance(request: Request):
     try:
         mode = request.query_params.get("mode", "prod")
-        with open(os.path.join("backend", "data", "accounts", "kalshi", mode, "account_balance.json")) as f:
+        with open(os.path.join("data", "accounts", "kalshi", mode, "account_balance.json")) as f:
             raw = json.load(f)
             try:
                 cents = int(raw["balance"])
@@ -799,19 +799,19 @@ def get_balance(request: Request):
 @app.get("/api/account/fills")
 def get_fills(request: Request):
     mode = request.query_params.get("mode", "prod")
-    with open(os.path.join("backend", "data", "accounts", "kalshi", mode, "fills.json")) as f:
+    with open(os.path.join("data", "accounts", "kalshi", mode, "fills.json")) as f:
         return json.load(f)
 
 @app.get("/api/account/positions")
 def get_positions(request: Request):
     mode = request.query_params.get("mode", "prod")
-    with open(os.path.join("backend", "data", "accounts", "kalshi", mode, "positions.json")) as f:
+    with open(os.path.join("data", "accounts", "kalshi", mode, "positions.json")) as f:
         return json.load(f)
 
 @app.get("/api/account/settlements")
 def get_settlements(request: Request):
     mode = request.query_params.get("mode", "prod")
-    with open(os.path.join("backend", "data", "accounts", "kalshi", mode, "settlements.json")) as f:
+    with open(os.path.join("data", "accounts", "kalshi", mode, "settlements.json")) as f:
         return json.load(f)
 
 
@@ -826,7 +826,7 @@ async def get_account_mode_api():
 def get_settlements_db():
     try:
         mode = get_account_mode()
-        db_path = os.path.join("backend", "data", "accounts", "kalshi", mode, "settlements.db")
+        db_path = os.path.join("data", "accounts", "kalshi", mode, "settlements.db")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT ticker, market_result, yes_count, no_count, revenue, settled_time FROM settlements ORDER BY settled_time DESC")
@@ -852,7 +852,7 @@ def get_settlements_db():
 def get_fills_db():
     try:
         mode = get_account_mode()
-        db_path = os.path.join("backend", "data", "accounts", "kalshi", mode, "fills.db")
+        db_path = os.path.join("data", "accounts", "kalshi", mode, "fills.db")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time FROM fills ORDER BY created_time DESC")
@@ -882,7 +882,7 @@ def get_fills_db():
 def get_positions_db():
     try:
         mode = get_account_mode()
-        db_path = os.path.join("backend", "data", "accounts", "kalshi", mode, "positions.db")
+        db_path = os.path.join("data", "accounts", "kalshi", mode, "positions.db")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT ticker, total_traded, position, market_exposure, realized_pnl, fees_paid, last_updated_ts FROM positions ORDER BY last_updated_ts DESC")
@@ -1565,7 +1565,8 @@ if __name__ == "__main__":
     def get_current_ttc():
         """Get current TTC in seconds from the /core endpoint."""
         try:
-            resp = requests.get("http://localhost:5001/core", timeout=2)
+            main_port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))
+            resp = requests.get(f"http://localhost:{main_port}/core", timeout=2)
             if resp.status_code == 200:
                 data = resp.json()
                 ttc = float(data.get("ttc_seconds", 0))
@@ -1612,7 +1613,8 @@ if __name__ == "__main__":
     def get_current_ttc():
         """Get current TTC in seconds from the /core endpoint."""
         try:
-            resp = requests.get("http://localhost:5001/core", timeout=2)
+            main_port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))
+            resp = requests.get(f"http://localhost:{main_port}/core", timeout=2)
             if resp.status_code == 200:
                 data = resp.json()
                 ttc = float(data.get("ttc_seconds", 0))
@@ -1654,7 +1656,7 @@ def get_earliest_trade_date():
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))
+    port = 5001  # EMERGENCY: Hardcoded for UI recovery
     print(f"[MAIN] Launching app on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
 
