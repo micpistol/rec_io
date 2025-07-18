@@ -572,7 +572,7 @@ def get_btc_changes():
 def get_market_title():
     import json
     try:
-        with open("backend/data/kalshi/latest_market_snapshot.json", "r") as f:
+        with open("data/kalshi/latest_market_snapshot.json", "r") as f:
             data = json.load(f)
             # Extract title from the event object
             title = data.get("event", {}).get("title", "No Title Available")
