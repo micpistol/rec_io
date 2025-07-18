@@ -209,6 +209,7 @@ class DatabasePoller:
                 print(f"✅ Notified main app about {db_name} change")
             else:
                 print(f"⚠️  Failed to notify main app: {response.status_code}")
+                print(f"Response text: {response.text}")
         except Exception as e:
             print(f"❌ Error notifying main app: {e}")
     

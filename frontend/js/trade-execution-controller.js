@@ -62,7 +62,7 @@ window.executeTrade = async function(tradeData) {
       symbol_close: null,
       momentum: tradeData.momentum,
       prob: tradeData.prob,
-      volatility: tradeData.volatility,
+
       
       win_loss: null
     };

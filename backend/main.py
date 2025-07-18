@@ -277,51 +277,12 @@ def get_core_data():
         delta_15m = calc_pct_delta(get_price_delta(cursor, 875))
         delta_30m = calc_pct_delta(get_price_delta(cursor, 1750))
 
-        # BTC Volatility Calculations
-        def get_volatility(cursor, window):
-            try:
-                cursor.execute(
-                    "SELECT price FROM price_log ORDER BY timestamp DESC LIMIT ?",
-                    (window + 1,)
-                )
-                rows = cursor.fetchall()
-                prices = [float(row[0]) for row in reversed(rows)]
-                if len(prices) <= 5:
-                    return None
-                grouped_returns = []
-                for i in range(0, len(prices) - 5, 5):
-                    start = prices[i]
-                    end = prices[i + 5]
-                    if start != 0:
-                        pct_change = (end - start) / start
-                        grouped_returns.append(pct_change)
-                if len(grouped_returns) == 0:
-                    return None
-                return np.std(grouped_returns) * 100
-            except Exception:
-                return None
-
-        vol_30s = get_volatility(cursor, 30)
-        vol_1m = get_volatility(cursor, 60)
-        vol_5m = get_volatility(cursor, 300)
-
-        # Compute Volatility Score and Volatility Spike
+        # Volatility calculations removed for performance
+        vol_30s = None
+        vol_1m = None
+        vol_5m = None
         vol_score = 0
         vol_spike = 0
-        try:
-            cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 15")
-            rows = cursor.fetchall()
-            prices = [float(row[0]) for row in reversed(rows)]
-            if len(prices) >= 11:
-                pct_changes = [(prices[i] - prices[i - 1]) / prices[i - 1] * 100 for i in range(1, len(prices))]
-                vol_30s_score = np.std(pct_changes[-30:]) if len(pct_changes) >= 30 else np.std(pct_changes)
-                vol_score = min(float((vol_30s_score / 0.02) * 100), float(100))
-
-                recent_5 = np.mean(prices[-5:])
-                prior_5 = np.mean(prices[-10:-5])
-                vol_spike = abs(recent_5 - prior_5)
-        except Exception:
-            pass
 
     finally:
         conn.close()
@@ -1051,112 +1012,7 @@ def get_trade_log(ticket_id: str):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-@app.get("/api/composite_volatility_score")
-def get_composite_volatility_score():
-    """Calculate composite absolute volatility score using multiple timeframes and historical context"""
-    try:
-        # Get the last 1500 prices from the database (15 minutes of 1-second data)
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT price, timestamp 
-            FROM price_log 
-            ORDER BY timestamp DESC 
-            LIMIT 1500
-        """)
-        results = cursor.fetchall()
-        conn.close()
-        
-        # Return prices in chronological order (oldest first)
-        prices = [float(row[0]) for row in reversed(results)]
-        
-        if len(prices) < 900:  # Need at least 15 minutes of data
-            return {"error": "Not enough data for composite volatility calculation"}
-        
-        # Calculate log returns for the most recent 900 prices (15 minutes)
-        recent_prices = prices[-900:]
-        log_returns = []
-        for i in range(1, len(recent_prices)):
-            if recent_prices[i-1] > 0 and recent_prices[i] > 0:
-                log_return = math.log(recent_prices[i] / recent_prices[i-1])
-                log_returns.append(log_return)
-        
-        if len(log_returns) < 899:
-            return {"error": "Not enough valid log returns"}
-        
-        # Define timeframes and their weights
-        timeframes = [
-            {"window": 60, "weight": 0.30, "name": "1m"},
-            {"window": 120, "weight": 0.25, "name": "2m"},
-            {"window": 300, "weight": 0.20, "name": "5m"},
-            {"window": 600, "weight": 0.15, "name": "10m"},
-            {"window": 900, "weight": 0.10, "name": "15m"}
-        ]
-        
-        # Calculate current volatility for each timeframe
-        current_volatilities = {}
-        for tf in timeframes:
-            window_size = tf["window"]
-            if len(log_returns) >= window_size:
-                window_returns = log_returns[-window_size:]
-                sigma = np.std(window_returns, ddof=1)
-                current_volatilities[tf["name"]] = sigma
-        
-        # Build historical reference distributions for each timeframe
-        historical_distributions = {}
-        for tf in timeframes:
-            window_size = tf["window"]
-            historical_sigmas = []
-            
-            # Calculate historical volatilities for this window size
-            for start in range(len(log_returns) - window_size + 1):
-                window_returns = log_returns[start:start + window_size]
-                if len(window_returns) == window_size:
-                    sigma = np.std(window_returns, ddof=1)
-                    historical_sigmas.append(sigma)
-            
-            historical_distributions[tf["name"]] = historical_sigmas
-        
-        # Calculate percentiles for each timeframe
-        percentiles = {}
-        for tf in timeframes:
-            tf_name = tf["name"]
-            if tf_name in current_volatilities and tf_name in historical_distributions:
-                current_sigma = current_volatilities[tf_name]
-                historical_sigmas = historical_distributions[tf_name]
-                
-                if historical_sigmas:
-                    # Calculate percentile rank
-                    count = sum(1 for s in historical_sigmas if s <= current_sigma)
-                    percentile = count / len(historical_sigmas)
-                    percentiles[tf_name] = percentile
-        
-        # Calculate weighted average of percentiles
-        composite_score = 0.0
-        total_weight = 0.0
-        
-        for tf in timeframes:
-            tf_name = tf["name"]
-            if tf_name in percentiles:
-                weight = tf["weight"]
-                percentile = percentiles[tf_name]
-                composite_score += weight * percentile
-                total_weight += weight
-        
-        if total_weight > 0:
-            composite_score = composite_score / total_weight
-        else:
-            composite_score = 0.0
-        
-        return {
-            "composite_abs_vol_score": round(composite_score, 3),
-            "timeframes": percentiles,
-            "current_volatilities": {k: round(v, 6) for k, v in current_volatilities.items()},
-            "historical_counts": {k: len(v) for k, v in historical_distributions.items()}
-        }
-        
-    except Exception as e:
-        return {"error": str(e)}
+
 
 # (Remove calculate_strike_probabilities function and both /api/strike_probabilities endpoints)
 
@@ -1176,17 +1032,17 @@ async def ping_handler(request: Request):
 
 @app.post("/api/db_change")
 async def notify_db_change(request: Request):
-    """Endpoint for db_poller to notify about database changes"""
     try:
+        print("[DEBUG] /api/db_change headers:", dict(request.headers))
+        body = await request.body()
+        print("[DEBUG] /api/db_change raw body:", body)
         data = await request.json()
         db_name = data.get("database")
         change_data = data.get("change_data", {})
-        
-        # Broadcast the change to all connected websocket clients
         await broadcast_db_change(db_name, change_data)
-        
-        return {"status": "ok", "message": f"Database change broadcast for {db_name}"}
+        return {"status": "ok", "message": f"Database change received for {db_name}"}
     except Exception as e:
+        print("[DEBUG] /api/db_change error:", str(e))
         return {"status": "error", "message": str(e)}
 
 @app.get("/frontend-changes")
@@ -1216,7 +1072,7 @@ def get_trades_db():
             SELECT id, date, time, strike, side, buy_price, position, status, 
                    symbol, market, trade_strategy, market_id,
                    symbol_open, symbol_close, momentum, momentum_delta, 
-                   volatility, win_loss 
+                   win_loss 
             FROM trades 
             ORDER BY id DESC
         """)
@@ -1240,8 +1096,7 @@ def get_trades_db():
                 "symbol_close": row[13],
                 "momentum": row[14],
                 "momentum_delta": row[15],
-                "volatility": row[16],
-                "win_loss": row[17],
+                "win_loss": row[16],
             }
             for row in rows
         ]
@@ -1261,7 +1116,7 @@ def get_trades():
             SELECT id, date, time, strike, side, buy_price, position, status, 
                    symbol, market, trade_strategy, market_id,
                    symbol_open, symbol_close, momentum, momentum_delta, 
-                   volatility, win_loss 
+                   win_loss 
             FROM trades 
             ORDER BY id DESC
         """)
@@ -1285,8 +1140,7 @@ def get_trades():
                 "symbol_close": row[13],
                 "momentum": row[14],
                 "momentum_delta": row[15],
-                "volatility": row[16],
-                "win_loss": row[17],
+                "win_loss": row[16],
             }
             for row in rows
         ]

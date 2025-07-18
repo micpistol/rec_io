@@ -612,6 +612,10 @@ function connectDbChangeWebSocket() {
       const data = JSON.parse(event.data);
       if (data.type === 'db_change' && data.database === 'trades') {
         fetchAndRenderStrikeTable();
+        // Also update active trades when trades.db changes
+        if (typeof window.fetchAndRenderTrades === 'function') {
+          window.fetchAndRenderTrades();
+        }
       }
     } catch (error) {
     }

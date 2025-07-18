@@ -91,45 +91,7 @@ function fetchOtherCoreData() {
       console.error('Live core fetch error:', error);
     });
   
-  // Fetch composite volatility score from backend using multiple timeframes
-  fetch('/api/composite_volatility_score')
-    .then(response => response.json())
-    .then(data => {
-      if (data.composite_abs_vol_score !== undefined) {
-        const volScoreEl = document.getElementById('volScore');
-        if (volScoreEl) {
-          volScoreEl.textContent = data.composite_abs_vol_score.toFixed(3);
-        }
-        
-        // Update individual timeframe scores
-        if (data.timeframes) {
-          const vol1mEl = document.getElementById('vol1m');
-          const vol2mEl = document.getElementById('vol2m');
-          const vol5mEl = document.getElementById('vol5m');
-          const vol10mEl = document.getElementById('vol10m');
-          
-          if (vol1mEl && data.timeframes['1m'] !== undefined) {
-            vol1mEl.textContent = data.timeframes['1m'].toFixed(3);
-          }
-          if (vol2mEl && data.timeframes['2m'] !== undefined) {
-            vol2mEl.textContent = data.timeframes['2m'].toFixed(3);
-          }
-          if (vol5mEl && data.timeframes['5m'] !== undefined) {
-            vol5mEl.textContent = data.timeframes['5m'].toFixed(3);
-          }
-          if (vol10mEl && data.timeframes['10m'] !== undefined) {
-            vol10mEl.textContent = data.timeframes['10m'].toFixed(3);
-          }
-        }
-        
-        // Store in coreData for other consumers
-        if (typeof window.coreData !== "object") window.coreData = {};
-        window.coreData.volatility_score = data.composite_abs_vol_score;
-      }
-    })
-    .catch(error => {
-      console.error('Composite volatility score fetch error:', error);
-    });
+
 }
 
 // Fetch BTC price changes from backend API and update ticker panel
@@ -312,11 +274,11 @@ document.addEventListener('DOMContentLoaded', () => {
   updateStrikePanelMarketTitle();
   fetchAndCacheTTC();
 
-  // Set up staggered polling intervals
+  // Set up polling intervals - all at 1 second for consistency
   setInterval(fetchAndUpdate, 1000);           // Strike panel
-  setInterval(fetchOtherCoreData, 1450);       // BTC price and volatility
-  setInterval(fetchCore, 1450);                // Momentum data
-  setInterval(fetchBTCPriceChanges, 1450);     // BTC price changes
+  setInterval(fetchOtherCoreData, 1000);       // BTC price and volatility
+  setInterval(fetchCore, 1000);                // Momentum data
+  setInterval(fetchBTCPriceChanges, 1000);     // BTC price changes
   setInterval(fetchMarketTitleRaw, 5000);      // Market title
   setInterval(updateStrikePanelMarketTitle, 5000); // Market title display
   setInterval(() => {
@@ -329,6 +291,14 @@ document.addEventListener('DOMContentLoaded', () => {
       fetchAndCacheTTC();
     }
   }, 1000); // TTC clock
+  
+  // Dedicated polling for active trades to ensure they update properly
+  setInterval(() => {
+    if (typeof window.fetchAndRenderTrades === 'function') {
+      console.log('[LIVE-DATA] Dedicated active trades polling');
+      window.fetchAndRenderTrades();
+    }
+  }, 2000); // Active trades every 2 seconds
 });
 
 // Export functions for use by other modules

@@ -297,7 +297,7 @@ def add_new_active_trade(trade_id: int, ticket_id: str) -> bool:
         cursor.execute("""
             SELECT id, ticket_id, date, time, strike, side, buy_price, position,
                    contract, ticker, symbol, market, trade_strategy, symbol_open,
-                   momentum, prob, volatility, fees, diff
+                   momentum, prob, fees, diff
             FROM trades 
             WHERE id = ? AND status = 'open'
         """, (trade_id,))
@@ -312,7 +312,7 @@ def add_new_active_trade(trade_id: int, ticket_id: str) -> bool:
         # Unpack the row data
         (db_id, ticket_id, date, time, strike, side, buy_price, position,
          contract, ticker, symbol, market, trade_strategy, symbol_open,
-         momentum, prob, volatility, fees, diff) = row
+         momentum, prob, fees, diff) = row
         
         # Insert into active trades database
         conn = get_db_connection()
@@ -321,12 +321,12 @@ def add_new_active_trade(trade_id: int, ticket_id: str) -> bool:
             INSERT INTO active_trades (
                 trade_id, ticket_id, date, time, strike, side, buy_price, position,
                 contract, ticker, symbol, market, trade_strategy, symbol_open,
-                momentum, prob, volatility, fees, diff
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                momentum, prob, fees, diff
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             trade_id, ticket_id, date, time, strike, side, buy_price, position,
             contract, ticker, symbol, market, trade_strategy, symbol_open,
-            momentum, prob, volatility, fees, diff
+            momentum, prob, fees, diff
         ))
         
         conn.commit()
@@ -349,7 +349,7 @@ def add_new_active_trade(trade_id: int, ticket_id: str) -> bool:
         log(f"   Fees: ${fees}")
         log(f"   Symbol Open: ${symbol_open}")
         log(f"   Momentum: {momentum}")
-        log(f"   Volatility: {volatility}")
+
         log(f"   Market: {market}")
         log(f"   Symbol: {symbol}")
         log(f"   ========================================")
