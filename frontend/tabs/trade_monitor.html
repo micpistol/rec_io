@@ -2105,9 +2105,14 @@ async function fetchAndRenderRecentTrades() {
       if (fill.side) {
         const s = fill.side.toUpperCase();
         side = s === 'YES' ? 'Y' : (s === 'NO' ? 'N' : s);
-        buy = s === 'YES'
-          ? (fill.yes_price != null ? fill.yes_price.toFixed(2) : '')
-          : (s === 'NO' ? (fill.no_price != null ? fill.no_price.toFixed(2) : '') : '');
+        // Convert price from cents to dollars
+        const price = s === 'YES' ? fill.yes_price : fill.no_price;
+        if (price != null) {
+          const priceInDollars = price / 100;
+          buy = priceInDollars.toFixed(2);
+        } else {
+          buy = '';
+        }
       }
       // Pos: count
       const pos = fill.count != null ? fill.count : '';

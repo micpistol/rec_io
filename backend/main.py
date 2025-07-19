@@ -549,43 +549,46 @@ async def get_account_balance(mode: str = "prod"):
         return {"balance": 0}
 
 @app.get("/api/db/fills")
-async def get_fills():
+def get_fills():
     """Get fills data."""
     try:
-        fills_file = os.path.join(get_accounts_data_dir(), "kalshi", "prod", "fills.json")
+        mode = get_account_mode()
+        fills_file = os.path.join(get_accounts_data_dir(), "kalshi", mode, "fills.json")
         if os.path.exists(fills_file):
             with open(fills_file, 'r') as f:
                 return json.load(f)
-        return []
+        return {"fills": []}
     except Exception as e:
         print(f"Error getting fills: {e}")
-        return []
+        return {"fills": []}
 
 @app.get("/api/db/positions")
-async def get_positions():
+def get_positions():
     """Get positions data."""
     try:
-        positions_file = os.path.join(get_accounts_data_dir(), "kalshi", "prod", "positions.json")
+        mode = get_account_mode()
+        positions_file = os.path.join(get_accounts_data_dir(), "kalshi", mode, "positions.json")
         if os.path.exists(positions_file):
             with open(positions_file, 'r') as f:
                 return json.load(f)
-        return []
+        return {"positions": []}
     except Exception as e:
         print(f"Error getting positions: {e}")
-        return []
+        return {"positions": []}
 
 @app.get("/api/db/settlements")
-async def get_settlements():
+def get_settlements():
     """Get settlements data."""
     try:
-        settlements_file = os.path.join(get_accounts_data_dir(), "kalshi", "prod", "settlements.json")
+        mode = get_account_mode()
+        settlements_file = os.path.join(get_accounts_data_dir(), "kalshi", mode, "settlements.json")
         if os.path.exists(settlements_file):
             with open(settlements_file, 'r') as f:
                 return json.load(f)
-        return []
+        return {"settlements": []}
     except Exception as e:
         print(f"Error getting settlements: {e}")
-        return []
+        return {"settlements": []}
 
 # Fingerprint and strike probability endpoints
 @app.get("/api/current_fingerprint")

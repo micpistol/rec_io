@@ -176,29 +176,48 @@
       document.getElementById("account-balance").textContent =
         `$${Number(balanceInDollars).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 
-      const settlementsBody = document.getElementById("settlements-body");
-      settlementsBody.innerHTML = settlements.map(s => `
-        <tr>
-          <td>${s.ticker}</td>
-          <td>${s.market_result === "yes" ? "Y" : "N"}</td>
-          <td>${s.yes_count}</td>
-          <td>${s.no_count}</td>
-          <td>${'$' + s.revenue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
-          <td>${new Date(s.settled_time).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
-        </tr>
-      `).join("");
+            const settlementsBody = document.getElementById("settlements-body");
+      settlementsBody.innerHTML = settlements.map(s => {
+        // Convert revenue from cents to dollars
+        const revenueInDollars = s.revenue / 100;
+        const formattedRevenue = revenueInDollars.toLocaleString(undefined, { 
+          minimumFractionDigits: 0, 
+          maximumFractionDigits: 0 
+        });
+        
+        return `
+          <tr>
+            <td>${s.ticker}</td>
+            <td>${s.market_result === "yes" ? "Y" : "N"}</td>
+            <td>${s.yes_count}</td>
+            <td>${s.no_count}</td>
+            <td>$${formattedRevenue}</td>
+            <td>${new Date(s.settled_time).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
+          </tr>
+        `;
+      }).join("");
 
-      const fillsBody = document.getElementById("fills-body");
-      fillsBody.innerHTML = fills.map(f => `
-        <tr>
-          <td>${f.ticker}</td>
-          <td>${f.side === "yes" ? "Y" : "N"}</td>
-          <td>${f.action.toUpperCase()}</td>
-          <td>${f.count}</td>
-          <td>${f.side === "yes" ? f.yes_price : f.no_price}</td>
-          <td>${new Date(f.created_time).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
-        </tr>
-      `).join("");
+            const fillsBody = document.getElementById("fills-body");
+      fillsBody.innerHTML = fills.map(f => {
+        // Convert price from cents to dollars
+        const price = f.side === "yes" ? f.yes_price : f.no_price;
+        const priceInDollars = price / 100;
+        const formattedPrice = priceInDollars.toLocaleString(undefined, { 
+          minimumFractionDigits: 2, 
+          maximumFractionDigits: 2 
+        });
+        
+        return `
+          <tr>
+            <td>${f.ticker}</td>
+            <td>${f.side === "yes" ? "Y" : "N"}</td>
+            <td>${f.action.toUpperCase()}</td>
+            <td>${f.count}</td>
+            <td>${formattedPrice}</td>
+            <td>${new Date(f.created_time).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
+          </tr>
+        `;
+      }).join("");
 
       const positionsBody = document.getElementById("positions-body");
       positionsBody.innerHTML = positions
