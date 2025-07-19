@@ -75,7 +75,7 @@ function fetchCore() {
     .catch(console.error);
 }
 
-// Fetch BTC price and volatility data
+// Fetch BTC price data
 function fetchOtherCoreData() {
   fetch('/core')
     .then(response => response.json())
@@ -275,12 +275,12 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchAndCacheTTC();
 
   // Set up polling intervals - all at 1 second for consistency
-  setInterval(fetchAndUpdate, 1000);           // Strike panel
-  setInterval(fetchOtherCoreData, 1000);       // BTC price and volatility
-  setInterval(fetchCore, 1000);                // Momentum data
-  setInterval(fetchBTCPriceChanges, 1000);     // BTC price changes
-  setInterval(fetchMarketTitleRaw, 5000);      // Market title
-  setInterval(updateStrikePanelMarketTitle, 5000); // Market title display
+  setInterval(fetchAndUpdate, 1000);           // Strike panel - back to original
+setInterval(fetchOtherCoreData, 1000);       // BTC price data
+setInterval(fetchCore, 1000);                // Momentum data - back to original
+setInterval(fetchBTCPriceChanges, 1000);     // BTC price changes
+setInterval(fetchMarketTitleRaw, 5000);      // Market title
+setInterval(updateStrikePanelMarketTitle, 5000); // Market title display
   setInterval(() => {
     if (cachedTTC !== null) {
       cachedTTC = Math.max(0, cachedTTC - 1);

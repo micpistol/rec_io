@@ -596,21 +596,26 @@ let dbChangeWebSocket = null;
 
 function connectDbChangeWebSocket() {
   if (dbChangeWebSocket && dbChangeWebSocket.readyState === WebSocket.OPEN) {
+    console.log("[WEBSOCKET] Already connected");
     return; // Already connected
   }
 
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}/ws/db_changes`;
+  console.log("[WEBSOCKET] Connecting to:", wsUrl);
   
   dbChangeWebSocket = new WebSocket(wsUrl);
   
   dbChangeWebSocket.onopen = function() {
+    console.log("[WEBSOCKET] ✅ Connection opened successfully");
   };
   
   dbChangeWebSocket.onmessage = function(event) {
     try {
+      console.log("[WEBSOCKET] Received message:", event.data);
       const data = JSON.parse(event.data);
       if (data.type === 'db_change' && data.database === 'trades') {
+        console.log("[WEBSOCKET] ✅ Trades DB change detected, updating UI");
         fetchAndRenderStrikeTable();
         // Also update active trades when trades.db changes
         if (typeof window.fetchAndRenderTrades === 'function') {
@@ -618,13 +623,21 @@ function connectDbChangeWebSocket() {
         }
       }
     } catch (error) {
+      console.error("[WEBSOCKET] Error processing message:", error);
     }
   };
   
-  dbChangeWebSocket.onclose = function() {
+  dbChangeWebSocket.onclose = function(event) {
+    console.log("[WEBSOCKET] ❌ Connection closed:", event.code, event.reason);
+    // Try to reconnect after 5 seconds
+    setTimeout(() => {
+      console.log("[WEBSOCKET] Attempting to reconnect...");
+      connectDbChangeWebSocket();
+    }, 5000);
   };
   
   dbChangeWebSocket.onerror = function(error) {
+    console.error("[WEBSOCKET] ❌ Connection error:", error);
   };
 }
 
@@ -638,6 +651,18 @@ function fetchAndRenderStrikeTable() {
 // Initialize WebSocket connection
 if (typeof window !== 'undefined') {
   connectDbChangeWebSocket();
+  
+  // Add a test function to manually trigger a database change notification
+  window.testWebSocketConnection = function() {
+    console.log("[WEBSOCKET] Testing connection...");
+    if (dbChangeWebSocket && dbChangeWebSocket.readyState === WebSocket.OPEN) {
+      console.log("[WEBSOCKET] ✅ Connection is open");
+      // Send a test message to the server
+      dbChangeWebSocket.send("ping");
+    } else {
+      console.log("[WEBSOCKET] ❌ Connection is not open, state:", dbChangeWebSocket ? dbChangeWebSocket.readyState : 'null');
+    }
+  };
 } 
 
  

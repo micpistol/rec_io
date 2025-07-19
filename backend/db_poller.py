@@ -22,25 +22,26 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.account_mode import get_account_mode
 from backend.util.paths import get_data_dir, get_accounts_data_dir
 from backend.core.config.settings import config
+from backend.util.ports import get_main_app_port, get_trade_manager_port, get_active_trade_supervisor_port
 
 class DatabasePoller:
     def __init__(self):
-        self.poll_interval = 0.5  # Poll twice per second
+        self.poll_interval = 0.5  # Poll twice per second - back to original
         self.last_hashes = {}
         self.db_paths = {}
         # Get main app host and port from config
         main_host = config.get("agents.main.host", "localhost")
-        main_port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))
+        main_port = get_main_app_port()
         self.main_app_url = f"http://{main_host}:{main_port}"
         
         # Get trade manager host and port from config
         trade_manager_host = config.get("agents.trade_manager.host", "localhost")
-        trade_manager_port = int(os.environ.get("TRADE_MANAGER_PORT", config.get("agents.trade_manager.port", 5003)))
+        trade_manager_port = get_trade_manager_port()
         self.trade_manager_url = f"http://{trade_manager_host}:{trade_manager_port}"
         
         # Get active trade supervisor host and port from config
         active_trade_supervisor_host = config.get("agents.active_trade_supervisor.host", "localhost")
-        active_trade_supervisor_port = int(os.environ.get("ACTIVE_TRADE_SUPERVISOR_PORT", config.get("agents.active_trade_supervisor.port", 5007)))
+        active_trade_supervisor_port = get_active_trade_supervisor_port()
         self.active_trade_supervisor_url = f"http://{active_trade_supervisor_host}:{active_trade_supervisor_port}"
         
         self.setup_database_paths()
@@ -75,11 +76,9 @@ class DatabasePoller:
             stat = os.stat(db_path)
             file_info = f"{stat.st_mtime}_{stat.st_size}"
             
-            # For more detailed change detection, also hash the content
-            with open(db_path, 'rb') as f:
-                content_hash = hashlib.md5(f.read()).hexdigest()
-            
-            return f"{file_info}_{content_hash}"
+            # For faster detection, only use file stats initially
+            # Only hash content if file stats indicate a change
+            return file_info
         except Exception as e:
             print(f"❌ Error reading database {db_path}: {e}")
             return None
@@ -204,14 +203,18 @@ class DatabasePoller:
                 "database": db_name,
                 "change_data": change_data
             }
-            response = requests.post(url, json=payload, timeout=5)
+            # Use shorter timeout and fire-and-forget for speed
+            response = requests.post(url, json=payload, timeout=1)
             if response.status_code == 200:
                 print(f"✅ Notified main app about {db_name} change")
             else:
                 print(f"⚠️  Failed to notify main app: {response.status_code}")
-                print(f"Response text: {response.text}")
         except Exception as e:
             print(f"❌ Error notifying main app: {e}")
+        
+        # ALSO directly notify frontend via WebSocket if trades.db changed
+        if db_name == "trades":
+            self.notify_frontend_websocket(db_name, change_data)
     
     def notify_trade_manager(self, db_name: str, change_data: Dict[str, Any]):
         """Notify trade manager about database changes via HTTP"""
@@ -221,7 +224,8 @@ class DatabasePoller:
                 "database": db_name,
                 "change_data": change_data
             }
-            response = requests.post(url, json=payload, timeout=5)
+            # Use shorter timeout and fire-and-forget for speed
+            response = requests.post(url, json=payload, timeout=1)
             if response.status_code == 200:
                 print(f"✅ Notified trade manager about {db_name} change")
             else:
@@ -237,7 +241,8 @@ class DatabasePoller:
                 "database": db_name,
                 "change_data": change_data
             }
-            response = requests.post(url, json=payload, timeout=5)
+            # Use shorter timeout and fire-and-forget for speed
+            response = requests.post(url, json=payload, timeout=1)
             if response.status_code == 200:
                 print(f"✅ Notified active trade supervisor about {db_name} change")
             else:

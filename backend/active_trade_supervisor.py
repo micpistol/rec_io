@@ -16,8 +16,8 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import requests
 from typing import Dict, List, Optional, Any
-from util.ports import get_port
-from core.config.settings import config
+from backend.util.ports import get_main_app_port, get_active_trade_supervisor_port
+from backend.core.config.settings import config
 from flask import Flask, request, jsonify
 
 # Configuration
@@ -30,6 +30,26 @@ os.makedirs(os.path.dirname(ACTIVE_TRADES_DB_PATH), exist_ok=True)
 
 # Flask app for HTTP notifications
 app = Flask(__name__)
+
+@app.route('/')
+def root():
+    """Health check endpoint"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
+        active_count = cursor.fetchone()[0]
+        conn.close()
+        
+        return jsonify({
+            "status": "running", 
+            "service": "active_trade_supervisor",
+            "active_trades": active_count,
+            "port": get_active_trade_supervisor_port()
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 def log(message: str):
     """Log messages with timestamp"""
@@ -60,7 +80,7 @@ def check_for_open_trades():
         cursor.execute("""
             SELECT id, ticket_id, date, time, strike, side, buy_price, position,
                    contract, ticker, symbol, market, trade_strategy, symbol_open,
-                   momentum, prob, volatility, fees, diff
+                   momentum, prob, fees, diff
             FROM trades 
             WHERE status = 'open'
         """)
@@ -244,7 +264,7 @@ def init_active_trades_db():
         symbol_open REAL,
         momentum REAL,
         prob REAL,
-        volatility REAL,
+
         fees REAL,
         diff TEXT,
         
@@ -796,6 +816,9 @@ def sync_on_demand():
     sync_with_trades_db()
     export_active_trades_to_json()
 
+def get_main_app_port():
+    return get_main_app_port()
+
 def start_event_driven_supervisor():
     """Start the event-driven active trade supervisor with HTTP server"""
     log("🚀 Starting event-driven active trade supervisor")
@@ -822,7 +845,7 @@ def start_event_driven_supervisor():
     def start_http_server():
         try:
             host = config.get("agents.active_trade_supervisor.host", "localhost")
-            port = int(os.environ.get("ACTIVE_TRADE_SUPERVISOR_PORT", config.get("agents.active_trade_supervisor.port", 5007)))
+            port = get_active_trade_supervisor_port()
             log(f"🌐 Starting HTTP server on {host}:{port}")
             app.run(host=host, port=port, debug=False, use_reloader=False)
         except Exception as e:

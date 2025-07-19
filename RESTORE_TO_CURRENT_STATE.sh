@@ -186,7 +186,7 @@ lsof -i :5001 -i :5003 -i :5050 -i :5007 -i :5090 -i :9001 -i :5002 -i :5004 -i 
 
 # Test main app connectivity
 echo "   Testing main app connectivity..."
-curl -s http://localhost:5001/status || echo "   ⚠️  Main app not responding yet"
+curl -s http://localhost:$(python -c "from backend.util.ports import get_main_app_port; print(get_main_app_port())")/status || echo "   ⚠️  Main app not responding yet"
 
 # =============================================================================
 # STEP 8: FINAL VERIFICATION

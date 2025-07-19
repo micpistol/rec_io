@@ -9,6 +9,7 @@ print('DEBUG sys.path:', sys.path)
 # Now import everything else
 
 from backend.core.config.settings import config
+from backend.util.ports import get_market_watchdog_port
 import requests
 import json
 import sqlite3
@@ -42,7 +43,7 @@ os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 last_failed_ticker = None  # Global tracker
 
 def get_port():
-    return int(os.environ.get("API_WATCHDOG_PORT", config.get("agents.market_watchdog.port", 5090)))
+    return get_market_watchdog_port()
 
 def get_current_event_ticker():
     global last_failed_ticker

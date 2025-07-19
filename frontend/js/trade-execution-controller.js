@@ -316,9 +316,7 @@ window.prepareTradeData = function(target) {
   // Get other data
   const symbol_open = typeof getCurrentBTCTickerPrice === 'function' ? getCurrentBTCTickerPrice() : null;
   const momentum = typeof getCurrentMomentumScore === 'function' ? getCurrentMomentumScore() : null;
-  const volatility = window.coreData?.volatility_score != null
-    ? parseFloat(window.coreData.volatility_score.toFixed(2))
-    : null;
+  
 
   // Get the PROB value from the strike table for this specific strike
   let prob = null;
@@ -359,7 +357,7 @@ window.prepareTradeData = function(target) {
     position: position,
     symbol_open: symbol_open,
     momentum: momentum,
-    volatility: volatility,
+    
     prob: prob,
     trade_strategy: tradeStrategy
   };

@@ -50,7 +50,7 @@ class EventType(Enum):
     # Indicator events
     INDICATOR_UPDATE = "indicator_update"
     MOMENTUM_UPDATE = "momentum_update"
-    VOLATILITY_UPDATE = "volatility_update"
+
 
 @dataclass
 class Event:
@@ -160,8 +160,7 @@ async def publish_indicator_update(source: str, indicator_type: str,
     event_type = EventType.INDICATOR_UPDATE
     if indicator_type == "momentum":
         event_type = EventType.MOMENTUM_UPDATE
-    elif indicator_type == "volatility":
-        event_type = EventType.VOLATILITY_UPDATE
+    
     
     event = Event(
         type=event_type,

@@ -116,13 +116,13 @@ supervisord --version > backup/supervisor_version.txt
 echo "🧪 STEP 7: Testing current system functionality..."
 
 # Test main app
-curl -s http://localhost:5001/status > backup/main_app_test.txt || echo "Main app not responding" > backup/main_app_test.txt
+curl -s http://localhost:$(python -c "from backend.util.ports import get_main_app_port; print(get_main_app_port())")/status > backup/main_app_test.txt || echo "Main app not responding" > backup/main_app_test.txt
 
 # Test trade manager
-curl -s http://localhost:5003/trades > backup/trade_manager_test.txt || echo "Trade manager not responding" > backup/trade_manager_test.txt
+curl -s http://localhost:$(python -c "from backend.util.ports import get_trade_manager_port; print(get_trade_manager_port())")/trades > backup/trade_manager_test.txt || echo "Trade manager not responding" > backup/trade_manager_test.txt
 
 # Test trade executor
-curl -s http://localhost:5050/ > backup/trade_executor_test.txt || echo "Trade executor not responding" > backup/trade_executor_test.txt
+curl -s http://localhost:$(python -c "from backend.util.ports import get_trade_executor_port; print(get_trade_executor_port())")/ > backup/trade_executor_test.txt || echo "Trade executor not responding" > backup/trade_executor_test.txt
 
 # =============================================================================
 # STEP 8: CREATE RESTORATION MANIFEST
@@ -169,7 +169,7 @@ RESTORATION COMMANDS:
 1. Run: ./RESTORE_TO_CURRENT_STATE.sh
 2. Or manually restore from backup/ directory
 3. Check: supervisorctl status
-4. Test: curl http://localhost:5001/status
+4. Test: curl http://localhost:$(python -c "from backend.util.ports import get_main_app_port; print(get_main_app_port())")/status
 
 EOF
 

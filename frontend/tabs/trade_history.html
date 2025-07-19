@@ -147,7 +147,7 @@
             <th data-key="symbol_open">Symbol Open</th>
             <th data-key="symbol_close">Symbol Close</th>
             <th data-key="momentum">Mom</th>
-            <th data-key="volatility">Vol</th>
+            
             <th data-key="win_loss">W/L</th>
           </tr>
         </thead>
@@ -275,7 +275,7 @@
         if (valB === null || valB === undefined) valB = '';
 
         // Try to parse as numbers for numeric fields
-        const numericKeys = ['id', 'strike', 'buy_price', 'sell_price', 'position', 'symbol_open', 'symbol_close', 'momentum', 'volatility', 'win_loss', 'pnl', 'prob', 'diff'];
+        const numericKeys = ['id', 'strike', 'buy_price', 'sell_price', 'position', 'symbol_open', 'symbol_close', 'momentum', 'win_loss', 'pnl', 'prob', 'diff'];
         if (numericKeys.includes(currentSort.key)) {
           valA = Number(valA);
           valB = Number(valB);
@@ -453,7 +453,7 @@
           <td>${trade.symbol_open !== null ? '$' + Math.round(trade.symbol_open).toLocaleString() : ''}</td>
           <td>${trade.symbol_close !== null ? '$' + Math.round(trade.symbol_close).toLocaleString() : ''}</td>
           <td>${plusSign(trade.momentum)}</td>
-          <td>${plusSign(trade.volatility)}</td>
+          
           <td>${plusSign(trade.win_loss)}</td>
         `;
         tbody.appendChild(tr);

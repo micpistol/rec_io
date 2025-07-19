@@ -1567,7 +1567,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Get current fingerprint information from backend
-        const response = await fetch('http://localhost:5001/api/current_fingerprint');
+        const mainAppPort = window.MAIN_APP_PORT || 5001;
+        const response = await fetch(`http://localhost:${mainAppPort}/api/current_fingerprint`);
         
         if (response.ok) {
           const data = await response.json();
@@ -2301,13 +2302,13 @@ document.addEventListener('DOMContentLoaded', () => {
   <!-- === Staggered polling loops for main panels === -->
   <script>
   // Polling refresh loops – staggered to avoid main thread congestion
-  function fetchVolatilityAndMomentum() {
+  function fetchMomentumData() {
     fetchOtherCoreData();
     fetchCore();
     fetchBTCPriceChanges();
   }
 
-  setInterval(fetchVolatilityAndMomentum, 1450);  // Volatility/momentum panels
+  setInterval(fetchMomentumData, 1450);  // Momentum panels
   </script>
 
   <!-- --- Add a MutationObserver to update arrows when momentum score changes --- -->

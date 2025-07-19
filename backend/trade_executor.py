@@ -1,19 +1,22 @@
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 print('PYTHONPATH:', sys.path)
 from backend.account_mode import get_account_mode
 # from config.ports import KALSHI_EXECUTOR_PORT  # Removed hard‑wired port import
 import uuid
 import os, sys
 # Add the backend directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from core.config.settings import config
 
 # --- Flask app for trade triggers ---
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import threading
+import psutil
+import platform
+from datetime import datetime
 
 print(f"✅ Running in account mode: {get_account_mode()}")
 import requests
@@ -49,7 +52,7 @@ print(f"Using base URL: {get_base_url()} for mode: {get_account_mode()}")
 # --- Credentials loading ---
 def load_credentials():
     mode = get_account_mode()
-    cred_dir = Path(__file__).resolve().parent / "kalshi-credentials" / mode
+    cred_dir = Path(__file__).resolve().parent / "api" / "kalshi-api" / "kalshi-credentials" / mode
     env_vars = dotenv_values(cred_dir / ".env")
     return {
         "KEY_ID": env_vars.get("KALSHI_API_KEY_ID"),
@@ -495,6 +498,75 @@ sync_balance()
 app = Flask(__name__)
 CORS(app)
 
+@app.route('/')
+def root():
+    """Health check endpoint"""
+    return {"status": "running", "service": "trade_executor", "port": get_executor_port()}
+
+# Health check endpoints
+@app.route('/health')
+def health_check():
+    """Comprehensive health check endpoint for trade executor."""
+    try:
+        # Basic system info
+        system_info = {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "service": "trade_executor",
+            "version": "1.0.0",
+            "account_mode": get_account_mode()
+        }
+        
+        # System resources
+        try:
+            system_info["cpu_percent"] = psutil.cpu_percent()
+            system_info["memory_percent"] = psutil.virtual_memory().percent
+            system_info["disk_percent"] = psutil.disk_usage('/').percent
+        except Exception as e:
+            system_info["resource_error"] = str(e)
+        
+        # API connectivity
+        try:
+            base_url = get_base_url()
+            response = requests.get(f"{base_url}/events", headers=API_HEADERS, timeout=5)
+            system_info["api_status"] = "healthy" if response.status_code == 200 else "unhealthy"
+        except Exception as e:
+            system_info["api_status"] = "unreachable"
+            system_info["api_error"] = str(e)
+        
+        # Overall health status
+        if system_info.get("api_status") in ["unhealthy", "unreachable"]:
+            system_info["status"] = "degraded"
+        
+        return jsonify(system_info)
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+@app.route('/health/simple')
+def simple_health_check():
+    """Simple health check for load balancers."""
+    return jsonify({
+        "status": "healthy", 
+        "timestamp": datetime.now().isoformat()
+    })
+
+@app.route('/system/info')
+def system_info():
+    """Get detailed system information."""
+    return jsonify({
+        "platform": platform.platform(),
+        "python_version": platform.python_version(),
+        "cpu_count": psutil.cpu_count(),
+        "memory_total": psutil.virtual_memory().total,
+        "disk_total": psutil.disk_usage('/').total,
+        "account_mode": get_account_mode()
+    })
+
 # --- Market order helper for /trigger_trade ---
 def place_market_order(ticker, side, count):
     method = "POST"
@@ -544,8 +616,9 @@ def log_event(ticket_id, message):
         # File name based on the last 5 characters of the ticket ID
         log_filename = f"trade_flow_{ticket_id[-5:]}.log"
 
-        # Log directory (…/backend/data/trade_history/tickets/)
-        log_dir = Path(__file__).resolve().parents[3] / "data" / "trade_history" / "tickets"
+        # Log directory (backend/data/trade_history/tickets/)
+        # Go up 1 level from current file to reach project root, then into backend/data/trade_history/tickets
+        log_dir = Path(__file__).resolve().parents[1] / "backend" / "data" / "trade_history" / "tickets"
         log_dir.mkdir(parents=True, exist_ok=True)
 
         # Full path for this ticket's log file
@@ -634,7 +707,7 @@ def trigger_trade():
             log_event(ticket_id, f"EXECUTOR: TRADE REJECTED — {response.text.strip()}")
             status_payload = {"ticket_id": ticket_id, "status": "error"}
             manager_port = get_manager_port()
-            status_url = f"http://localhost:{manager_port}/api/update_trade_status"
+            status_url = f"{get_manager_url()}/api/update_trade_status"
             def notify_error():
                 try:
                     resp = requests.post(status_url, json=status_payload, timeout=5)
@@ -650,7 +723,7 @@ def trigger_trade():
             # Use the normalized ticket_id
             status_payload = {"ticket_id": ticket_id, "status": "accepted"}
             manager_port = get_manager_port()
-            status_url = f"http://localhost:{manager_port}/api/update_trade_status"
+            status_url = f"{get_manager_url()}/api/update_trade_status"
             def notify_accepted():
                 try:
                     resp = requests.post(status_url, json=status_payload, timeout=5)
@@ -665,10 +738,16 @@ def trigger_trade():
         return jsonify({"error": str(e)}), 500
 
 def get_executor_port():
-    return int(os.environ.get("KALSHI_EXECUTOR_PORT", config.get("agents.trade_executor.port", 5050)))
+    from backend.util.ports import get_trade_executor_port
+    return get_trade_executor_port()
 
 def get_manager_port():
-    return int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5000)))
+    from backend.util.ports import get_main_app_port
+    return get_main_app_port()
+
+def get_manager_url():
+    from backend.util.ports import get_main_app_port
+    return f"http://localhost:{get_main_app_port()}"
 
 def run_flask():
     """Start the executor's internal Flask app on the configured port."""

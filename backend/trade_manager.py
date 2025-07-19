@@ -1,623 +1,27 @@
 # ---------- CORE HELPERS ----------------------------------------------------
-def create_pending_trade(trade: dict) -> int:
-    """Insert a new ticket immediately with status='pending' and return DB id."""
-    # Ensure the trade is created with 'pending' status
-    trade['status'] = 'pending'
-    trade_id = insert_trade(trade)
-    log_event(trade["ticket_id"], "MANAGER: TICKET RECEIVED — CONFIRMED")
-    log_event(trade["ticket_id"], "MANAGER: TRADE LOGGED PENDING — CONFIRMED")
-    return trade_id
-
-
-def _wait_for_fill(ticker: str, timeout: int = 10) -> tuple[int | None, float | None]:
-    """
-    Poll /api/db/positions (no hard‑wired port) until ticker appears with
-    non‑zero position, or timeout seconds elapse.
-    Returns (abs_position, buy_price) or (None, None) if not seen in time.
-    """
-    deadline = time.time() + timeout
-    # Use the main agent port for positions API
-    port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5000)))
-    url = f"http://localhost:{port}/api/db/positions"          # host‑relative; no port hard‑coding
-    while time.time() < deadline:
-        try:
-            r = requests.get(url, timeout=2)
-            if r.status_code == 200:
-                payload = r.json()
-                positions = (
-                    payload.get("positions")
-                    or payload.get("market_positions")
-                    or []
-                )
-                for p in positions:
-                    # Return the first position with pos > 0 and exposure > 0 regardless of ticker
-                    pos = abs(p.get("position", 0))
-                    exposure = abs(p.get("market_exposure", 0))
-                    if pos > 0 and exposure > 0:
-                        price = round(float(exposure) / float(pos) / 100, 2)
-                        return int(pos), price
-                # print(f"[FILL POLL] No position data yet for any position, retrying...")
-        except Exception:
-            pass
-        time.sleep(1)
-    return None, None
-
-
-def confirm_open_trade(id: int, ticket_id: str) -> None:
-    """
-    Confirms a PENDING trade has been opened in the market account.
-    Polls positions.db for matching ticker with non-zero position.
-    Updates trade status to 'open' and fills in actual buy price and fees.
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT ticker FROM trades WHERE id = ?", (id,))
-    row = cursor.fetchone()
-    conn.close()
-    
-    if not row:
-        log_event(ticket_id, f"MANAGER: No trade found for ID {id}")
-        return
-    
-    expected_ticker = row[0]
-    
-    # Determine positions.db path based on demo mode
-    demo_env = os.environ.get("DEMO_MODE", "false")
-    DEMO_MODE = demo_env.strip().lower() == "true"
-    if DEMO_MODE:
-        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "positions.db")
-    else:
-        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "positions.db")
-    
-    if not os.path.exists(POSITIONS_DB_PATH):
-        log_event(ticket_id, f"MANAGER: Positions DB path not found: {POSITIONS_DB_PATH}")
-        return
-    
-    conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
-    cursor_pos = conn_pos.cursor()
-    deadline = time.time() + 15  # 15 second timeout
-    
-    while time.time() < deadline:
-        try:
-            cursor_pos.execute("SELECT position, market_exposure, fees_paid FROM positions WHERE ticker = ?", (expected_ticker,))
-            row = cursor_pos.fetchone()
-            
-            if row and row[0] is not None and row[1] is not None:
-                pos = abs(row[0])
-                exposure = abs(row[1])
-                fees_paid = float(row[2]) if row[2] is not None else 0.0
-                
-                # Calculate actual buy price and fees
-                price = round(float(exposure) / float(pos) / 100, 2) if pos > 0 else 0.0
-                fees = round(fees_paid / 100, 2)
-                
-                # Check if trade is still pending and position has appeared
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT status FROM trades WHERE id = ?", (id,))
-                status_row = cursor.fetchone()
-                current_status = status_row[0] if status_row else None
-                conn.close()
-                
-                if current_status == "pending" and pos > 0 and exposure > 0:
-                    # Calculate DIFF: PROB - BUY (formatted as whole integer)
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT prob FROM trades WHERE id = ?", (id,))
-                    prob_row = cursor.fetchone()
-                    conn.close()
-                    
-                    prob_value = prob_row[0] if prob_row and prob_row[0] is not None else None
-                    diff_value = None
-                    
-                    if prob_value is not None:
-                        # Convert prob from percentage to decimal (96.7 -> 0.967)
-                        prob_decimal = float(prob_value) / 100
-                        # Calculate diff: prob_decimal - buy_price
-                        diff_decimal = prob_decimal - price
-                        # Convert to whole integer (0.02 -> +2, -0.03 -> -3)
-                        diff_value = int(round(diff_decimal * 100))
-                        # Format as string with sign
-                        diff_formatted = f"+{diff_value}" if diff_value >= 0 else f"{diff_value}"
-                    else:
-                        diff_formatted = None
-                    
-                    # Update trade to OPEN status with actual data
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                        UPDATE trades
-                        SET status = 'open',
-                            position = ?,
-                            buy_price = ?,
-                            fees = ?,
-                            diff = ?
-                        WHERE id = ?
-                    """, (pos, price, round(fees_paid, 2), diff_formatted, id))
-                    conn.commit()
-                    conn.close()
-                    
-                    log_event(ticket_id, f"MANAGER: OPEN TRADE CONFIRMED — pos={pos}, price={price}, fees={fees}, diff={diff_formatted}")
-                    
-                    # Notify active trade supervisor about new open trade
-                    notify_active_trade_supervisor(id, ticket_id, "open")
-                    
-                    break
-                    
-        except Exception as e:
-            log_event(ticket_id, f"MANAGER: OPEN TRADE WATCH DB read error: {e}")
-        
-        time.sleep(1)
-    
-    conn_pos.close()
-    log_event(ticket_id, f"MANAGER: OPEN TRADE polling complete for ticker: {expected_ticker}")
-
-
-def confirm_close_trade(id: int, ticket_id: str) -> None:
-    """
-    Confirms a CLOSING trade has been closed in the market account.
-    Polls positions.db for matching ticker with zero position.
-    Updates trade status to 'closed' and fills in actual sell price and PnL.
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT ticker FROM trades WHERE id = ?", (id,))
-    row = cursor.fetchone()
-    conn.close()
-    
-    if not row:
-        log_event(ticket_id, f"MANAGER: No trade found for ID {id}")
-        return
-    
-    expected_ticker = row[0]
-    
-    # Determine positions.db path based on demo mode
-    demo_env = os.environ.get("DEMO_MODE", "false")
-    DEMO_MODE = demo_env.strip().lower() == "true"
-    if DEMO_MODE:
-        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "positions.db")
-    else:
-        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "positions.db")
-    
-    if not os.path.exists(POSITIONS_DB_PATH):
-        log_event(ticket_id, f"MANAGER: positions.db not found at {POSITIONS_DB_PATH}")
-        return
-    
-    # Poll for position to be zeroed out
-    max_attempts = 15  # 15 seconds
-    attempt = 0
-    
-    while attempt < max_attempts:
-        try:
-            conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
-            cursor_pos = conn_pos.cursor()
-            cursor_pos.execute("SELECT position FROM positions WHERE ticker = ?", (expected_ticker,))
-            row = cursor_pos.fetchone()
-            conn_pos.close()
-            
-            if row and row[0] == 0:
-                # Position has been zeroed out - confirm the close
-                log_event(ticket_id, f"MANAGER: POSITION ZEROED OUT for {expected_ticker}")
-                
-                # Get current time for closed_at
-                now_est = datetime.now(ZoneInfo("America/New_York"))
-                closed_at = now_est.strftime("%H:%M:%S")
-                
-                # Get fees_paid from positions.db for this ticker
-                conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
-                cursor_pos = conn_pos.cursor()
-                cursor_pos.execute("SELECT fees_paid FROM positions WHERE ticker = ?", (expected_ticker,))
-                fees_row = cursor_pos.fetchone()
-                conn_pos.close()
-                
-                # Get the total fees_paid from positions.db
-                total_fees_paid = float(fees_row[0]) if fees_row and fees_row[0] is not None else 0.0
-                
-                # Get the original trade side to determine which price to use
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT side FROM trades WHERE id = ?", (id,))
-                side_row = cursor.fetchone()
-                conn.close()
-                
-                original_side = side_row[0] if side_row else None
-                
-                # Get the actual sell price from fills.db
-                # Determine fills.db path based on demo mode
-                if DEMO_MODE:
-                    FILLS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "fills.db")
-                else:
-                    FILLS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "fills.db")
-                
-                sell_price = 999  # Default fallback
-                
-                if os.path.exists(FILLS_DB_PATH):
-                    conn_fills = sqlite3.connect(FILLS_DB_PATH, timeout=0.25)
-                    cursor_fills = conn_fills.cursor()
-                    
-                    # Look for fills with the OPPOSITE side of the original trade
-                    # YES trade closes by buying NO, NO trade closes by buying YES
-                    opposite_side = 'no' if original_side == 'Y' else 'yes'
-                    
-                    # Get fills for this ticker with the opposite side, ordered by most recent
-                    cursor_fills.execute("""
-                        SELECT yes_price, no_price, created_time, side 
-                        FROM fills 
-                        WHERE ticker = ? AND side = ? 
-                        ORDER BY created_time DESC 
-                        LIMIT 1
-                    """, (expected_ticker, opposite_side))
-                    fill_row = cursor_fills.fetchone()
-                    conn_fills.close()
-                    
-                    if fill_row and original_side:
-                        yes_price, no_price, fill_time, fill_side = fill_row
-                        
-                        # Use the price for the opposite side (the side we're buying to close)
-                        if original_side == 'Y':  # Original was YES, so use NO price (we're buying NO to close)
-                            sell_price = float(no_price)
-                        elif original_side == 'N':  # Original was NO, so use YES price (we're buying YES to close)
-                            sell_price = float(yes_price)
-                        
-                        log_event(ticket_id, f"MANAGER: Found closing fill at {fill_time} - side={fill_side}, yes_price={yes_price}, no_price={no_price}, using sell_price={sell_price}")
-                    else:
-                        # If no opposite-side fill found, wait and retry
-                        log_event(ticket_id, f"MANAGER: No closing fill found for {opposite_side} side yet, waiting...")
-                        conn_fills.close()
-                        time.sleep(1)  # Wait 1 second before next check
-                        continue
-                
-                # Get symbol_close from the trade record
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT symbol_close FROM trades WHERE id = ?", (id,))
-                symbol_close_row = cursor.fetchone()
-                conn.close()
-                
-                symbol_close = symbol_close_row[0] if symbol_close_row else None
-                
-                # Calculate PnL with fees included
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT buy_price, position FROM trades WHERE id = ?", (id,))
-                trade_data = cursor.fetchone()
-                conn.close()
-                
-                if trade_data:
-                    buy_price, position = trade_data
-                    # Calculate PnL with fees: (sell_price - buy_price) * position - fees
-                    buy_value = buy_price * position
-                    sell_value = sell_price * position
-                    fees = total_fees_paid if total_fees_paid is not None else 0.0
-                    pnl = round(sell_value - buy_value - fees, 2)
-                    
-                    # Determine win/loss
-                    win_loss = "W" if pnl > 0 else "L" if pnl < 0 else "D"
-                    
-                    # Update trade status to closed with correct PnL calculation
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                        UPDATE trades 
-                        SET status = 'closed',
-                            closed_at = ?,
-                            sell_price = ?,
-                            symbol_close = ?,
-                            win_loss = ?,
-                            pnl = ?
-                        WHERE id = ?
-                    """, (closed_at, sell_price, symbol_close, win_loss, pnl, id))
-                    conn.commit()
-                    conn.close()
-                    
-                    # Update the FEES column in trades.db with total_fees_paid
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("UPDATE trades SET fees = ? WHERE id = ?", (total_fees_paid, id))
-                    conn.commit()
-                    conn.close()
-                    
-                    log_event(ticket_id, f"MANAGER: CLOSE TRADE CONFIRMED - PnL: {pnl}, W/L: {win_loss}, Fees: {total_fees_paid}")
-                    log(f"[✅ CLOSE TRADE CONFIRMED] id={id}, ticker={expected_ticker}, PnL={pnl}, W/L={win_loss}, Fees={total_fees_paid}")
-                    notify_active_trade_supervisor(id, ticket_id, "closed")
-                    return
-                else:
-                    log_event(ticket_id, f"MANAGER: Could not get trade data for PnL calculation")
-                    return
-            else:
-                position_value = row[0] if row else "None"
-                log_event(ticket_id, f"MANAGER: Waiting for position to zero out... Current: {position_value}")
-                
-        except Exception as e:
-            log_event(ticket_id, f"MANAGER: Error checking position: {e}")
-        
-        attempt += 1
-        time.sleep(1)  # Wait 1 second before next check
-    
-    # If we get here, position was never zeroed out
-    log_event(ticket_id, f"MANAGER: TIMEOUT - Position never zeroed out for {expected_ticker}")
-    log(f"[❌ CLOSE TRADE TIMEOUT] id={id}, ticker={expected_ticker}")
-
-
-def finalize_trade(id: int, ticket_id: str) -> None:
-    """
-    Called only after executor says 'accepted'.
-    Immediately sets status to 'open', no fill checking.
-    """
-    conn = get_db_connection()
-    cur = conn.cursor()
-    # Removed immediate status='open' update; will update after fill is confirmed.
-    conn.commit()
-    conn.close()
-
-    # Begin polling positions.db for matching ticker
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT ticker FROM trades WHERE id = ?", (id,))
-    row = cursor.fetchone()
-    conn.close()
-    if not row:
-        log_event(ticket_id, f"MANAGER: No trade found for ID {id}")
-        return
-    expected_ticker = row[0]
-    demo_env = os.environ.get("DEMO_MODE", "false")
-    DEMO_MODE = demo_env.strip().lower() == "true"
-    if DEMO_MODE:
-        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "positions.db")
-    else:
-        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "positions.db")
-    if not os.path.exists(POSITIONS_DB_PATH):
-        log_event(ticket_id, f"MANAGER: Positions DB path not found: {POSITIONS_DB_PATH}")
-        return
-    conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
-    cursor_pos = conn_pos.cursor()
-    deadline = time.time() + 15
-    while time.time() < deadline:
-        try:
-            cursor_pos.execute("SELECT position, market_exposure, fees_paid FROM positions WHERE ticker = ?", (expected_ticker,))
-            row = cursor_pos.fetchone()
-            pos = abs(row[0]) if row else 0
-            exposure = abs(row[1]) if row else 0
-            fees_paid = float(row[2]) if row and row[2] is not None else 0.0
-            price = round(float(exposure) / float(pos) / 100, 2) if pos > 0 else 0.0
-            fees = round(fees_paid / 100, 2)
-
-            # ------------------------------------------------------------------
-            # Decide what to do based on the latest trade status
-            # ------------------------------------------------------------------
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT status FROM trades WHERE id=?", (id,))
-            status_row = cursor.fetchone()
-            current_status = status_row[0] if status_row else None
-            conn.close()
-
-            # ❶ If trade is still pending, finalize once position appears
-            if current_status == "pending" and pos > 0 and exposure > 0:
-                # Calculate DIFF: PROB - BUY (formatted as whole integer)
-                # Get the prob value from the trade
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT prob FROM trades WHERE id = ?", (id,))
-                prob_row = cursor.fetchone()
-                conn.close()
-                
-                prob_value = prob_row[0] if prob_row and prob_row[0] is not None else None
-                diff_value = None
-                
-                if prob_value is not None:
-                    # Convert prob from percentage to decimal (96.7 -> 0.967)
-                    prob_decimal = float(prob_value) / 100
-                    # Calculate diff: prob_decimal - buy_price
-                    diff_decimal = prob_decimal - price
-                    # Convert to whole integer (0.02 -> +2, -0.03 -> -3)
-                    diff_value = int(round(diff_decimal * 100))
-                    # Format as string with sign
-                    diff_formatted = f"+{diff_value}" if diff_value >= 0 else f"{diff_value}"
-                else:
-                    diff_formatted = None
-                
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("""
-                    UPDATE trades
-                    SET status = 'open',
-                        position = ?,
-                        buy_price = ?,
-                        fees      = ?,
-                        diff      = ?
-                    WHERE id = ?
-                """, (pos, price, round(fees_paid, 2), diff_formatted, id))
-                conn.commit()
-                conn.close()
-                log_event(ticket_id, f"MANAGER: FILL CONFIRMED — pos={pos}, price={price}, fees={fees}, diff={diff_formatted}")
-                
-                # Notify active trade supervisor about new open trade
-                notify_active_trade_supervisor(id, ticket_id, "open")
-                
-                break
-
-            # ❷ If trade is closing, wait until position is zero (row missing or pos == 0)
-            elif current_status == "closing" and (row is None or pos == 0):
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                closed_at = datetime.now(ZoneInfo("America/New_York")).strftime("%H:%M:%S")
-                
-                # Get trade data for PnL and win_loss calculation
-                cursor.execute("SELECT buy_price, position, side, ticket_id FROM trades WHERE ticker = ? AND status = 'closing'", (expected_ticker,))
-                trade_row = cursor.fetchone()
-                if trade_row:
-                    buy_price, position, side, ticket_id = trade_row
-                    
-                    # Calculate actual sell price from fills.db
-                    actual_sell_price = None
-                    try:
-                        # fills.db is in the prod directory
-                        FILLS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "fills.db")
-                        
-                        if os.path.exists(FILLS_DB_PATH):
-                            conn_fills = sqlite3.connect(FILLS_DB_PATH, timeout=0.25)
-                            cursor_fills = conn_fills.cursor()
-                            
-                            # For closing trades: match by ticker and opposite side
-                            # YES trade closes by buying NO, NO trade closes by buying YES
-                            opposite_side = 'no' if side == 'Y' else 'yes'
-                            
-                            # Get fills in reverse chronological order (latest first)
-                            cursor_fills.execute("SELECT yes_price, no_price, count FROM fills WHERE ticker = ? AND side = ? AND action = 'buy' ORDER BY rowid DESC", (expected_ticker, opposite_side))
-                            fills = cursor_fills.fetchall()
-                            
-                            if fills:
-                                total_value = 0
-                                total_count = 0
-                                fills_used = []
-                                
-                                # Work backwards through fills until we have enough to match the original position
-                                for fill in fills:
-                                    yes_price, no_price, count = fill
-                                    # Use the opposite side's price
-                                    price = no_price if side == 'Y' else yes_price
-                                    
-                                    # Add this fill to our calculation
-                                    fills_used.append((price, count))
-                                    total_value += price * count
-                                    total_count += count
-                                    
-                                    # Stop when we have enough fills to match the original position
-                                    if total_count >= position:
-                                        break
-                                
-                                if total_count > 0:
-                                    actual_sell_price = total_value / total_count
-                                    log_event(ticket_id, f"MANAGER: Found {len(fills_used)} fills for closing trade (position={position}), calculated weighted average sell price: {actual_sell_price}")
-                                else:
-                                    log_event(ticket_id, f"MANAGER: No valid fills found for closing trade")
-                            else:
-                                log_event(ticket_id, f"MANAGER: No fills found for ticker={expected_ticker}, side={opposite_side}, action=buy")
-                            
-                            conn_fills.close()
-                        else:
-                            log_event(ticket_id, f"MANAGER: fills.db not found at {FILLS_DB_PATH}")
-                    except Exception as e:
-                        log_event(ticket_id, f"MANAGER: Error querying fills.db: {str(e)}")
-                    
-                    # Use actual sell price from fills if available, otherwise write NULL
-                    final_sell_price = actual_sell_price
-                    
-                    # Calculate PnL only if we have a valid sell price
-                    pnl = None
-                    win_loss = None
-                    if buy_price is not None and final_sell_price is not None and position is not None:
-                        buy_value = buy_price * position
-                        sell_value = final_sell_price * position
-                        fees = round(fees_paid, 2) if fees_paid is not None else 0.0
-                        pnl = round(sell_value - buy_value - fees, 2)
-                        win_loss = 'W' if final_sell_price > buy_price else 'L'
-                        
-                        if actual_sell_price is not None:
-                            log_event(ticket_id, f"MANAGER: Using fills-derived sell price {final_sell_price} for PnL calculation")
-                        else:
-                            log_event(ticket_id, f"MANAGER: No valid sell price from fills, PnL will be NULL")
-                    else:
-                        log_event(ticket_id, f"MANAGER: Missing required data for PnL calculation")
-                    
-                    # Use NULL for sell_price if no valid price found
-                    sell_price_for_db = final_sell_price if final_sell_price is not None else None
-                    
-                    cursor.execute("""
-                        UPDATE trades
-                        SET status    = 'closed',
-                            closed_at = ?,
-                            sell_price = ?,
-                            fees      = COALESCE(fees, 0) + ?,
-                            pnl       = ?,
-                            win_loss  = ?
-                        WHERE ticker = ? AND status = 'closing'
-                    """, (closed_at, sell_price_for_db, round(fees_paid, 2), pnl, win_loss, expected_ticker))
-                    
-                    conn.commit()
-                    conn.close()
-                    
-                    log_event(ticket_id, f"MANAGER: Trade finalized with sell_price={sell_price_for_db}, pnl={pnl}, win_loss={win_loss}")
-                    notify_active_trade_supervisor(id, ticket_id, "closed")
-                else:
-                    log_event(ticket_id, f"MANAGER: No trade found for ticker {expected_ticker}")
-        except Exception as e:
-            log_event(ticket_id, f"MANAGER: FILL WATCH DB read error: {e}")
-        time.sleep(1)
-    conn_pos.close()
-    log_event(ticket_id, f"MANAGER: FILL WATCH polling complete for ticker: {expected_ticker}")
-
-from fastapi import APIRouter, HTTPException, status, Request
-router = APIRouter()
-
-
-@router.post("/api/ping_fill_watch")
-async def ping_fill_watch():
-    """
-    Trigger a re-check of open trades that may be missing fill data.
-    This is a lightweight endpoint for account_sync to notify us of possible changes.
-    """
-    log("[PING] Received ping from account_sync — checking for missing fills")
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, ticket_id, position, buy_price FROM trades WHERE status IN ('open', 'pending')")
-    rows = cursor.fetchall()
-    conn.close()
-
-    for row in rows:
-        id, ticket_id, pos, price = row
-        if not pos or not price:
-            log(f"[PING] Found unfilled trade — id={id}, ticket_id={ticket_id}")
-            threading.Thread(target=finalize_trade, args=(id, ticket_id), daemon=True).start()
-
-    return {"message": "Ping received, checking unfilled trades"}
-
-
-# New endpoint: ping_settlement_watch
-@router.post("/api/ping_settlement_watch")
-async def ping_settlement_watch():
-    """
-    Called when account_sync confirms new entries in settlements.db.
-    If any expired trades are still unfinalized, finalize them now.
-    """
-    log("[PING] Received ping from account_sync — checking for expired trades")
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, ticket_id FROM trades WHERE status = 'expired'")
-    expired_trades = cursor.fetchall()
-    conn.close()
-
-    for id, ticket_id in expired_trades:
-        log(f"[PING] Triggering finalize_trade for expired trade id={id}")
-        threading.Thread(target=finalize_trade, args=(id, ticket_id), daemon=True).start()
-
-    return {"message": f"Triggered finalize_trade for {len(expired_trades)} expired trades"}
-
-@router.post("/api/manual_expiration_check")
-async def manual_expiration_check():
-    """
-    Manually trigger the expiration check - marks all open trades as expired
-    """
-    log("[MANUAL] Manual expiration check triggered")
-    
-    # Run the expiration check in a separate thread to avoid blocking
-    threading.Thread(target=check_expired_trades, daemon=True).start()
-    
-    return {"message": "Manual expiration check triggered"}
+import os
 import sqlite3
 import threading
 import time
-import os
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import re
 import requests
 from core.config.settings import config
+from backend.util.ports import get_main_app_port, get_trade_manager_port, get_trade_executor_port
 # APScheduler imports
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from fastapi import APIRouter, HTTPException, status, Request
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI
+from contextlib import asynccontextmanager
+import json
+import psutil
+import platform
+
+router = APIRouter()
 
 def log(msg):
     log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs", "trade_manager.out.log")
@@ -709,7 +113,7 @@ def init_trades_db():
         symbol_open REAL DEFAULT NULL,
         momentum REAL DEFAULT NULL,
         prob REAL DEFAULT NULL,
-        volatility REAL DEFAULT NULL,
+
 
         symbol_close REAL DEFAULT NULL,
         win_loss TEXT DEFAULT NULL,
@@ -777,6 +181,44 @@ def insert_trade(trade):
     last_id = cursor.lastrowid
     conn.close()
     return last_id
+
+def create_pending_trade(data):
+    """Create a pending trade entry"""
+    trade_id = insert_trade(data)
+    log(f"✅ Created pending trade with ID: {trade_id}")
+    return trade_id
+
+def confirm_open_trade(trade_id, ticket_id):
+    """Confirm that a pending trade has been opened"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE trades SET status = 'open' WHERE id = ?", (trade_id,))
+        conn.commit()
+        conn.close()
+        log(f"✅ Confirmed open trade: id={trade_id}, ticket_id={ticket_id}")
+        log_event(ticket_id, "MANAGER: TRADE CONFIRMED OPEN")
+        notify_active_trade_supervisor(trade_id, ticket_id, "open")
+        
+
+    except Exception as e:
+        log(f"❌ Error confirming open trade: {e}")
+
+def confirm_close_trade(trade_id, ticket_id):
+    """Confirm that a closing trade has been closed"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE trades SET status = 'closed' WHERE id = ?", (trade_id,))
+        conn.commit()
+        conn.close()
+        log(f"✅ Confirmed close trade: id={trade_id}, ticket_id={ticket_id}")
+        log_event(ticket_id, "MANAGER: TRADE CONFIRMED CLOSED")
+        notify_active_trade_supervisor(trade_id, ticket_id, "closed")
+        
+
+    except Exception as e:
+        log(f"❌ Error confirming close trade: {e}")
 
 def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbol_close=None, win_loss=None, pnl=None):
     conn = get_db_connection()
@@ -846,7 +288,7 @@ def fetch_recent_closed_trades(hours=24):
 # API routes for trade management
 
 @router.get("/trades")
-def get_trades(status: str = None, recent_hours: int = None):
+def get_trades(status: str | None = None, recent_hours: int | None = None):
     import time
     start_time = time.time()
     if status == "open":
@@ -934,7 +376,7 @@ async def add_trade(request: Request):
                     "symbol_close": symbol_close,
                     "intent": "close"
                 }
-                response = requests.post(f"http://localhost:{executor_port}/trigger_trade", json=close_payload, timeout=5)
+                response = requests.post(f"{get_executor_url()}/trigger_trade", json=close_payload, timeout=5)
                 log(f"[CLOSE EXECUTOR] Executor responded with {response.status_code}: {response.text}")
             except Exception as e:
                 log(f"[CLOSE EXECUTOR ERROR] Failed to send close trade to executor: {e}")
@@ -971,8 +413,8 @@ async def add_trade(request: Request):
     try:
         executor_port = get_executor_port()
         log(f"📤 SENDING TO EXECUTOR on port {executor_port}")
-        log(f"📤 FULL URL: http://localhost:{executor_port}/trigger_trade")
-        response = requests.post(f"http://localhost:{executor_port}/trigger_trade", json=data, timeout=5)
+        log(f"📤 FULL URL: {get_executor_url()}/trigger_trade")
+        response = requests.post(f"{get_executor_url()}/trigger_trade", json=data, timeout=5)
         print(f"[EXECUTOR RESPONSE] {response.status_code} — {response.text}")
         # Do not mark as open or error here; status update will come from executor via /api/update_trade_status
     except Exception as e:
@@ -1162,8 +604,8 @@ def check_expired_trades():
         # Get current BTC price from watchdog
         try:
             import requests
-            main_port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))
-            response = requests.get(f"http://localhost:{main_port}/core", timeout=5)
+            main_port = get_main_app_port()
+            response = requests.get(f"{get_main_app_url()}/core", timeout=5)
             if response.ok:
                 core_data = response.json()
                 symbol_close = core_data.get('btc_price')
@@ -1316,28 +758,125 @@ def poll_settlements_for_matches(expired_tickers):
 _scheduler = BackgroundScheduler(timezone=ZoneInfo("America/New_York"))
 _scheduler.add_job(check_expired_trades, CronTrigger(minute=0, second=0), max_instances=1, coalesce=True)
 
-from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.on_event("startup")
-async def startup_event():
-    """Start APScheduler when FastAPI app starts"""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for FastAPI"""
     try:
         _scheduler.start()
         print("[SCHEDULER] APScheduler started successfully")
     except Exception as e:
         print(f"[SCHEDULER ERROR] Failed to start APScheduler: {e}")
+    yield
+    try:
+        _scheduler.shutdown()
+        print("[SCHEDULER] APScheduler shutdown successfully")
+    except Exception as e:
+        print(f"[SCHEDULER ERROR] Failed to shutdown APScheduler: {e}")
+
+app = FastAPI(lifespan=lifespan)
+
+@app.get("/")
+async def root():
+    """Health check endpoint"""
+    return {"status": "running", "service": "trade_manager", "port": get_trade_manager_port()}
 
 app.include_router(router)
+
+# Health check endpoints
+@app.get("/health")
+async def health_check():
+    """Comprehensive health check endpoint for trade manager."""
+    try:
+        # Basic system info
+        system_info = {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "service": "trade_manager",
+            "version": "1.0.0"
+        }
+        
+        # System resources
+        try:
+            system_info["cpu_percent"] = psutil.cpu_percent()
+            system_info["memory_percent"] = psutil.virtual_memory().percent
+            system_info["disk_percent"] = psutil.disk_usage('/').percent
+        except Exception as e:
+            system_info["resource_error"] = str(e)
+        
+        # Database connectivity
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM trades")
+            trade_count = cursor.fetchone()[0]
+            conn.close()
+            system_info["database_status"] = "healthy"
+            system_info["trade_records"] = trade_count
+        except Exception as e:
+            system_info["database_status"] = "error"
+            system_info["database_error"] = str(e)
+        
+        # Service dependencies
+        dependencies = {}
+        try:
+            # Check trade executor
+            trade_executor_port = get_trade_executor_port()
+            resp = requests.get(f"http://localhost:{trade_executor_port}/health", timeout=2)
+            dependencies["trade_executor"] = "healthy" if resp.status_code == 200 else "unhealthy"
+        except Exception as e:
+            dependencies["trade_executor"] = "unreachable"
+        
+        system_info["dependencies"] = dependencies
+        
+        # Overall health status
+        if any(status == "unhealthy" or status == "unreachable" for status in dependencies.values()):
+            system_info["status"] = "degraded"
+        
+        return JSONResponse(content=system_info)
+        
+    except Exception as e:
+        return JSONResponse(
+            content={
+                "status": "error",
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            },
+            status_code=500
+        )
+
+@app.get("/health/simple")
+async def simple_health_check():
+    """Simple health check for load balancers."""
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+@app.get("/system/info")
+async def system_info():
+    """Get detailed system information."""
+    return {
+        "platform": platform.platform(),
+        "python_version": platform.python_version(),
+        "cpu_count": psutil.cpu_count(),
+        "memory_total": psutil.virtual_memory().total,
+        "disk_total": psutil.disk_usage('/').total,
+        "config_environment": config.get("system.environment", "unknown")
+    }
 
 if __name__ == "__main__":
     import uvicorn
     import os
 
-    port = int(os.environ.get("TRADE_MANAGER_PORT", config.get("agents.trade_manager.port", 5002)))
+    port = get_trade_manager_port()
     print(f"[INFO] Trade Manager running on port {port}")
-    uvicorn.run(app, host="127.0.0.1", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 def get_executor_port():
-    return int(os.environ.get("KALSHI_EXECUTOR_PORT", config.get("agents.trade_executor.port", 5050)))
+    return get_trade_executor_port()
+
+def get_main_app_port():
+    return get_main_app_port()
+
+def get_executor_url():
+    return f"http://localhost:{get_executor_port()}"
+
+def get_main_app_url():
+    return f"http://localhost:{get_main_app_port()}"

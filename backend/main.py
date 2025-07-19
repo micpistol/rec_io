@@ -22,10 +22,13 @@ from typing import List, Optional, Tuple
 from fastapi import Body
 import pandas as pd
 from pydantic import BaseModel
+import psutil
+import platform
 
 
 from backend.account_mode import get_account_mode
 from core.config.settings import config
+from backend.util.ports import get_main_app_port, get_main_app_url
 
 from util.paths import get_price_history_dir, get_data_dir, ensure_data_dirs
 from util.probability_calculator_directional import calculate_directional_strike_probabilities
@@ -83,11 +86,16 @@ def save_preferences(prefs):
 
 # CORS setup
 origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
     "https://rec-becy.onrender.com",
     "https://rec-becy.onrender.com/tabs"
 ]
+
+# Add dynamic localhost origins based on port configuration
+main_port = get_main_app_port()
+origins.extend([
+    f"http://localhost:{main_port}",
+    f"http://127.0.0.1:{main_port}"
+])
 
 app.add_middleware(
     CORSMiddleware,
@@ -892,50 +900,6 @@ def get_btc_price_history_db():
     except Exception as e:
         return {"error": str(e), "prices": [], "count": 0}
 
-# New route: /api/volatility_score
-@app.get("/api/volatility_score")
-def get_volatility_score():
-    """Calculate the absolute volatility score using raw realized volatility (no annualization)"""
-    try:
-        # Get the last 1500 prices from the database
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT price, timestamp 
-            FROM price_log 
-            ORDER BY timestamp DESC 
-            LIMIT 1500
-        """)
-        results = cursor.fetchall()
-        conn.close()
-        # Return prices in chronological order (oldest first)
-        prices = [float(row[0]) for row in reversed(results)]
-        if len(prices) < 61:
-            return {"error": "Not enough data for volatility calculation"}
-        # Calculate log returns for the most recent 60 prices
-        log_returns = [math.log(prices[i+1] / prices[i]) for i in range(-61, -1) if prices[i] > 0 and prices[i+1] > 0]
-        if len(log_returns) < 59:
-            return {"error": "Not enough valid log returns"}
-        # Sample standard deviation (realized volatility, not annualized)
-        sigma = np.std(log_returns, ddof=1)
-        # Build historical buffer of 1-minute realized volatility (rolling window)
-        historical_sigmas = []
-        for start in range(len(prices) - 60):
-            window = prices[start:start+61]
-            if any(p <= 0 for p in window):
-                continue
-            window_log_returns = [math.log(window[j+1] / window[j]) for j in range(60)]
-            window_sigma = np.std(window_log_returns, ddof=1)
-            historical_sigmas.append(window_sigma)
-        if not historical_sigmas:
-            return {"error": "No valid historical volatility windows"}
-        # Percentile rank of current sigma in historical buffer
-        count = sum(1 for s in historical_sigmas if s <= sigma)
-        score = count / len(historical_sigmas)
-        return {"score": score, "sigma": sigma, "historical_count": len(historical_sigmas)}
-    except Exception as e:
-        return {"error": str(e)}
-
 # WebSocket endpoint for preferences updates
 @app.websocket("/ws/preferences")
 async def websocket_preferences(websocket: WebSocket):
@@ -951,11 +915,14 @@ async def websocket_preferences(websocket: WebSocket):
 async def websocket_db_changes(websocket: WebSocket):
     await websocket.accept()
     db_change_clients.add(websocket)
+    print(f"[WEBSOCKET] ✅ Client connected. Total clients: {len(db_change_clients)}")
     try:
         while True:
-            await websocket.receive_text()  # Keep connection alive
+            message = await websocket.receive_text()  # Keep connection alive
+            print(f"[WEBSOCKET] Received message from client: {message}")
     except WebSocketDisconnect:
         db_change_clients.remove(websocket)
+        print(f"[WEBSOCKET] ❌ Client disconnected. Total clients: {len(db_change_clients)}")
 
 
 
@@ -986,14 +953,17 @@ async def broadcast_db_change(db_name: str, change_data: dict):
     message = json.dumps({
         "type": "db_change",
         "database": db_name,
-        "data": change_data,
+        "change_data": change_data,
         "timestamp": datetime.now().isoformat()
     })
+    print(f"[WEBSOCKET] Broadcasting {db_name} change to {len(db_change_clients)} clients")
     to_remove = set()
     for client in db_change_clients:
         try:
             await client.send_text(message)
-        except Exception:
+            print(f"[WEBSOCKET] ✅ Sent to client")
+        except Exception as e:
+            print(f"[WEBSOCKET] ❌ Failed to send to client: {e}")
             to_remove.add(client)
     db_change_clients.difference_update(to_remove)
 
@@ -1017,7 +987,8 @@ def get_trade_log(ticket_id: str):
 # (Remove calculate_strike_probabilities function and both /api/strike_probabilities endpoints)
 
 def get_main_app_port():
-    return int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5000)))
+    from backend.util.ports import get_main_app_port as get_port
+    return get_port()
 
 @app.post("/ping")
 async def ping_handler(request: Request):
@@ -1033,17 +1004,31 @@ async def ping_handler(request: Request):
 @app.post("/api/db_change")
 async def notify_db_change(request: Request):
     try:
-        print("[DEBUG] /api/db_change headers:", dict(request.headers))
+        # Write to a file to ensure we see the log
+        with open("logs/debug.log", "a") as f:
+            f.write(f"[{datetime.now()}] /api/db_change ENDPOINT CALLED\n")
+        print("[DEBUG] /api/db_change ENDPOINT CALLED", flush=True)
+        print("[DEBUG] /api/db_change headers:", dict(request.headers), flush=True)
         body = await request.body()
-        print("[DEBUG] /api/db_change raw body:", body)
+        print("[DEBUG] /api/db_change raw body:", body, flush=True)
         data = await request.json()
         db_name = data.get("database")
         change_data = data.get("change_data", {})
+        print(f"[DEBUG] /api/db_change calling broadcast_db_change for {db_name}", flush=True)
         await broadcast_db_change(db_name, change_data)
+        print(f"[DEBUG] /api/db_change broadcast completed for {db_name}", flush=True)
         return {"status": "ok", "message": f"Database change received for {db_name}"}
     except Exception as e:
-        print("[DEBUG] /api/db_change error:", str(e))
+        print("[DEBUG] /api/db_change error:", str(e), flush=True)
         return {"status": "error", "message": str(e)}
+
+# Add a simple test endpoint
+@app.get("/api/test")
+async def test_endpoint():
+    print("[DEBUG] /api/test ENDPOINT CALLED", flush=True)
+    with open("logs/debug.log", "a") as f:
+        f.write(f"[{datetime.now()}] /api/test ENDPOINT CALLED\n")
+    return {"status": "ok", "message": "Test endpoint working"}
 
 @app.get("/frontend-changes")
 def frontend_changes():
@@ -1396,121 +1381,101 @@ def get_current_fingerprint():
 
 
 
-if __name__ == "__main__":
-    import threading
-    import os
-    import importlib.util
-
-    threading.Thread(target=start_websocket, daemon=True).start()
-
-    # Start live probability writer
-    def get_current_price():
-        """Get current BTC price from database."""
-        try:
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
-            row = cursor.fetchone()
-            conn.close()
-            return float(row[0]) if row else 50000.0
-        except:
-            return 50000.0
-    
-    def get_current_ttc():
-        """Get current TTC in seconds from the /core endpoint."""
-        try:
-            main_port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))
-            resp = requests.get(f"http://localhost:{main_port}/core", timeout=2)
-            if resp.status_code == 200:
-                data = resp.json()
-                ttc = float(data.get("ttc_seconds", 0))
-                if ttc > 0:
-                    return ttc
-            print("[LiveProbWriter] Could not get valid ttc_seconds from /core.")
-            return None
-        except Exception as e:
-            print(f"[LiveProbWriter] Error fetching ttc_seconds from /core: {e}")
-            return None
-    
-    # Start the live probability writer
-    # start_live_probability_writer( # This line is removed as per the edit hint
-    #     update_interval=10,  # Update every 10 seconds
-    #     current_price_getter=get_current_price,
-    #     ttc_getter=get_current_ttc
-    # )
-
-
-
-
-
-
-if __name__ == "__main__":
-    import threading
-    import os
-    import importlib.util
-
-    threading.Thread(target=start_websocket, daemon=True).start()
-
-    # Start live probability writer
-    def get_current_price():
-        """Get current BTC price from database."""
-        try:
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
-            row = cursor.fetchone()
-            conn.close()
-            return float(row[0]) if row else 50000.0
-        except:
-            return 50000.0
-    
-    def get_current_ttc():
-        """Get current TTC in seconds from the /core endpoint."""
-        try:
-            main_port = int(os.environ.get("MAIN_APP_PORT", config.get("agents.main.port", 5001)))
-            resp = requests.get(f"http://localhost:{main_port}/core", timeout=2)
-            if resp.status_code == 200:
-                data = resp.json()
-                ttc = float(data.get("ttc_seconds", 0))
-                if ttc > 0:
-                    return ttc
-            print("[LiveProbWriter] Could not get valid ttc_seconds from /core.")
-            return None
-        except Exception as e:
-            print(f"[LiveProbWriter] Error fetching ttc_seconds from /core: {e}")
-            return None
-    
-    # Start the live probability writer
-    # start_live_probability_writer( # This line is removed as per the edit hint
-    #     update_interval=10,  # Update every 10 seconds
-    #     current_price_getter=get_current_price,
-    #     ttc_getter=get_current_ttc
-    # )
-
-
-
-# New endpoint to get earliest trade date
-@app.get("/api/earliest_trade_date")
-def get_earliest_trade_date():
+# Health check endpoints
+@app.get("/health")
+async def health_check():
+    """Comprehensive health check endpoint."""
     try:
-        db_path = os.path.join(os.path.dirname(__file__), "data", "trade_history", "trades.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT MIN(date) FROM trades WHERE date IS NOT NULL")
-        result = cursor.fetchone()
-        conn.close()
+        # Basic system info
+        system_info = {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "service": "main_app",
+            "version": "1.0.0",
+            "uptime": 0  # Will be calculated if startup time is available
+        }
         
-        earliest_date = result[0] if result and result[0] else None
-        return {"earliest_date": earliest_date}
+        # System resources
+        try:
+            system_info.update({
+                "cpu_percent": psutil.cpu_percent(),
+                "memory_percent": psutil.virtual_memory().percent,
+                "disk_percent": psutil.disk_usage('/').percent
+            })
+        except Exception as e:
+            system_info["resource_error"] = str(e)
+        
+        # Database connectivity
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM price_log")
+            price_count = cursor.fetchone()[0]
+            conn.close()
+            system_info["database_status"] = "healthy"
+            system_info["price_records"] = price_count
+        except Exception as e:
+            system_info["database_status"] = "error"
+            system_info["database_error"] = str(e)
+        
+        # Service dependencies
+        dependencies = {}
+        try:
+            # Check trade manager
+            trade_manager_port = config.get("agents.trade_manager.port", 5003)
+            resp = requests.get(f"http://localhost:{trade_manager_port}/health", timeout=2)
+            dependencies["trade_manager"] = "healthy" if resp.status_code == 200 else "unhealthy"
+        except Exception as e:
+            dependencies["trade_manager"] = "unreachable"
+        
+        try:
+            # Check trade executor
+            trade_executor_port = config.get("agents.trade_executor.port", 5050)
+            resp = requests.get(f"http://localhost:{trade_executor_port}/health", timeout=2)
+            dependencies["trade_executor"] = "healthy" if resp.status_code == 200 else "unhealthy"
+        except Exception as e:
+            dependencies["trade_executor"] = "unreachable"
+        
+        system_info["dependencies"] = dependencies
+        
+        # Overall health status
+        if any(status == "unhealthy" or status == "unreachable" for status in dependencies.values()):
+            system_info["status"] = "degraded"
+        
+        return JSONResponse(content=system_info)
+        
     except Exception as e:
-        return {"error": str(e), "earliest_date": None}
+        return JSONResponse(
+            content={
+                "status": "error",
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            },
+            status_code=500
+        )
 
+@app.get("/health/simple")
+async def simple_health_check():
+    """Simple health check for load balancers."""
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
+@app.get("/system/info")
+async def system_info():
+    """Get detailed system information."""
+    return {
+        "platform": platform.platform(),
+        "python_version": platform.python_version(),
+        "cpu_count": psutil.cpu_count(),
+        "memory_total": psutil.virtual_memory().total,
+        "disk_total": psutil.disk_usage('/').total,
+        "account_mode": get_account_mode(),
+        "config_environment": config.get("system.environment", "unknown")
+    }
 
 
 if __name__ == "__main__":
     import uvicorn
-    port = 5001  # EMERGENCY: Hardcoded for UI recovery
+    port = get_main_app_port()
     print(f"[MAIN] Launching app on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
 

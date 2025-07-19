@@ -14,13 +14,115 @@ class ConfigManager:
     def __init__(self, config_path: str = "backend/core/config/config.json"):
         self.config_path = Path(config_path)
         self.config = self._load_config()
+        self._validate_config()
         
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from JSON file."""
         if self.config_path.exists():
-            with open(self.config_path, 'r') as f:
-                return json.load(f)
+            try:
+                with open(self.config_path, 'r') as f:
+                    config_data = json.load(f)
+                return config_data
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"⚠️  Warning: Failed to load config from {self.config_path}: {e}")
+                print("🔄 Falling back to default configuration...")
+                return self._get_default_config()
         return self._get_default_config()
+    
+    def _validate_config(self) -> None:
+        """Validate configuration and fix common issues."""
+        try:
+            # Validate required sections exist
+            required_sections = ["system", "agents", "data"]
+            for section in required_sections:
+                if section not in self.config:
+                    print(f"⚠️  Warning: Missing required config section '{section}', adding defaults...")
+                    if section == "system":
+                        self.config[section] = {"name": "Trading System", "version": "1.0.0", "environment": "development"}
+                    elif section == "agents":
+                        self.config[section] = self._get_default_agents_config()
+                    elif section == "data":
+                        self.config[section] = self._get_default_data_config()
+            
+            # Validate agent configurations
+            agents = self.config.get("agents", {})
+            for agent_name, agent_config in agents.items():
+                if not isinstance(agent_config, dict):
+                    print(f"⚠️  Warning: Invalid agent config for '{agent_name}', using defaults...")
+                    agents[agent_name] = self._get_default_agent_config(agent_name)
+                else:
+                    # Ensure required fields exist
+                    if "enabled" not in agent_config:
+                        agent_config["enabled"] = True
+                    if "port" in agent_config and not isinstance(agent_config["port"], int):
+                        try:
+                            agent_config["port"] = int(agent_config["port"])
+                        except (ValueError, TypeError):
+                            print(f"⚠️  Warning: Invalid port for agent '{agent_name}', using default...")
+                            agent_config["port"] = self._get_default_port(agent_name)
+            
+            # Save validated config
+            self.save()
+            
+        except Exception as e:
+            print(f"❌ Error validating configuration: {e}")
+            print("🔄 Using default configuration...")
+            self.config = self._get_default_config()
+    
+    def _get_default_port(self, agent_name: str) -> int:
+        """Get default port for an agent."""
+        defaults = {
+            "main": 5001,
+            "trade_manager": 5003,
+            "trade_executor": 5050,
+            "active_trade_supervisor": 5007,
+            "market_watchdog": 5090,
+            "trade_monitor": 5002
+        }
+        return defaults.get(agent_name, 5000)
+    
+    def _get_default_agent_config(self, agent_name: str) -> Dict[str, Any]:
+        """Get default configuration for an agent."""
+        base_config = {"enabled": True, "host": "localhost"}
+        
+        # Add port if it's a service that needs one
+        if agent_name in ["main", "trade_manager", "trade_executor", "active_trade_supervisor", "market_watchdog", "trade_monitor"]:
+            base_config["port"] = self._get_default_port(agent_name)
+        
+        # Add specific configurations
+        if agent_name == "symbol_watchdog":
+            base_config.update({"update_interval": 1.0, "providers": ["coinbase"]})
+        elif agent_name == "market_watchdog":
+            base_config.update({"update_interval": 2.0, "providers": ["kalshi"]})
+        elif agent_name == "account_sync":
+            base_config.update({"update_interval": 30.0, "providers": ["kalshi"]})
+        
+        return base_config
+    
+    def _get_default_agents_config(self) -> Dict[str, Any]:
+        """Get default agents configuration."""
+        return {
+            "main": self._get_default_agent_config("main"),
+            "symbol_watchdog": self._get_default_agent_config("symbol_watchdog"),
+            "market_watchdog": self._get_default_agent_config("market_watchdog"),
+            "trade_monitor": self._get_default_agent_config("trade_monitor"),
+            "trade_manager": self._get_default_agent_config("trade_manager"),
+            "trade_executor": self._get_default_agent_config("trade_executor"),
+            "active_trade_supervisor": self._get_default_agent_config("active_trade_supervisor"),
+            "account_sync": self._get_default_agent_config("account_sync")
+        }
+    
+    def _get_default_data_config(self) -> Dict[str, Any]:
+        """Get default data configuration."""
+        return {
+            "base_path": "backend/data",
+            "databases": {
+                "trades": "trade_history/trades.db",
+                "prices": "price_history/",
+                "accounts": "accounts/",
+                "logs": "logs/"
+            }
+        }
     
     def _get_default_config(self) -> Dict[str, Any]:
         """Get default configuration."""
@@ -30,52 +132,8 @@ class ConfigManager:
                 "version": "1.0.0",
                 "environment": "development"
             },
-            "agents": {
-                "main": {
-                    "enabled": True,
-                    "port": 5000,
-                    "host": "localhost"
-                },
-                "symbol_watchdog": {
-                    "enabled": True,
-                    "update_interval": 1.0,
-                    "providers": ["coinbase"]
-                },
-                "market_watchdog": {
-                    "enabled": True,
-                    "update_interval": 2.0,
-                    "providers": ["kalshi"]
-                },
-                "trade_monitor": {
-                    "enabled": True,
-                    "port": 5001,
-                    "host": "localhost"
-                },
-                "trade_manager": {
-                    "enabled": True,
-                    "port": 5002,
-                    "host": "localhost"
-                },
-                "trade_executor": {
-                    "enabled": True,
-                    "port": 5050,
-                    "host": "localhost"
-                },
-                "account_sync": {
-                    "enabled": True,
-                    "update_interval": 30.0,
-                    "providers": ["kalshi"]
-                },
-            },
-            "data": {
-                "base_path": "backend/data",
-                "databases": {
-                    "trades": "trade_history/trades.db",
-                    "prices": "price_history/",
-                    "accounts": "accounts/",
-                    "logs": "logs/"
-                }
-            },
+            "agents": self._get_default_agents_config(),
+            "data": self._get_default_data_config(),
             "providers": {
                 "coinbase": {
                     "base_url": "https://api.coinbase.com/v2",
@@ -92,10 +150,6 @@ class ConfigManager:
                     "enabled": True,
                     "periods": [1, 2, 3, 4, 15, 30],
                     "weights": [0.3, 0.25, 0.2, 0.15, 0.05, 0.05]
-                },
-                "volatility": {
-                    "enabled": True,
-                    "window": 30
                 }
             },
             "trading": {
@@ -136,20 +190,6 @@ class ConfigManager:
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.config_path, 'w') as f:
             json.dump(self.config, f, indent=2)
-    
-    def get_agent_config(self, agent_name: str) -> Dict[str, Any]:
-        """Get configuration for a specific agent."""
-        return self.get(f"agents.{agent_name}", {})
-    
-    def get_provider_config(self, provider_name: str) -> Dict[str, Any]:
-        """Get configuration for a specific provider."""
-        return self.get(f"providers.{provider_name}", {})
-    
-    def get_data_path(self, data_type: str) -> str:
-        """Get data path for a specific data type."""
-        base_path = self.get("data.base_path", "backend/data")
-        db_path = self.get(f"data.databases.{data_type}", "")
-        return os.path.join(base_path, db_path)
 
-# Global configuration instance
+# Global config instance
 config = ConfigManager() 

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Test</h1>
+    <button onclick="testWebSocket()">Test WebSocket Connection</button>
+    <div id="status"></div>
+    <div id="messages"></div>
+
+    <script>
+        let ws = null;
+        
+        function testWebSocket() {
+            const statusDiv = document.getElementById('status');
+            const messagesDiv = document.getElementById('messages');
+            
+            statusDiv.innerHTML = 'Connecting...';
+            
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/db_changes`;
+            
+            console.log('Connecting to:', wsUrl);
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                console.log('WebSocket connected!');
+                statusDiv.innerHTML = '✅ Connected';
+                messagesDiv.innerHTML += '<p>✅ WebSocket connected successfully</p>';
+            };
+            
+            ws.onmessage = function(event) {
+                console.log('Received message:', event.data);
+                messagesDiv.innerHTML += '<p>📨 Received: ' + event.data + '</p>';
+            };
+            
+            ws.onclose = function(event) {
+                console.log('WebSocket closed:', event.code, event.reason);
+                statusDiv.innerHTML = '❌ Disconnected';
+                messagesDiv.innerHTML += '<p>❌ WebSocket closed: ' + event.code + '</p>';
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                statusDiv.innerHTML = '❌ Error';
+                messagesDiv.innerHTML += '<p>❌ WebSocket error</p>';
+            };
+        }
+        
+        function sendTestMessage() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send('ping');
+                document.getElementById('messages').innerHTML += '<p>📤 Sent: ping</p>';
+            }
+        }
+    </script>
+    
+    <button onclick="sendTestMessage()">Send Test Message</button>
+</body>
+</html> 
