@@ -10,6 +10,7 @@ import sys
 from datetime import datetime, timedelta
 import numpy as np
 from typing import Dict, Optional, Tuple
+import pytz
 
 # Add backend to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -22,6 +23,8 @@ class LiveDataAnalyzer:
         self.price_history_db = os.path.join(get_price_history_dir(), "btc_price_history.db")
         self.cache = {}
         self.last_update = None
+        # Use EST timezone for all calculations
+        self.est_tz = pytz.timezone('US/Eastern')
         
     def get_price_at_offset(self, minutes_ago: int) -> Optional[float]:
         """Get price from X minutes ago using the watchdog database"""
@@ -32,8 +35,9 @@ class LiveDataAnalyzer:
             conn = sqlite3.connect(self.price_history_db)
             cursor = conn.cursor()
             
-            # Calculate timestamp for X minutes ago
-            target_time = datetime.now() - timedelta(minutes=minutes_ago)
+            # Calculate timestamp for X minutes ago in EST
+            now_est = datetime.now(self.est_tz)
+            target_time = now_est - timedelta(minutes=minutes_ago)
             target_timestamp = target_time.isoformat()
             
             # Get the closest price before the target time
@@ -147,10 +151,13 @@ class LiveDataAnalyzer:
         deltas = self.calculate_momentum_deltas()
         weighted_score = self.calculate_weighted_momentum_score(deltas)
         
+        # Use EST timestamp
+        now_est = datetime.now(self.est_tz)
+        
         return {
             **deltas,
             'weighted_momentum_score': weighted_score,
-            'timestamp': datetime.now().isoformat(),
+            'timestamp': now_est.isoformat(),
             'current_price': self.get_current_price()
         }
 

@@ -105,7 +105,7 @@ async function fetchProbabilities(symbol, currentPrice, ttcMinutes, strikes, yea
     const ttcSeconds = ttcMinutes * 60;
     
     // Get current momentum score from the UI
-    const momentumScore = getCurrentMomentumScore();
+    const momentumScore = await getCurrentMomentumScore();
     
     const res = await fetch(window.location.origin + '/api/strike_probabilities', {
       method: 'POST',
@@ -175,6 +175,11 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
 
   // Fetch model-based probabilities for all strikes
   const probMap = await fetchProbabilities(symbol, centerPrice, ttcMinutes, strikes, year);
+
+  // Update fingerprint display after fetching probabilities with momentum score
+  if (typeof updateFingerprintDisplay === 'function') {
+    updateFingerprintDisplay();
+  }
 
   // Find the correct index to insert the spanner row - STABLE PLACEMENT
   let spannerIndex = strikeRows.length; // default to end
@@ -287,7 +292,7 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
       }
     }
     if (!spannerRow) {
-      spannerRow = createSpannerRow(centerPrice);
+      spannerRow = await createSpannerRow(centerPrice);
       if (insertIndex < allRows.length) {
         strikeTableBody.insertBefore(spannerRow, allRows[insertIndex]);
       } else {
@@ -468,14 +473,27 @@ function getCurrentBTCTickerPrice() {
   return "";
 }
 
-// Utility function to get current momentum score from the panel
-function getCurrentMomentumScore() {
+// Utility function to get current momentum score from the unified API
+async function getCurrentMomentumScore() {
+  try {
+    const response = await fetch('/api/momentum');
+    if (response.ok) {
+      const data = await response.json();
+      if (data.status === 'ok' && data.momentum_score !== null && data.momentum_score !== undefined) {
+        return data.momentum_score;
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching momentum score:', error);
+  }
+  
+  // Fallback to DOM element if API fails
   const el = document.getElementById('momentum-score-value');
   if (el && el.textContent) {
     const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
-    return isNaN(val) ? "" : val;
+    return isNaN(val) ? 0 : val;
   }
-  return "";
+  return 0;
 }
 
 // Play a sound by type, allowing overlapping playback
@@ -517,7 +535,7 @@ window.updatePositionIndicator = updatePositionIndicator;
 window.addStrikeTableRowClickHandlers = addStrikeTableRowClickHandlers;
 
 // === Spanner Row Helper ===
-function createSpannerRow(currentPrice) {
+async function createSpannerRow(currentPrice) {
   const spannerRow = document.createElement("tr");
   spannerRow.className = "spanner-row";
   const spannerTd = document.createElement("td");
@@ -525,8 +543,21 @@ function createSpannerRow(currentPrice) {
   // SVGs for straight arrows (no margin)
   const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  // Helper to get current momentum score from DOM
-  function getCurrentMomentumScoreForArrow() {
+  // Helper to get current momentum score from unified API
+  async function getCurrentMomentumScoreForArrow() {
+    try {
+      const response = await fetch('/api/momentum');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === 'ok' && data.momentum_score !== null && data.momentum_score !== undefined) {
+          return data.momentum_score;
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching momentum score for arrow:', error);
+    }
+    
+    // Fallback to DOM element if API fails
     const el = document.getElementById('momentum-score-value');
     if (el && el.textContent) {
       const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
@@ -534,7 +565,7 @@ function createSpannerRow(currentPrice) {
     }
     return 0;
   }
-  let momentumScore = getCurrentMomentumScoreForArrow();
+  let momentumScore = await getCurrentMomentumScoreForArrow();
   let arrowBlock = '';
   const absMomentum = Math.abs(momentumScore);
   if (absMomentum < 5) {

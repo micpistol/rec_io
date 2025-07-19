@@ -1537,53 +1537,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Function to update the fingerprint display
+    // CACHE-BUSTING: Updated fingerprint display logic - 2025-07-19
     async function updateFingerprintDisplay() {
       const fingerprintEl = document.getElementById('fingerprint-display');
       if (!fingerprintEl) return;
       
       try {
-        // Get current momentum score
-        const momentumScore = getCurrentMomentumScore();
-        if (momentumScore === "") {
-          fingerprintEl.textContent = "Fingerprint: —";
-          return;
-        }
-        
-        // Get current BTC price and TTC for the API call
-        const btcPriceEl = document.getElementById('btc-price-value');
-        const ttcEl = document.getElementById('strikePanelTTC');
-        
-        if (!btcPriceEl || !ttcEl) {
-          fingerprintEl.textContent = "Fingerprint: —";
-          return;
-        }
-        
-        const btcPrice = parseFloat(btcPriceEl.textContent.replace(/[$,]/g, ''));
-        const ttcText = ttcEl.textContent.trim();
-        const ttcMinutes = parseInt(ttcText.split(':')[0]) * 60 + parseInt(ttcText.split(':')[1]);
-        
-        if (isNaN(btcPrice) || isNaN(ttcMinutes)) {
-          fingerprintEl.textContent = "Fingerprint: —";
-          return;
-        }
-        
-        // Get current fingerprint information from backend using service registry
-        const apiBaseUrl = window.SERVICE_CONFIG?.api_base_url || getMainAppUrl();
-        const response = await fetch(`${apiBaseUrl}/api/current_fingerprint`);
-        
+        const response = await fetch('/api/current_fingerprint');
         if (response.ok) {
           const data = await response.json();
-          if (data.status === 'ok') {
+          if (data.fingerprint) {
             fingerprintEl.textContent = `Fingerprint: ${data.fingerprint}`;
           } else {
-            fingerprintEl.textContent = "Fingerprint: error";
+            fingerprintEl.textContent = "Fingerprint: —";
           }
         } else {
           fingerprintEl.textContent = "Fingerprint: —";
         }
-        
       } catch (error) {
-        console.error('Error updating fingerprint display:', error);
         fingerprintEl.textContent = "Fingerprint: —";
       }
     }
@@ -2025,8 +1996,13 @@ function getCurrentBTCTickerPrice() {
 function getCurrentMomentumScore() {
   const el = document.getElementById('momentum-score-value');
   if (el && el.textContent) {
-    const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
-    return isNaN(val) ? "" : val;
+    // Parse the display value (e.g., "+1", "-2", "0") and convert to decimal
+    const displayText = el.textContent.trim();
+    const val = parseFloat(displayText.replace(/[^\d\.\-]/g, ''));
+    if (!isNaN(val)) {
+      // Convert from display format (e.g., +1) to decimal format (e.g., 0.01)
+      return val / 100;
+    }
   }
   return "";
 }

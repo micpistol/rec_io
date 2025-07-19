@@ -12,7 +12,7 @@ import glob
 from .fingerprint_generator_directional import get_fingerprint_dir, get_fingerprint_filename
 
 
-class DirectionalProbabilityCalculator:
+class ProbabilityCalculator:
     """
     Calculates strike probabilities using directional fingerprint data interpolation.
     Handles both positive and negative price movements separately.
@@ -164,7 +164,8 @@ class DirectionalProbabilityCalculator:
         """Convert momentum score to bucket number."""
         # Clamp momentum to valid range (-30 to +30)
         momentum_score = max(-30, min(30, momentum_score))
-        return int(round(momentum_score))
+        # Convert to bucket number (0.02 -> 2, -0.03 -> -3, etc.)
+        return int(round(momentum_score * 100))
     
     def _switch_to_momentum_fingerprint(self, momentum_score: float):
         """Switch to the appropriate momentum fingerprint based on score."""
@@ -245,7 +246,7 @@ class DirectionalProbabilityCalculator:
         else:
             return (float(pos_prob), float(neg_prob))
     
-    def calculate_directional_strike_probabilities(
+    def calculate_strike_probabilities(
         self, 
         current_price: float, 
         ttc_seconds: float, 
@@ -312,15 +313,15 @@ class DirectionalProbabilityCalculator:
 _directional_calculator_instance = None
 
 
-def get_directional_calculator(symbol="btc") -> DirectionalProbabilityCalculator:
+def get_probability_calculator(symbol="btc") -> ProbabilityCalculator:
     """Get or create the global directional calculator instance."""
     global _directional_calculator_instance
     if _directional_calculator_instance is None:
-        _directional_calculator_instance = DirectionalProbabilityCalculator(symbol)
+        _directional_calculator_instance = ProbabilityCalculator(symbol)
     return _directional_calculator_instance
 
 
-def calculate_directional_strike_probabilities(
+def calculate_strike_probabilities(
     current_price: float, 
     ttc_seconds: float, 
     strikes: Sequence[Union[float, int]],
@@ -338,8 +339,8 @@ def calculate_directional_strike_probabilities(
     Returns:
         List of dictionaries with directional strike probability data
     """
-    calculator = get_directional_calculator()
-    return calculator.calculate_directional_strike_probabilities(current_price, ttc_seconds, strikes, momentum_score)
+    calculator = get_probability_calculator()
+    return calculator.calculate_strike_probabilities(current_price, ttc_seconds, strikes, momentum_score)
 
 
 # Live directional probability writer
@@ -377,7 +378,7 @@ def start_live_directional_probability_writer(
     
     def writer_loop():
         """Background loop that writes live directional probability data."""
-        calculator = get_directional_calculator()
+        calculator = get_probability_calculator()
         
         while _live_directional_writer_running:
             try:
@@ -408,7 +409,7 @@ def start_live_directional_probability_writer(
                         strikes.append(strike)
                     
                     # Calculate directional probabilities
-                    probabilities = calculator.calculate_directional_strike_probabilities(
+                    probabilities = calculator.calculate_strike_probabilities(
                         current_price, ttc_seconds, strikes
                     )
                     
@@ -448,14 +449,14 @@ def stop_live_directional_probability_writer():
 
 if __name__ == "__main__":
     # Example usage
-    calculator = DirectionalProbabilityCalculator()
+    calculator = ProbabilityCalculator()
     
     # Test with some sample data
     current_price = 50000.0
     ttc_seconds = 300.0  # 5 minutes
     strikes = [49500, 50000, 50500, 51000]
     
-    results = calculator.calculate_directional_strike_probabilities(current_price, ttc_seconds, strikes)
+    results = calculator.calculate_strike_probabilities(current_price, ttc_seconds, strikes)
     
     print("Directional Strike Probabilities:")
     for result in results:

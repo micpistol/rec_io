@@ -482,26 +482,93 @@ async def get_settlements():
 # Fingerprint and strike probability endpoints
 @app.get("/api/current_fingerprint")
 async def get_current_fingerprint():
-    """Get current fingerprint."""
+    """Get current fingerprint information."""
     try:
-        # Placeholder for fingerprint logic
-        return {"fingerprint": "current_fingerprint"}
+        from util.probability_calculator import get_probability_calculator
+        
+        calculator = get_probability_calculator()
+        
+        fingerprint_info = {
+            "symbol": calculator.symbol,
+            "current_momentum_bucket": calculator.current_momentum_bucket,
+            "last_used_momentum_bucket": calculator.last_used_momentum_bucket,
+            "fingerprint": f"{calculator.symbol}_fingerprint_directional_momentum_{calculator.current_momentum_bucket:03d}.csv",
+            "fingerprint_file": f"{calculator.symbol}_fingerprint_directional_momentum_{calculator.current_momentum_bucket:03d}.csv",
+            "available_buckets": list(calculator.momentum_fingerprints.keys()) if hasattr(calculator, 'momentum_fingerprints') else []
+        }
+        
+        print(f"[FINGERPRINT] Current fingerprint: {fingerprint_info['fingerprint_file']}")
+        return fingerprint_info
+        
     except Exception as e:
         print(f"Error getting fingerprint: {e}")
-        return {"fingerprint": "error"}
+        return {"fingerprint": "error", "error": str(e)}
 
 @app.post("/api/strike_probabilities")
 async def calculate_strike_probabilities(data: dict):
-    """Calculate strike probabilities."""
+    """Calculate strike probabilities using the probability calculator with live momentum score."""
     try:
-        momentum_score = data.get("momentum_score", 0)
-        print(f"API momentum_score received: {momentum_score}")
+        current_price = data.get("current_price")
+        ttc_seconds = data.get("ttc_seconds")
+        strikes = data.get("strikes", [])
         
-        # Placeholder for strike probability calculation
-        return {"probabilities": []}
+        if not current_price or not ttc_seconds or not strikes:
+            return {"status": "error", "message": "Missing required parameters: current_price, ttc_seconds, strikes"}
+        
+        # Fetch live momentum score from the unified momentum endpoint
+        momentum_score = None
+        try:
+            from backend.live_data_analysis import LiveDataAnalyzer
+            analyzer = LiveDataAnalyzer()
+            momentum_data = analyzer.get_momentum_analysis()
+            momentum_score = momentum_data.get('weighted_momentum_score')
+            print(f"[STRIKE_PROB] Fetched live momentum score: {momentum_score}")
+        except Exception as e:
+            print(f"[STRIKE_PROB] Error fetching live momentum score: {e}")
+            # Fallback to 0 if momentum fetch fails
+            momentum_score = 0
+        
+        print(f"[STRIKE_PROB] Calculating probabilities for {len(strikes)} strikes")
+        print(f"[STRIKE_PROB] Current price: {current_price}, TTC: {ttc_seconds}s, Live Momentum: {momentum_score}")
+        
+        # Import and use the probability calculator
+        from util.probability_calculator import calculate_strike_probabilities as calc_probs
+        
+        probabilities = calc_probs(current_price, ttc_seconds, strikes, momentum_score)
+        
+        print(f"[STRIKE_PROB] Calculated {len(probabilities)} probability results")
+        return {"status": "ok", "probabilities": probabilities}
+        
     except Exception as e:
         print(f"Error calculating strike probabilities: {e}")
-        return {"probabilities": []}
+        return {"status": "error", "message": str(e), "probabilities": []}
+
+@app.get("/api/momentum")
+async def get_current_momentum():
+    """Get current unified momentum score and analysis."""
+    try:
+        from backend.live_data_analysis import LiveDataAnalyzer
+        
+        analyzer = LiveDataAnalyzer()
+        momentum_data = analyzer.get_momentum_analysis()
+        
+        return {
+            "status": "ok",
+            "momentum_score": momentum_data.get('weighted_momentum_score'),
+            "deltas": {
+                "1m": momentum_data.get('delta_1m'),
+                "2m": momentum_data.get('delta_2m'),
+                "3m": momentum_data.get('delta_3m'),
+                "4m": momentum_data.get('delta_4m'),
+                "15m": momentum_data.get('delta_15m'),
+                "30m": momentum_data.get('delta_30m')
+            },
+            "timestamp": momentum_data.get('timestamp')
+        }
+        
+    except Exception as e:
+        print(f"Error getting momentum data: {e}")
+        return {"status": "error", "message": str(e)}
 
 # Startup and shutdown events
 @app.on_event("startup")
