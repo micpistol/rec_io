@@ -58,14 +58,8 @@ function fetchCore() {
       window.momentumData.deltas['15m'] = data.delta_15m;
       window.momentumData.deltas['30m'] = data.delta_30m;
 
-      window.momentumData.weightedScore = (
-        window.momentumData.deltas['1m'] * 0.3 +
-        window.momentumData.deltas['2m'] * 0.25 +
-        window.momentumData.deltas['3m'] * 0.2 +
-        window.momentumData.deltas['4m'] * 0.15 +
-        window.momentumData.deltas['15m'] * 0.05 +
-        window.momentumData.deltas['30m'] * 0.05
-      );
+      // Use the weighted momentum score from the backend (single source of truth)
+      window.momentumData.weightedScore = data.weighted_momentum_score;
 
       // Trigger momentum panel update if function exists
       if (typeof updateMomentumPanel === 'function') {
@@ -97,20 +91,35 @@ function fetchOtherCoreData() {
 // Fetch BTC price changes from backend API and update ticker panel
 async function fetchBTCPriceChanges() {
   try {
+    console.log('[LIVE-DATA] Fetching BTC price changes...');
     const res = await fetch('/btc_price_changes');
     if (!res.ok) throw new Error('Failed to fetch BTC price changes');
     const data = await res.json();
-    if ('change_1h' in data) {
+    console.log('[LIVE-DATA] BTC changes data:', data);
+    
+    if ('change1h' in data) {
       const el = document.getElementById('change-1h');
-      if (el) decorateChange(el, data.change_1h);
+      console.log('[LIVE-DATA] change-1h element:', el);
+      if (el) {
+        decorateChange(el, data.change1h);
+        console.log('[LIVE-DATA] Updated change-1h to:', el.textContent);
+      }
     }
-    if ('change_3h' in data) {
+    if ('change3h' in data) {
       const el = document.getElementById('change-3h');
-      if (el) decorateChange(el, data.change_3h);
+      console.log('[LIVE-DATA] change-3h element:', el);
+      if (el) {
+        decorateChange(el, data.change3h);
+        console.log('[LIVE-DATA] Updated change-3h to:', el.textContent);
+      }
     }
-    if ('change_1d' in data) {
+    if ('change1d' in data) {
       const el = document.getElementById('change-1d');
-      if (el) decorateChange(el, data.change_1d);
+      console.log('[LIVE-DATA] change-1d element:', el);
+      if (el) {
+        decorateChange(el, data.change1d);
+        console.log('[LIVE-DATA] Updated change-1d to:', el.textContent);
+      }
     }
   } catch (error) {
     console.error('Error fetching BTC price changes:', error);

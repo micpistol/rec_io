@@ -172,8 +172,9 @@
 
       const activeBal = GLOBAL_ACCOUNT_MODE === "prod" ? prodBalJson : demoBalJson;
       const balanceVal = activeBal.balance ?? activeBal.total_balance ?? activeBal.available_balance ?? 0;
+      const balanceInDollars = balanceVal / 100; // Convert cents to dollars
       document.getElementById("account-balance").textContent =
-        `$${Number(balanceVal).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        `$${Number(balanceInDollars).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 
       const settlementsBody = document.getElementById("settlements-body");
       settlementsBody.innerHTML = settlements.map(s => `

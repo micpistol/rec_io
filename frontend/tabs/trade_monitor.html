@@ -1058,7 +1058,8 @@ window.CurrentMarketTitleRaw = "";
         const balanceEl = document.getElementById("account-balance");
         if (balanceEl) {
           const balance = data.balance || 0;
-          balanceEl.textContent = `$${Number(balance).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+          const balanceInDollars = balance / 100; // Convert cents to dollars
+          balanceEl.textContent = `$${Number(balanceInDollars).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
         }
       } catch (error) {
         console.error('Error fetching account balance:', error);
@@ -1862,28 +1863,8 @@ document.addEventListener('DOMContentLoaded', () => {
       el.style.display = "inline-block";
     }
 
-    // Fetch BTC price changes from backend API and update ticker panel
-    async function fetchBTCPriceChanges() {
-      try {
-        const res = await fetch('/btc_price_changes');
-        if (!res.ok) throw new Error('Failed to fetch BTC price changes');
-        const data = await res.json();
-        if ('change_1h' in data) {
-          const el = document.getElementById('change-1h');
-          if (el) decorateChange(el, data.change_1h);
-        }
-        if ('change_3h' in data) {
-          const el = document.getElementById('change-3h');
-          if (el) decorateChange(el, data.change_3h);
-        }
-        if ('change_1d' in data) {
-          const el = document.getElementById('change-1d');
-          if (el) decorateChange(el, data.change_1d);
-        }
-      } catch (error) {
-        console.error('Error fetching BTC price changes:', error);
-      }
-    }
+    // NOTE: fetchBTCPriceChanges is now handled by live-data.js
+    // The live-data.js module provides centralized data polling for price changes
 
 
     // === Momentum Chart (Chart.js) ===
@@ -1935,28 +1916,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // === Momentum Chart Duplicate (Chart.js) ===
     // (Poll for fills/positions/settlements/balance REMOVED below)
 
-    function fetchOtherCoreData() {
-      fetch('/core')
-        .then(response => response.json())
-        .then(data => {
-          // BTC price
-          if ('btc_price' in data) {
-            const price = Number(data.btc_price);
-            const el = document.getElementById('btc-price-value');
-            if (el) el.textContent = formatUSD(price);
-          }
-        })
-        .catch(error => {
-          console.error('Live core fetch error:', error);
-        });
-      
-
-    }
-
-    fetchOtherCoreData();
-    // setInterval(fetchOtherCoreData, 1000); // Replaced by staggered polling below
-    fetchBTCPriceChanges();
-    // setInterval(fetchBTCPriceChanges, 1000); // Replaced by staggered polling below
+    // NOTE: fetchOtherCoreData and fetchBTCPriceChanges are now handled by live-data.js
+    // The live-data.js module provides centralized data polling for all price updates
 
     // === POLLING REMOVALS: Fills, Positions, Settlements, Balance ===
     // The following polling code is disabled as requested:
@@ -2301,14 +2262,8 @@ document.addEventListener('DOMContentLoaded', () => {
   </audio>
   <!-- === Staggered polling loops for main panels === -->
   <script>
-  // Polling refresh loops – staggered to avoid main thread congestion
-  function fetchMomentumData() {
-    fetchOtherCoreData();
-    fetchCore();
-    fetchBTCPriceChanges();
-  }
-
-  setInterval(fetchMomentumData, 1450);  // Momentum panels
+  // NOTE: All polling is now handled by live-data.js module
+  // This centralized approach prevents conflicts and ensures consistent updates
   </script>
 
   <!-- --- Add a MutationObserver to update arrows when momentum score changes --- -->

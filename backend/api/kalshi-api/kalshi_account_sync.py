@@ -1,7 +1,7 @@
 import sys
 import os
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../'))
-sys.path.insert(0, project_root)
+from backend.util.paths import get_project_root
+sys.path.insert(0, get_project_root())
 from backend.core.config.settings import config
 from backend.account_mode import get_account_mode
 import requests
@@ -79,8 +79,8 @@ API_HEADERS = {
 # Add project root to path for imports
 import sys
 import os
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../'))
-sys.path.insert(0, project_root)
+from backend.util.paths import get_project_root
+sys.path.insert(0, get_project_root())
 
 from backend.util.paths import get_kalshi_data_dir, get_accounts_data_dir, ensure_data_dirs
 

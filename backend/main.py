@@ -148,15 +148,67 @@ async def get_core_data():
             close_time += timedelta(days=1)
         ttc_seconds = int((close_time - now).total_seconds())
         
-        # Get BTC price
+        # Get BTC price from watchdog data
         btc_price = 0
         try:
-            response = requests.get("https://api.kraken.com/0/public/Ticker?pair=BTCUSD", timeout=5)
-            if response.status_code == 200:
-                data = response.json()
-                btc_price = float(data['result']['XXBTZUSD']['c'][0])
+            # First try to get the latest price from the watchdog's database
+            from backend.util.paths import get_price_history_dir
+            btc_price_history_db = os.path.join(get_price_history_dir(), "btc_price_history.db")
+            
+            if os.path.exists(btc_price_history_db):
+                conn = sqlite3.connect(btc_price_history_db)
+                cursor = conn.cursor()
+                cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
+                result = cursor.fetchone()
+                conn.close()
+                
+                if result:
+                    btc_price = float(result[0])
+                    print(f"[MAIN] Using watchdog BTC price: ${btc_price:,.2f}")
+                else:
+                    # Fallback to direct API call if no watchdog data
+                    response = requests.get("https://api.kraken.com/0/public/Ticker?pair=BTCUSD", timeout=5)
+                    if response.status_code == 200:
+                        data = response.json()
+                        btc_price = float(data['result']['XXBTZUSD']['c'][0])
+                        print(f"[MAIN] Using fallback API BTC price: ${btc_price:,.2f}")
+            else:
+                # Fallback to direct API call if watchdog DB doesn't exist
+                response = requests.get("https://api.kraken.com/0/public/Ticker?pair=BTCUSD", timeout=5)
+                if response.status_code == 200:
+                    data = response.json()
+                    btc_price = float(data['result']['XXBTZUSD']['c'][0])
+                    print(f"[MAIN] Using fallback API BTC price: ${btc_price:,.2f}")
         except Exception as e:
             print(f"Error fetching BTC price: {e}")
+            # Final fallback to direct API call
+            try:
+                response = requests.get("https://api.kraken.com/0/public/Ticker?pair=BTCUSD", timeout=5)
+                if response.status_code == 200:
+                    data = response.json()
+                    btc_price = float(data['result']['XXBTZUSD']['c'][0])
+                    print(f"[MAIN] Using emergency fallback API BTC price: ${btc_price:,.2f}")
+            except Exception as e2:
+                print(f"Emergency fallback also failed: {e2}")
+        
+        # Get momentum data from live data analyzer
+        momentum_data = {}
+        try:
+            from live_data_analysis import get_momentum_data
+            momentum_data = get_momentum_data()
+            print(f"[MAIN] Momentum analysis: {momentum_data.get('weighted_momentum_score', 'N/A'):.4f}%")
+        except Exception as e:
+            print(f"Error getting momentum data: {e}")
+            # Fallback to null momentum data
+            momentum_data = {
+                'delta_1m': None,
+                'delta_2m': None,
+                'delta_3m': None,
+                'delta_4m': None,
+                'delta_15m': None,
+                'delta_30m': None,
+                'weighted_momentum_score': None
+            }
         
         # Get latest database price
         latest_db_price = 0
@@ -171,54 +223,6 @@ async def get_core_data():
             conn.close()
         except Exception as e:
             print(f"Error getting latest DB price: {e}")
-        
-        # Calculate deltas
-        deltas = {}
-        try:
-            trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
-            conn = sqlite3.connect(trades_db_path)
-            cursor = conn.cursor()
-            
-            # Get recent prices for delta calculations
-            cursor.execute("""
-                SELECT buy_price, date, time FROM trades 
-                WHERE date >= date('now', '-1 day')
-                ORDER BY date DESC, time DESC LIMIT 10
-            """)
-            recent_trades = cursor.fetchall()
-            conn.close()
-            
-            if recent_trades:
-                # Calculate price deltas
-                prices = [trade[0] for trade in recent_trades]
-                if len(prices) > 1:
-                    deltas["1h"] = prices[0] - prices[-1]
-                    deltas["30m"] = prices[0] - prices[2] if len(prices) > 2 else 0
-                    deltas["15m"] = prices[0] - prices[1] if len(prices) > 1 else 0
-                    
-        except Exception as e:
-            print(f"Error calculating deltas: {e}")
-        
-        # Get volume data
-        volume_data = {}
-        try:
-            trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
-            conn = sqlite3.connect(trades_db_path)
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT COUNT(*) as trade_count, AVG(buy_price) as avg_price
-                FROM trades 
-                WHERE date >= date('now', '-1 day')
-            """)
-            result = cursor.fetchone()
-            conn.close()
-            
-            if result:
-                volume_data["trade_count"] = result[0]
-                volume_data["avg_price"] = result[1] if result[1] else 0
-                
-        except Exception as e:
-            print(f"Error getting volume data: {e}")
         
         # Get Kraken changes
         kraken_changes = {}
@@ -253,8 +257,7 @@ async def get_core_data():
             "btc_price": btc_price,
             "latest_db_price": latest_db_price,
             "timestamp": datetime.now().isoformat(),
-            **deltas,
-            **volume_data,
+            **momentum_data,  # Include all momentum deltas and weighted score
             "status": "online",
             "volScore": 0,
             "volSpike": 0,
@@ -324,7 +327,61 @@ async def get_trades(status: Optional[str] = None):
 # Additional endpoints for other data
 @app.get("/btc_price_changes")
 async def get_btc_changes():
-    """Get BTC price changes."""
+    """Get BTC price changes from watchdog data."""
+    try:
+        # Try to get current price from watchdog database
+        from backend.util.paths import get_price_history_dir
+        btc_price_history_db = os.path.join(get_price_history_dir(), "btc_price_history.db")
+        
+        if os.path.exists(btc_price_history_db):
+            conn = sqlite3.connect(btc_price_history_db)
+            cursor = conn.cursor()
+            
+            # Get current price
+            cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
+            current_result = cursor.fetchone()
+            
+            if current_result:
+                current_price = float(current_result[0])
+                
+                # Calculate changes based on historical data in the database
+                changes = {}
+                
+                # Get prices from different time periods
+                for period in ['1h', '3h', '1d']:
+                    if period == '1h':
+                        cursor.execute("SELECT price FROM price_log WHERE timestamp <= datetime('now', '-1 hour') ORDER BY timestamp DESC LIMIT 1")
+                    elif period == '3h':
+                        cursor.execute("SELECT price FROM price_log WHERE timestamp <= datetime('now', '-3 hours') ORDER BY timestamp DESC LIMIT 1")
+                    else:  # 1d
+                        cursor.execute("SELECT price FROM price_log WHERE timestamp <= datetime('now', '-1 day') ORDER BY timestamp DESC LIMIT 1")
+                    
+                    old_result = cursor.fetchone()
+                    if old_result:
+                        old_price = float(old_result[0])
+                        change = (current_price - old_price) / old_price
+                        changes[f"change{period}"] = change
+                    else:
+                        changes[f"change{period}"] = 0.0
+                
+                conn.close()
+                print(f"[Watchdog Changes] {changes}")
+                return changes
+            else:
+                conn.close()
+                # Fallback to API if no watchdog data
+                return await _get_api_changes()
+        else:
+            # Fallback to API if watchdog DB doesn't exist
+            return await _get_api_changes()
+            
+    except Exception as e:
+        print(f"Error getting BTC changes from watchdog: {e}")
+        # Final fallback to API
+        return await _get_api_changes()
+
+async def _get_api_changes():
+    """Fallback function to get changes from API."""
     try:
         response = requests.get("https://api.kraken.com/0/public/Ticker?pair=BTCUSD", timeout=5)
         if response.status_code == 200:
@@ -345,18 +402,26 @@ async def get_btc_changes():
                 change = (current_price - old_price) / old_price
                 changes[f"change{period}"] = change
             
-            print(f"[Kraken Changes] {changes}")
+            print(f"[API Fallback Changes] {changes}")
             return changes
     except Exception as e:
-        print(f"Error getting BTC changes: {e}")
+        print(f"Error getting BTC changes from API: {e}")
         return {}
 
 @app.get("/kalshi_market_snapshot")
 async def get_kalshi_snapshot():
     """Get Kalshi market snapshot."""
     try:
-        # Placeholder for Kalshi data
-        return {"markets": []}
+        # Read from the latest market snapshot file
+        snapshot_file = os.path.join("backend", "data", "kalshi", "latest_market_snapshot.json")
+        
+        if os.path.exists(snapshot_file):
+            with open(snapshot_file, 'r') as f:
+                snapshot_data = json.load(f)
+                return snapshot_data
+        else:
+            print(f"Kalshi snapshot file not found: {snapshot_file}")
+            return {"markets": []}
     except Exception as e:
         print(f"Error getting Kalshi snapshot: {e}")
         return {"markets": []}
