@@ -264,9 +264,20 @@ class DirectionalProbabilityCalculator:
         self.last_used_momentum_bucket = self.current_momentum_bucket
         # LOGGING
         try:
-            log_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'fingerprint_debug.log')
+            from backend.util.paths import get_data_dir
+            log_path = os.path.join(get_data_dir(), "fingerprint_debug.log")
+            
+            timestamp = datetime.now().isoformat()
+            log_entry = {
+                "timestamp": timestamp,
+                "symbol": self.symbol,
+                "momentum_score": momentum_score,
+                "bucket": self.current_momentum_bucket,
+                "fingerprint": f"{self.symbol}_fingerprint_directional_momentum_{self.current_momentum_bucket:03d}.csv"
+            }
+            
             with open(log_path, 'a') as f:
-                f.write(f"symbol={self.symbol}, momentum_score={momentum_score}, bucket={self.current_momentum_bucket}, fingerprint={self.symbol}_fingerprint_directional_momentum_{self.current_momentum_bucket:03d}.csv\n")
+                f.write(json.dumps(log_entry) + '\n')
         except Exception as e:
             print(f"[Fingerprint Debug Log] Error: {e}")
         results = []

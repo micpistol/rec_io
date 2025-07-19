@@ -3,12 +3,12 @@
 <head>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="../styles/global.css">
-<script src="../js/live-data.js"></script>
-<script src="../js/strike-table.js"></script>
+<link rel="stylesheet" href="/styles/global.css">
+<script src="/js/live-data.js"></script>
+<script src="/js/strike-table.js"></script>
 
-        <script src="../js/active-trades.js"></script>
-        <script src="../js/trade-execution-controller.js"></script>
+        <script src="/js/active-trades.js"></script>
+        <script src="/js/trade-execution-controller.js"></script>
       
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -1566,9 +1566,9 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
         
-        // Get current fingerprint information from backend
-        const mainAppPort = window.MAIN_APP_PORT || 5001;
-        const response = await fetch(`http://localhost:${mainAppPort}/api/current_fingerprint`);
+        // Get current fingerprint information from backend using service registry
+        const apiBaseUrl = window.SERVICE_CONFIG?.api_base_url || getMainAppUrl();
+        const response = await fetch(`${apiBaseUrl}/api/current_fingerprint`);
         
         if (response.ok) {
           const data = await response.json();

@@ -7,6 +7,7 @@ import os
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional
+from backend.core.port_config import get_port
 
 class ConfigManager:
     """Centralized configuration management for all trading system agents."""
@@ -70,16 +71,13 @@ class ConfigManager:
             self.config = self._get_default_config()
     
     def _get_default_port(self, agent_name: str) -> int:
-        """Get default port for an agent."""
-        defaults = {
-            "main": 5001,
-            "trade_manager": 5003,
-            "trade_executor": 5050,
-            "active_trade_supervisor": 5007,
-            "market_watchdog": 5090,
-            "trade_monitor": 5002
-        }
-        return defaults.get(agent_name, 5000)
+        """Get default port for an agent using centralized port management."""
+        
+        # Use centralized port management for default ports
+        # All ports are now managed by the centralized port system
+        
+        # All ports are now managed by the centralized port system
+        return get_port(agent_name)
     
     def _get_default_agent_config(self, agent_name: str) -> Dict[str, Any]:
         """Get default configuration for an agent."""

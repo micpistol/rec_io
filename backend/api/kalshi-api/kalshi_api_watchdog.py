@@ -9,7 +9,7 @@ print('DEBUG sys.path:', sys.path)
 # Now import everything else
 
 from backend.core.config.settings import config
-from backend.util.ports import get_market_watchdog_port
+from backend.core.port_config import get_port
 import requests
 import json
 import sqlite3
@@ -42,8 +42,8 @@ os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 last_failed_ticker = None  # Global tracker
 
-def get_port():
-    return get_market_watchdog_port()
+def get_watchdog_port():
+    return get_port("kalshi_api_watchdog")
 
 def get_current_event_ticker():
     global last_failed_ticker

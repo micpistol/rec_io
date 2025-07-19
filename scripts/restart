@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Simple alias for MASTER_RESTART.sh
+# Usage: ./scripts/restart [command]
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MASTER_RESTART_SCRIPT="$SCRIPT_DIR/MASTER_RESTART.sh"
+
+if [ -f "$MASTER_RESTART_SCRIPT" ]; then
+    exec "$MASTER_RESTART_SCRIPT" "$@"
+else
+    echo "Error: MASTER_RESTART.sh not found at $MASTER_RESTART_SCRIPT"
+    exit 1
+fi 

@@ -29,6 +29,20 @@ def get_trade_history_dir():
     """Get the trade history directory path."""
     return os.path.join(get_data_dir(), "trade_history")
 
+def get_logs_dir():
+    """Get the logs directory path."""
+    return os.path.join(get_project_root(), "logs")
+
+def get_host():
+    """Get the host configuration for the current environment."""
+    # Default to localhost, but can be overridden by environment variable
+    return os.getenv("TRADING_SYSTEM_HOST", "localhost")
+
+def get_service_url(port: int) -> str:
+    """Get a service URL with the configured host."""
+    host = get_host()
+    return f"http://{host}:{port}"
+
 def ensure_data_dirs():
     """Ensure all data directories exist."""
     dirs = [

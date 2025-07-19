@@ -16,9 +16,12 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import requests
 from typing import Dict, List, Optional, Any
-from backend.util.ports import get_main_app_port, get_active_trade_supervisor_port
-from backend.core.config.settings import config
-from flask import Flask, request, jsonify
+# Import the universal centralized port system
+from backend.core.port_config import get_port, get_port_info
+
+# Get port from centralized system
+ACTIVE_TRADE_SUPERVISOR_PORT = get_port("active_trade_supervisor")
+print(f"[ACTIVE_TRADE_SUPERVISOR] 🚀 Using centralized port: {ACTIVE_TRADE_SUPERVISOR_PORT}")
 
 # Configuration
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -28,28 +31,31 @@ ACTIVE_TRADES_JSON_PATH = os.path.join(BASE_DIR, "backend", "data", "active_trad
 # Ensure directory exists
 os.makedirs(os.path.dirname(ACTIVE_TRADES_DB_PATH), exist_ok=True)
 
-# Flask app for HTTP notifications
+# Import centralized path utilities
+from backend.core.config.settings import config
+from backend.util.paths import get_data_dir, get_trade_history_dir, get_kalshi_data_dir
+from flask import Flask, request, jsonify
+
+# Create Flask app
 app = Flask(__name__)
 
-@app.route('/')
-def root():
-    """Health check endpoint"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
-        active_count = cursor.fetchone()[0]
-        conn.close()
-        
-        return jsonify({
-            "status": "running", 
-            "service": "active_trade_supervisor",
-            "active_trades": active_count,
-            "port": get_active_trade_supervisor_port()
-        }), 200
-        
-    except Exception as e:
-        return jsonify({"status": "error", "error": str(e)}), 500
+# Health check endpoint
+@app.route("/health")
+def health_check():
+    """Health check endpoint."""
+    return {
+        "status": "healthy",
+        "service": "active_trade_supervisor",
+        "port": ACTIVE_TRADE_SUPERVISOR_PORT,
+        "timestamp": datetime.now().isoformat(),
+        "port_system": "centralized"
+    }
+
+# Port information endpoint
+@app.route("/api/ports")
+def get_ports():
+    """Get all port assignments from centralized system."""
+    return get_port_info()
 
 def log(message: str):
     """Log messages with timestamp"""
@@ -195,25 +201,6 @@ def handle_trades_db_change():
     except Exception as e:
         log(f"❌ Error handling trades.db change notification: {e}")
         return jsonify({"error": str(e)}), 500
-
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
-        active_count = cursor.fetchone()[0]
-        conn.close()
-        
-        return jsonify({
-            "status": "healthy",
-            "active_trades": active_count,
-            "timestamp": datetime.now(ZoneInfo("America/New_York")).isoformat()
-        }), 200
-        
-    except Exception as e:
-        return jsonify({"status": "error", "error": str(e)}), 500
 
 def migrate_database_schema():
     """Migrate the database schema if needed"""
@@ -538,8 +525,8 @@ def get_current_probability(strike: float, current_price: float, ttc_seconds: fl
     Returns the prob_within value for the strike, or None on error.
     """
     try:
-        host = config.get("agents.main.host", "localhost")
-        port = config.get("agents.main.port", 5000)
+        host = "localhost"
+        port = get_port("main_app")
         url = f"http://{host}:{port}/api/strike_probabilities"
         payload = {
             "current_price": current_price,
@@ -816,9 +803,6 @@ def sync_on_demand():
     sync_with_trades_db()
     export_active_trades_to_json()
 
-def get_main_app_port():
-    return get_main_app_port()
-
 def start_event_driven_supervisor():
     """Start the event-driven active trade supervisor with HTTP server"""
     log("🚀 Starting event-driven active trade supervisor")
@@ -845,7 +829,7 @@ def start_event_driven_supervisor():
     def start_http_server():
         try:
             host = config.get("agents.active_trade_supervisor.host", "localhost")
-            port = get_active_trade_supervisor_port()
+            port = ACTIVE_TRADE_SUPERVISOR_PORT
             log(f"🌐 Starting HTTP server on {host}:{port}")
             app.run(host=host, port=port, debug=False, use_reloader=False)
         except Exception as e:

@@ -1,42 +1,43 @@
 #!/usr/bin/env python3
 """
-Enhanced Error Recovery System
-Automatically detects and recovers from common system failures.
+Error Recovery System
+
+Monitors system health and automatically recovers from common failures.
+Provides centralized error handling and recovery mechanisms.
 """
 
 import os
 import sys
-import subprocess
 import time
 import json
 import requests
-import psutil
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+import subprocess
+from datetime import datetime
+from typing import Dict, List, Optional, Any
+from backend.core.port_config import get_service_url
 
-# Add project root to path
+# Import project utilities
+import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.util.ports import (
-    get_main_app_port, get_trade_manager_port, get_trade_executor_port,
-    get_active_trade_supervisor_port, get_market_watchdog_port
-)
 from backend.core.config.settings import config
+from backend.util.paths import get_logs_dir
 
-class ErrorRecovery:
-    """Enhanced error recovery system for the trading system."""
-    
+class ErrorRecoverySystem:
     def __init__(self):
-        self.services = {
-            "main_app": get_main_app_port(),
-            "trade_manager": get_trade_manager_port(),
-            "trade_executor": get_trade_executor_port(),
-            "active_trade_supervisor": get_active_trade_supervisor_port(),
-            "market_watchdog": get_market_watchdog_port()
-        }
         self.recovery_attempts = {}
         self.max_recovery_attempts = 3
+        self.recovery_cooldown = 60  # seconds
         
+        # Service URLs using bulletproof port manager
+        self.service_urls = {
+            "main_app": get_service_url("main_app"),
+            "trade_manager": get_service_url("trade_manager"),
+            "trade_executor": get_service_url("trade_executor"),
+            "active_trade_supervisor": get_service_url("active_trade_supervisor"),
+            "market_watchdog": get_service_url("market_watchdog")
+        }
+    
     def check_port_availability(self, port: int) -> bool:
         """Check if a port is available."""
         import socket
@@ -103,42 +104,23 @@ class ErrorRecovery:
             print(f"❌ Error restarting {service_name}: {e}")
             return False
     
-    def check_service_health(self, service_name: str, port: int) -> Dict[str, Any]:
-        """Check health of a specific service."""
-        health_info = {
-            "service": service_name,
-            "port": port,
-            "timestamp": datetime.now().isoformat(),
-            "status": "unknown"
-        }
-        
+    def check_service_health(self, service_name: str, port: int) -> bool:
+        """Check if a service is healthy."""
         try:
-            response = requests.get(f"http://localhost:{port}/health", timeout=5)
-            if response.status_code == 200:
-                data = response.json()
-                health_info.update(data)
-                health_info["status"] = data.get("status", "healthy")
-            else:
-                health_info["status"] = "unhealthy"
-                health_info["error"] = f"HTTP {response.status_code}"
-        except requests.exceptions.ConnectionError:
-            health_info["status"] = "unreachable"
-            health_info["error"] = "Connection refused"
-        except requests.exceptions.Timeout:
-            health_info["status"] = "timeout"
-            health_info["error"] = "Request timeout"
+            from backend.util.paths import get_host
+            host = get_host()
+            response = requests.get(f"http://{host}:{port}/health", timeout=5)
+            return response.status_code == 200
         except Exception as e:
-            health_info["status"] = "error"
-            health_info["error"] = str(e)
-        
-        return health_info
+            print(f"❌ Service {service_name} health check failed: {e}")
+            return False
     
     def detect_issues(self) -> List[Dict[str, Any]]:
         """Detect system issues that need recovery."""
         issues = []
         
         # Check each service
-        for service_name, port in self.services.items():
+        for service_name, port in self.service_urls.items():
             health = self.check_service_health(service_name, port)
             
             if health["status"] in ["unhealthy", "unreachable", "timeout", "error"]:
@@ -152,7 +134,7 @@ class ErrorRecovery:
                 })
         
         # Check for port conflicts
-        for service_name, port in self.services.items():
+        for service_name, port in self.service_urls.items():
             if not self.check_port_availability(port):
                 # Check if it's actually our service
                 health = self.check_service_health(service_name, port)
@@ -380,7 +362,7 @@ class ErrorRecovery:
 
 def main():
     """Main recovery function."""
-    recovery = ErrorRecovery()
+    recovery = ErrorRecoverySystem()
     
     # Run recovery
     report = recovery.run_recovery()

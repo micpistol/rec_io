@@ -7,11 +7,12 @@
   "agents": {
     "main": {
       "enabled": true,
-      "port": 5001,
-      "host": "localhost"
+      "host": "localhost",
+      "port": 3000
     },
     "symbol_watchdog": {
       "enabled": true,
+      "host": "localhost",
       "update_interval": 1.0,
       "providers": [
         "coinbase"
@@ -19,47 +20,40 @@
     },
     "market_watchdog": {
       "enabled": true,
+      "host": "localhost",
+      "port": 3000,
       "update_interval": 2.0,
-      "providers": [
-        "kalshi"
-      ],
-      "port": 5090
-    },
-    "trade_monitor": {
-      "enabled": true,
-      "port": 5002,
-      "host": "localhost"
-    },
-    "trade_manager": {
-      "enabled": true,
-      "port": 5003,
-      "host": "localhost"
-    },
-    "trade_executor": {
-      "enabled": true,
-      "port": 5050,
-      "host": "localhost"
-    },
-    "active_trade_supervisor": {
-      "enabled": true,
-      "port": 5007,
-      "host": "localhost"
-    },
-    "account_sync": {
-      "enabled": true,
-      "update_interval": 30.0,
       "providers": [
         "kalshi"
       ]
     },
-    "data_updater": {
+    "trade_monitor": {
       "enabled": true,
-      "schedule_time": "23:59:59",
-      "schedule_day": "saturday",
-      "symbols": [
-        "BTC/USD"
-      ],
-      "update_interval": 60.0
+      "host": "localhost",
+      "port": 3000
+    },
+    "trade_manager": {
+      "enabled": true,
+      "host": "localhost",
+      "port": 4000
+    },
+    "trade_executor": {
+      "enabled": true,
+      "host": "localhost",
+      "port": 8001
+    },
+    "active_trade_supervisor": {
+      "enabled": true,
+      "host": "localhost",
+      "port": 6000
+    },
+    "account_sync": {
+      "enabled": true,
+      "host": "localhost",
+      "update_interval": 30.0,
+      "providers": [
+        "kalshi"
+      ]
     }
   },
   "data": {

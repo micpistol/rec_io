@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Trade History</title>
   <link rel="stylesheet" href="/styles/global.css" />
+  <script src="/js/globals.js"></script>
   <style>
     table {
       width: 100%;
@@ -466,7 +467,10 @@
     async function fetchAllTrades() {
       console.log('Fetching trades at', new Date().toLocaleTimeString());
       try {
-        const res = await fetch('/trades', { cache: 'no-store' });
+        // Use the centralized port system
+        const apiBaseUrl = getMainAppUrl();
+        
+        const res = await fetch(`${apiBaseUrl}/trades`, { cache: 'no-store' });
         if (!res.ok) throw new Error('Network response was not ok');
         trades = await res.json();
         const dateFilterPicker = document.getElementById('date-filter-picker');
@@ -478,6 +482,7 @@
       } catch (error) {
         const tbody = document.querySelector('#trade-log-table tbody');
         tbody.innerHTML = `<tr><td colspan="22" style="color:red;">Failed to load trades: ${error.message}</td></tr>`;
+        console.error('Error fetching trades:', error);
       }
     }
 
@@ -524,7 +529,8 @@
         case 'ALL':
           // Get the earliest date from the backend
           try {
-            const response = await fetch('/api/earliest_trade_date');
+            const apiBaseUrl = getMainAppUrl();
+            const response = await fetch(`${apiBaseUrl}/api/earliest_trade_date`);
             if (response.ok) {
               const data = await response.json();
               if (data.earliest_date) {

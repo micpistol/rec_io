@@ -22,27 +22,22 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.account_mode import get_account_mode
 from backend.util.paths import get_data_dir, get_accounts_data_dir
 from backend.core.config.settings import config
-from backend.util.ports import get_main_app_port, get_trade_manager_port, get_active_trade_supervisor_port
+from backend.core.port_config import get_port
 
 class DatabasePoller:
     def __init__(self):
         self.poll_interval = 0.5  # Poll twice per second - back to original
         self.last_hashes = {}
         self.db_paths = {}
-        # Get main app host and port from config
-        main_host = config.get("agents.main.host", "localhost")
-        main_port = get_main_app_port()
-        self.main_app_url = f"http://{main_host}:{main_port}"
         
-        # Get trade manager host and port from config
-        trade_manager_host = config.get("agents.trade_manager.host", "localhost")
-        trade_manager_port = get_trade_manager_port()
-        self.trade_manager_url = f"http://{trade_manager_host}:{trade_manager_port}"
+        # Get service URLs using centralized port system
+        main_app_port = get_port("main_app")
+        trade_manager_port = get_port("trade_manager")
+        active_trade_supervisor_port = get_port("active_trade_supervisor")
         
-        # Get active trade supervisor host and port from config
-        active_trade_supervisor_host = config.get("agents.active_trade_supervisor.host", "localhost")
-        active_trade_supervisor_port = get_active_trade_supervisor_port()
-        self.active_trade_supervisor_url = f"http://{active_trade_supervisor_host}:{active_trade_supervisor_port}"
+        self.main_app_url = f"http://localhost:{main_app_port}"
+        self.trade_manager_url = f"http://localhost:{trade_manager_port}"
+        self.active_trade_supervisor_url = f"http://localhost:{active_trade_supervisor_port}"
         
         self.setup_database_paths()
         

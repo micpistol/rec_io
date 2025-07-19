@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives import hashes
 
 # Add: import account_mode
 import backend.account_mode as account_mode
+from backend.util.paths import get_accounts_data_dir
 
 # Usage: python kalshi_historical_ingest.py [prod|demo]
 
@@ -374,6 +375,199 @@ def write_positions_to_db():
     conn.commit()
     conn.close()
     print(f"✅ Positions written to database at {db_path}")
+
+def ingest_settlements():
+    """Ingest settlements data."""
+    print(f"🔄 Ingesting settlements for mode: {mode}")
+    
+    try:
+        # Get settlements data
+        settlements_data = get_settlements_data()
+        if not settlements_data:
+            print("❌ No settlements data available")
+            return
+        
+        # Save to JSON file
+        output_path = os.path.join(get_accounts_data_dir(), "kalshi", mode, "settlements.json")
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        with open(output_path, 'w') as f:
+            json.dump(settlements_data, f, indent=2)
+        
+        print(f"✅ Settlements saved to: {output_path}")
+        
+        # Save to SQLite database
+        settlements_path = os.path.join(get_accounts_data_dir(), "kalshi", mode, "settlements.json")
+        db_path = os.path.join(get_accounts_data_dir(), "kalshi", mode, "settlements.db")
+        
+        # Create database and table
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS settlements (
+                id TEXT PRIMARY KEY,
+                user_id TEXT,
+                market_id TEXT,
+                amount INTEGER,
+                created_time TEXT,
+                updated_time TEXT
+            )
+        """)
+        
+        # Insert settlements data
+        for settlement in settlements_data.get("settlements", []):
+            cursor.execute("""
+                INSERT OR REPLACE INTO settlements 
+                (id, user_id, market_id, amount, created_time, updated_time)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                settlement.get("id"),
+                settlement.get("user_id"),
+                settlement.get("market_id"),
+                settlement.get("amount"),
+                settlement.get("created_time"),
+                settlement.get("updated_time")
+            ))
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Settlements database updated: {db_path}")
+        
+    except Exception as e:
+        print(f"❌ Error ingesting settlements: {e}")
+
+def ingest_fills():
+    """Ingest fills data."""
+    print(f"🔄 Ingesting fills for mode: {mode}")
+    
+    try:
+        # Get fills data
+        fills_data = get_fills_data()
+        if not fills_data:
+            print("❌ No fills data available")
+            return
+        
+        # Save to JSON file
+        output_path = os.path.join(get_accounts_data_dir(), "kalshi", mode, "fills.json")
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        with open(output_path, 'w') as f:
+            json.dump(fills_data, f, indent=2)
+        
+        print(f"✅ Fills saved to: {output_path}")
+        
+        # Save to SQLite database
+        fills_path = os.path.join(get_accounts_data_dir(), "kalshi", mode, "fills.json")
+        db_path = os.path.join(get_accounts_data_dir(), "kalshi", mode, "fills.db")
+        
+        # Create database and table
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS fills (
+                id TEXT PRIMARY KEY,
+                user_id TEXT,
+                market_id TEXT,
+                order_id TEXT,
+                side TEXT,
+                count INTEGER,
+                price INTEGER,
+                created_time TEXT
+            )
+        """)
+        
+        # Insert fills data
+        for fill in fills_data.get("fills", []):
+            cursor.execute("""
+                INSERT OR REPLACE INTO fills 
+                (id, user_id, market_id, order_id, side, count, price, created_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                fill.get("id"),
+                fill.get("user_id"),
+                fill.get("market_id"),
+                fill.get("order_id"),
+                fill.get("side"),
+                fill.get("count"),
+                fill.get("price"),
+                fill.get("created_time")
+            ))
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Fills database updated: {db_path}")
+        
+    except Exception as e:
+        print(f"❌ Error ingesting fills: {e}")
+
+def ingest_positions():
+    """Ingest positions data."""
+    print(f"🔄 Ingesting positions for mode: {mode}")
+    
+    try:
+        # Get positions data
+        positions_data = get_positions_data()
+        if not positions_data:
+            print("❌ No positions data available")
+            return
+        
+        # Save to JSON file
+        json_output_path = os.path.join(get_accounts_data_dir(), "kalshi", mode, "positions.json")
+        os.makedirs(os.path.dirname(json_output_path), exist_ok=True)
+        
+        with open(json_output_path, 'w') as f:
+            json.dump(positions_data, f, indent=2)
+        
+        print(f"✅ Positions saved to: {json_output_path}")
+        
+        # Save to SQLite database
+        db_path = os.path.join(get_accounts_data_dir(), "kalshi", mode, "positions.db")
+        
+        # Create database and table
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS positions (
+                id TEXT PRIMARY KEY,
+                user_id TEXT,
+                market_id TEXT,
+                side TEXT,
+                count INTEGER,
+                average_price INTEGER,
+                created_time TEXT,
+                updated_time TEXT
+            )
+        """)
+        
+        # Insert positions data
+        for position in positions_data.get("positions", []):
+            cursor.execute("""
+                INSERT OR REPLACE INTO positions 
+                (id, user_id, market_id, side, count, average_price, created_time, updated_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                position.get("id"),
+                position.get("user_id"),
+                position.get("market_id"),
+                position.get("side"),
+                position.get("count"),
+                position.get("average_price"),
+                position.get("created_time"),
+                position.get("updated_time")
+            ))
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Positions database updated: {db_path}")
+        
+    except Exception as e:
+        print(f"❌ Error ingesting positions: {e}")
 
 def main():
     sync_settlements()

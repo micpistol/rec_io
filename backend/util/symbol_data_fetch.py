@@ -4,6 +4,7 @@ import os
 from datetime import datetime, timedelta, timezone
 import time
 from typing import Optional, Tuple
+import yfinance as yf
 
 # Use Coinbase (Kraken limits historical depth)
 exchange = ccxt.coinbase({'enableRateLimit': True})
@@ -316,6 +317,67 @@ def update_all_symbols(symbols: Optional[list] = None) -> dict:
             }
     
     return results
+
+def fetch_symbol_data(symbol: str, output_dir: str = None):
+    """
+    Fetch historical data for a symbol from Yahoo Finance.
+    
+    Args:
+        symbol: The trading symbol (e.g., 'BTC-USD')
+        output_dir: Output directory (defaults to backend/data/price_history/{symbol_lower})
+    """
+    try:
+        # Default to backend/data/price_history/{symbol_lower}
+        if output_dir is None:
+            from backend.util.paths import get_price_history_dir
+            output_dir = os.path.join(get_price_history_dir(), symbol.lower())
+        
+        # Create output directory
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Clean symbol name for filename
+        symbol_clean = symbol.replace('-', '_').replace('/', '_')
+        output_file = f"{symbol_clean}_1m_master_5y.csv"
+        output_path = os.path.join(output_dir, output_file)
+        
+        print(f"📊 Fetching {symbol} data...")
+        print(f"📁 Output: {output_path}")
+        
+        # Fetch data from Yahoo Finance
+        ticker = yf.Ticker(symbol)
+        data = ticker.history(period="5y", interval="1m")
+        
+        if data.empty:
+            print(f"❌ No data found for {symbol}")
+            return None
+        
+        # Save to CSV
+        data.to_csv(output_path)
+        print(f"✅ Saved {len(data)} records to {output_path}")
+        
+        return output_path
+        
+    except Exception as e:
+        print(f"❌ Error fetching {symbol} data: {e}")
+        return None
+
+def get_symbol_data_path(symbol: str) -> str:
+    """
+    Get the expected path for symbol data.
+    
+    Args:
+        symbol: The trading symbol
+        
+    Returns:
+        Expected path for the symbol's CSV file
+    """
+    from backend.util.paths import get_price_history_dir
+    
+    # Default to backend/data/price_history/{symbol_lower}/{symbol_clean}_1m_master_5y.csv
+    symbol_lower = symbol.lower()
+    symbol_clean = symbol.replace('-', '_').replace('/', '_')
+    
+    return os.path.join(get_price_history_dir(), symbol_lower, f"{symbol_clean}_1m_master_5y.csv")
 
 # Legacy function for backward compatibility
 def fetch_btc_data():

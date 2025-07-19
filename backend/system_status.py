@@ -1,62 +1,92 @@
 #!/usr/bin/env python3
 """
-Comprehensive System Status Report
-Shows the current state of all improvements and system health.
+System Status Monitor
+
+Provides comprehensive system status information including:
+- Service health checks
+- Port availability
+- Resource usage
+- Error tracking
 """
 
 import os
 import sys
+import time
 import json
 import requests
 import subprocess
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Dict, List, Optional, Any
+from backend.core.port_config import get_service_url
 
-# Add project root to path
+# Import project utilities
+import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.util.ports import (
-    get_main_app_port, get_trade_manager_port, get_trade_executor_port,
-    get_active_trade_supervisor_port, get_market_watchdog_port
-)
 from backend.core.config.settings import config
+from backend.util.paths import get_logs_dir
 
-class SystemStatus:
-    """Comprehensive system status reporting."""
-    
+class SystemStatusMonitor:
     def __init__(self):
-        self.services = {
-            "main_app": get_main_app_port(),
-            "trade_manager": get_trade_manager_port(),
-            "trade_executor": get_trade_executor_port(),
-            "active_trade_supervisor": get_active_trade_supervisor_port(),
-            "market_watchdog": get_market_watchdog_port()
+        self.status_cache = {}
+        self.cache_duration = 30  # seconds
+        
+        # Service URLs using bulletproof port manager
+        self.service_urls = {
+            "main_app": get_service_url("main_app"),
+            "trade_manager": get_service_url("trade_manager"),
+            "trade_executor": get_service_url("trade_executor"),
+            "active_trade_supervisor": get_service_url("active_trade_supervisor"),
+            "market_watchdog": get_service_url("market_watchdog")
         }
     
     def check_port_validation(self) -> Dict[str, Any]:
         """Check if port validation is working."""
-        from backend.util.ports import validate_port_availability
-        
         validation_results = {}
-        for service_name, port in self.services.items():
-            validation_results[service_name] = {
-                "port": port,
-                "available": validate_port_availability(port),
-                "conflict_resolved": port != self.get_default_port(service_name)
-            }
+        for service_name, url in self.service_urls.items():
+            try:
+                response = requests.get(url + "/health", timeout=5)
+                if response.status_code == 200:
+                    data = response.json()
+                    validation_results[service_name] = {
+                        "port": url.split(":")[-1], # Extract port from URL
+                        "available": True,
+                        "conflict_resolved": False # No explicit conflict resolution here, rely on bulletproof port manager
+                    }
+                else:
+                    validation_results[service_name] = {
+                        "port": url.split(":")[-1],
+                        "available": False,
+                        "conflict_resolved": False
+                    }
+            except requests.exceptions.ConnectionError:
+                validation_results[service_name] = {
+                    "port": url.split(":")[-1],
+                    "available": False,
+                    "conflict_resolved": False
+                }
+            except requests.exceptions.Timeout:
+                validation_results[service_name] = {
+                    "port": url.split(":")[-1],
+                    "available": False,
+                    "conflict_resolved": False
+                }
+            except Exception as e:
+                validation_results[service_name] = {
+                    "port": url.split(":")[-1],
+                    "available": False,
+                    "conflict_resolved": False,
+                    "error": str(e)
+                }
         
         return validation_results
     
     def get_default_port(self, service_name: str) -> int:
-        """Get default port for a service."""
-        defaults = {
-            "main_app": 5001,
-            "trade_manager": 5003,
-            "trade_executor": 5050,
-            "active_trade_supervisor": 5007,
-            "market_watchdog": 5090
-        }
-        return defaults.get(service_name, 5000)
+        """Get default port for a service using centralized port management."""
+        from backend.core.port_config import get_port
+        
+        # Use centralized port management for default ports
+        return get_port(service_name)
     
     def check_config_validation(self) -> Dict[str, Any]:
         """Check if configuration validation is working."""
@@ -105,9 +135,9 @@ class SystemStatus:
         """Check if health endpoints are working."""
         health_results = {}
         
-        for service_name, port in self.services.items():
+        for service_name, url in self.service_urls.items():
             try:
-                response = requests.get(f"http://localhost:{port}/health", timeout=5)
+                response = requests.get(url + "/health", timeout=5)
                 if response.status_code == 200:
                     data = response.json()
                     health_results[service_name] = {
@@ -185,8 +215,7 @@ class SystemStatus:
         """Check if monitoring tools are available."""
         tools = {
             "system_monitor": os.path.exists("backend/system_monitor.py"),
-            "error_recovery": os.path.exists("backend/error_recovery.py"),
-            "port_test": os.path.exists("backend/test_port_communication.py")
+            "error_recovery": os.path.exists("backend/error_recovery.py")
         }
         
         # Test if tools can be imported
@@ -328,7 +357,7 @@ class SystemStatus:
 
 def main():
     """Main status function."""
-    status = SystemStatus()
+    status = SystemStatusMonitor()
     
     # Generate report
     report = status.generate_comprehensive_report()

@@ -1,101 +1,47 @@
-# Port management now handled by config
-from fastapi import FastAPI
-from fastapi import Request
-from fastapi import WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+"""
+MAIN APPLICATION - UNIVERSAL CENTRALIZED PORT SYSTEM
+Uses the single centralized port configuration system.
+"""
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from sse_starlette.sse import EventSourceResponse
+import uvicorn
 import os
 import json
 import asyncio
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import pytz
 import requests
-from dateutil import parser
 import sqlite3
-import math
-import numpy as np
-from typing import List, Optional, Tuple
-from fastapi import Body
-import pandas as pd
-from pydantic import BaseModel
-import psutil
-import platform
+from typing import List, Optional, Dict
 
+# Import the universal centralized port system
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.account_mode import get_account_mode
-from core.config.settings import config
-from backend.util.ports import get_main_app_port, get_main_app_url
+# Use relative imports to avoid ModuleNotFoundError
+from core.port_config import get_port, get_port_info
 
-from util.paths import get_price_history_dir, get_data_dir, ensure_data_dirs
-from util.probability_calculator_directional import calculate_directional_strike_probabilities
-from backend.util.probability_calculator_directional import get_directional_calculator
-from backend.util.fingerprint_generator_directional import get_fingerprint_filename
+# Get port from centralized system
+MAIN_APP_PORT = get_port("main_app")
+print(f"[MAIN] 🚀 Using centralized port: {MAIN_APP_PORT}")
 
+# Import centralized path utilities
+from util.paths import get_data_dir, get_trade_history_dir, get_accounts_data_dir
+from account_mode import get_account_mode
 
+# Create FastAPI app
+app = FastAPI(title="Trading System Main App")
 
-
-
-
-# Ensure all data directories exist
-ensure_data_dirs()
-
-DB_PATH = os.path.join(get_price_history_dir(), "btc_price_history.db")
-
-
-app = FastAPI()
-
-import asyncio
-
-trade_db_event = asyncio.Event()
-
-
-# Global set of connected websocket clients for preferences
-connected_clients = set()
-
-# Global set of connected websocket clients for database changes
-db_change_clients = set()
-
-# Global auto_stop state
-PREFERENCES_PATH = os.path.join(get_data_dir(), "trade_preferences.json")
-
-def load_preferences():
-    if os.path.exists(PREFERENCES_PATH):
-        try:
-            with open(PREFERENCES_PATH, "r") as f:
-                prefs = json.load(f)
-                # Migrate old plus_minus_mode to diff_mode if needed
-                if "plus_minus_mode" in prefs and "diff_mode" not in prefs:
-                    prefs["diff_mode"] = prefs.pop("plus_minus_mode")
-                    # Save the migrated preferences
-                    save_preferences(prefs)
-                return prefs
-        except Exception:
-            pass
-    return {"auto_stop": True, "reco": False, "diff_mode": False}
-
-def save_preferences(prefs):
-    try:
-        with open(PREFERENCES_PATH, "w") as f:
-            json.dump(prefs, f)
-    except Exception as e:
-        print(f"[Preferences Save Error] {e}")
-
-# CORS setup
+# Configure CORS with static origins
 origins = [
-    "https://rec-becy.onrender.com",
-    "https://rec-becy.onrender.com/tabs"
+    f"http://localhost:{MAIN_APP_PORT}",
+    f"http://127.0.0.1:{MAIN_APP_PORT}",
 ]
-
-# Add dynamic localhost origins based on port configuration
-main_port = get_main_app_port()
-origins.extend([
-    f"http://localhost:{main_port}",
-    f"http://127.0.0.1:{main_port}"
-])
 
 app.add_middleware(
     CORSMiddleware,
@@ -105,1377 +51,407 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# Serve heartbeat file
-app.mount(
-    "/logger",
-    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "data", "coinbase")),
-    name="logger"
-)
-
-# Serve the tabs/ folder as static files under /tabs
-app.mount(
-    "/tabs",
-    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend", "tabs")),
-    name="tabs"
-)
-
-# Serve the images/ folder as static files under /images
-app.mount(
-    "/images",
-    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend", "images")),
-    name="images"
-)
-
-# Serve the audio/ folder as static files under /audio
-app.mount(
-    "/audio",
-    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend", "audio")),
-    name="audio"
-)
-
-# Serve the styles/ folder as static files under /styles
-app.mount(
-    "/styles",
-    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend", "styles")),
-    name="styles"
-)
-
-# Serve the logs folder as static files under /logs
-app.mount("/logs", StaticFiles(directory="logs"), name="logs")
-
-
-
-# Serve the public folder as static files under /public
-app.mount("/public", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "public")), name="public")
-
-# Serve the frontend/js folder as static files under /js
-app.mount("/js", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend", "js")), name="js")
-
-# Serve the frontend/styles folder as static files under /styles
-app.mount("/styles", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend", "styles")), name="styles")
-
-@app.get("/", response_class=HTMLResponse)
-def serve_index():
-    with open(os.path.join(os.path.dirname(__file__), "..", "index.html")) as f:
-        content = f.read()
-    # Update the JavaScript inside index.html for delta values formatting
-    # Assuming the JavaScript section is present, we replace the delta display logic
-    # We do a simple string replacement for the delta innerText assignments
-
-    # New JavaScript snippet for delta values formatting
-    delta_js = """
-    const delta1m = data.delta_1m;
-    document.getElementById("delta-1m").innerText =
-      delta1m === null || delta1m === undefined
-        ? "—"
-        : (delta1m >= 0 ? "+" : "") + delta1m.toFixed(2);
-
-    const delta2m = data.delta_2m;
-    document.getElementById("delta-2m").innerText =
-      delta2m === null || delta2m === undefined
-        ? "—"
-        : (delta2m >= 0 ? "+" : "") + delta2m.toFixed(2);
-
-    const delta3m = data.delta_3m;
-    document.getElementById("delta-3m").innerText =
-      delta3m === null || delta3m === undefined
-        ? "—"
-        : (delta3m >= 0 ? "+" : "") + delta3m.toFixed(2);
-
-    const delta4m = data.delta_4m;
-    document.getElementById("delta-4m").innerText =
-      delta4m === null || delta4m === undefined
-        ? "—"
-        : (delta4m >= 0 ? "+" : "") + delta4m.toFixed(2);
-
-    const delta15m = data.delta_15m;
-    document.getElementById("delta-15m").innerText =
-      delta15m === null || delta15m === undefined
-        ? "—"
-        : (delta15m >= 0 ? "+" : "") + delta15m.toFixed(2);
-
-    const delta30m = data.delta_30m;
-    document.getElementById("delta-30m").innerText =
-      delta30m === null || delta30m === undefined
-        ? "—"
-        : (delta30m >= 0 ? "+" : "") + delta30m.toFixed(2);
-
-    document.getElementById("latest-db-price").innerText =
-      "DB Price: $" + (data.btc_price !== null ? data.btc_price.toFixed(2) : "—");
-    """
-
-    # Replace the existing delta innerText assignments in the content
-    import re
-    # This regex captures the block where delta-1m to delta-30m innerText is assigned
-    # We'll replace any existing code that sets innerText of delta elements with the new code
-    pattern = re.compile(
-        r'document\.getElementById\("delta-1m"\)\.innerText\s*=[^;]+;.*?document\.getElementById\("delta-30m"\)\.innerText\s*=[^;]+;',
-        re.DOTALL
-    )
-    content = pattern.sub(delta_js.strip(), content)
-
-    # Return HTMLResponse with cache-busting headers
-    response = HTMLResponse(content=content)
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
-    return response
-
-@app.get("/status")
-def get_status():
-    return {
-        "app": "kalshi-webapp",
-        "timestamp": datetime.utcnow().isoformat(),
-        "status": "online"
-    }
-
-@app.get("/core")
-def get_core_data():
-    import sqlite3
-    # Current time in EST
-    local_now = datetime.now(pytz.timezone("US/Eastern"))
-    date_str = local_now.strftime("%A, %B %d, %Y")
-    time_str = local_now.strftime("%I:%M:%S %p %Z")
-
-    # Time to top of next hour in EST
-    est_now = datetime.now(pytz.timezone("US/Eastern"))
-    next_hour = est_now.replace(minute=0, second=0, microsecond=0)
-    if est_now.minute != 0 or est_now.second != 0:
-        next_hour += timedelta(hours=1)
-    ttc_seconds = int((next_hour - est_now).total_seconds())
-
-    # BTC Price from latest logger entry
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
-        result = cursor.fetchone()
-        btc_price = float(result[0]) if result and result[0] is not None else None
-    except Exception:
-        btc_price = None
-
-    utc_timestamp = datetime.now(pytz.UTC).isoformat()
-
-    # BTC Price Deltas
-    def get_price_delta(cursor, rows_back):
-        try:
-            cursor.execute(
-                "SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1 OFFSET ?",
-                (rows_back,)
-            )
-            result = cursor.fetchone()
-            return float(result[0]) if result and result[0] is not None else None
-        except Exception:
-            return None
-
-    def calc_pct_delta(past_price):
-        if btc_price is None or past_price is None or past_price == 0:
-            return None
-        return ((btc_price - past_price) / past_price) * 100
-
-    delta_1m = delta_2m = delta_3m = delta_4m = delta_15m = delta_30m = None
-    try:
-        # Open single connection and cursor for delta calculations
-        # Note: conn and cursor already opened above, reuse them
-        delta_1m = calc_pct_delta(get_price_delta(cursor, 55))
-        delta_2m = calc_pct_delta(get_price_delta(cursor, 115))
-        delta_3m = calc_pct_delta(get_price_delta(cursor, 175))
-        delta_4m = calc_pct_delta(get_price_delta(cursor, 235))
-        delta_15m = calc_pct_delta(get_price_delta(cursor, 875))
-        delta_30m = calc_pct_delta(get_price_delta(cursor, 1750))
-
-        # Volatility calculations removed for performance
-        vol_30s = None
-        vol_1m = None
-        vol_5m = None
-        vol_score = 0
-        vol_spike = 0
-
-    finally:
-        conn.close()
-
-    status = "online"
-
-    core_data = {
-        "date": date_str,
-        "time": time_str,
-        "ttc_seconds": ttc_seconds,
-        "btc_price": btc_price,
-        "latest_db_price": btc_price,
-        "timestamp": utc_timestamp,
-        "delta_1m": delta_1m,
-        "delta_2m": delta_2m,
-        "delta_3m": delta_3m,
-        "delta_4m": delta_4m,
-        "delta_5m": None,
-        "delta_15m": delta_15m,
-        "delta_30m": delta_30m,
-        "vol_30s": vol_30s,
-        "vol_1m": vol_1m,
-        "vol_5m": vol_5m,
-        "status": status
-    }
-    # Add volatility score and spike to core_data
-    core_data["volScore"] = vol_score
-    core_data["volSpike"] = vol_spike
-    try:
-        btc_changes = get_btc_changes()
-        print("[Kraken Changes]", btc_changes)  # Debug line
-        if isinstance(btc_changes, dict):
-            core_data.update({
-                "change1h": btc_changes.get("change1h"),
-                "change3h": btc_changes.get("change3h"),
-                "change1d": btc_changes.get("change1d"),
-            })
-    except Exception as e:
-        print(f"[Kraken Parse Error] {e}")
-        core_data.update({
-            "change1h": "Error",
-            "change3h": "Error",
-            "change1d": "Error"
-        })
-    
-    # Add Kalshi market data to core response
-    try:
-        with open("data/kalshi/latest_market_snapshot.json", "r") as f:
-            kalshi_data = json.load(f)
-            core_data["kalshi_markets"] = kalshi_data.get("markets", [])
-    except Exception as e:
-        print(f"[Kalshi Market Data Error] {e}")
-        core_data["kalshi_markets"] = []
-    
-    return core_data
-
-# Serve just the latest BTC price and timestamp for hover popup
-@app.get("/last-price")
-def get_last_price():
-    import sqlite3
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT timestamp, price FROM price_log ORDER BY timestamp DESC LIMIT 1")
-        result = cursor.fetchone()
-        conn.close()
-        if result:
-            return {
-                "timestamp": result[0],
-                "price": float(result[1])
-            }
-        else:
-            return {
-                "timestamp": None,
-                "price": None
-            }
-    except Exception as e:
-        return {
-            "error": str(e),
-            "timestamp": None,
-            "price": None
-        }
-
-# Route to search history by timestamp range
-
-@app.post("/search-history")
-async def search_history(request: Request):
-    import sqlite3
-    data = await request.json()
-    start = data.get("start")
-    end = data.get("end")
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT timestamp, price FROM price_log WHERE timestamp BETWEEN ? AND ? ORDER BY timestamp ASC",
-            (start, end)
-        )
-        rows = cursor.fetchall()
-        conn.close()
-        return JSONResponse(content={"results": rows})
-    except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
-
-# BTC price changes API endpoint
-@app.get("/btc_price_changes")
-def get_btc_price_changes():
-    import sqlite3
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-
-        # Get latest price and timestamp
-        cursor.execute("SELECT timestamp, price FROM price_log ORDER BY timestamp DESC LIMIT 1")
-        latest = cursor.fetchone()
-        if not latest:
-            return {"error": "No price data found"}
-
-        latest_time_str, latest_price = latest
-        from dateutil import parser
-        latest_time = parser.isoparse(latest_time_str)
-
-        # Helper function to get price closest before target time
-        def get_price_before(target_time):
-            cursor.execute(
-                "SELECT price FROM price_log WHERE timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
-                (target_time.isoformat(),)
-            )
-            res = cursor.fetchone()
-            return float(res[0]) if res else None
-
-        # Calculate times for 1h, 3h, 1d ago
-        from datetime import timedelta
-        time_1h = latest_time - timedelta(hours=1)
-        time_3h = latest_time - timedelta(hours=3)
-        time_1d = latest_time - timedelta(days=1)
-
-        price_1h = get_price_before(time_1h)
-        price_3h = get_price_before(time_3h)
-        price_1d = get_price_before(time_1d)
-
-        def calc_pct_change(current, past):
-            if current is None or past is None or past == 0:
-                return None
-            return (current - past) / past * 100
-
-        change_1h = calc_pct_change(latest_price, price_1h)
-        change_3h = calc_pct_change(latest_price, price_3h)
-        change_1d = calc_pct_change(latest_price, price_1d)
-
-        conn.close()
-
-        return {
-            "change_1h": change_1h,
-            "change_3h": change_3h,
-            "change_1d": change_1d,
-            "latest_price": latest_price,
-            "latest_timestamp": latest_time_str
-        }
-
-    except Exception as e:
-        return {"error": str(e)}
-
-def start_websocket():
-    import websocket
-    import time
-    import json
-
-    def on_open(ws):
-        print("[WebSocket] Connection opened")
-        subscribe_message = {
-            "type": "subscribe",
-            "channels": [{"name": "ticker", "product_ids": ["BTC-USD"]}]
-        }
-        ws.send(json.dumps(subscribe_message))
-
-    def on_message(ws, message):
-        try:
-            data = json.loads(message)
-            if data.get("type") == "ticker" and "price" in data:
-                print(f"[WebSocket] BTC Price: {data['price']}")
-            else:
-                print("[WebSocket] Non-ticker message received")
-        except Exception as e:
-            print(f"[WebSocket] Error parsing message: {e}")
-
-    def on_error(ws, error):
-        print(f"[WebSocket] Error: {error}")
-
-    def on_close(ws, close_status_code, close_msg):
-        print("[WebSocket] Connection closed")
-
-    while True:
-        try:
-            ws = websocket.WebSocketApp(
-                "wss://ws-feed.exchange.coinbase.com",
-                on_open=on_open,
-                on_message=on_message,
-                on_error=on_error,
-                on_close=on_close
-            )
-            ws.run_forever()
-        except Exception as e:
-            print(f"[ERROR] WebSocket crashed: {e}")
-        print("[INFO] Reconnecting in 5 seconds...")
-        time.sleep(5)
-
-
-# Fetch BTC price changes from Kraken OHLC endpoint
-def get_btc_changes():
-    try:
-        url = "https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=60"
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-
-        json_data = response.json()
-        result = json_data.get("result", {})
-
-        # Exclude "last" key and dynamically determine the actual pair key
-        pair_key = next((key for key in result.keys() if key != "last"), None)
-        if not pair_key or pair_key not in result:
-            raise ValueError("Kraken response missing expected pair key")
-
-        data = result[pair_key]
-
-        close_now = float(data[-1][4])
-        close_1h = float(data[-2][4])
-        close_3h = float(data[-4][4])
-        close_1d = float(data[-25][4])
-
-        def pct_change(from_val, to_val):
-            return (to_val - from_val) / from_val
-
-        return {
-            "change1h": pct_change(close_1h, close_now),
-            "change3h": pct_change(close_3h, close_now),
-            "change1d": pct_change(close_1d, close_now)
-        }
-    except Exception as e:
-        print(f"[Kraken Fetch Error] {e}")
-        return {
-            "change1h": "Error",
-            "change3h": "Error",
-            "change1d": "Error"
-        }
-
-@app.get("/market_title")
-def get_market_title():
-    import json
-    try:
-        with open("data/kalshi/latest_market_snapshot.json", "r") as f:
-            data = json.load(f)
-            # Extract title from the event object
-            title = data.get("event", {}).get("title", "No Title Available")
-    except Exception:
-        title = "No Title Available"
-    return {"title": title}
-
-# Feed status endpoint
-@app.get("/feed-status")
-def get_feed_status():
-    import os
-    FEEDS = {
-        "BTC": os.path.join("backend", "api", "coinbase-api", "coinbase-btc", "data", "btc_logger_heartbeat.txt"),
-        "KALSHI": os.path.join("backend", "api", "kalshi-api", "data", "kalshi_logger_heartbeat.txt")
-    }
-
-    status = {}
-    now = datetime.now(pytz.UTC)
-
-    for name, path in FEEDS.items():
-        try:
-            with open(path, "r") as f:
-                line = f.readline().strip()
-                ts = line.split()[0]
-                from dateutil import parser
-                dt = parser.isoparse(ts)
-                if dt.tzinfo is None:
-                    dt = pytz.timezone("US/Eastern").localize(dt)
-                delay = (now - dt).total_seconds()
-                alive = 0 <= delay <= 10  # Extended window to 10s
-                print(f"[FEED CHECK] {name} delay={delay:.2f} seconds (alive={alive})")
-                status[name] = {
-                    "alive": alive,
-                    "timestamp": dt.strftime("%Y-%m-%d %H:%M:%S")
-                }
-        except Exception as e:
-            print(f"[FEED CHECK ERROR] {name}: {e}")
-            status[name] = {
-                "alive": False,
-                "timestamp": "N/A"
-            }
-
-    return {"feeds": status}
-
-@app.get("/kalshi_market_snapshot")
-def kalshi_market_snapshot():
-    import json
-    try:
-        with open("data/kalshi/latest_market_snapshot.json", "r") as f:
-            return json.load(f)
-    except Exception:
-        return {"markets": []}
-
-
-
-#
-# Trade manager integration
-#
-# Ensure trade_manager uses buy_price instead of price in all SQL queries and data mappings.
-from backend.trade_manager import router as trade_router
-app.include_router(trade_router)
-
-
-
-# Set account mode endpoint
-from backend import account_mode
-from fastapi import Request
-
-@app.post("/api/set_account_mode")
-async def set_account_mode(request: Request):
-    data = await request.json()
-    mode = data.get("mode")
-    if mode not in ("prod", "demo"):
-        return {"status": "error", "message": "Invalid mode"}
-    try:
-        account_mode.set_account_mode(mode)
-        await broadcast_account_mode(mode)
-        return {"status": "ok", "mode": mode}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-# Register the auto_stop endpoints so they are always included when the app is loaded
-
-# Log event endpoint
-@app.post("/api/log_event")
-async def log_event(request: Request):
-    data = await request.json()
-    ticket_id = data.get("ticket_id", "UNKNOWN")
-    message = data.get("message", "No message provided")
-    timestamp = datetime.now(pytz.timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S")
-
-    log_line = f"[{timestamp}] Ticket {ticket_id}: {message}\n"
-    # Directory for trade flow logs
-    log_dir = os.path.join("backend", "data", "trade_history", "tickets")
-    # Use last 5 characters of ticket_id for log file name, fallback to full ticket_id if too short
-    log_path = os.path.join(log_dir, f"trade_flow_{ticket_id[-5:] if len(ticket_id) >= 5 else ticket_id}.log")
-
-    try:
-        os.makedirs(log_dir, exist_ok=True)
-        with open(log_path, "a") as f:
-            f.write(log_line)
-
-        # Prune older log files, keep only latest 20
-        log_files = sorted(
-            [f for f in os.listdir(log_dir) if f.startswith("trade_flow_") and f.endswith(".log")],
-            key=lambda name: os.path.getmtime(os.path.join(log_dir, name)),
-            reverse=True
-        )
-        for old_log in log_files[100:]:
-            os.remove(os.path.join(log_dir, old_log))
-
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-    return {"status": "ok"}
-
-@app.post("/api/set_auto_stop")
-async def set_auto_stop(request: Request):
-    data = await request.json()
-    prefs = load_preferences()
-    prefs["auto_stop"] = bool(data.get("enabled", True))
-    save_preferences(prefs)
-    await broadcast_preferences_update()
-    return {"status": "ok"}
-
-@app.post("/api/set_reco")
-async def set_reco(request: Request):
-    data = await request.json()
-    prefs = load_preferences()
-    prefs["reco"] = bool(data.get("enabled", False))
-    save_preferences(prefs)
-    await broadcast_preferences_update()
-    return {"status": "ok"}
-
-@app.post("/api/set_diff_mode")
-async def set_diff_mode(request: Request):
-    data = await request.json()
-    prefs = load_preferences()
-    prefs["diff_mode"] = bool(data.get("enabled", False))
-    save_preferences(prefs)
-    await broadcast_preferences_update()
-    return {"status": "ok"}
-
-# Add set_position_size and set_multiplier routes
-@app.post("/api/set_position_size")
-async def set_position_size(request: Request):
-    data = await request.json()
-    prefs = load_preferences()
-    try:
-        prefs["position_size"] = int(data.get("position_size", 100))
-        save_preferences(prefs)
-        await broadcast_preferences_update()
-    except Exception as e:
-        print(f"[Set Position Size Error] {e}")
-    return {"status": "ok"}
-
-@app.post("/api/set_multiplier")
-async def set_multiplier(request: Request):
-    data = await request.json()
-    prefs = load_preferences()
-    try:
-        prefs["multiplier"] = int(data.get("multiplier", 1))
-        save_preferences(prefs)
-        await broadcast_preferences_update()
-    except Exception as e:
-        print(f"[Set Multiplier Error] {e}")
-    return {"status": "ok"}
-
-
-
-# New route: update position size and multiplier preferences
-@app.post("/api/update_preferences")
-async def update_preferences(request: Request):
-    data = await request.json()
-    prefs = load_preferences()
-    updated = False
-
-    if "position_size" in data:
-        try:
-            prefs["position_size"] = int(data["position_size"])
-            updated = True
-        except Exception as e:
-            print(f"[Invalid Position Size] {e}")
-
-    if "multiplier" in data:
-        try:
-            prefs["multiplier"] = int(data["multiplier"])
-            updated = True
-        except Exception as e:
-            print(f"[Invalid Multiplier] {e}")
-
-
-
-    if updated:
-        save_preferences(prefs)
-        await broadcast_preferences_update()
-    return {"status": "ok"}
-
-
-# Expose trade preferences to the frontend
-@app.get("/api/get_preferences")
-async def get_preferences():
-    return load_preferences()
-
-@app.get("/api/get_auto_stop")
-async def get_auto_stop():
-    prefs = load_preferences()
-    return {"enabled": prefs.get("auto_stop", True)}
-
-@app.get("/api/account/balance")
-def get_balance(request: Request):
-    try:
-        mode = request.query_params.get("mode", "prod")
-        with open(os.path.join("data", "accounts", "kalshi", mode, "account_balance.json")) as f:
-            raw = json.load(f)
-            try:
-                cents = int(raw["balance"])
-                dollars = cents / 100
-                return {"balance": f"{dollars:.2f}"}
-            except Exception:
-                return {"balance": "Error"}
-    except Exception as e:
-        return {"balance": "0.00", "error": str(e)}
-
-@app.get("/api/account/fills")
-def get_fills(request: Request):
-    mode = request.query_params.get("mode", "prod")
-    with open(os.path.join("data", "accounts", "kalshi", mode, "fills.json")) as f:
-        return json.load(f)
-
-@app.get("/api/account/positions")
-def get_positions(request: Request):
-    mode = request.query_params.get("mode", "prod")
-    with open(os.path.join("data", "accounts", "kalshi", mode, "positions.json")) as f:
-        return json.load(f)
-
-@app.get("/api/account/settlements")
-def get_settlements(request: Request):
-    mode = request.query_params.get("mode", "prod")
-    with open(os.path.join("data", "accounts", "kalshi", mode, "settlements.json")) as f:
-        return json.load(f)
-
-
-# New endpoint: /api/get_account_mode
-@app.get("/api/get_account_mode")
-async def get_account_mode_api():
-    return {"mode": get_account_mode()}
-
-
-# New route: /api/db/settlements
-@app.get("/api/db/settlements")
-def get_settlements_db():
-    try:
-        mode = get_account_mode()
-        db_path = os.path.join("data", "accounts", "kalshi", mode, "settlements.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT ticker, market_result, yes_count, no_count, revenue, settled_time FROM settlements ORDER BY settled_time DESC")
-        rows = cursor.fetchall()
-        conn.close()
-        results = [
-            {
-                "ticker": row[0],
-                "market_result": row[1],
-                "yes_count": row[2],
-                "no_count": row[3],
-                "revenue": row[4],
-                "settled_time": row[5],
-            }
-            for row in rows
-        ]
-        return {"settlements": results}
-    except Exception as e:
-        return {"error": str(e), "settlements": []}
-
-# New route: /api/db/fills
-@app.get("/api/db/fills")
-def get_fills_db():
-    try:
-        mode = get_account_mode()
-        db_path = os.path.join("data", "accounts", "kalshi", mode, "fills.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time FROM fills ORDER BY created_time DESC")
-        rows = cursor.fetchall()
-        conn.close()
-        results = [
-            {
-                "trade_id": row[0],
-                "ticker": row[1],
-                "order_id": row[2],
-                "side": row[3],
-                "action": row[4],
-                "count": row[5],
-                "yes_price": row[6],
-                "no_price": row[7],
-                "is_taker": row[8],
-                "created_time": row[9],
-            }
-            for row in rows
-        ]
-        return {"fills": results}
-    except Exception as e:
-        return {"error": str(e), "fills": []}
-
-# New route: /api/db/positions
-@app.get("/api/db/positions")
-def get_positions_db():
-    try:
-        mode = get_account_mode()
-        db_path = os.path.join("data", "accounts", "kalshi", mode, "positions.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT ticker, total_traded, position, market_exposure, realized_pnl, fees_paid, last_updated_ts FROM positions ORDER BY last_updated_ts DESC")
-        rows = cursor.fetchall()
-        conn.close()
-        results = [
-            {
-                "ticker": row[0],
-                "total_traded": row[1],
-                "position": row[2],
-                "market_exposure": row[3],
-                "realized_pnl": row[4],
-                "fees_paid": row[5],
-                "last_updated_ts": row[6],
-            }
-            for row in rows
-        ]
-        return {"positions": results}
-    except Exception as e:
-        return {"error": str(e), "positions": []}
-
-# New route: /api/db/btc_price_history
-@app.get("/api/db/btc_price_history")
-def get_btc_price_history_db():
-    """Get BTC price history from the database (identical to other /api/db/* endpoints)"""
-    try:
-        db_path = os.path.join(os.path.dirname(__file__), "data", "price_history", "btc_price_history.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT price, timestamp 
-            FROM price_log 
-            ORDER BY timestamp DESC 
-            LIMIT 1000
-        """)
-        rows = cursor.fetchall()
-        conn.close()
-        results = [
-            {
-                "price": float(row[0]),
-                "timestamp": row[1]
-            }
-            for row in rows
-        ]
-        return {"prices": results, "count": len(results)}
-    except Exception as e:
-        return {"error": str(e), "prices": [], "count": 0}
-
-# WebSocket endpoint for preferences updates
-@app.websocket("/ws/preferences")
-async def websocket_preferences(websocket: WebSocket):
-    await websocket.accept()
-    connected_clients.add(websocket)
-    try:
-        while True:
-            await websocket.receive_text()  # Keep connection alive
-    except WebSocketDisconnect:
-        connected_clients.remove(websocket)
-
-@app.websocket("/ws/db_changes")
-async def websocket_db_changes(websocket: WebSocket):
-    await websocket.accept()
-    db_change_clients.add(websocket)
-    print(f"[WEBSOCKET] ✅ Client connected. Total clients: {len(db_change_clients)}")
-    try:
-        while True:
-            message = await websocket.receive_text()  # Keep connection alive
-            print(f"[WEBSOCKET] Received message from client: {message}")
-    except WebSocketDisconnect:
-        db_change_clients.remove(websocket)
-        print(f"[WEBSOCKET] ❌ Client disconnected. Total clients: {len(db_change_clients)}")
-
-
-
-# Broadcast helper function for preferences updates
-async def broadcast_preferences_update():
-    data = json.dumps(load_preferences())
-    to_remove = set()
-    for client in connected_clients:
-        try:
-            await client.send_text(data)
-        except Exception:
-            to_remove.add(client)
-    connected_clients.difference_update(to_remove)
-
-# Broadcast helper function for account mode updates
-async def broadcast_account_mode(mode: str):
-    message = json.dumps({"account_mode": mode})
-    to_remove = set()
-    for client in connected_clients:
-        try:
-            await client.send_text(message)
-        except Exception:
-            to_remove.add(client)
-    connected_clients.difference_update(to_remove)
-
-# Broadcast helper function for database changes
-async def broadcast_db_change(db_name: str, change_data: dict):
-    message = json.dumps({
-        "type": "db_change",
-        "database": db_name,
-        "change_data": change_data,
-        "timestamp": datetime.now().isoformat()
-    })
-    print(f"[WEBSOCKET] Broadcasting {db_name} change to {len(db_change_clients)} clients")
-    to_remove = set()
-    for client in db_change_clients:
-        try:
-            await client.send_text(message)
-            print(f"[WEBSOCKET] ✅ Sent to client")
-        except Exception as e:
-            print(f"[WEBSOCKET] ❌ Failed to send to client: {e}")
-            to_remove.add(client)
-    db_change_clients.difference_update(to_remove)
-
-# Serve trade flow logs from the tickets directory
-@app.get("/api/trade_log/{ticket_id}")
-def get_trade_log(ticket_id: str):
-    try:
-        log_dir = os.path.join("backend", "data", "trade_history", "tickets")
-        log_filename = f"trade_flow_{ticket_id[-5:]}.log"
-        log_path = os.path.join(log_dir, log_filename)
-        if not os.path.exists(log_path):
-            return {"status": "error", "message": "Log file not found"}
-        with open(log_path, "r") as f:
-            content = f.read()
-        return {"status": "ok", "log": content}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-
-# (Remove calculate_strike_probabilities function and both /api/strike_probabilities endpoints)
-
-def get_main_app_port():
-    from backend.util.ports import get_main_app_port as get_port
-    return get_port()
-
-@app.post("/ping")
-async def ping_handler(request: Request):
-    data = await request.json()
-    ticket_id = data.get("ticket_id")
-    status = data.get("status")
-    
-    # Simple ping handler - just acknowledge receipt
-    print(f"Received ping for ticket {ticket_id} with status {status}")
-    
-    return {"message": "Ping received"}
-
-@app.post("/api/db_change")
-async def notify_db_change(request: Request):
-    try:
-        # Write to a file to ensure we see the log
-        with open("logs/debug.log", "a") as f:
-            f.write(f"[{datetime.now()}] /api/db_change ENDPOINT CALLED\n")
-        print("[DEBUG] /api/db_change ENDPOINT CALLED", flush=True)
-        print("[DEBUG] /api/db_change headers:", dict(request.headers), flush=True)
-        body = await request.body()
-        print("[DEBUG] /api/db_change raw body:", body, flush=True)
-        data = await request.json()
-        db_name = data.get("database")
-        change_data = data.get("change_data", {})
-        print(f"[DEBUG] /api/db_change calling broadcast_db_change for {db_name}", flush=True)
-        await broadcast_db_change(db_name, change_data)
-        print(f"[DEBUG] /api/db_change broadcast completed for {db_name}", flush=True)
-        return {"status": "ok", "message": f"Database change received for {db_name}"}
-    except Exception as e:
-        print("[DEBUG] /api/db_change error:", str(e), flush=True)
-        return {"status": "error", "message": str(e)}
-
-# Add a simple test endpoint
-@app.get("/api/test")
-async def test_endpoint():
-    print("[DEBUG] /api/test ENDPOINT CALLED", flush=True)
-    with open("logs/debug.log", "a") as f:
-        f.write(f"[{datetime.now()}] /api/test ENDPOINT CALLED\n")
-    return {"status": "ok", "message": "Test endpoint working"}
-
-@app.get("/frontend-changes")
-def frontend_changes():
-    import os
-    latest = 0
-    for root, dirs, files in os.walk("frontend"):
-        for f in files:
-            path = os.path.join(root, f)
-            try:
-                mtime = os.path.getmtime(path)
-                if mtime > latest:
-                    latest = mtime
-            except Exception:
-                pass
-    return {"last_modified": latest}
-
-# Serve current trades from trades.db
-@app.get("/api/db/trades")
-def get_trades_db():
-    mode = get_account_mode()
-    try:
-        db_path = os.path.join(os.path.dirname(__file__), "data", "trade_history", "trades.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, date, time, strike, side, buy_price, position, status, 
-                   symbol, market, trade_strategy, market_id,
-                   symbol_open, symbol_close, momentum, momentum_delta, 
-                   win_loss 
-            FROM trades 
-            ORDER BY id DESC
-        """)
-        rows = cursor.fetchall()
-        conn.close()
-        results = [
-            {
-                "id": row[0],
-                "date": row[1],
-                "time": row[2],
-                "strike": row[3],
-                "side": row[4],
-                "buy_price": row[5],
-                "position": row[6],
-                "status": row[7],
-                "symbol": row[8],
-                "market": row[9],
-                "trade_strategy": row[10],
-                "market_id": row[11],
-                "symbol_open": row[12],
-                "symbol_close": row[13],
-                "momentum": row[14],
-                "momentum_delta": row[15],
-                "win_loss": row[16],
-            }
-            for row in rows
-        ]
-        return {"trades": results}
-    except Exception as e:
-        return {"error": str(e), "trades": []}
-
-# Frontend-compatible /trades endpoint
-@app.get("/trades")
-def get_trades():
-    mode = get_account_mode()
-    try:
-        db_path = os.path.join(os.path.dirname(__file__), "data", "trade_history", "trades.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, date, time, strike, side, buy_price, position, status, 
-                   symbol, market, trade_strategy, market_id,
-                   symbol_open, symbol_close, momentum, momentum_delta, 
-                   win_loss 
-            FROM trades 
-            ORDER BY id DESC
-        """)
-        rows = cursor.fetchall()
-        conn.close()
-        results = [
-            {
-                "id": row[0],
-                "date": row[1],
-                "time": row[2],
-                "strike": row[3],
-                "side": row[4],
-                "buy_price": row[5],
-                "position": row[6],
-                "status": row[7],
-                "symbol": row[8],
-                "market": row[9],
-                "trade_strategy": row[10],
-                "market_id": row[11],
-                "symbol_open": row[12],
-                "symbol_close": row[13],
-                "momentum": row[14],
-                "momentum_delta": row[15],
-                "win_loss": row[16],
-            }
-            for row in rows
-        ]
-        return results
-    except Exception as e:
-        return []
-
-# SSE endpoint for watching trades DB updates
-@app.get("/watch/trades")
-async def watch_trades():
-    async def event_stream():
-        while True:
-            await trade_db_event.wait()
-            yield {"event": "update", "data": "trades_db_updated"}
-            trade_db_event.clear()
-    return EventSourceResponse(event_stream())
-
-
-# Helper function to notify trade DB update
-
-def notify_trade_update():
-    trade_db_event.set()
-
-@app.post("/api/strike_probabilities")
-async def get_strike_probabilities(request: Request):
-    """
-    Calculate strike probabilities using the directional fingerprint-based calculator.
-    Now supports momentum-aware fingerprint selection.
-    
-    Expected JSON payload:
-    {
-        "current_price": float,
-        "ttc_seconds": float,
-        "strikes": [float, ...],
-        "momentum_score": float (optional)
-    }
-    
-    Returns:
-    {
-        "status": "ok",
-        "probabilities": [
-            {
-                "strike": float,
-                "buffer": float,
-                "move_percent": float,
-                "prob_beyond": float,
-                "prob_within": float
-            },
-            ...
-        ]
-    }
-    """
-    try:
-        data = await request.json()
-        current_price = data.get("current_price")
-        ttc_seconds = data.get("ttc_seconds")
-        strikes = data.get("strikes")
-        momentum_score = data.get("momentum_score")  # Get from frontend
-        
-        if not all([current_price, ttc_seconds, strikes]):
-            return {"status": "error", "message": "Missing required parameters"}
-        
-        # Convert momentum_score to float if provided
-        if momentum_score is not None:
-            try:
-                momentum_score = float(momentum_score)
-            except (ValueError, TypeError):
-                print(f"Warning: Invalid momentum_score provided: {momentum_score}")
-                momentum_score = None
-        print("API momentum_score received:", momentum_score)  # DEBUG
-        # Calculate directional probabilities with momentum awareness
-        probabilities = calculate_directional_strike_probabilities(
-            current_price=float(current_price),
-            ttc_seconds=float(ttc_seconds),
-            strikes=strikes,
-            momentum_score=momentum_score
-        )
-        
-        # Only return the original fields
-        filtered_probabilities = [
-            {k: row[k] for k in ['strike', 'buffer', 'move_percent', 'prob_beyond', 'prob_within']}
-            for row in probabilities
-        ]
-        return {
-            "status": "ok",
-            "probabilities": filtered_probabilities
-        }
-        
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-@app.get("/api/strike_table")
-def get_strike_table():
-    """
-    Get the current strike table data in the format used by the frontend.
-    This provides the exact data that the frontend uses for Prob and Close values.
-    """
-    try:
-        # Get current core data
-        core_data = get_core_data()
-        current_price = core_data.get("btc_price", 0)
-        ttc_seconds = core_data.get("ttc_seconds", 1)
-        
-        # Get Kalshi markets data
-        markets_data = kalshi_market_snapshot()
-        markets = markets_data.get("markets", [])
-        
-        # Calculate strike table rows
-        strike_table_rows = []
-        
-        for market in markets:
-            try:
-                # Extract strike from ticker (e.g., "KXBTCD-25JUL1617-T119499.99" -> 119499.99)
-                ticker = market.get("ticker", "")
-                if "-T" in ticker:
-                    strike_str = ticker.split("-T")[-1]
-                    strike = float(strike_str)
-                else:
-                    continue
-                
-                # Format strike for display
-                strike_formatted = f"${strike:,.0f}"
-                
-                # Calculate buffer
-                buffer = current_price - strike
-                buffer_display = f"{buffer:,.0f}"
-                
-                # Get probability from yes_ask
-                yes_ask = market.get("yes_ask", 0)
-                prob_display = f"{yes_ask:.1f}" if yes_ask > 0 else "—"
-                
-                # Get ask prices
-                yes_ask_display = str(market.get("yes_ask", "N/A"))
-                no_ask_display = str(market.get("no_ask", "N/A"))
-                
-                # Determine row class based on buffer
-                abs_buffer = abs(buffer)
-                if abs_buffer >= 300:
-                    row_class = "ultra-safe"
-                elif abs_buffer >= 200:
-                    row_class = "safe"
-                elif abs_buffer >= 100:
-                    row_class = "caution"
-                elif abs_buffer >= 50:
-                    row_class = "high-risk"
-                else:
-                    row_class = "danger-stop"
-                
-                strike_table_rows.append({
-                    "strike": strike_formatted,
-                    "buffer": buffer_display,
-                    "prob": prob_display,
-                    "yes_ask": yes_ask_display,
-                    "no_ask": no_ask_display,
-                    "row_class": row_class,
-                    "ticker": ticker
-                })
-                
-            except Exception as e:
-                print(f"Error processing market {market.get('ticker', 'unknown')}: {e}")
-                continue
-        
-        return {
-            "status": "ok",
-            "rows": strike_table_rows,
-            "current_price": current_price,
-            "ttc_seconds": ttc_seconds
-        }
-        
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-@app.get("/api/live_probabilities")
-def get_live_probabilities():
-    """
-    Get the current live probability data from the JSON file.
-    """
-    try:
-        live_prob_path = os.path.join(
-            os.path.dirname(__file__), 
-            'data', 'live_probabilities.json'
-        )
-        
-        if os.path.exists(live_prob_path):
-            with open(live_prob_path, 'r') as f:
-                data = json.load(f)
-            return data
-        else:
-            return {"status": "error", "message": "Live probability file not found"}
-            
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-
-
-
-
-
-
-@app.get("/api/current_fingerprint")
-def get_current_fingerprint():
-    """
-    Get information about the current fingerprint being used by the calculator.
-    Always returns the most recent fingerprint, even after restart, by reading the log if needed.
-    """
-    try:
-        symbol = "btc"  # TODO: Make this dynamic if needed
-        
-        # First, try to read from the debug log to get the most recent bucket
-        log_path = os.path.join(os.path.dirname(__file__), 'data', 'fingerprint_debug.log')
-        if os.path.exists(log_path):
-            with open(log_path, 'r') as f:
-                lines = f.readlines()
-                for line in reversed(lines):
-                    if 'fingerprint=' in line:
-                        parts = line.strip().split(',')
-                        bucket_part = [p for p in parts if p.strip().startswith('bucket=')]
-                        fp_part = [p for p in parts if p.strip().startswith('fingerprint=')]
-                        if bucket_part and fp_part:
-                            bucket_val = bucket_part[0].split('=')[1].strip()
-                            fp_val = fp_part[0].split('=')[1].strip()
-                            try:
-                                bucket_val = int(bucket_val)
-                            except Exception:
-                                pass
-                            return {
-                                "status": "ok",
-                                "fingerprint": fp_val,
-                                "bucket": bucket_val,
-                                "source": "logfile"
-                            }
-        
-        # If no log entry found, fall back to calculator instance
-        calculator = get_directional_calculator(symbol)
-        bucket = getattr(calculator, 'last_used_momentum_bucket', None)
-        if bucket is None:
-            bucket = calculator.current_momentum_bucket
-        if bucket is not None:
-            fingerprint_name = f"{symbol}_fingerprint_directional_momentum_{int(bucket):03d}.csv"
-            return {
-                "status": "ok",
-                "fingerprint": fingerprint_name,
-                "bucket": bucket,
-                "total_loaded": len(calculator.momentum_fingerprints),
-                "source": "calculator"
-            }
-        
-        return {"status": "error", "message": "No momentum bucket is currently loaded or used!"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-
-# Health check endpoints
+# Mount static files
+app.mount("/styles", StaticFiles(directory="frontend/styles"), name="styles")
+app.mount("/images", StaticFiles(directory="frontend/images"), name="images")
+app.mount("/js", StaticFiles(directory="frontend/js"), name="js")
+app.mount("/tabs", StaticFiles(directory="frontend/tabs"), name="tabs")
+app.mount("/audio", StaticFiles(directory="frontend/audio"), name="audio")
+
+# Health check endpoint
 @app.get("/health")
 async def health_check():
-    """Comprehensive health check endpoint."""
-    try:
-        # Basic system info
-        system_info = {
-            "status": "healthy",
-            "timestamp": datetime.now().isoformat(),
-            "service": "main_app",
-            "version": "1.0.0",
-            "uptime": 0  # Will be calculated if startup time is available
-        }
-        
-        # System resources
-        try:
-            system_info.update({
-                "cpu_percent": psutil.cpu_percent(),
-                "memory_percent": psutil.virtual_memory().percent,
-                "disk_percent": psutil.disk_usage('/').percent
-            })
-        except Exception as e:
-            system_info["resource_error"] = str(e)
-        
-        # Database connectivity
-        try:
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM price_log")
-            price_count = cursor.fetchone()[0]
-            conn.close()
-            system_info["database_status"] = "healthy"
-            system_info["price_records"] = price_count
-        except Exception as e:
-            system_info["database_status"] = "error"
-            system_info["database_error"] = str(e)
-        
-        # Service dependencies
-        dependencies = {}
-        try:
-            # Check trade manager
-            trade_manager_port = config.get("agents.trade_manager.port", 5003)
-            resp = requests.get(f"http://localhost:{trade_manager_port}/health", timeout=2)
-            dependencies["trade_manager"] = "healthy" if resp.status_code == 200 else "unhealthy"
-        except Exception as e:
-            dependencies["trade_manager"] = "unreachable"
-        
-        try:
-            # Check trade executor
-            trade_executor_port = config.get("agents.trade_executor.port", 5050)
-            resp = requests.get(f"http://localhost:{trade_executor_port}/health", timeout=2)
-            dependencies["trade_executor"] = "healthy" if resp.status_code == 200 else "unhealthy"
-        except Exception as e:
-            dependencies["trade_executor"] = "unreachable"
-        
-        system_info["dependencies"] = dependencies
-        
-        # Overall health status
-        if any(status == "unhealthy" or status == "unreachable" for status in dependencies.values()):
-            system_info["status"] = "degraded"
-        
-        return JSONResponse(content=system_info)
-        
-    except Exception as e:
-        return JSONResponse(
-            content={
-                "status": "error",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            },
-            status_code=500
-        )
-
-@app.get("/health/simple")
-async def simple_health_check():
-    """Simple health check for load balancers."""
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
-
-@app.get("/system/info")
-async def system_info():
-    """Get detailed system information."""
+    """Health check endpoint."""
     return {
-        "platform": platform.platform(),
-        "python_version": platform.python_version(),
-        "cpu_count": psutil.cpu_count(),
-        "memory_total": psutil.virtual_memory().total,
-        "disk_total": psutil.disk_usage('/').total,
-        "account_mode": get_account_mode(),
-        "config_environment": config.get("system.environment", "unknown")
+        "status": "healthy",
+        "service": "main_app",
+        "port": MAIN_APP_PORT,
+        "timestamp": datetime.now().isoformat(),
+        "port_system": "centralized"
     }
 
+# Port information endpoint
+@app.get("/api/ports")
+async def get_ports():
+    """Get all port assignments from centralized system."""
+    return get_port_info()
 
+# WebSocket connections
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        print(f"[WEBSOCKET] ✅ Client connected. Total clients: {len(self.active_connections)}")
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+        print(f"[WEBSOCKET] ❌ Client disconnected. Total clients: {len(self.active_connections)}")
+
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        await websocket.send_text(message)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except:
+                # Remove dead connections
+                self.active_connections.remove(connection)
+
+manager = ConnectionManager()
+
+# WebSocket endpoint
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            await manager.send_personal_message(f"Message text was: {data}", websocket)
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+
+# Serve main index.html
+@app.get("/", response_class=HTMLResponse)
+async def read_root():
+    with open("index.html", "r") as f:
+        return HTMLResponse(content=f.read())
+
+# Serve favicon
+@app.get("/favicon.ico")
+async def serve_favicon():
+    """Serve favicon."""
+    from fastapi.responses import FileResponse
+    import os
+    file_path = os.path.join("frontend", "images", "icons", "fave.ico")
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
+    else:
+        return {"error": "Favicon not found"}, 404
+
+# Core data endpoint
+@app.get("/core")
+async def get_core_data():
+    """Get core trading data."""
+    try:
+        # Get current time
+        now = datetime.now(pytz.timezone('US/Eastern'))
+        date_str = now.strftime("%A, %B %d, %Y")
+        time_str = now.strftime("%I:%M:%S %p EDT")
+        
+        # Calculate time to close
+        close_time = now.replace(hour=16, minute=0, second=0, microsecond=0)
+        if now.time() >= close_time.time():
+            close_time += timedelta(days=1)
+        ttc_seconds = int((close_time - now).total_seconds())
+        
+        # Get BTC price
+        btc_price = 0
+        try:
+            response = requests.get("https://api.kraken.com/0/public/Ticker?pair=BTCUSD", timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                btc_price = float(data['result']['XXBTZUSD']['c'][0])
+        except Exception as e:
+            print(f"Error fetching BTC price: {e}")
+        
+        # Get latest database price
+        latest_db_price = 0
+        try:
+            trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
+            conn = sqlite3.connect(trades_db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT buy_price FROM trades ORDER BY date DESC, time DESC LIMIT 1")
+            result = cursor.fetchone()
+            if result:
+                latest_db_price = result[0]
+            conn.close()
+        except Exception as e:
+            print(f"Error getting latest DB price: {e}")
+        
+        # Calculate deltas
+        deltas = {}
+        try:
+            trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
+            conn = sqlite3.connect(trades_db_path)
+            cursor = conn.cursor()
+            
+            # Get recent prices for delta calculations
+            cursor.execute("""
+                SELECT buy_price, date, time FROM trades 
+                WHERE date >= date('now', '-1 day')
+                ORDER BY date DESC, time DESC LIMIT 10
+            """)
+            recent_trades = cursor.fetchall()
+            conn.close()
+            
+            if recent_trades:
+                # Calculate price deltas
+                prices = [trade[0] for trade in recent_trades]
+                if len(prices) > 1:
+                    deltas["1h"] = prices[0] - prices[-1]
+                    deltas["30m"] = prices[0] - prices[2] if len(prices) > 2 else 0
+                    deltas["15m"] = prices[0] - prices[1] if len(prices) > 1 else 0
+                    
+        except Exception as e:
+            print(f"Error calculating deltas: {e}")
+        
+        # Get volume data
+        volume_data = {}
+        try:
+            trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
+            conn = sqlite3.connect(trades_db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT COUNT(*) as trade_count, AVG(buy_price) as avg_price
+                FROM trades 
+                WHERE date >= date('now', '-1 day')
+            """)
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result:
+                volume_data["trade_count"] = result[0]
+                volume_data["avg_price"] = result[1] if result[1] else 0
+                
+        except Exception as e:
+            print(f"Error getting volume data: {e}")
+        
+        # Get Kraken changes
+        kraken_changes = {}
+        try:
+            response = requests.get("https://api.kraken.com/0/public/Ticker?pair=BTCUSD", timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                ticker = data['result']['XXBTZUSD']
+                
+                # Calculate changes
+                current_price = float(ticker['c'][0])
+                for period in ['1h', '3h', '1d']:
+                    if period == '1h':
+                        old_price = float(ticker['p'][0])  # 24h low as proxy
+                    elif period == '3h':
+                        old_price = float(ticker['p'][0])  # 24h low as proxy
+                    else:  # 1d
+                        old_price = float(ticker['p'][0])  # 24h low as proxy
+                    
+                    change = (current_price - old_price) / old_price
+                    kraken_changes[f"change{period}"] = change
+        except Exception as e:
+            print(f"Error getting Kraken changes: {e}")
+        
+        # Get Kalshi markets (placeholder)
+        kalshi_markets = []
+        
+        return {
+            "date": date_str,
+            "time": time_str,
+            "ttc_seconds": ttc_seconds,
+            "btc_price": btc_price,
+            "latest_db_price": latest_db_price,
+            "timestamp": datetime.now().isoformat(),
+            **deltas,
+            **volume_data,
+            "status": "online",
+            "volScore": 0,
+            "volSpike": 0,
+            **kraken_changes,
+            "kalshi_markets": kalshi_markets
+        }
+    except Exception as e:
+        print(f"Error in core data: {e}")
+        return {"error": str(e)}
+
+# Account mode endpoints
+@app.get("/api/get_account_mode")
+async def get_account_mode():
+    """Get current account mode."""
+    return {"mode": get_account_mode()}
+
+@app.post("/api/set_account_mode")
+async def set_account_mode(mode_data: dict):
+    """Set account mode."""
+    from backend.account_mode import set_account_mode
+    mode = mode_data.get("mode")
+    if mode in ["prod", "demo"]:
+        set_account_mode(mode)
+        return {"status": "success", "mode": mode}
+    return {"status": "error", "message": "Invalid mode"}
+
+# Trade data endpoints
+@app.get("/trades")
+async def get_trades(status: Optional[str] = None):
+    """Get trade data."""
+    try:
+        trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
+        conn = sqlite3.connect(trades_db_path)
+        cursor = conn.cursor()
+        
+        if status:
+            cursor.execute("SELECT * FROM trades WHERE status = ? ORDER BY date DESC, time DESC LIMIT 100", (status,))
+        else:
+            cursor.execute("SELECT * FROM trades ORDER BY date DESC, time DESC LIMIT 100")
+        
+        trades = cursor.fetchall()
+        conn.close()
+        
+        # Get column names from cursor description
+        columns = [desc[0] for desc in cursor.description]
+        
+        # Convert to list of dictionaries
+        result = []
+        for trade in trades:
+            trade_dict = dict(zip(columns, trade))
+            
+            # Create a combined timestamp field for frontend compatibility
+            if 'date' in trade_dict and 'time' in trade_dict:
+                trade_dict['timestamp'] = f"{trade_dict['date']} {trade_dict['time']}"
+            
+            # Create a combined price field for frontend compatibility
+            if 'buy_price' in trade_dict:
+                trade_dict['price'] = trade_dict['buy_price']
+            
+            result.append(trade_dict)
+        
+        return result
+    except Exception as e:
+        print(f"Error getting trades: {e}")
+        return []
+
+# Additional endpoints for other data
+@app.get("/btc_price_changes")
+async def get_btc_changes():
+    """Get BTC price changes."""
+    try:
+        response = requests.get("https://api.kraken.com/0/public/Ticker?pair=BTCUSD", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            ticker = data['result']['XXBTZUSD']
+            
+            current_price = float(ticker['c'][0])
+            changes = {}
+            
+            for period in ['1h', '3h', '1d']:
+                if period == '1h':
+                    old_price = float(ticker['p'][0])
+                elif period == '3h':
+                    old_price = float(ticker['p'][0])
+                else:
+                    old_price = float(ticker['p'][0])
+                
+                change = (current_price - old_price) / old_price
+                changes[f"change{period}"] = change
+            
+            print(f"[Kraken Changes] {changes}")
+            return changes
+    except Exception as e:
+        print(f"Error getting BTC changes: {e}")
+        return {}
+
+@app.get("/kalshi_market_snapshot")
+async def get_kalshi_snapshot():
+    """Get Kalshi market snapshot."""
+    try:
+        # Placeholder for Kalshi data
+        return {"markets": []}
+    except Exception as e:
+        print(f"Error getting Kalshi snapshot: {e}")
+        return {"markets": []}
+
+# API endpoints for account data
+@app.get("/api/account/balance")
+async def get_account_balance(mode: str = "prod"):
+    """Get account balance."""
+    try:
+        balance_file = os.path.join(get_accounts_data_dir(), "kalshi", mode, "account_balance.json")
+        if os.path.exists(balance_file):
+            with open(balance_file, 'r') as f:
+                return json.load(f)
+        return {"balance": 0}
+    except Exception as e:
+        print(f"Error getting account balance: {e}")
+        return {"balance": 0}
+
+@app.get("/api/db/fills")
+async def get_fills():
+    """Get fills data."""
+    try:
+        fills_file = os.path.join(get_accounts_data_dir(), "kalshi", "prod", "fills.json")
+        if os.path.exists(fills_file):
+            with open(fills_file, 'r') as f:
+                return json.load(f)
+        return []
+    except Exception as e:
+        print(f"Error getting fills: {e}")
+        return []
+
+@app.get("/api/db/positions")
+async def get_positions():
+    """Get positions data."""
+    try:
+        positions_file = os.path.join(get_accounts_data_dir(), "kalshi", "prod", "positions.json")
+        if os.path.exists(positions_file):
+            with open(positions_file, 'r') as f:
+                return json.load(f)
+        return []
+    except Exception as e:
+        print(f"Error getting positions: {e}")
+        return []
+
+@app.get("/api/db/settlements")
+async def get_settlements():
+    """Get settlements data."""
+    try:
+        settlements_file = os.path.join(get_accounts_data_dir(), "kalshi", "prod", "settlements.json")
+        if os.path.exists(settlements_file):
+            with open(settlements_file, 'r') as f:
+                return json.load(f)
+        return []
+    except Exception as e:
+        print(f"Error getting settlements: {e}")
+        return []
+
+# Fingerprint and strike probability endpoints
+@app.get("/api/current_fingerprint")
+async def get_current_fingerprint():
+    """Get current fingerprint."""
+    try:
+        # Placeholder for fingerprint logic
+        return {"fingerprint": "current_fingerprint"}
+    except Exception as e:
+        print(f"Error getting fingerprint: {e}")
+        return {"fingerprint": "error"}
+
+@app.post("/api/strike_probabilities")
+async def calculate_strike_probabilities(data: dict):
+    """Calculate strike probabilities."""
+    try:
+        momentum_score = data.get("momentum_score", 0)
+        print(f"API momentum_score received: {momentum_score}")
+        
+        # Placeholder for strike probability calculation
+        return {"probabilities": []}
+    except Exception as e:
+        print(f"Error calculating strike probabilities: {e}")
+        return {"probabilities": []}
+
+# Startup and shutdown events
+@app.on_event("startup")
+async def startup_event():
+    """Called when the application starts."""
+    print(f"[MAIN] 🚀 Main app started on centralized port {MAIN_APP_PORT}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Called when the application shuts down."""
+    print("[MAIN] 🛑 Main app shutting down")
+    # No port release needed for static ports
+
+# Main entry point
 if __name__ == "__main__":
-    import uvicorn
-    port = get_main_app_port()
-    print(f"[MAIN] Launching app on port {port}")
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    print(f"[MAIN] 🚀 Launching app on centralized port {MAIN_APP_PORT}")
+    uvicorn.run(app, host="0.0.0.0", port=MAIN_APP_PORT)
 
