@@ -91,34 +91,26 @@ function fetchOtherCoreData() {
 // Fetch BTC price changes from backend API and update ticker panel
 async function fetchBTCPriceChanges() {
   try {
-    console.log('[LIVE-DATA] Fetching BTC price changes...');
     const res = await fetch('/btc_price_changes');
     if (!res.ok) throw new Error('Failed to fetch BTC price changes');
     const data = await res.json();
-    console.log('[LIVE-DATA] BTC changes data:', data);
     
     if ('change1h' in data) {
       const el = document.getElementById('change-1h');
-      console.log('[LIVE-DATA] change-1h element:', el);
       if (el) {
         decorateChange(el, data.change1h);
-        console.log('[LIVE-DATA] Updated change-1h to:', el.textContent);
       }
     }
     if ('change3h' in data) {
       const el = document.getElementById('change-3h');
-      console.log('[LIVE-DATA] change-3h element:', el);
       if (el) {
         decorateChange(el, data.change3h);
-        console.log('[LIVE-DATA] Updated change-3h to:', el.textContent);
       }
     }
     if ('change1d' in data) {
       const el = document.getElementById('change-1d');
-      console.log('[LIVE-DATA] change-1d element:', el);
       if (el) {
         decorateChange(el, data.change1d);
-        console.log('[LIVE-DATA] Updated change-1d to:', el.textContent);
       }
     }
   } catch (error) {
@@ -194,12 +186,10 @@ async function fetchAndUpdate() {
 // Fetch the raw market title from backend
 async function fetchMarketTitleRaw() {
   try {
-    console.log('[LIVE-DATA] Fetching market title from dedicated service...');
     // Call the dedicated market title service instead of main.py
     const res = await fetch('http://localhost:8006/market_title');
     const data = await res.json();
     window.CurrentMarketTitleRaw = data.title || "";
-    console.log('[LIVE-DATA] Market title fetched:', window.CurrentMarketTitleRaw);
   } catch (e) {
     window.CurrentMarketTitleRaw = "";
     console.error("Error fetching market title:", e);
@@ -209,12 +199,8 @@ async function fetchMarketTitleRaw() {
 // Update the strike panel market title display with formatting
 function updateStrikePanelMarketTitle() {
   const cell = document.getElementById('strikePanelMarketTitleCell');
-  console.log('[LIVE-DATA] updateStrikePanelMarketTitle called');
-  console.log('[LIVE-DATA] Cell element:', cell);
-  console.log('[LIVE-DATA] CurrentMarketTitleRaw:', window.CurrentMarketTitleRaw);
   
   if (!cell || !window.CurrentMarketTitleRaw) {
-    console.log('[LIVE-DATA] Missing cell or title data');
     return;
   }
 
@@ -223,7 +209,6 @@ function updateStrikePanelMarketTitle() {
   const formattedTitle = `Bitcoin price today at ${timeStr}?`;
   cell.textContent = formattedTitle;
   cell.style.color = "white";
-  console.log('[LIVE-DATA] Updated market title to:', formattedTitle);
 }
 
 // === TTC CLOCK FUNCTIONS ===

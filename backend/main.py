@@ -378,7 +378,7 @@ async def get_core_data():
 
 # Account mode endpoints
 @app.get("/api/get_account_mode")
-async def get_account_mode():
+async def get_account_mode_endpoint():
     """Get current account mode."""
     return {"mode": get_account_mode()}
 
@@ -431,6 +431,35 @@ async def get_trades(status: Optional[str] = None):
     except Exception as e:
         print(f"Error getting trades: {e}")
         return []
+
+@app.post("/trades")
+async def create_trade(trade_data: dict):
+    """Forward trade ticket to trade_manager."""
+    try:
+        # Get trade_manager port from centralized system
+        trade_manager_port = get_port("trade_manager")
+        trade_manager_url = f"http://localhost:{trade_manager_port}/trades"
+        
+        print(f"[MAIN] Forwarding trade ticket to trade_manager at {trade_manager_url}")
+        
+        # Forward the request to trade_manager
+        response = requests.post(
+            trade_manager_url,
+            json=trade_data,
+            headers={"Content-Type": "application/json"},
+            timeout=10
+        )
+        
+        if response.status_code == 201:
+            print(f"[MAIN] ✅ Trade ticket forwarded successfully to trade_manager")
+            return response.json()
+        else:
+            print(f"[MAIN] ❌ Trade ticket forwarding failed: {response.status_code}")
+            return {"error": f"Trade manager returned status {response.status_code}"}
+            
+    except Exception as e:
+        print(f"[MAIN] ❌ Error forwarding trade ticket: {e}")
+        return {"error": str(e)}
 
 # Additional endpoints for other data
 @app.get("/btc_price_changes")
@@ -570,7 +599,10 @@ def get_positions():
         positions_file = os.path.join(get_accounts_data_dir(), "kalshi", mode, "positions.json")
         if os.path.exists(positions_file):
             with open(positions_file, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+                # Extract market_positions and return as positions array
+                positions = data.get("market_positions", [])
+                return {"positions": positions}
         return {"positions": []}
     except Exception as e:
         print(f"Error getting positions: {e}")

@@ -79,18 +79,134 @@ async def positions_change(request: Request):
         print(f"Error processing positions change: {e}")
         return {"status": "error", "message": str(e)}
 
-# Trade execution endpoint
-@app.post("/api/execute_trade")
-async def execute_trade(request: Request):
-    """Execute a trade."""
+# Trade execution endpoint (restored from original working version)
+@app.post("/trades")
+async def add_trade(request: Request):
+    """Add a new trade (restored from original working version)."""
     try:
         data = await request.json()
         print(f"[🔔 TRADE EXECUTION REQUEST] {data}")
         
-        # Here you would implement your trade execution logic
-        # For now, just log the request
+        # Handle close trades
+        intent = data.get("intent", "open").lower()
+        if intent == "close":
+            print("[DEBUG] CLOSE TICKET RECEIVED")
+            print("[DEBUG] Close Payload:", data)
+            ticker = data.get("ticker")
+            if ticker:
+                # Update trade status to closing
+                from backend.util.paths import get_trade_history_dir
+                import sqlite3
+                trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
+                conn = sqlite3.connect(trades_db_path)
+                cursor = conn.cursor()
+                sell_price = data.get("buy_price")
+                symbol_close = data.get("symbol_close")
+                cursor.execute("UPDATE trades SET status = 'closing', symbol_close = ? WHERE ticker = ?", (symbol_close, ticker))
+                conn.commit()
+                conn.close()
+                print(f"[DEBUG] Trade status set to 'closing' for ticker: {ticker}")
+                
+                # Send close trade to executor
+                try:
+                    executor_port = get_port("trade_executor")
+                    print(f"[CLOSE EXECUTOR] Sending close trade to executor on port {executor_port}")
+                    close_payload = {
+                        "ticker": ticker,
+                        "side": data.get("side"),
+                        "count": data.get("count"),
+                        "action": "close",
+                        "type": "market",
+                        "time_in_force": "IOC",
+                        "buy_price": sell_price,
+                        "symbol_close": symbol_close,
+                        "intent": "close"
+                    }
+                    import requests
+                    response = requests.post(f"http://localhost:{executor_port}/trigger_trade", json=close_payload, timeout=5)
+                    print(f"[CLOSE EXECUTOR] Executor responded with {response.status_code}: {response.text}")
+                except Exception as e:
+                    print(f"[CLOSE EXECUTOR ERROR] Failed to send close trade to executor: {e}")
+            
+            return {"message": "Close ticket received"}
         
-        return {"status": "success", "message": "Trade execution request received"}
+        # Handle open trades
+        print("✅ TRADE MANAGER received POST")
+        required_fields = {"date", "time", "strike", "side", "buy_price", "position"}
+        if not required_fields.issubset(data.keys()):
+            return {"status": "error", "message": "Missing required trade fields"}
+        
+        # Write trade to trades.db
+        from backend.util.paths import get_trade_history_dir
+        import sqlite3
+        
+        trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
+        os.makedirs(os.path.dirname(trades_db_path), exist_ok=True)
+        
+        conn = sqlite3.connect(trades_db_path)
+        cursor = conn.cursor()
+        
+        # Create trades table if it doesn't exist
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS trades (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticket_id TEXT UNIQUE,
+                status TEXT,
+                date TEXT,
+                time TEXT,
+                symbol TEXT,
+                market TEXT,
+                trade_strategy TEXT,
+                contract TEXT,
+                strike TEXT,
+                side TEXT,
+                ticker TEXT,
+                buy_price REAL,
+                symbol_open REAL,
+                symbol_close REAL,
+                momentum REAL,
+                prob TEXT,
+                position INTEGER,
+                win_loss REAL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Insert the trade with pending status
+        data['status'] = 'pending'
+        cursor.execute('''
+            INSERT INTO trades (
+                ticket_id, status, date, time, symbol, market, trade_strategy,
+                contract, strike, side, ticker, buy_price, symbol_open,
+                symbol_close, momentum, prob, position, win_loss
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data['ticket_id'], data['status'], data['date'], data['time'],
+            data['symbol'], data['market'], data['trade_strategy'],
+            data['contract'], data['strike'], data['side'], data['ticker'],
+            data['buy_price'], data['symbol_open'], data['symbol_close'],
+            data['momentum'], data['prob'], data.get('position'), data.get('win_loss')
+        ))
+        
+        trade_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        print(f"[✅ TRADE WRITTEN TO DB] Ticket: {data['ticket_id']}, ID: {trade_id}")
+        
+        # Send trade to executor
+        try:
+            executor_port = get_port("trade_executor")
+            print(f"📤 SENDING TO EXECUTOR on port {executor_port}")
+            print(f"📤 FULL URL: http://localhost:{executor_port}/trigger_trade")
+            import requests
+            response = requests.post(f"http://localhost:{executor_port}/trigger_trade", json=data, timeout=5)
+            print(f"[EXECUTOR RESPONSE] {response.status_code} — {response.text}")
+        except Exception as e:
+            print(f"[❌ EXECUTOR ERROR] Failed to send trade to executor: {e}")
+        
+        return {"id": trade_id, "status": "success", "message": "Trade created and sent to executor"}
+        
     except Exception as e:
         print(f"Error executing trade: {e}")
         return {"status": "error", "message": str(e)}
@@ -152,6 +268,55 @@ async def get_fills():
     except Exception as e:
         print(f"Error getting fills: {e}")
         return []
+
+# Status update endpoint
+@app.post("/api/update_trade_status")
+async def update_trade_status_api(request: Request):
+    """Handle status updates from the trade executor."""
+    try:
+        data = await request.json()
+        id = data.get("id")
+        ticket_id = data.get("ticket_id")
+        new_status = data.get("status", "").strip().lower()
+        print(f"[🔥 STATUS UPDATE API HIT] ticket_id={ticket_id} | id={id} | new_status={new_status}")
+
+        if not new_status or (not id and not ticket_id):
+            return {"error": "Missing id or ticket_id or status"}
+
+        # If id is not provided, try to fetch it via ticket_id
+        if not id and ticket_id:
+            from backend.util.paths import get_trade_history_dir
+            trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
+            conn = sqlite3.connect(trades_db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM trades WHERE ticket_id = ?", (ticket_id,))
+            row = cursor.fetchone()
+            conn.close()
+            if not row:
+                return {"error": "Trade with provided ticket_id not found"}
+            id = row[0]
+
+        # Update trade status in database
+        from backend.util.paths import get_trade_history_dir
+        trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
+        conn = sqlite3.connect(trades_db_path)
+        cursor = conn.cursor()
+        
+        if new_status == "accepted":
+            cursor.execute("UPDATE trades SET status = 'open' WHERE id = ?", (id,))
+            print(f"[✅ TRADE ACCEPTED BY EXECUTOR] id={id}, ticket_id={ticket_id}")
+        elif new_status == "error":
+            cursor.execute("UPDATE trades SET status = 'error' WHERE id = ?", (id,))
+            print(f"[❌ TRADE ERROR] id={id}, ticket_id={ticket_id}")
+        
+        conn.commit()
+        conn.close()
+        
+        return {"message": f"Trade status updated to {new_status}", "id": id}
+        
+    except Exception as e:
+        print(f"Error updating trade status: {e}")
+        return {"error": str(e)}
 
 # System status endpoint
 @app.get("/api/system_status")

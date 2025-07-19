@@ -1,7 +1,7 @@
 import sys
 import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 from backend.util.paths import get_project_root
-sys.path.insert(0, get_project_root())
 from backend.core.config.settings import config
 from backend.account_mode import get_account_mode
 import requests

@@ -27,7 +27,15 @@ window.executeTrade = async function(tradeData) {
   }
 
   // Validate trade data
+  console.log('🔍 DEBUG: executeTrade - validating trade data:', {
+    tradeData: !!tradeData,
+    symbol: tradeData?.symbol,
+    side: tradeData?.side,
+    buy_price: tradeData?.buy_price
+  });
+  
   if (!tradeData || !tradeData.symbol || !tradeData.side || !tradeData.buy_price) {
+    console.log('❌ DEBUG: executeTrade - validation failed');
     return { success: false, error: 'Invalid trade data' };
   }
 
@@ -265,20 +273,42 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
 
 // Function to prepare trade data from button click
 window.prepareTradeData = function(target) {
+  console.log('🔍 DEBUG: prepareTradeData called with target:', target);
+  
   const btn = target;
-  if (btn?.disabled) return null;
+  console.log('🔍 DEBUG: btn element:', btn);
+  console.log('🔍 DEBUG: btn.disabled:', btn?.disabled);
+  
+  if (btn?.disabled) {
+    console.log('❌ DEBUG: Button is disabled, returning null');
+    return null;
+  }
 
-  const btnText = btn?.textContent?.trim() || '';
-  const buy_price = parseFloat((parseFloat(btnText) / 100).toFixed(2));
+  // Get the actual ask price from data attribute (not the display text)
+  const askPrice = btn?.dataset?.askPrice;
+  console.log('🔍 DEBUG: askPrice from data attribute:', askPrice);
+  
+  let buy_price = 0;
+  if (askPrice) {
+    // Convert from cents to dollars (e.g., "96" becomes 0.96)
+    buy_price = parseFloat(askPrice) / 100;
+  } else {
+    console.log('❌ DEBUG: No ask price found in data attribute');
+  }
+  
+  console.log('🔍 DEBUG: buy_price calculated:', buy_price);
 
   const posInput = document.getElementById('position-size');
   const rawBasePos = posInput ? parseInt(posInput.value, 10) : NaN;
   const validBase = Number.isFinite(rawBasePos) && rawBasePos > 0 ? rawBasePos : null;
+  console.log('🔍 DEBUG: position input:', { posInput: posInput?.value, rawBasePos, validBase });
 
   const multiplierBtn = document.querySelector('.multiplier-btn.active');
   const multiplier = multiplierBtn ? parseInt(multiplierBtn.dataset.multiplier, 10) : 1;
+  console.log('🔍 DEBUG: multiplier:', { multiplierBtn: multiplierBtn?.dataset?.multiplier, multiplier });
 
   const position = validBase !== null ? validBase * multiplier : null;
+  console.log('🔍 DEBUG: final position:', position);
 
   const symbol = typeof getSelectedSymbol === 'function' ? getSelectedSymbol() : 'BTC';
   const contract = typeof getTruncatedMarketTitle === 'function' ? getTruncatedMarketTitle() : 'BTC Market';
@@ -322,23 +352,47 @@ window.prepareTradeData = function(target) {
   let prob = null;
   if (strike) {
     const strikeFormatted = '$' + Number(strike).toLocaleString();
+    console.log('🔍 DEBUG: Looking for strike:', strikeFormatted);
+    
     const strikeTableRows = document.querySelectorAll('#strike-table tbody tr');
+    console.log('🔍 DEBUG: Found', strikeTableRows.length, 'strike table rows');
+    
     for (const row of strikeTableRows) {
       const firstTd = row.querySelector('td');
       if (!firstTd) continue;
       const firstTdText = firstTd.textContent.trim();
+      console.log('🔍 DEBUG: Checking row with first cell:', firstTdText);
+      
       if (firstTdText === strikeFormatted) {
+        console.log('🔍 DEBUG: Found matching strike row!');
         const tds = row.querySelectorAll('td');
+        console.log('🔍 DEBUG: Row has', tds.length, 'cells');
+        
         if (tds.length > 3) {
           const probText = tds[3].textContent.trim(); // FIXED: Use the Prob column
+          console.log('🔍 DEBUG: Probability cell text:', probText);
+          
           if (probText && probText !== '—') {
             prob = probText; // Keep as string (e.g., "97.6")
+            console.log('🔍 DEBUG: Found probability:', prob);
+          } else {
+            console.log('🔍 DEBUG: Probability cell is empty or "—"');
           }
+        } else {
+          console.log('🔍 DEBUG: Row has fewer than 4 cells');
         }
         break;
       }
     }
+    
+    if (!prob) {
+      console.log('❌ DEBUG: No probability found for strike', strikeFormatted);
+      console.log('❌ DEBUG: Returning null - trade execution will fail');
+    }
+  } else {
+    console.log('❌ DEBUG: No strike found from button context');
   }
+
   if (!prob) {
     return null;
   }
@@ -383,3 +437,10 @@ window.getTradeState = function() {
 };
 
 // Initialize the controller 
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('Trade execution controller initialized');
+  console.log('window.executeTrade available:', typeof window.executeTrade === 'function');
+  console.log('window.prepareTradeData available:', typeof window.prepareTradeData === 'function');
+  console.log('TRADE_CONFIG:', window.TRADE_CONFIG);
+  console.log('TRADE_STATE:', window.TRADE_STATE);
+}); 

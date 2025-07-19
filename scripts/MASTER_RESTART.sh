@@ -257,23 +257,40 @@ master_restart() {
     stop_supervisor
     echo ""
     
-    # Step 2: Flush all ports
-    print_status "Step 2: Flushing all ports..."
+    # Step 2: Force kill all Python processes related to our project
+    print_status "Step 2: Force killing all related Python processes..."
+    pkill -f "python.*backend" || true
+    pkill -f "python.*main.py" || true
+    pkill -f "python.*trade_manager.py" || true
+    pkill -f "python.*trade_executor.py" || true
+    pkill -f "python.*active_trade_supervisor.py" || true
+    pkill -f "python.*btc_price_watchdog.py" || true
+    pkill -f "python.*db_poller.py" || true
+    pkill -f "python.*kalshi_account_sync.py" || true
+    pkill -f "python.*kalshi_api_watchdog.py" || true
+    pkill -f "python.*market_title_service.py" || true
+    
+    # Wait for processes to fully terminate
+    sleep 3
+    echo ""
+    
+    # Step 3: Flush all ports
+    print_status "Step 3: Flushing all ports..."
     flush_all_ports
     echo ""
     
-    # Step 3: Start supervisor
-    print_status "Step 3: Starting supervisor..."
+    # Step 4: Start supervisor
+    print_status "Step 4: Starting supervisor..."
     start_supervisor
     echo ""
     
-    # Step 4: Restart all services
-    print_status "Step 4: Restarting all services..."
+    # Step 5: Restart all services
+    print_status "Step 5: Restarting all services..."
     restart_all_services
     echo ""
     
-    # Step 5: Verify everything is running
-    print_status "Step 5: Verifying all services..."
+    # Step 6: Verify everything is running
+    print_status "Step 6: Verifying all services..."
     verify_services
     echo ""
     
@@ -356,7 +373,7 @@ main() {
             quick_restart
             ;;
         "emergency"|"force")
-            emergency_restart
+            master_restart
             ;;
         "status")
             show_status
@@ -368,17 +385,17 @@ main() {
             echo "Usage: $0 [COMMAND]"
             echo ""
             echo "Commands:"
-            echo "  master, full    - Complete restart with port flushing (default)"
-            echo "  quick           - Quick supervisor restart only"
-            echo "  emergency, force - Force kill all processes and restart"
+            echo "  master, full    - Complete MASTER RESTART with process cleanup (default)"
+            echo "  quick           - Quick supervisor restart only (no process cleanup)"
+            echo "  emergency, force - Same as master restart (legacy alias)"
             echo "  status          - Show current system status"
             echo "  flush           - Flush all ports only"
             echo "  help            - Show this help message"
             echo ""
             echo "Examples:"
-            echo "  $0              # Master restart (default)"
-            echo "  $0 quick        # Quick restart"
-            echo "  $0 emergency    # Emergency restart"
+            echo "  $0              # MASTER RESTART (default) - KILLS ALL PROCESSES"
+            echo "  $0 quick        # Quick restart (supervisor only)"
+            echo "  $0 emergency    # Same as default (legacy)"
             echo "  $0 status       # Show status"
             ;;
         *)

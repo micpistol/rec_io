@@ -7,7 +7,7 @@ import os
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional
-from core.port_config import get_port
+from backend.core.port_config import get_port
 
 class ConfigManager:
     """Centralized configuration management for all trading system agents."""

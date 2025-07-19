@@ -19,7 +19,8 @@ DEFAULT_PORTS = {
     "btc_price_watchdog": 8002,
     "db_poller": 8003,
     "kalshi_account_sync": 8004,
-    "kalshi_api_watchdog": 8005
+    "kalshi_api_watchdog": 8005,
+    "market_title_service": 8006
 }
 
 def ensure_port_config_exists():

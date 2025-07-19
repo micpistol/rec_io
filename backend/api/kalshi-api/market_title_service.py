@@ -3,7 +3,13 @@ MARKET TITLE SERVICE
 Dedicated service for serving market title data directly from Kalshi watchdog
 """
 
+import sys
 import os
+# Add the project root to the Python path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 import json
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -51,4 +57,10 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8006) 
+    from backend.core.port_config import get_port
+    
+    # Get port from centralized system
+    MARKET_TITLE_PORT = get_port("market_title_service")
+    print(f"[MARKET_TITLE_SERVICE] 🚀 Using centralized port: {MARKET_TITLE_PORT}")
+    
+    uvicorn.run(app, host="0.0.0.0", port=MARKET_TITLE_PORT) 

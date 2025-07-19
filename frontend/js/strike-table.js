@@ -233,30 +233,10 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
       const isYesActive = (volume >= 1000) && yesAsk > noAsk && yesAsk < 99 && yesAsk >= 40;
       const isNoActive = (volume >= 1000) && noAsk > yesAsk && noAsk < 99 && noAsk >= 40;
       
-      // Always show actual ask prices unless there's a specific reason not to
-      let yesValue = yesAsk;
-      let noValue = noAsk;
-      
-      if (diffMode) {
-        // DIFF MODE: Show probability - ask price difference in enabled button
-        let prob = probMap && probMap.has(strike) ? probMap.get(strike) : null;
-        if (prob !== null && prob !== undefined) {
-          if (isYesActive) {
-            const diff = Math.round(prob - yesAsk);
-            yesValue = diff > 0 ? `+${diff}` : `${diff}`;
-            // noValue stays as noAsk (actual price)
-          } else if (isNoActive) {
-            const diff = Math.round(prob - noAsk);
-            noValue = diff > 0 ? `+${diff}` : `${diff}`;
-            // yesValue stays as yesAsk (actual price)
-          }
-        }
-        // If no probability data or neither button is active, both values stay as actual ask prices
-      }
-      // In PRICE MODE, both values stay as actual ask prices
-      
-      updateYesNoButton(yesSpan, strike, "yes", yesValue, isYesActive, ticker);
-      updateYesNoButton(noSpan, strike, "no", noValue, isNoActive, ticker);
+      // Always pass actual ask prices to updateYesNoButton for trade execution
+      // Display values will be set inside updateYesNoButton based on mode
+      updateYesNoButton(yesSpan, strike, "yes", yesAsk, isYesActive, ticker, false, diffMode, probMap?.get(strike));
+      updateYesNoButton(noSpan, strike, "no", noAsk, isNoActive, ticker, false, diffMode, probMap?.get(strike));
     }
     updatePositionIndicator(cells.row.children[0], strike);
   });
@@ -366,7 +346,7 @@ function debounce(func, wait) {
 }
 
 // Helper function to update Yes/No button with conditional redraw
-function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = null, forceRefresh = false) {
+function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = null, forceRefresh = false, diffMode = false, probability = null) {
   const key = `${strike}-${side}`;
   const prev = lastButtonStates.get(key);
   
@@ -375,8 +355,19 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
     return;
   }
 
-  // Handle both numeric and string values
-  const displayValue = (askPrice && askPrice !== '—' && askPrice !== 0) ? askPrice : '—';
+  // Determine display value based on mode
+  let displayValue = '—';
+  if (askPrice && askPrice !== '—' && askPrice !== 0) {
+    if (diffMode && probability !== null && isActive) {
+      // DIFF MODE: Show probability - ask price difference for active button
+      const diff = Math.round(probability - askPrice);
+      displayValue = diff > 0 ? `+${diff}` : `${diff}`;
+    } else {
+      // PRICE MODE or inactive button: Show actual ask price
+      displayValue = askPrice;
+    }
+  }
+  
   spanEl.textContent = displayValue;
   spanEl.className = isActive ? 'price-box' : 'price-box disabled';
   spanEl.style.cursor = isActive ? 'pointer' : 'default';
@@ -399,16 +390,21 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
   // Set data-strike and data-side for easier retrieval in openTrade
   spanEl.setAttribute('data-strike', strike);
   spanEl.setAttribute('data-side', side);
+  
+  // Store the actual ask price for trade execution (not the display value)
+  if (askPrice && askPrice !== '—' && askPrice !== 0) {
+    spanEl.setAttribute('data-ask-price', askPrice);
+  } else {
+    spanEl.removeAttribute('data-ask-price');
+  }
 
   if (isActive) {
     spanEl.onclick = debounce(function(event) {
-      
-      // Use centralized trade controller
-      if (typeof window.prepareTradeData === 'function' && typeof window.executeTrade === 'function') {
-        const tradeData = window.prepareTradeData(spanEl);
-        if (tradeData) {
-          window.executeTrade(tradeData);
-        }
+      // Call master openTrade function
+      if (typeof openTrade === 'function') {
+        openTrade(spanEl);
+      } else {
+        console.error('openTrade function not available');
       }
     }, 300);
   } else {

@@ -731,36 +731,61 @@ rowFlashStyle.innerHTML = `
 `;
 document.head.appendChild(rowFlashStyle);
 
+// === MASTER OPEN TRADE FUNCTION ===
+// This is the single entry point for all trade execution
 function openTrade(target) {
-  // Use centralized trade execution controller
   const btn = target;
   if (btn?.disabled) return;
+  
+  // === STEP 1: PREPARE TRADE DATA BEFORE DISABLING BUTTON ===
+  console.log('🔍 DEBUG: openTrade - prepareTradeData available:', typeof window.prepareTradeData === 'function');
+  console.log('🔍 DEBUG: openTrade - btn element:', btn);
+  
+  // Use existing centralized trade preparation BEFORE disabling button
+  const tradeData = window.prepareTradeData ? window.prepareTradeData(btn) : null;
+  
+  console.log('🔍 DEBUG: openTrade - tradeData result:', tradeData);
+  
+  if (!tradeData) {
+    console.error('Failed to prepare trade data');
+    return;
+  }
+  
+  // === STEP 2: IMMEDIATE FEEDBACK & PROTECTION ===
   btn.disabled = true;
-
-  // --- Visual feedback: row flash highlight ---
+  
+  // Visual feedback: row flash highlight
   let row = btn.closest('tr');
   if (row) {
     row.classList.add('strike-row-flash');
     setTimeout(() => row.classList.remove('strike-row-flash'), 600);
   }
-
-  // Defer to centralized controller
+  
+  // === STEP 3: INSTANTANEOUS AUDIO/VISUAL ALERTS ===
+  // Play sound immediately
+  if (typeof playSound === 'function') {
+    playSound('open');
+  }
+  
+  // Show popup immediately
+  if (typeof showTradeOpenedPopup === 'function') {
+    showTradeOpenedPopup();
+  }
+  
+  // === STEP 4: EXECUTE TRADE USING EXISTING FUNCTIONS ===
   setTimeout(async () => {
     try {
-      // Prepare trade data using centralized helper
-      const tradeData = window.prepareTradeData ? window.prepareTradeData(btn) : null;
-      
-      if (!tradeData) {
-        console.error('Failed to prepare trade data');
-        setTimeout(() => (btn.disabled = false), 500);
-        return;
-      }
-
-      // Execute trade using centralized controller
       const result = await window.executeTrade(tradeData);
       
       if (result.success) {
         console.log('Trade executed successfully:', result);
+        // Refresh panels to show new trade
+        if (typeof fetchAndRenderTrades === 'function') {
+          fetchAndRenderTrades();
+        }
+        if (typeof fetchAndRenderRecentTrades === 'function') {
+          fetchAndRenderRecentTrades();
+        }
       } else {
         console.error('Trade execution failed:', result.error);
       }
