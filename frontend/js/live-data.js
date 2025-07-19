@@ -194,9 +194,12 @@ async function fetchAndUpdate() {
 // Fetch the raw market title from backend
 async function fetchMarketTitleRaw() {
   try {
-    const res = await fetch('/market_title');
+    console.log('[LIVE-DATA] Fetching market title from dedicated service...');
+    // Call the dedicated market title service instead of main.py
+    const res = await fetch('http://localhost:8006/market_title');
     const data = await res.json();
     window.CurrentMarketTitleRaw = data.title || "";
+    console.log('[LIVE-DATA] Market title fetched:', window.CurrentMarketTitleRaw);
   } catch (e) {
     window.CurrentMarketTitleRaw = "";
     console.error("Error fetching market title:", e);
@@ -206,12 +209,21 @@ async function fetchMarketTitleRaw() {
 // Update the strike panel market title display with formatting
 function updateStrikePanelMarketTitle() {
   const cell = document.getElementById('strikePanelMarketTitleCell');
-  if (!cell || !window.CurrentMarketTitleRaw) return;
+  console.log('[LIVE-DATA] updateStrikePanelMarketTitle called');
+  console.log('[LIVE-DATA] Cell element:', cell);
+  console.log('[LIVE-DATA] CurrentMarketTitleRaw:', window.CurrentMarketTitleRaw);
+  
+  if (!cell || !window.CurrentMarketTitleRaw) {
+    console.log('[LIVE-DATA] Missing cell or title data');
+    return;
+  }
 
   const timeMatch = window.CurrentMarketTitleRaw.match(/at\s(.*)\?/i);
   const timeStr = timeMatch ? timeMatch[1] : "";
-  cell.textContent = `Bitcoin price today at ${timeStr}?`;
+  const formattedTitle = `Bitcoin price today at ${timeStr}?`;
+  cell.textContent = formattedTitle;
   cell.style.color = "white";
+  console.log('[LIVE-DATA] Updated market title to:', formattedTitle);
 }
 
 // === TTC CLOCK FUNCTIONS ===
@@ -220,9 +232,19 @@ function formatTTC(seconds) {
   if (seconds === null || seconds === undefined || isNaN(seconds)) {
     return '--:--';
   }
-  const m = String(Math.floor(seconds / 60)).padStart(2, '0');
-  const s = String(seconds % 60).padStart(2, '0');
-  return `${m}:${s}`;
+  
+  const totalMinutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  
+  if (totalMinutes >= 60) {
+    // Display as HH:MM:SS for times >= 1 hour
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  } else {
+    // Display as MM:SS for times < 1 hour
+    return `${totalMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  }
 }
 
 function updateClockDisplay() {
@@ -252,7 +274,7 @@ function updateClockDisplay() {
     ttcEl.style.borderRadius = '6px';
     ttcEl.style.padding = '0 10px';
   } else if (cachedTTC <= 900) {
-    ttcEl.style.backgroundColor = '#ffc107';
+    ttcEl.style.backgroundColor = '#45d34a';
     ttcEl.style.color = '#fff';
     ttcEl.style.borderRadius = '6px';
     ttcEl.style.padding = '0 10px';
@@ -261,7 +283,7 @@ function updateClockDisplay() {
 
 async function fetchAndCacheTTC() {
   try {
-    const res = await fetch('/core');
+    const res = await fetch('/api/ttc');
     const data = await res.json();
     cachedTTC = data.ttc_seconds;
     lastFetchTimestamp = Date.now();

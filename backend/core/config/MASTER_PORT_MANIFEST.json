@@ -23,6 +23,11 @@
       "port": 6000,
       "description": "Active trade monitoring",
       "status": "RUNNING"
+    },
+    "market_title_service": {
+      "port": 8006,
+      "description": "Market title service",
+      "status": "RUNNING"
     }
   },
   

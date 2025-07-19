@@ -102,17 +102,14 @@ function initializeStrikeTable(basePrice) {
 
 async function fetchProbabilities(symbol, currentPrice, ttcMinutes, strikes, year = null) {
   try {
-    const ttcSeconds = ttcMinutes * 60;
-    
     // Get current momentum score from the UI
-    const momentumScore = await getCurrentMomentumScore();
+    const momentumScore = getCurrentMomentumScore();
     
     const res = await fetch(window.location.origin + '/api/strike_probabilities', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         current_price: currentPrice,
-        ttc_seconds: ttcSeconds,
         strikes: strikes,
         momentum_score: momentumScore
       })
@@ -160,8 +157,7 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
   const symbol = getSelectedSymbol ? getSelectedSymbol() : 'BTC';
   const year = '2021'; // TODO: make dynamic if needed
 
-  // Remove any existing spanner rows first
-  // strikeTableBody.querySelectorAll('.spanner-row').forEach(row => row.remove());
+
 
   // Build array of strike rows for proper ordering
   const strikeRows = [];
@@ -181,15 +177,7 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
     updateFingerprintDisplay();
   }
 
-  // Find the correct index to insert the spanner row - STABLE PLACEMENT
-  let spannerIndex = strikeRows.length; // default to end
-  for (let i = 0; i < strikes.length; i++) {
-    const strike = strikes[i];
-    if (centerPrice < strike) {
-      spannerIndex = i;
-      break;
-    }
-  }
+
 
   window.strikeRowsMap.forEach((cells, strike) => {
     const { row, bufferTd, bmTd, probTd, yesSpan, noSpan } = cells;
@@ -292,7 +280,7 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
       }
     }
     if (!spannerRow) {
-      spannerRow = await createSpannerRow(centerPrice);
+      spannerRow = createSpannerRow(centerPrice);
       if (insertIndex < allRows.length) {
         strikeTableBody.insertBefore(spannerRow, allRows[insertIndex]);
       } else {
@@ -319,6 +307,8 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
       }
     }
   }
+
+
   
   if (typeof window.addStrikeTableClickHandlers === 'function') window.addStrikeTableClickHandlers();
 
@@ -473,27 +463,14 @@ function getCurrentBTCTickerPrice() {
   return "";
 }
 
-// Utility function to get current momentum score from the unified API
-async function getCurrentMomentumScore() {
-  try {
-    const response = await fetch('/api/momentum');
-    if (response.ok) {
-      const data = await response.json();
-      if (data.status === 'ok' && data.momentum_score !== null && data.momentum_score !== undefined) {
-        return data.momentum_score;
-      }
-    }
-  } catch (error) {
-    console.error('Error fetching momentum score:', error);
-  }
-  
-  // Fallback to DOM element if API fails
+// Utility function to get current momentum score from the panel
+function getCurrentMomentumScore() {
   const el = document.getElementById('momentum-score-value');
   if (el && el.textContent) {
     const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
-    return isNaN(val) ? 0 : val;
+    return isNaN(val) ? "" : val;
   }
-  return 0;
+  return "";
 }
 
 // Play a sound by type, allowing overlapping playback
@@ -533,54 +510,6 @@ window.updateYesNoButton = updateYesNoButton;
 window.updatePositionIndicator = updatePositionIndicator;
 // window.redrawYesNoButtonsForDIFMode = redrawYesNoButtonsForDIFMode; // REMOVED
 window.addStrikeTableRowClickHandlers = addStrikeTableRowClickHandlers;
-
-// === Spanner Row Helper ===
-async function createSpannerRow(currentPrice) {
-  const spannerRow = document.createElement("tr");
-  spannerRow.className = "spanner-row";
-  const spannerTd = document.createElement("td");
-  spannerTd.colSpan = 6; // PATCHED: match actual number of columns
-  // SVGs for straight arrows (no margin)
-  const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  // Helper to get current momentum score from unified API
-  async function getCurrentMomentumScoreForArrow() {
-    try {
-      const response = await fetch('/api/momentum');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.status === 'ok' && data.momentum_score !== null && data.momentum_score !== undefined) {
-          return data.momentum_score;
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching momentum score for arrow:', error);
-    }
-    
-    // Fallback to DOM element if API fails
-    const el = document.getElementById('momentum-score-value');
-    if (el && el.textContent) {
-      const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
-      return isNaN(val) ? 0 : val;
-    }
-    return 0;
-  }
-  let momentumScore = await getCurrentMomentumScoreForArrow();
-  let arrowBlock = '';
-  const absMomentum = Math.abs(momentumScore);
-  if (absMomentum < 5) {
-    arrowBlock = '-';
-  } else if (absMomentum < 10) {
-    arrowBlock = momentumScore > 0 ? svgDown : svgUp;
-  } else if (absMomentum < 20) {
-    arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(2);
-  } else {
-    arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(3);
-  }
-  spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
-  spannerRow.appendChild(spannerTd);
-  return spannerRow;
-}
 
 // === STRIKE TABLE ROW CLICK HANDLERS ===
 function addStrikeTableRowClickHandlers() {
@@ -694,6 +623,41 @@ if (typeof window !== 'undefined') {
       console.log("[WEBSOCKET] ❌ Connection is not open, state:", dbChangeWebSocket ? dbChangeWebSocket.readyState : 'null');
     }
   };
+} 
+
+// === Spanner Row Helper ===
+function createSpannerRow(currentPrice) {
+  const spannerRow = document.createElement("tr");
+  spannerRow.className = "spanner-row";
+  const spannerTd = document.createElement("td");
+  spannerTd.colSpan = 6; // PATCHED: match actual number of columns
+  // SVGs for straight arrows (no margin)
+  const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  // Helper to get current momentum score from DOM
+  function getCurrentMomentumScoreForArrow() {
+    const el = document.getElementById('momentum-score-value');
+    if (el && el.textContent) {
+      const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
+      return isNaN(val) ? 0 : val;
+    }
+    return 0;
+  }
+  let momentumScore = getCurrentMomentumScoreForArrow();
+  let arrowBlock = '';
+  const absMomentum = Math.abs(momentumScore);
+  if (absMomentum < 5) {
+    arrowBlock = '-';
+  } else if (absMomentum < 10) {
+    arrowBlock = momentumScore > 0 ? svgDown : svgUp;
+  } else if (absMomentum < 20) {
+    arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(2);
+  } else {
+    arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(3);
+  }
+  spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
+  spannerRow.appendChild(spannerTd);
+  return spannerRow;
 } 
 
  

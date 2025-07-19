@@ -366,103 +366,65 @@ async function fetchAndRenderTrades() {
 
     // Only insert the spanner row if there are open trades
     if (tradeRows.length > 0) {
-      // Build the spanner row
-      const spannerRow = document.createElement("tr");
-      spannerRow.className = "spanner-row";
-      const spannerTd = document.createElement("td");
-      spannerTd.colSpan = 7;
-
-      // --- Add arrow icons based on momentum score ---
-      // Helper to get current momentum score from DOM
-      function getCurrentMomentumScoreForArrow() {
-        const el = document.getElementById('momentum-score-value');
-        if (el && el.textContent) {
-          const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
-          return isNaN(val) ? 0 : val;
-        }
-        return 0;
-      }
-      let momentumScore = getCurrentMomentumScoreForArrow();
-      // SVGs for straight arrows (no margin)
-      const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-      const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-      let arrowBlock = '';
-      const absMomentum = Math.abs(momentumScore);
-      if (absMomentum < 5) {
-        arrowBlock = '-';
-      } else if (absMomentum < 10) {
-        arrowBlock = momentumScore > 0 ? svgDown : svgUp;
-      } else if (absMomentum < 20) {
-        arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(2);
-      } else {
-        arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(3);
-      }
-      spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
-      spannerRow.appendChild(spannerTd);
-
-      // Insert the spanner row at the correct index
-      tradeRows.splice(spannerIndex, 0, spannerRow);
+      // REMOVED: Spanner row creation - this should only be in strike table
+      // The spanner row with current price should only be created by strike-table.js
     }
 
     // Update table efficiently by only changing what's needed
     const existingRows = Array.from(activeTradesTableBody.children);
     
-    // Remove spanner rows first
+    // Remove spanner rows first (they should only be in strike table)
     existingRows.filter(row => row.classList.contains('spanner-row')).forEach(row => row.remove());
     
     // Update or add trade rows
     tradeRows.forEach((newRow, index) => {
+      // Skip spanner rows - they should only be in strike table
       if (newRow.classList.contains('spanner-row')) {
-        // Insert spanner row at correct position
-        if (index < activeTradesTableBody.children.length) {
-          activeTradesTableBody.insertBefore(newRow, activeTradesTableBody.children[index]);
-        } else {
-          activeTradesTableBody.appendChild(newRow);
+        return; // Skip spanner rows in active trades table
+      }
+      
+      // For trade rows, find existing row by trade ID
+      const tradeId = newRow.querySelector('[data-trade-id]')?.dataset.tradeId;
+      const existingRow = existingRows.find(row => 
+        row.querySelector(`[data-trade-id="${tradeId}"]`)
+      );
+      
+      if (existingRow) {
+        // Update existing row content without recreating the row
+        const newCells = Array.from(newRow.children);
+        const existingCells = Array.from(existingRow.children);
+        
+        for (let i = 0; i < Math.min(newCells.length, existingCells.length); i++) {
+          if (existingCells[i].textContent !== newCells[i].textContent) {
+            existingCells[i].textContent = newCells[i].textContent;
+          }
+        }
+        
+        // Update row class if needed
+        if (existingRow.className !== newRow.className) {
+          existingRow.className = newRow.className;
         }
       } else {
-        // For trade rows, find existing row by trade ID
-        const tradeId = newRow.querySelector('[data-trade-id]')?.dataset.tradeId;
-        const existingRow = existingRows.find(row => 
-          row.querySelector(`[data-trade-id="${tradeId}"]`)
-        );
+        // New row, insert it at the correct sorted position
+        // Find the correct position to insert based on strike value
+        const newStrike = parseFloat(String(newRow.children[0].textContent).replace(/[^\d.-]/g, '')) || 0;
+        let insertIndex = activeTradesTableBody.children.length;
         
-        if (existingRow) {
-          // Update existing row content without recreating the row
-          const newCells = Array.from(newRow.children);
-          const existingCells = Array.from(existingRow.children);
+        for (let i = 0; i < activeTradesTableBody.children.length; i++) {
+          const row = activeTradesTableBody.children[i];
+          if (row.classList.contains('spanner-row')) continue;
           
-          for (let i = 0; i < Math.min(newCells.length, existingCells.length); i++) {
-            if (existingCells[i].textContent !== newCells[i].textContent) {
-              existingCells[i].textContent = newCells[i].textContent;
-            }
+          const existingStrike = parseFloat(String(row.children[0].textContent).replace(/[^\d.-]/g, '')) || 0;
+          if (newStrike < existingStrike) {
+            insertIndex = i;
+            break;
           }
-          
-          // Update row class if needed
-          if (existingRow.className !== newRow.className) {
-            existingRow.className = newRow.className;
-          }
+        }
+        
+        if (insertIndex < activeTradesTableBody.children.length) {
+          activeTradesTableBody.insertBefore(newRow, activeTradesTableBody.children[insertIndex]);
         } else {
-          // New row, insert it at the correct sorted position
-          // Find the correct position to insert based on strike value
-          const newStrike = parseFloat(String(newRow.children[0].textContent).replace(/[^\d.-]/g, '')) || 0;
-          let insertIndex = activeTradesTableBody.children.length;
-          
-          for (let i = 0; i < activeTradesTableBody.children.length; i++) {
-            const row = activeTradesTableBody.children[i];
-            if (row.classList.contains('spanner-row')) continue;
-            
-            const existingStrike = parseFloat(String(row.children[0].textContent).replace(/[^\d.-]/g, '')) || 0;
-            if (newStrike < existingStrike) {
-              insertIndex = i;
-              break;
-            }
-          }
-          
-          if (insertIndex < activeTradesTableBody.children.length) {
-            activeTradesTableBody.insertBefore(newRow, activeTradesTableBody.children[insertIndex]);
-          } else {
-            activeTradesTableBody.appendChild(newRow);
-          }
+          activeTradesTableBody.appendChild(newRow);
         }
       }
     });

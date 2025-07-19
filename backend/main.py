@@ -132,6 +132,16 @@ async def serve_favicon():
     else:
         return {"error": "Favicon not found"}, 404
 
+@app.get("/api/ttc")
+async def get_ttc_data():
+    """Get time to close data from live data analyzer."""
+    try:
+        from live_data_analysis import get_ttc_data
+        return get_ttc_data()
+    except Exception as e:
+        print(f"Error getting TTC data: {e}")
+        return {"error": str(e)}
+
 # Core data endpoint
 @app.get("/core")
 async def get_core_data():
@@ -142,11 +152,19 @@ async def get_core_data():
         date_str = now.strftime("%A, %B %d, %Y")
         time_str = now.strftime("%I:%M:%S %p EDT")
         
-        # Calculate time to close
-        close_time = now.replace(hour=16, minute=0, second=0, microsecond=0)
-        if now.time() >= close_time.time():
-            close_time += timedelta(days=1)
-        ttc_seconds = int((close_time - now).total_seconds())
+        # Get TTC from live data analyzer
+        ttc_seconds = 0
+        try:
+            from live_data_analysis import get_ttc_data
+            ttc_data = get_ttc_data()
+            ttc_seconds = ttc_data.get('ttc_seconds', 0)
+        except Exception as e:
+            print(f"Error getting TTC from live data analyzer: {e}")
+            # Fallback calculation
+            close_time = now.replace(hour=16, minute=0, second=0, microsecond=0)
+            if now.time() >= close_time.time():
+                close_time += timedelta(days=1)
+            ttc_seconds = int((close_time - now).total_seconds())
         
         # Get BTC price from watchdog data
         btc_price = 0
@@ -509,11 +527,25 @@ async def calculate_strike_probabilities(data: dict):
     """Calculate strike probabilities using the probability calculator with live momentum score."""
     try:
         current_price = data.get("current_price")
-        ttc_seconds = data.get("ttc_seconds")
         strikes = data.get("strikes", [])
         
-        if not current_price or not ttc_seconds or not strikes:
-            return {"status": "error", "message": "Missing required parameters: current_price, ttc_seconds, strikes"}
+        if not current_price or not strikes:
+            return {"status": "error", "message": "Missing required parameters: current_price, strikes"}
+        
+        # Get TTC directly from live data analyzer
+        ttc_seconds = 0
+        try:
+            from live_data_analysis import get_ttc_data
+            ttc_data = get_ttc_data()
+            ttc_seconds = ttc_data.get('ttc_seconds', 0)
+            print(f"[STRIKE_PROB] Got TTC from live data analyzer: {ttc_seconds}s")
+        except Exception as e:
+            print(f"[STRIKE_PROB] Error getting TTC from live data analyzer: {e}")
+            # Fallback calculation
+            now = datetime.now(pytz.timezone('US/Eastern'))
+            next_hour = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+            ttc_seconds = int((next_hour - now).total_seconds())
+            print(f"[STRIKE_PROB] Using fallback TTC: {ttc_seconds}s")
         
         # Fetch live momentum score from the unified momentum endpoint
         momentum_score = None

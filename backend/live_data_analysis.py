@@ -160,6 +160,30 @@ class LiveDataAnalyzer:
             'timestamp': now_est.isoformat(),
             'current_price': self.get_current_price()
         }
+    
+    def get_ttc_seconds(self) -> int:
+        """Calculate time to next hour in seconds"""
+        now_est = datetime.now(self.est_tz)
+        
+        # Calculate next hour (e.g., if it's 7:30 PM, count down to 8:00 PM)
+        next_hour = now_est.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        
+        # Calculate seconds until next hour
+        ttc_seconds = int((next_hour - now_est).total_seconds())
+        return ttc_seconds
+    
+    def get_ttc_data(self) -> Dict:
+        """Get TTC data for external use"""
+        ttc_seconds = self.get_ttc_seconds()
+        now_est = datetime.now(self.est_tz)
+        next_hour = now_est.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        
+        return {
+            'ttc_seconds': ttc_seconds,
+            'timestamp': now_est.isoformat(),
+            'current_time_est': now_est.strftime("%I:%M:%S %p EDT"),
+            'next_hour_est': next_hour.strftime("%I:%M:%S %p EDT")
+        }
 
 # Global analyzer instance
 analyzer = LiveDataAnalyzer()
@@ -167,6 +191,10 @@ analyzer = LiveDataAnalyzer()
 def get_momentum_data() -> Dict:
     """Get momentum data for external use"""
     return analyzer.get_momentum_analysis()
+
+def get_ttc_data() -> Dict:
+    """Get TTC data for external use"""
+    return analyzer.get_ttc_data()
 
 if __name__ == "__main__":
     # Test the analyzer
