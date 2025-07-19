@@ -3,7 +3,7 @@ MAIN APPLICATION - UNIVERSAL CENTRALIZED PORT SYSTEM
 Uses the single centralized port configuration system.
 """
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,6 +33,75 @@ print(f"[MAIN] 🚀 Using centralized port: {MAIN_APP_PORT}")
 # Import centralized path utilities
 from util.paths import get_data_dir, get_trade_history_dir, get_accounts_data_dir
 from account_mode import get_account_mode
+
+# Global set of connected websocket clients for preferences
+connected_clients = set()
+
+# Global set of connected websocket clients for database changes
+db_change_clients = set()
+
+# Global auto_stop state
+PREFERENCES_PATH = os.path.join(get_data_dir(), "trade_preferences.json")
+
+def load_preferences():
+    if os.path.exists(PREFERENCES_PATH):
+        try:
+            with open(PREFERENCES_PATH, "r") as f:
+                prefs = json.load(f)
+                # Migrate old plus_minus_mode to diff_mode if needed
+                if "plus_minus_mode" in prefs and "diff_mode" not in prefs:
+                    prefs["diff_mode"] = prefs.pop("plus_minus_mode")
+                    # Save the migrated preferences
+                    save_preferences(prefs)
+                return prefs
+        except Exception:
+            pass
+    return {"auto_stop": True, "reco": False, "diff_mode": False, "position_size": 1, "multiplier": 1}
+
+def save_preferences(prefs):
+    try:
+        with open(PREFERENCES_PATH, "w") as f:
+            json.dump(prefs, f)
+    except Exception as e:
+        print(f"[Preferences Save Error] {e}")
+
+# Broadcast helper function for preferences updates
+async def broadcast_preferences_update():
+    data = json.dumps(load_preferences())
+    to_remove = set()
+    for client in connected_clients:
+        try:
+            await client.send_text(data)
+        except Exception:
+            to_remove.add(client)
+    connected_clients.difference_update(to_remove)
+
+# Broadcast helper function for account mode updates
+async def broadcast_account_mode(mode: str):
+    message = json.dumps({"account_mode": mode})
+    to_remove = set()
+    for client in connected_clients:
+        try:
+            await client.send_text(message)
+        except Exception:
+            to_remove.add(client)
+    connected_clients.difference_update(to_remove)
+
+# Broadcast helper function for database changes
+async def broadcast_db_change(db_name: str, change_data: dict):
+    message = json.dumps({
+        "type": "db_change",
+        "database": db_name,
+        "data": change_data,
+        "timestamp": datetime.now().isoformat()
+    })
+    to_remove = set()
+    for client in db_change_clients:
+        try:
+            await client.send_text(message)
+        except Exception:
+            to_remove.add(client)
+    db_change_clients.difference_update(to_remove)
 
 # Create FastAPI app
 app = FastAPI(title="Trading System Main App")
@@ -113,6 +182,27 @@ async def websocket_endpoint(websocket: WebSocket):
             await manager.send_personal_message(f"Message text was: {data}", websocket)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+
+# WebSocket endpoint for preferences updates
+@app.websocket("/ws/preferences")
+async def websocket_preferences(websocket: WebSocket):
+    await websocket.accept()
+    connected_clients.add(websocket)
+    try:
+        while True:
+            await websocket.receive_text()  # Keep connection alive
+    except WebSocketDisconnect:
+        connected_clients.remove(websocket)
+
+@app.websocket("/ws/db_changes")
+async def websocket_db_changes(websocket: WebSocket):
+    await websocket.accept()
+    db_change_clients.add(websocket)
+    try:
+        while True:
+            await websocket.receive_text()  # Keep connection alive
+    except WebSocketDisconnect:
+        db_change_clients.remove(websocket)
 
 # Serve main index.html
 @app.get("/", response_class=HTMLResponse)
@@ -577,30 +667,152 @@ async def calculate_strike_probabilities(data: dict):
 
 @app.get("/api/momentum")
 async def get_current_momentum():
-    """Get current unified momentum score and analysis."""
+    """Get current momentum score from the unified API."""
     try:
-        from backend.live_data_analysis import LiveDataAnalyzer
-        
-        analyzer = LiveDataAnalyzer()
-        momentum_data = analyzer.get_momentum_analysis()
-        
-        return {
-            "status": "ok",
-            "momentum_score": momentum_data.get('weighted_momentum_score'),
-            "deltas": {
-                "1m": momentum_data.get('delta_1m'),
-                "2m": momentum_data.get('delta_2m'),
-                "3m": momentum_data.get('delta_3m'),
-                "4m": momentum_data.get('delta_4m'),
-                "15m": momentum_data.get('delta_15m'),
-                "30m": momentum_data.get('delta_30m')
-            },
-            "timestamp": momentum_data.get('timestamp')
-        }
-        
+        # Get momentum score from the momentum service
+        momentum_service_url = f"http://localhost:{get_port('momentum_service')}/momentum"
+        response = requests.get(momentum_service_url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            return {
+                "status": "ok",
+                "momentum_score": data.get("momentum_score", 0)
+            }
     except Exception as e:
-        print(f"Error getting momentum data: {e}")
-        return {"status": "error", "message": str(e)}
+        print(f"Error getting momentum from service: {e}")
+    
+    # Fallback to simple calculation
+    try:
+        # Get latest BTC price from database
+        from backend.util.paths import get_price_history_dir
+        btc_price_history_db = os.path.join(get_price_history_dir(), "btc_price_history.db")
+        
+        if os.path.exists(btc_price_history_db):
+            conn = sqlite3.connect(btc_price_history_db)
+            cursor = conn.cursor()
+            cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 31")
+            results = cursor.fetchall()
+            conn.close()
+            
+            if len(results) >= 31:
+                prices = [float(row[0]) for row in results]
+                # Calculate simple momentum score
+                current_price = prices[0]
+                p1m = prices[1] if len(prices) > 1 else current_price
+                p2m = prices[2] if len(prices) > 2 else p1m
+                p3m = prices[3] if len(prices) > 3 else p2m
+                p4m = prices[4] if len(prices) > 4 else p3m
+                p15m = prices[15] if len(prices) > 15 else p4m
+                p30m = prices[30] if len(prices) > 30 else p15m
+                
+                score = (
+                    ((current_price - p1m) / p1m) * 0.30 +
+                    ((current_price - p2m) / p2m) * 0.25 +
+                    ((current_price - p3m) / p3m) * 0.20 +
+                    ((current_price - p4m) / p4m) * 0.15 +
+                    ((current_price - p15m) / p15m) * 0.05 +
+                    ((current_price - p30m) / p30m) * 0.05
+                ) * 10000
+                
+                return {
+                    "status": "ok",
+                    "momentum_score": int(round(score))
+                }
+    except Exception as e:
+        print(f"Error calculating momentum: {e}")
+    
+    return {
+        "status": "error",
+        "momentum_score": 0,
+        "error": "Unable to calculate momentum"
+    }
+
+# === PREFERENCES API ENDPOINTS ===
+
+@app.post("/api/set_auto_stop")
+async def set_auto_stop(request: Request):
+    data = await request.json()
+    prefs = load_preferences()
+    prefs["auto_stop"] = bool(data.get("enabled", False))
+    save_preferences(prefs)
+    await broadcast_preferences_update()
+    return {"status": "ok"}
+
+@app.post("/api/set_reco")
+async def set_reco(request: Request):
+    data = await request.json()
+    prefs = load_preferences()
+    prefs["reco"] = bool(data.get("enabled", False))
+    save_preferences(prefs)
+    await broadcast_preferences_update()
+    return {"status": "ok"}
+
+@app.post("/api/set_diff_mode")
+async def set_diff_mode(request: Request):
+    data = await request.json()
+    prefs = load_preferences()
+    prefs["diff_mode"] = bool(data.get("enabled", False))
+    save_preferences(prefs)
+    await broadcast_preferences_update()
+    return {"status": "ok"}
+
+@app.post("/api/set_position_size")
+async def set_position_size(request: Request):
+    data = await request.json()
+    prefs = load_preferences()
+    try:
+        prefs["position_size"] = int(data.get("position_size", 100))
+        save_preferences(prefs)
+        await broadcast_preferences_update()
+    except Exception as e:
+        print(f"[Set Position Size Error] {e}")
+    return {"status": "ok"}
+
+@app.post("/api/set_multiplier")
+async def set_multiplier(request: Request):
+    data = await request.json()
+    prefs = load_preferences()
+    try:
+        prefs["multiplier"] = int(data.get("multiplier", 1))
+        save_preferences(prefs)
+        await broadcast_preferences_update()
+    except Exception as e:
+        print(f"[Set Multiplier Error] {e}")
+    return {"status": "ok"}
+
+@app.post("/api/update_preferences")
+async def update_preferences(request: Request):
+    data = await request.json()
+    prefs = load_preferences()
+    updated = False
+
+    if "position_size" in data:
+        try:
+            prefs["position_size"] = int(data["position_size"])
+            updated = True
+        except Exception as e:
+            print(f"[Invalid Position Size] {e}")
+
+    if "multiplier" in data:
+        try:
+            prefs["multiplier"] = int(data["multiplier"])
+            updated = True
+        except Exception as e:
+            print(f"[Invalid Multiplier] {e}")
+
+    if updated:
+        save_preferences(prefs)
+        await broadcast_preferences_update()
+    return {"status": "ok"}
+
+@app.get("/api/get_preferences")
+async def get_preferences():
+    return load_preferences()
+
+@app.get("/api/get_auto_stop")
+async def get_auto_stop():
+    prefs = load_preferences()
+    return {"enabled": prefs.get("auto_stop", True)}
 
 # Startup and shutdown events
 @app.on_event("startup")
