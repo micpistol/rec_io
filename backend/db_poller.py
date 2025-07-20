@@ -194,9 +194,9 @@ class DatabasePoller:
         """Notify main app about database changes via HTTP"""
         try:
             url = f"{self.main_app_url}/api/db_change"
+            # Send minimal notification - just the database name
             payload = {
-                "database": db_name,
-                "change_data": change_data
+                "database": db_name
             }
             # Use shorter timeout and fire-and-forget for speed
             response = requests.post(url, json=payload, timeout=1)
@@ -209,15 +209,16 @@ class DatabasePoller:
         
         # ALSO directly notify frontend via WebSocket if trades.db changed
         if db_name == "trades":
-            self.notify_frontend_websocket(db_name, change_data)
+            # WebSocket notification removed - method doesn't exist
+            pass
     
     def notify_trade_manager(self, db_name: str, change_data: Dict[str, Any]):
         """Notify trade manager about database changes via HTTP"""
         try:
             url = f"{self.trade_manager_url}/api/positions_change"
+            # Send minimal notification - just the database name
             payload = {
-                "database": db_name,
-                "change_data": change_data
+                "database": db_name
             }
             # Use shorter timeout and fire-and-forget for speed
             response = requests.post(url, json=payload, timeout=1)
@@ -232,9 +233,9 @@ class DatabasePoller:
         """Notify active trade supervisor about database changes via HTTP"""
         try:
             url = f"{self.active_trade_supervisor_url}/api/trades_db_change"
+            # Send minimal notification - just the database name
             payload = {
-                "database": db_name,
-                "change_data": change_data
+                "database": db_name
             }
             # Use shorter timeout and fire-and-forget for speed
             response = requests.post(url, json=payload, timeout=1)

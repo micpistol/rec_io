@@ -81,10 +81,7 @@ window.executeTrade = async function(tradeData) {
 
     // === DEMO MODE CHECK ===
     if (window.TRADE_CONFIG.DEMO_MODE) {
-      // No popup, just log
-      if (window.TRADE_CONFIG.ENABLE_SOUNDS && typeof playSound === 'function') {
-        playSound('open');
-      }
+      // Audio alert already played in trade_monitor.html when button was clicked
       window.TRADE_STATE.executedTrades.add(ticket_id);
       window.TRADE_STATE.lastTradeId = ticket_id;
       return { 
@@ -112,10 +109,7 @@ window.executeTrade = async function(tradeData) {
     window.TRADE_STATE.executedTrades.add(ticket_id);
     window.TRADE_STATE.lastTradeId = ticket_id;
 
-    // Play sound if enabled
-    if (window.TRADE_CONFIG.ENABLE_SOUNDS && typeof playSound === 'function') {
-      playSound('open');
-    }
+    // Audio alert already played in trade_monitor.html when button was clicked
 
     return { 
       success: true, 
@@ -208,10 +202,7 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
 
     // === DEMO MODE CHECK ===
     if (window.TRADE_CONFIG.DEMO_MODE) {
-      // No popup, just log
-      if (window.TRADE_CONFIG.ENABLE_SOUNDS && typeof playSound === 'function') {
-        playSound('close');
-      }
+      // Audio alert already played in trade_monitor.html when button was clicked
       window.TRADE_STATE.executedTrades.add(ticket_id);
       window.TRADE_STATE.lastTradeId = ticket_id;
       return { 

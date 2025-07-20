@@ -95,8 +95,8 @@ def log_event(ticket_id, message):
         # File name based on the last 5 characters of the ticket ID
         log_filename = f"trade_flow_{ticket_id[-5:]}.log"
 
-        # Log directory (…/backend/data/trade_history/tickets/)
-        log_dir = Path(__file__).resolve().parents[3] / "data" / "trade_history" / "tickets"
+        # Log directory (backend/data/trade_history/tickets/)
+        log_dir = Path(__file__).resolve().parents[1] / "data" / "trade_history" / "tickets"
         log_dir.mkdir(parents=True, exist_ok=True)
 
         # Full path for this ticket's log file
@@ -109,7 +109,7 @@ def log_event(ticket_id, message):
             f.write(entry)
 
         # Echo to stdout for immediate visibility
-        print(entry.strip())
+        print(f"[TRADE_EXECUTOR] {entry.strip()}")
 
         # --- Retention: keep only the 20 most‑recent logs ---
         logs = sorted(
@@ -127,7 +127,7 @@ def log_event(ticket_id, message):
         print(f"❌ Failed to write to log: {e}")
 
 def get_manager_port():
-    return get_port("main")
+    return get_port("trade_manager")
 
 # Health check endpoint
 @app.route("/health")
@@ -153,6 +153,7 @@ def trigger_trade():
     """Execute a trade."""
     try:
         data = request.get_json()
+        print(f"[TRADE_EXECUTOR] 🔍 RECEIVED TRADE DATA: {data}")
         ticket_id = data.get("ticket_id", "UNKNOWN")
         # Normalize ticket_id to avoid double "TICKET-" prefixing
         if ticket_id.count("TICKET-") > 1:
@@ -227,7 +228,7 @@ def trigger_trade():
                 except Exception as e:
                     print(f"❌ STATUS UPDATE FAILED: {e}")
             threading.Thread(target=notify_accepted, daemon=True).start()
-            print("✅ TRADE SENT SUCCESSFULLY")
+            print("[TRADE_EXECUTOR] ✅ TRADE SENT SUCCESSFULLY")
             return jsonify({"status": "sent", "message": "Trade sent successfully"}), 200
 
     except Exception as e:

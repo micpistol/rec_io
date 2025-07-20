@@ -447,7 +447,11 @@ def get_current_btc_price() -> Optional[float]:
         
         if result and result[0] is not None:
             btc_price = float(result[0])
-            log(f"📊 BTC PRICE: Current BTC price: ${btc_price:,.2f}")
+            # Only log BTC price every 30 seconds to reduce noise
+            current_time = time.time()
+            if not hasattr(get_current_btc_price, 'last_log_time') or current_time - get_current_btc_price.last_log_time > 30:
+                log(f"📊 BTC PRICE: Current BTC price: ${btc_price:,.2f}")
+                get_current_btc_price.last_log_time = current_time
             return btc_price
         else:
             log("⚠️ No BTC price found in database")
@@ -567,8 +571,6 @@ def update_active_trade_monitoring_data():
             log("⚠️ Could not get Kalshi market snapshot, skipping monitoring update")
             return
         
-        log(f"📊 MONITORING: Got Kalshi market snapshot with {len(snapshot_data['markets'])} markets")
-        
         # Get all active trades
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -581,10 +583,7 @@ def update_active_trade_monitoring_data():
         conn.close()
         
         if not active_trades:
-            log("📊 MONITORING: No active trades found")
             return
-        
-        log(f"📊 MONITORING: Updating {len(active_trades)} active trades")
         
         for (active_id, trade_id, buy_price, prob, time_str, date_str, strike, side, momentum, ticker) in active_trades:
             try:
@@ -652,7 +651,9 @@ def update_active_trade_monitoring_data():
                 """, (current_btc_price, current_probability, buffer_from_strike, time_since_entry, current_market_price, pnl_formatted, active_id))
                 conn.commit()
                 conn.close()
-                log(f"📊 MONITORING: Updated trade {trade_id} - symbol_price: {current_btc_price}, market_price: {current_market_price}, buffer: {buffer_from_strike}, prob: {current_probability}, pnl: {pnl_formatted}")
+                # Only log significant updates (every 10 seconds) to reduce noise
+                if time_since_entry % 10 == 0:
+                    log(f"📊 MONITORING: Updated trade {trade_id} - symbol_price: {current_btc_price}, market_price: {current_market_price}, buffer: {buffer_from_strike}, prob: {current_probability}, pnl: {pnl_formatted}")
                 
             except Exception as e:
                 log(f"Error updating monitoring data for trade {trade_id}: {e}")
@@ -679,8 +680,6 @@ def start_monitoring_loop():
             if active_count == 0:
                 log("📊 MONITORING: No more active trades, stopping monitoring loop")
                 break
-            
-            log(f"📊 MONITORING: Loop iteration - {active_count} active trades")
             
             # Update monitoring data
             update_active_trade_monitoring_data()
@@ -732,7 +731,11 @@ def export_active_trades_to_json():
                 'count': len(active_trades)
             }, f, indent=2, default=str)
             
-        log(f"📄 JSON EXPORT: Exported {len(active_trades)} active trades to active_trades.json")
+        # Only log JSON export every 30 seconds to reduce noise
+        current_time = time.time()
+        if not hasattr(export_active_trades_to_json, 'last_log_time') or current_time - export_active_trades_to_json.last_log_time > 30:
+            log(f"📄 JSON EXPORT: Exported {len(active_trades)} active trades to active_trades.json")
+            export_active_trades_to_json.last_log_time = current_time
         
     except Exception as e:
         log(f"Error exporting active trades to JSON: {e}")
