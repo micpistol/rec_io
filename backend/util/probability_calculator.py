@@ -202,31 +202,6 @@ class ProbabilityCalculator:
         """
         ttc_seconds = max(self.ttc_values[0], min(ttc_seconds, self.ttc_values[-1]))
 
-        # Handle low-end manually with linear ramp: (0%, 100%) → (0.25%, value)
-        if move_percent < 0.25:
-            low_point = 0.0
-            high_point = 0.25
-
-            # Get the probabilities at 0.25% for this TTC
-            point_low = np.array([[ttc_seconds, high_point]])
-            
-            try:
-                pos_prob_at_025 = griddata(self.positive_interp_points, self.positive_interp_values, point_low, method='linear')[0]
-                neg_prob_at_025 = griddata(self.negative_interp_points, self.negative_interp_values, point_low, method='linear')[0]
-            except:
-                pos_prob_at_025 = griddata(self.positive_interp_points, self.positive_interp_values, point_low, method='nearest')[0]
-                neg_prob_at_025 = griddata(self.negative_interp_points, self.negative_interp_values, point_low, method='nearest')[0]
-
-            pos_prob = np.interp(move_percent, [low_point, high_point], [100.0, pos_prob_at_025])
-            neg_prob = np.interp(move_percent, [low_point, high_point], [100.0, neg_prob_at_025])
-            
-            if direction == 'positive':
-                return float(pos_prob)
-            elif direction == 'negative':
-                return float(neg_prob)
-            else:
-                return (float(pos_prob), float(neg_prob))
-
         # Clamp to max fingerprint range
         move_percent = min(move_percent, self.positive_move_percentages[-1])
 
