@@ -134,6 +134,8 @@ window.executeTrade = async function(tradeData) {
 // === CENTRALIZED CLOSE TRADE FUNCTION ===
 // This is the ONLY function that should close trades
 window.closeTrade = async function(tradeId, sellPrice, event) {
+  // Audio is already played in trade_monitor.html when button was clicked
+  
   // Prevent multiple simultaneous executions
   if (window.TRADE_STATE.isExecuting) {
     return { success: false, error: 'Trade already executing' };
@@ -230,15 +232,7 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
     window.TRADE_STATE.executedTrades.add(ticket_id);
     window.TRADE_STATE.lastTradeId = ticket_id;
 
-    // Play sound if enabled
-    if (window.TRADE_CONFIG.ENABLE_SOUNDS && typeof playSound === 'function') {
-      playSound('close');
-    }
-
-    // Show popup if enabled
-    if (window.TRADE_CONFIG.ENABLE_POPUPS && typeof showTradeClosedPopup === 'function') {
-      showTradeClosedPopup();
-    }
+    // Audio and popup already handled in trade_monitor.html when button was clicked
 
     return { 
       success: true, 

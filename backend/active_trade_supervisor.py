@@ -35,9 +35,11 @@ os.makedirs(os.path.dirname(ACTIVE_TRADES_DB_PATH), exist_ok=True)
 from backend.core.config.settings import config
 from backend.util.paths import get_data_dir, get_trade_history_dir, get_kalshi_data_dir
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 # Create Flask app
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 # Health check endpoint
 @app.route("/health")
@@ -50,6 +52,22 @@ def health_check():
         "timestamp": datetime.now().isoformat(),
         "port_system": "centralized"
     }
+
+# Active trades data endpoint
+@app.route("/api/active_trades")
+def get_active_trades():
+    """Get all active trades for frontend display"""
+    try:
+        active_trades = get_all_active_trades()
+        return jsonify({
+            "status": "success",
+            "timestamp": datetime.now().isoformat(),
+            "active_trades": active_trades,
+            "count": len(active_trades)
+        })
+    except Exception as e:
+        log(f"❌ Error serving active trades: {e}")
+        return jsonify({"error": str(e)}), 500
 
 # Port information endpoint
 @app.route("/api/ports")

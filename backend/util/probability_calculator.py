@@ -261,7 +261,12 @@ class ProbabilityCalculator:
             buffer = abs(current_price - strike)
             move_percent = (buffer / current_price) * 100
             is_above = strike > current_price
-            pos_prob, neg_prob = self.interpolate_directional_probability(ttc_seconds, move_percent, 'both')
+            result_tuple = self.interpolate_directional_probability(ttc_seconds, move_percent, 'both')
+            if isinstance(result_tuple, tuple):
+                pos_prob, neg_prob = result_tuple
+            else:
+                # If it's not a tuple, it's a single value
+                pos_prob = neg_prob = result_tuple
             if is_above:
                 prob_beyond = pos_prob
                 prob_within = 100 - pos_prob

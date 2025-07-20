@@ -470,16 +470,7 @@ function getCurrentMomentumScore() {
   return "";
 }
 
-// Play a sound by type, allowing overlapping playback
-function playSound(type) {
-  const soundId = type === 'open' ? 'openTradeSound' : 'closeTradeSound';
-  const original = document.getElementById(soundId);
-  if (!original) return;
 
-  const clone = original.cloneNode(true); // Allow overlapping playback
-  clone.volume = type === 'open' ? 0.1 : 0.2; // Set volume inline
-  clone.play().catch(err => {});
-}
 
 function showTradeOpenedPopup() {
   const popup = document.getElementById('tradePopup');

@@ -45,7 +45,7 @@
     "active_trade_supervisor": {
       "enabled": true,
       "host": "localhost",
-      "port": 6000
+      "port": 8007
     },
     "account_sync": {
       "enabled": true,

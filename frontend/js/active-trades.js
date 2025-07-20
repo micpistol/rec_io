@@ -453,10 +453,6 @@ async function fetchAndRenderTrades() {
 
 // New async function to close trade by id with current time and BTC price, using sellPrice
 async function closeTradeById(tradeId, sellPrice) {
-  // Play close trade sound using overlapping playback
-  if (typeof playSound === 'function') {
-    playSound('close');
-  }
   
   // --- All other logic temporarily disabled ---
   /*

@@ -7,7 +7,9 @@
 <script src="/js/live-data.js"></script>
 <script src="/js/strike-table.js"></script>
 
+        <script src="/js/globals.js"></script>
         <script src="/js/active-trades.js"></script>
+        <script src="/js/active-trade-supervisor.js"></script>
         <script src="/js/trade-execution-controller.js"></script>
       
 <meta charset="UTF-8" />
@@ -800,8 +802,10 @@ function openTrade(target) {
 }
 
 function closeTrade(tradeId, sellPrice, event) {
-  // 🎧 Sound confirmation
-  setTimeout(() => playSound('close'), 0);
+  // 🎧 Sound confirmation - IMMEDIATE
+  if (typeof playSound === 'function') {
+    playSound('close');
+  }
 
   // ✅ Add UI popup
   showTradeClosedPopup();
@@ -2040,7 +2044,7 @@ function playSound(type) {
 
   const clone = original.cloneNode(true); // Allow overlapping playback
   clone.volume = type === 'open' ? 0.1 : 0.2; // Set volume inline
-  clone.play().catch(err => console.error(`Failed to play sound clone:`, err));
+  clone.play().catch(err => {});
 }
 
 async function showPopup(strike, side, price) {

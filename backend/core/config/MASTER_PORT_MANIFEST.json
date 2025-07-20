@@ -20,7 +20,7 @@
       "status": "RUNNING"
     },
     "active_trade_supervisor": {
-      "port": 6000,
+      "port": 8007,
       "description": "Active trade monitoring",
       "status": "RUNNING"
     },

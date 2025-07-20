@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Active Trade Supervisor Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>Active Trade Supervisor Test</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Port Configuration</h2>
+        <div id="port-test"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 2: API Access</h2>
+        <div id="api-test"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 3: Table Population</h2>
+        <table id="testTable">
+            <thead>
+                <tr>
+                    <th>Trade ID</th>
+                    <th>Ticker</th>
+                    <th>Side</th>
+                    <th>Strike</th>
+                    <th>Buy Price</th>
+                    <th>Current PnL</th>
+                    <th>Buffer</th>
+                    <th>Probability</th>
+                </tr>
+            </thead>
+            <tbody id="testTableBody">
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Test 1: Port Configuration
+        async function testPortConfig() {
+            const div = document.getElementById('port-test');
+            try {
+                const response = await fetch('/api/ports');
+                if (response.ok) {
+                    const config = await response.json();
+                    div.innerHTML = `<div class="success">✅ Port config loaded: ${JSON.stringify(config.ports.active_trade_supervisor)}</div>`;
+                    return config.ports.active_trade_supervisor;
+                } else {
+                    div.innerHTML = `<div class="error">❌ Failed to load port config: ${response.status}</div>`;
+                    return null;
+                }
+            } catch (error) {
+                div.innerHTML = `<div class="error">❌ Port config error: ${error.message}</div>`;
+                return null;
+            }
+        }
+
+        // Test 2: API Access
+        async function testApiAccess(port) {
+            const div = document.getElementById('api-test');
+            if (!port) {
+                div.innerHTML = `<div class="error">❌ No port available for API test</div>`;
+                return;
+            }
+            
+            try {
+                const url = `http://localhost:${port}/api/active_trades`;
+                console.log('Testing API URL:', url);
+                const response = await fetch(url);
+                if (response.ok) {
+                    const data = await response.json();
+                    div.innerHTML = `<div class="success">✅ API working: ${data.active_trades.length} trades found</div>`;
+                    return data.active_trades;
+                } else {
+                    div.innerHTML = `<div class="error">❌ API failed: ${response.status}</div>`;
+                    return null;
+                }
+            } catch (error) {
+                div.innerHTML = `<div class="error">❌ API error: ${error.message}</div>`;
+                return null;
+            }
+        }
+
+        // Test 3: Table Population
+        function populateTable(trades) {
+            const tbody = document.getElementById('testTableBody');
+            if (!trades || trades.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8">No trades found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            trades.forEach(trade => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${trade.trade_id || trade.id}</td>
+                    <td>${trade.ticker}</td>
+                    <td>${trade.side}</td>
+                    <td>${trade.strike}</td>
+                    <td>${trade.buy_price}</td>
+                    <td>${trade.current_pnl || 'N/A'}</td>
+                    <td>${trade.buffer_from_entry || 'N/A'}</td>
+                    <td>${trade.current_probability || 'N/A'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Run all tests
+        async function runTests() {
+            console.log('Starting Active Trade Supervisor tests...');
+            
+            // Test 1: Port Configuration
+            const port = await testPortConfig();
+            
+            // Test 2: API Access
+            const trades = await testApiAccess(port);
+            
+            // Test 3: Table Population
+            populateTable(trades);
+            
+            console.log('Tests completed');
+        }
+
+        // Run tests when page loads
+        document.addEventListener('DOMContentLoaded', runTests);
+    </script>
+</body>
+</html> 
