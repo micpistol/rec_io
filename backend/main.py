@@ -24,15 +24,15 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Use relative imports to avoid ModuleNotFoundError
-from core.port_config import get_port, get_port_info
+from backend.core.port_config import get_port, get_port_info
 
 # Get port from centralized system
 MAIN_APP_PORT = get_port("main_app")
 print(f"[MAIN] 🚀 Using centralized port: {MAIN_APP_PORT}")
 
 # Import centralized path utilities
-from util.paths import get_data_dir, get_trade_history_dir, get_accounts_data_dir
-from account_mode import get_account_mode
+from backend.util.paths import get_data_dir, get_trade_history_dir, get_accounts_data_dir
+from backend.account_mode import get_account_mode
 
 # Global set of connected websocket clients for preferences
 connected_clients = set()
