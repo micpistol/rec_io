@@ -886,9 +886,9 @@ async def add_trade(request: Request):
     data = await request.json()
     intent = data.get("intent", "open").lower()
     if intent == "close":
-        print("[DEBUG] CLOSE TICKET RECEIVED")
-        print("[DEBUG] Close Payload:", data)
-        log(f"[DEBUG] CLOSE TICKET RECEIVED — Payload: {data}")
+        print("[TRADE_MANAGER] 🔴 CLOSE TICKET RECEIVED")
+        print("[TRADE_MANAGER] Close Payload:", data)
+        log(f"[TRADE_MANAGER] 🔴 CLOSE TICKET RECEIVED — Payload: {data}")
         ticker = data.get("ticker")
         if ticker:
             conn = get_db_connection()
@@ -970,7 +970,7 @@ async def add_trade(request: Request):
             else:
                 log(f"[CONFIRM CLOSE THREAD ERROR] Could not find trade id for ticker: {ticker}")
 
-        return {"message": "Close ticket received and ignored"}
+        return {"message": "Close ticket received and processed"}
     log("✅ /trades POST route triggered successfully")
     print("✅ TRADE MANAGER received POST")
     required_fields = {"date", "time", "strike", "side", "buy_price", "position"}

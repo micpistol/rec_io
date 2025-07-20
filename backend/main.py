@@ -432,6 +432,33 @@ async def get_trades(status: Optional[str] = None):
         print(f"Error getting trades: {e}")
         return []
 
+@app.get("/trades/{trade_id}")
+async def get_trade(trade_id: int):
+    """Forward trade GET request to trade_manager."""
+    try:
+        # Get trade_manager port from centralized system
+        trade_manager_port = get_port("trade_manager")
+        trade_manager_url = f"http://localhost:{trade_manager_port}/trades/{trade_id}"
+        
+        print(f"[MAIN] Forwarding trade GET request to trade_manager at {trade_manager_url}")
+        
+        # Forward the request to trade_manager
+        response = requests.get(
+            trade_manager_url,
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            print(f"[MAIN] ✅ Trade GET request forwarded successfully to trade_manager")
+            return response.json()
+        else:
+            print(f"[MAIN] ❌ Trade GET request forwarding failed: {response.status_code}")
+            return {"error": f"Trade manager returned status {response.status_code}"}
+            
+    except Exception as e:
+        print(f"[MAIN] ❌ Error forwarding trade GET request: {e}")
+        return {"error": str(e)}
+
 @app.post("/trades")
 async def create_trade(trade_data: dict):
     """Forward trade ticket to trade_manager."""
