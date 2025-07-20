@@ -166,7 +166,7 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
       }
       row.appendChild(probCell);
       
-      // Close button
+      // Close button with PnL display
       const closeCell = document.createElement("td");
       closeCell.style.textAlign = "center";
       const closeSpan = document.createElement("span");
@@ -176,7 +176,24 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
       closeSpan.style.cursor = "pointer";
       closeSpan.onclick = () => closeActiveTrade(trade.trade_id, trade.ticket_id);
       const innerDiv = document.createElement("div");
-      innerDiv.textContent = "Close";
+      
+      // Display PnL if available, otherwise show "Close"
+      if (trade.current_pnl !== null && trade.current_pnl !== undefined) {
+        const pnl = parseFloat(trade.current_pnl);
+        if (!isNaN(pnl)) {
+          // Format PnL with white text
+          const pnlText = pnl >= 0 ? `+${pnl.toFixed(2)}` : pnl.toFixed(2);
+          innerDiv.textContent = pnlText;
+          innerDiv.style.color = "white";
+        } else {
+          innerDiv.textContent = "Close";
+          innerDiv.style.color = "white";
+        }
+      } else {
+        innerDiv.textContent = "Close";
+        innerDiv.style.color = "white";
+      }
+      
       closeSpan.appendChild(innerDiv);
       closeCell.appendChild(closeSpan);
       row.appendChild(closeCell);
@@ -209,6 +226,22 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
       // Update probability
       if (cells.length > 5 && trade.current_probability !== null) {
         cells[5].textContent = `${trade.current_probability.toFixed(1)}%`;
+      }
+      
+      // Update PnL on close button
+      if (cells.length > 6 && trade.current_pnl !== null && trade.current_pnl !== undefined) {
+        const closeButton = cells[6].querySelector('.price-box div');
+        if (closeButton) {
+          const pnl = parseFloat(trade.current_pnl);
+          if (!isNaN(pnl)) {
+            const pnlText = pnl >= 0 ? `+${pnl.toFixed(2)}` : pnl.toFixed(2);
+            closeButton.textContent = pnlText;
+            closeButton.style.color = "white";
+          } else {
+            closeButton.textContent = "Close";
+            closeButton.style.color = "white";
+          }
+        }
       }
     }
   });
