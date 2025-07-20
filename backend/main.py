@@ -876,6 +876,22 @@ async def get_auto_stop():
     prefs = load_preferences()
     return {"enabled": prefs.get("auto_stop", True)}
 
+@app.get("/frontend-changes")
+def frontend_changes():
+    """Get the latest modification time of frontend files for cache busting."""
+    import os
+    latest = 0
+    for root, dirs, files in os.walk("frontend"):
+        for f in files:
+            path = os.path.join(root, f)
+            try:
+                mtime = os.path.getmtime(path)
+                if mtime > latest:
+                    latest = mtime
+            except Exception:
+                pass
+    return {"last_modified": latest}
+
 # Startup and shutdown events
 @app.on_event("startup")
 async def startup_event():

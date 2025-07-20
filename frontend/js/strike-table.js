@@ -186,9 +186,10 @@ async function updateStrikeTable(coreData, latestKalshiMarkets) {
     const buffer = centerPrice - strike;
     bufferTd.textContent = Math.abs(buffer).toLocaleString(undefined, {maximumFractionDigits: 0});
 
-    // B/M
-    const bpm = Math.abs(buffer) / ttcMinutes;
-    bmTd.textContent = Math.round(bpm).toLocaleString();
+    // % (Buffer as percentage of one strike level)
+    const strikeLevel = 250; // One strike level is $250
+    const bufferPercent = Math.abs(buffer) / strikeLevel;
+    bmTd.textContent = bufferPercent.toFixed(2);
 
     // --- PATCH: Use model-based probability for Prob Touch (%) ---
     let prob = probMap && probMap.has(strike) ? probMap.get(strike) : null;

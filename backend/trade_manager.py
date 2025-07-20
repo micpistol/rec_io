@@ -276,10 +276,11 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                         yes_price, no_price, fill_time, fill_side = fill_row
                         
                         # Use the price for the opposite side (the side we're buying to close)
+                        # Sell price should be 1 - the price we're paying to close
                         if original_side == 'Y':  # Original was YES, so use NO price (we're buying NO to close)
-                            sell_price = float(no_price)
+                            sell_price = 1 - float(no_price)
                         elif original_side == 'N':  # Original was NO, so use YES price (we're buying YES to close)
-                            sell_price = float(yes_price)
+                            sell_price = 1 - float(yes_price)
                         
                         log_event(ticket_id, f"MANAGER: Found closing fill at {fill_time} - side={fill_side}, yes_price={yes_price}, no_price={no_price}, using sell_price={sell_price}")
                     else:
