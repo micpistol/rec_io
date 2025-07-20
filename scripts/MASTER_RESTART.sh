@@ -257,8 +257,19 @@ master_restart() {
     stop_supervisor
     echo ""
     
-    # Step 2: Force kill all Python processes related to our project
-    print_status "Step 2: Force killing all related Python processes..."
+    # Step 2: Force kill ALL related processes - MORE AGGRESSIVE
+    print_status "Step 2: Force killing ALL related processes..."
+    
+    # Kill all screen sessions that might be running our processes
+    print_warning "Killing all screen sessions..."
+    screen -ls | grep -E "(combined_trade_tails|trade)" | cut -d. -f1 | xargs -r kill 2>/dev/null || true
+    
+    # Kill all tail processes that might be monitoring logs
+    print_warning "Killing all tail processes..."
+    pkill -f "tail.*log" || true
+    
+    # Kill all Python processes related to our project - MORE COMPREHENSIVE
+    print_warning "Killing all Python backend processes..."
     pkill -f "python.*backend" || true
     pkill -f "python.*main.py" || true
     pkill -f "python.*trade_manager.py" || true
@@ -270,8 +281,23 @@ master_restart() {
     pkill -f "python.*kalshi_api_watchdog.py" || true
     pkill -f "python.*market_title_service.py" || true
     
+    # Kill any processes with our project path in the command line
+    print_warning "Killing processes with project path..."
+    pkill -f "rec_io" || true
+    pkill -f "rec_io_20" || true
+    
+    # Kill any processes using our ports
+    print_warning "Killing processes using our ports..."
+    for port in "${PORTS[@]}"; do
+        lsof -ti :$port | xargs kill -9 2>/dev/null || true
+    done
+    
+    # Kill any remaining Python processes that might be ours
+    print_warning "Killing any remaining suspicious Python processes..."
+    ps aux | grep python | grep -E "(backend|trade|kalshi|btc)" | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null || true
+    
     # Wait for processes to fully terminate
-    sleep 3
+    sleep 5
     echo ""
     
     # Step 3: Flush all ports
@@ -331,8 +357,16 @@ emergency_restart() {
     pkill -f "supervisord" || true
     sleep 2
     
-    # Kill all Python processes related to our project
-    print_warning "Force killing all Python processes..."
+    # Kill all screen sessions that might be running our processes
+    print_warning "Killing all screen sessions..."
+    screen -ls | grep -E "(combined_trade_tails|trade)" | cut -d. -f1 | xargs -r kill 2>/dev/null || true
+    
+    # Kill all tail processes that might be monitoring logs
+    print_warning "Killing all tail processes..."
+    pkill -f "tail.*log" || true
+    
+    # Kill all Python processes related to our project - MORE COMPREHENSIVE
+    print_warning "Killing all Python backend processes..."
     pkill -f "python.*backend" || true
     pkill -f "python.*main.py" || true
     pkill -f "python.*trade_manager.py" || true
@@ -342,12 +376,28 @@ emergency_restart() {
     pkill -f "python.*db_poller.py" || true
     pkill -f "python.*kalshi_account_sync.py" || true
     pkill -f "python.*kalshi_api_watchdog.py" || true
+    pkill -f "python.*market_title_service.py" || true
+    
+    # Kill any processes with our project path in the command line
+    print_warning "Killing processes with project path..."
+    pkill -f "rec_io" || true
+    pkill -f "rec_io_20" || true
+    
+    # Kill any processes using our ports
+    print_warning "Killing processes using our ports..."
+    for port in "${PORTS[@]}"; do
+        lsof -ti :$port | xargs kill -9 2>/dev/null || true
+    done
+    
+    # Kill any remaining Python processes that might be ours
+    print_warning "Killing any remaining suspicious Python processes..."
+    ps aux | grep python | grep -E "(backend|trade|kalshi|btc)" | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null || true
     
     # Clean up socket files
     rm -f /tmp/supervisord.sock /tmp/supervisord.pid
     
     # Wait a moment for processes to fully terminate
-    sleep 3
+    sleep 5
     
     # Flush all ports
     flush_all_ports

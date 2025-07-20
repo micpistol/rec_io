@@ -6,7 +6,8 @@ import json
 import sys
 
 # === LOAD CREDENTIALS ===
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+# Add backend to path for local imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from load_credentials import read_kalshi_credentials
 
 pem_path = os.path.join(os.path.dirname(__file__), "kalshi-credentials", "kalshi-auth.txt")
