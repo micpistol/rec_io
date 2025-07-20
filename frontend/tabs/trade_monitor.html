@@ -8,7 +8,7 @@
 <script src="/js/strike-table.js"></script>
 
         <script src="/js/globals.js"></script>
-        <script src="/js/active-trades.js"></script>
+        
         <script src="/js/active-trade-supervisor.js"></script>
         <script src="/js/trade-execution-controller.js"></script>
       
@@ -166,29 +166,7 @@
     .col-yes { width: 60px; }
     .col-no { width: 60px; }
 
-  /* === ACTIVE TRADES TABLE STYLES === */
-  #activeTradesTable {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 10px;
-  }
-  #activeTradesTable th,
-  #activeTradesTable td {
-    font-size: 14px;
-    border: 1px solid #888;
-    padding: 4px 6px;
-  }
-  /* Center all values (cells) in the Active Trades table */
-  #activeTradesTable td {
-    text-align: center;
-  }
-  #activeTradesTable thead th {
-    font-size: 13px;
-    font-weight: bold;
-    text-align: center;
-    background-color: #222c3c;
-    padding: 4px 6px;
-  }
+
 
   /* === ACTIVE TRADE SUPERVISOR TABLE STYLES === */
   #activeTradeSupervisorTable {
@@ -234,13 +212,7 @@
 </style>
 <style>
 
-  /* Remove top, left, right, and interior borders from header row in Active Trades table */
-  #activeTradesTable thead tr th {
-    border-top: none;
-    border-left: none;
-    border-right: none;
-    border-bottom: none;
-  }
+
 
   /* Remove top, left, right, and interior borders from header row in Active Trade Supervisor table */
   #activeTradeSupervisorTable thead tr th {
@@ -284,15 +256,6 @@
   }
 </style>
 <style>
-  #activeTradesTable tr.spanner-row td {
-    background-color: #535668;
-    color: #c0c0c0;
-    text-align: center;
-    font-size: 12px;
-    font-style: italic;
-    height: 25px;
-    padding: 2px 4px;
-  }
 
   #activeTradeSupervisorTable tr.spanner-row td {
     background-color: #535668;
@@ -572,11 +535,7 @@
     border-bottom: 1px solid #222c3c;
   }
 </style>
-<style>
-  #activeTradesTable button.close-trade-btn {
-    transform: scale(0.8);
-    transform-origin: center;
-  }
+
 </style>
 <style>
   /* Strike Table Column Widths (page-specific) */
@@ -1403,29 +1362,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 });
 </script>
-              <div class="panel-container" style="min-height: 319px;" id="activeTradesPanel">
-        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
-          <span>Active Trades</span>
-          <label style="font-size: 12px; user-select: none; color: white; display: flex; align-items: center; gap: 6px; margin: 0;">
-            AUTO STOP
-            <input type="checkbox" id="autoStopToggle" />
-          </label>
-        </div>
-        <table id="activeTradesTable" class="panel-table" style="width: 100%; border-collapse: collapse;">
-          <thead>
-            <tr>
-              <th>Strike</th>
-              <th>Side</th>
-              <th>Buy</th>
-              <th>Pos</th>
-              <th>Buffer</th>
-              <th style="width: 40px;"">Prob</th>
-              <th style="text-align: center;">Close</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
+
 
       <!-- Active Trade Supervisor Panel -->
       <div class="panel-container" style="min-height: 319px;" id="activeTradeSupervisorPanel">
@@ -1958,7 +1895,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </body>
 <script>
 // === Active Trades Panel and Trade Execution ===
-const activeTradesTableBody = document.querySelector('#activeTradesTable tbody');
+
 const recentTradesTableBody = document.querySelector('#recentTradesTable tbody');
 
 const errorTooltip = document.getElementById('errorTooltip');
@@ -2315,7 +2252,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       // Update spanner rows in all tables
-      updateSpannerArrows('#activeTradesTable');
+      
       updateSpannerArrows('#strike-table');
     });
     observer.observe(momentumEl, { childList: true, characterData: true, subtree: true });
