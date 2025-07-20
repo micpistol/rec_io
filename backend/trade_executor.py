@@ -153,7 +153,7 @@ def trigger_trade():
     """Execute a trade."""
     try:
         data = request.get_json()
-        print(f"[TRADE_EXECUTOR] 🔍 RECEIVED TRADE DATA: {data}")
+        print(f"[TRADE_EXECUTOR] 🔍 RECEIVED TRADE DATA: {data}", flush=True)
         ticket_id = data.get("ticket_id", "UNKNOWN")
         # Normalize ticket_id to avoid double "TICKET-" prefixing
         if ticket_id.count("TICKET-") > 1:
@@ -192,12 +192,12 @@ def trigger_trade():
         }
 
         url = f"{get_base_url()}{path}"
-        print(f"🚀 SENDING TRADE PAYLOAD TO KALSHI:\n{json.dumps(order_payload, indent=2)}")
-        print(f"📡 HEADERS:\n{json.dumps(headers, indent=2)}")
-        print(f"🌐 URL: {url}")
+        print(f"🚀 SENDING TRADE PAYLOAD TO KALSHI:\n{json.dumps(order_payload, indent=2)}", flush=True)
+        print(f"📡 HEADERS:\n{json.dumps(headers, indent=2)}", flush=True)
+        print(f"🌐 URL: {url}", flush=True)
         response = requests.post(url, headers=headers, json=order_payload, timeout=10)
-        print(f"📬 RESPONSE STATUS: {response.status_code}")
-        print(f"📨 RESPONSE BODY: {response.text}")
+        print(f"📬 RESPONSE STATUS: {response.status_code}", flush=True)
+        print(f"📨 RESPONSE BODY: {response.text}", flush=True)
 
         if response.status_code >= 400:
             log_event(ticket_id, "EXECUTOR: TRADE REJECTED — ERROR")
@@ -228,7 +228,7 @@ def trigger_trade():
                 except Exception as e:
                     print(f"❌ STATUS UPDATE FAILED: {e}")
             threading.Thread(target=notify_accepted, daemon=True).start()
-            print("[TRADE_EXECUTOR] ✅ TRADE SENT SUCCESSFULLY")
+            print("[TRADE_EXECUTOR] ✅ ✅ ✅ TRADE EXECUTED SUCCESSFULLY ✅ ✅ ✅")
             return jsonify({"status": "sent", "message": "Trade sent successfully"}), 200
 
     except Exception as e:

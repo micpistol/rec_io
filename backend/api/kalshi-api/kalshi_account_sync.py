@@ -620,6 +620,29 @@ def sync_settlements():
         else:
             db.commit()
     print(f"💾 {len(new_settlements)} new settlements written to {SETTLEMENTS_DB_PATH}")
+    
+    # Also write to settlements.json for frontend consumption
+    settlements_json_path = os.path.join(os.path.dirname(SETTLEMENTS_DB_PATH), "settlements.json")
+    try:
+        # Transform settlements back to JSON format for frontend
+        settlements_for_json = []
+        for settlement in all_settlements:
+            settlements_for_json.append({
+                "ticker": settlement.get("ticker"),
+                "market_result": settlement.get("market_result"),
+                "yes_count": settlement.get("yes_count"),
+                "yes_total_cost": settlement.get("yes_total_cost"),
+                "no_count": settlement.get("no_count"),
+                "no_total_cost": settlement.get("no_total_cost"),
+                "revenue": settlement.get("revenue"),
+                "settled_time": settlement.get("settled_time")
+            })
+        
+        with open(settlements_json_path, "w") as f:
+            json.dump({"settlements": settlements_for_json}, f, indent=2)
+        print(f"💾 settlements.json updated at {settlements_json_path}")
+    except Exception as e:
+        print(f"❌ Failed to write settlements.json: {e}")
 
 
 def main():
