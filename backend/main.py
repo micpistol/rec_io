@@ -884,13 +884,22 @@ def load_auto_stop_settings():
     if os.path.exists(AUTO_STOP_SETTINGS_PATH):
         try:
             with open(AUTO_STOP_SETTINGS_PATH, "r") as f:
-                return json.load(f)
+                data = json.load(f)
+                # Ensure min_ttc_seconds is present
+                if "min_ttc_seconds" not in data:
+                    data["min_ttc_seconds"] = 60
+                return data
         except Exception:
             pass
-    return {"current_probability": 25}
+    return {"current_probability": 25, "min_ttc_seconds": 60}
 
 def save_auto_stop_settings(settings):
     try:
+        # Always write both fields
+        if "current_probability" not in settings:
+            settings["current_probability"] = 25
+        if "min_ttc_seconds" not in settings:
+            settings["min_ttc_seconds"] = 60
         with open(AUTO_STOP_SETTINGS_PATH, "w") as f:
             json.dump(settings, f)
     except Exception as e:
@@ -906,8 +915,10 @@ async def set_auto_stop_settings(request: Request):
     settings = load_auto_stop_settings()
     if "current_probability" in data:
         settings["current_probability"] = int(data["current_probability"])
-        save_auto_stop_settings(settings)
-    return {"status": "ok", "current_probability": settings["current_probability"]}
+    if "min_ttc_seconds" in data:
+        settings["min_ttc_seconds"] = int(data["min_ttc_seconds"])
+    save_auto_stop_settings(settings)
+    return {"status": "ok", "current_probability": settings["current_probability"], "min_ttc_seconds": settings["min_ttc_seconds"]}
 
 @app.get("/frontend-changes")
 def frontend_changes():

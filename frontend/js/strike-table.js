@@ -34,7 +34,8 @@ window.strikeRowsMap = new Map();
 function buildStrikeTableRows(basePrice) {
   const step = 250;
   const rows = [];
-  for (let i = basePrice - 6 * step; i <= basePrice + 6 * step; i += step) {
+  // Generate two extra rows: one above, one below
+  for (let i = basePrice - 7 * step; i <= basePrice + 7 * step; i += step) {
     rows.push(i);
   }
   return rows;
@@ -43,10 +44,10 @@ function buildStrikeTableRows(basePrice) {
 function initializeStrikeTable(basePrice) {
   const strikeTableBody = document.querySelector('#strike-table tbody');
   const strikes = buildStrikeTableRows(basePrice);
-  strikeTableBody.innerHTML = ''; // only clear once at start
+  strikeTableBody.innerHTML = '';
   window.strikeRowsMap.clear();
 
-  strikes.forEach(strike => {
+  strikes.forEach((strike, idx) => {
     const row = document.createElement('tr');
 
     // Strike cell
@@ -84,6 +85,11 @@ function initializeStrikeTable(basePrice) {
     noTd.appendChild(noSpan);
     row.appendChild(noTd);
 
+    // Hide the first and last row (buffer rows)
+    if (idx === 0 || idx === strikes.length - 1) {
+      row.classList.add('strike-row-buffer');
+      row.style.display = 'none';
+    }
     strikeTableBody.appendChild(row);
 
     window.strikeRowsMap.set(strike, {

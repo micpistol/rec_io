@@ -764,19 +764,34 @@ def start_monitoring_loop():
             # === AUTO STOP LOGIC ===
             if is_auto_stop_enabled():
                 threshold = get_auto_stop_threshold()
+                min_ttc_seconds = get_min_ttc_seconds()
                 for trade in active_trades:
                     prob = trade.get('current_probability')
                     trade_id = trade.get('trade_id')
+                    ttc_seconds = trade.get('time_since_entry')
+                    
                     # Only trigger if not already closing/closed and not already triggered
                     if (
                         prob is not None and
                         isinstance(prob, (int, float)) and
                         prob < threshold and
                         trade.get('status') == 'active' and
-                        trade_id not in auto_stop_triggered_trades
+                        trade_id not in auto_stop_triggered_trades and
+                        ttc_seconds is not None and
+                        ttc_seconds >= min_ttc_seconds # Respect min_ttc_seconds setting
                     ):
+                        log(f"[AUTO STOP] Triggering auto stop for trade {trade_id} (prob={prob}, ttc={ttc_seconds}s, min_ttc={min_ttc_seconds}s)")
                         trigger_auto_stop_close(trade)
                         auto_stop_triggered_trades.add(trade_id)
+                    elif (
+                        prob is not None and
+                        isinstance(prob, (int, float)) and
+                        prob < threshold and
+                        trade.get('status') == 'active' and
+                        trade_id not in auto_stop_triggered_trades and
+                        (ttc_seconds is None or ttc_seconds < min_ttc_seconds)
+                    ):
+                        log(f"[AUTO STOP] Skipping auto stop for trade {trade_id} - TTC ({ttc_seconds}s) below minimum ({min_ttc_seconds}s)")
             
             # Sleep for 1 second
             time.sleep(1)
@@ -1008,6 +1023,17 @@ def get_auto_stop_threshold():
     except Exception as e:
         log(f"[AUTO STOP] Error reading threshold: {e}")
     return 25
+
+def get_min_ttc_seconds():
+    """Get the minimum TTC seconds setting from auto_stop_settings.json"""
+    try:
+        if os.path.exists(AUTO_STOP_SETTINGS_PATH):
+            with open(AUTO_STOP_SETTINGS_PATH, "r") as f:
+                data = json.load(f)
+                return int(data.get("min_ttc_seconds", 60))
+    except Exception as e:
+        log(f"[AUTO STOP] Error reading min_ttc_seconds: {e}")
+    return 60
 
 if __name__ == "__main__":
     # Start the event-driven supervisor
