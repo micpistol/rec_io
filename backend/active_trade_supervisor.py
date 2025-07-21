@@ -33,7 +33,7 @@ os.makedirs(os.path.dirname(ACTIVE_TRADES_DB_PATH), exist_ok=True)
 
 # Import centralized path utilities
 from backend.core.config.settings import config
-from backend.util.paths import get_data_dir, get_trade_history_dir, get_kalshi_data_dir
+from backend.util.paths import get_data_dir, get_trade_history_dir, get_kalshi_data_dir, get_service_url
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -741,16 +741,17 @@ def start_monitoring_loop():
     """
     def monitoring_worker():
         log("📊 MONITORING: Starting monitoring loop for active trades")
-        
+        auto_stop_triggered_trades = set()
         while True:
             # Check if there are still active trades
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
-            active_count = cursor.fetchone()[0]
+            cursor.execute("SELECT * FROM active_trades WHERE status = 'active'")
+            columns = [desc[0] for desc in cursor.description]
+            active_trades = [dict(zip(columns, row)) for row in cursor.fetchall()]
             conn.close()
             
-            if active_count == 0:
+            if not active_trades:
                 log("📊 MONITORING: No more active trades, stopping monitoring loop")
                 break
             
@@ -759,6 +760,22 @@ def start_monitoring_loop():
             
             # Export JSON after each update
             export_active_trades_to_json()
+            
+            # === AUTO STOP LOGIC ===
+            if is_auto_stop_enabled():
+                for trade in active_trades:
+                    prob = trade.get('current_probability')
+                    trade_id = trade.get('trade_id')
+                    # Only trigger if not already closing/closed and not already triggered
+                    if (
+                        prob is not None and
+                        isinstance(prob, (int, float)) and
+                        prob < 25 and
+                        trade.get('status') == 'active' and
+                        trade_id not in auto_stop_triggered_trades
+                    ):
+                        trigger_auto_stop_close(trade)
+                        auto_stop_triggered_trades.add(trade_id)
             
             # Sleep for 1 second
             time.sleep(1)
@@ -923,6 +940,58 @@ def start_event_driven_supervisor():
         log("🛑 Active trade supervisor stopped by user")
     except Exception as e:
         log(f"❌ Error in supervisor: {e}")
+
+def is_auto_stop_enabled():
+    """Check if AUTO STOP is enabled in trade_preferences.json"""
+    from backend.util.paths import get_data_dir
+    import json
+    prefs_path = os.path.join(get_data_dir(), "trade_preferences.json")
+    if os.path.exists(prefs_path):
+        try:
+            with open(prefs_path, "r") as f:
+                prefs = json.load(f)
+                return prefs.get("auto_stop", False)
+        except Exception as e:
+            log(f"[AUTO STOP] Error reading preferences: {e}")
+    return False
+
+def trigger_auto_stop_close(trade):
+    """Trigger a close for the given trade using the same payload as manual close."""
+    import requests
+    import random
+    # Generate unique ticket ID
+    ticket_id = f"TICKET-{{random.getrandbits(32):x}}-{{int(time.time() * 1000)}}"
+    # Invert side
+    side = trade['side']
+    inverted_side = 'N' if side.upper() in ['Y', 'YES'] else 'Y' if side.upper() in ['N', 'NO'] else side
+    # Use current market price for symbol_close and buy_price
+    sell_price = trade.get('current_close_price')
+    symbol_close = trade.get('current_symbol_price')
+    if sell_price is None or symbol_close is None:
+        log(f"[AUTO STOP] Skipping close for trade {trade['trade_id']} due to missing price data.")
+        return
+    payload = {
+        'ticket_id': ticket_id,
+        'intent': 'close',
+        'ticker': trade['ticker'],
+        'side': inverted_side,
+        'count': trade['position'],
+        'action': 'close',
+        'type': 'market',
+        'time_in_force': 'IOC',
+        'buy_price': sell_price,
+        'symbol_close': symbol_close
+    }
+    try:
+        port = get_port('main_app')
+        url = get_service_url(port) + "/trades"
+        resp = requests.post(url, json=payload, timeout=3)
+        if resp.status_code == 201 or resp.status_code == 200:
+            log(f"[AUTO STOP] Triggered AUTO STOP close for trade {trade['trade_id']} (prob={trade.get('current_probability')})")
+        else:
+            log(f"[AUTO STOP] Failed to trigger close for trade {trade['trade_id']}: {resp.status_code} {resp.text}")
+    except Exception as e:
+        log(f"[AUTO STOP] Exception posting close for trade {trade['trade_id']}: {e}")
 
 if __name__ == "__main__":
     # Start the event-driven supervisor
