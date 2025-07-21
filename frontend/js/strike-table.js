@@ -1,3 +1,4 @@
+
 // Add no-op definitions for missing functions to prevent ReferenceError
 if (typeof window.updateClickHandlersForReco !== 'function') {
   window.updateClickHandlersForReco = function() {};

@@ -1,3 +1,4 @@
+
 // === ACTIVE TRADE SUPERVISOR MANAGER ===
 // This module handles the Active Trade Supervisor table creation, updates, and maintenance
 // Pulls data directly from active_trades.db via the active_trade_supervisor service
@@ -263,13 +264,25 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
 
 async function closeActiveTrade(tradeId, ticketId) {
   try {
+    console.log('[ACTIVE TRADE SUPERVISOR] Attempting to close trade:', tradeId);
+    
     // Use the centralized closeTrade function from the trade execution controller
     if (typeof window.closeTrade === 'function') {
       // Get current BTC price for sell price
       const currentPrice = typeof getCurrentBTCTickerPrice === 'function' ? getCurrentBTCTickerPrice() : 0.5;
+      console.log('[ACTIVE TRADE SUPERVISOR] Current price for close:', currentPrice);
+      
+      // Create a mock event object since we don't have the actual event
+      const mockEvent = {
+        target: document.createElement('button'),
+        preventDefault: () => {},
+        stopPropagation: () => {}
+      };
       
       // Call the centralized close trade function - let it handle all notifications
-      await window.closeTrade(tradeId, currentPrice, event);
+      console.log('[ACTIVE TRADE SUPERVISOR] Calling window.closeTrade with:', { tradeId, currentPrice });
+      await window.closeTrade(tradeId, currentPrice, mockEvent);
+      console.log('[ACTIVE TRADE SUPERVISOR] Close trade call completed');
     } else {
       console.error('[ACTIVE TRADE SUPERVISOR] Centralized closeTrade function not available');
     }
@@ -286,10 +299,10 @@ function startActiveTradeSupervisorRefresh() {
   // Initial load
   fetchAndRenderActiveTradeSupervisorTrades();
   
-  // Set up periodic refresh (every 2 seconds)
+  // Set up periodic refresh (every 5 seconds - REDUCED to prevent resource exhaustion)
   setInterval(() => {
     fetchAndRenderActiveTradeSupervisorTrades();
-  }, 2000);
+  }, 5000);
 }
 
 // === INITIALIZATION ===

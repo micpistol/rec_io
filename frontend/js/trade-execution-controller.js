@@ -1,3 +1,4 @@
+
 // === CENTRALIZED TRADE EXECUTION CONTROLLER ===
 // This file centralizes ALL trade execution to prevent multiple functions
 // and add proper safety controls for live money trading
@@ -134,40 +135,46 @@ window.executeTrade = async function(tradeData) {
 // === CENTRALIZED CLOSE TRADE FUNCTION ===
 // This is the ONLY function that should close trades
 window.closeTrade = async function(tradeId, sellPrice, event) {
+  console.log('🔍 DEBUG: closeTrade function ENTRY POINT - called with:', { tradeId, sellPrice, event: !!event });
+  console.log('🔍 DEBUG: closeTrade function STARTING EXECUTION');
+  
   // Audio is already played in trade_monitor.html when button was clicked
   
   // Prevent multiple simultaneous executions
   if (window.TRADE_STATE.isExecuting) {
+    console.log('❌ DEBUG: Trade already executing, returning');
     return { success: false, error: 'Trade already executing' };
   }
 
   // Validate inputs
   if (!tradeId || !sellPrice) {
+    console.log('❌ DEBUG: Invalid close trade parameters:', { tradeId, sellPrice });
     return { success: false, error: 'Invalid close trade parameters' };
   }
+  
+  console.log('🔍 DEBUG: closeTrade validation passed, proceeding with execution');
 
   // Generate unique ticket ID
   const ticket_id = 'TICKET-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+  console.log('🔍 DEBUG: Generated ticket_id:', ticket_id);
   
   // Add to pending trades
   window.TRADE_STATE.pendingTrades.add(ticket_id);
   window.TRADE_STATE.isExecuting = true;
 
   try {
+    console.log('🔍 DEBUG: Fetching trade details for trade ID:', tradeId);
     // Fetch trade details to construct the close ticket
     const tradeRes = await fetch(`/trades/${tradeId}`);
-    if (!tradeRes.ok) throw new Error('Failed to fetch trade for closing');
+    if (!tradeRes.ok) {
+      console.log('❌ DEBUG: Failed to fetch trade, status:', tradeRes.status);
+      throw new Error('Failed to fetch trade for closing');
+    }
     const trade = await tradeRes.json();
+    console.log('🔍 DEBUG: Trade details fetched:', trade);
 
-    // === Immediately log the close ticket creation ===
-    await fetch('/api/log_event', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ticket_id: ticket_id,
-        message: "MONITOR: CLOSE TICKET INITIATED — CONFIRMED"
-      })
-    });
+    // === Log the close ticket creation (removed API call since endpoint doesn't exist) ===
+    console.log('🔍 DEBUG: Close ticket initiated:', ticket_id);
 
 
 
@@ -201,6 +208,7 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
       buy_price:        sellPrice,
       symbol_close:     symbolClose
     };
+    console.log('🔍 DEBUG: Close trade payload created:', payload);
 
     // === DEMO MODE CHECK ===
     if (window.TRADE_CONFIG.DEMO_MODE) {
@@ -216,17 +224,21 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
     }
 
     // Execute the actual close trade
+    console.log('🔍 DEBUG: Executing close trade request to /trades');
     const response = await fetch('/trades', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
+    console.log('🔍 DEBUG: Close trade response status:', response.status);
     if (!response.ok) {
+      console.log('❌ DEBUG: Close trade execution failed with status:', response.status);
       throw new Error(`Close trade execution failed: ${response.status}`);
     }
 
     const result = await response.json();
+    console.log('🔍 DEBUG: Close trade result:', result);
     
     // Add to executed trades
     window.TRADE_STATE.executedTrades.add(ticket_id);

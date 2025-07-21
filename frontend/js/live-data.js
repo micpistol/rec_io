@@ -1,3 +1,4 @@
+
 // === LIVE DATA POLLING MODULE ===
 // This module handles all live data fetching and polling for the trade monitor
 
@@ -64,6 +65,13 @@ function fetchCore() {
       // Trigger momentum panel update if function exists
       if (typeof updateMomentumPanel === 'function') {
         updateMomentumPanel();
+      }
+
+      // Also update BTC price display (combined with momentum data)
+      if ('btc_price' in data) {
+        const price = Number(data.btc_price);
+        const el = document.getElementById('btc-price-value');
+        if (el) el.textContent = formatUSD(price);
       }
     })
     .catch(console.error);
@@ -283,20 +291,16 @@ async function fetchAndCacheTTC() {
 document.addEventListener('DOMContentLoaded', () => {
   // Initial data fetches
   fetchCore();
-  fetchOtherCoreData();
-  fetchBTCPriceChanges();
   fetchAndUpdate();
   fetchMarketTitleRaw();
   updateStrikePanelMarketTitle();
   fetchAndCacheTTC();
 
-  // Set up polling intervals - all at 1 second for consistency
-  setInterval(fetchAndUpdate, 1000);           // Strike panel - back to original
-setInterval(fetchOtherCoreData, 1000);       // BTC price data
-setInterval(fetchCore, 1000);                // Momentum data - back to original
-setInterval(fetchBTCPriceChanges, 1000);     // BTC price changes
-setInterval(fetchMarketTitleRaw, 5000);      // Market title
-setInterval(updateStrikePanelMarketTitle, 5000); // Market title display
+  // Set up polling intervals - OPTIMIZED to reduce resource usage
+  setInterval(fetchAndUpdate, 1000);           // Strike panel + BTC price + momentum data (combined)
+  setInterval(fetchCore, 1000);                // Momentum data (kept separate for reliability)
+  setInterval(fetchMarketTitleRaw, 60000);     // Market title - every minute
+  setInterval(updateStrikePanelMarketTitle, 60000); // Market title display - every minute
   setInterval(() => {
     if (cachedTTC !== null) {
       cachedTTC = Math.max(0, cachedTTC - 1);
