@@ -1,9 +1,9 @@
 import sys
 import os
 # Add the project root to the Python path (permanent scalable fix)
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+from backend.util.paths import get_project_root
+if get_project_root() not in sys.path:
+    sys.path.insert(0, get_project_root())
 print('DEBUG sys.path:', sys.path)
 
 # Now import everything else

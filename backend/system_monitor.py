@@ -1,25 +1,23 @@
 #!/usr/bin/env python3
 """
-System Monitor - Comprehensive system health monitoring
-Monitors all services, databases, and system resources.
+System Monitor
+Monitors system health and performance metrics.
 """
 
 import os
 import sys
-import time
-import json
-import requests
-import sqlite3
 import psutil
-import platform
-from datetime import datetime
-from typing import Dict, List, Any, Optional
+import sqlite3
+import time
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+from typing import Dict, Any, List
 
-# Import project utilities
-import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add project root to path for imports
+from backend.util.paths import get_project_root
+sys.path.insert(0, get_project_root())
 
-from backend.core.port_config import get_service_url, get_port
+from backend.core.port_config import get_port, get_port_info
 from backend.util.paths import get_data_dir, get_trade_history_dir, get_price_history_dir
 
 class SystemMonitor:
@@ -30,11 +28,11 @@ class SystemMonitor:
         
         # Get service URLs using bulletproof port manager
         self.service_urls = {
-            "main_app": get_service_url("main_app"),
-            "trade_manager": get_service_url("trade_manager"),
-            "trade_executor": get_service_url("trade_executor"),
-            "active_trade_supervisor": get_service_url("active_trade_supervisor"),
-            "market_watchdog": get_service_url("market_watchdog")
+            "main_app": get_port_info("main_app"),
+            "trade_manager": get_port_info("trade_manager"),
+            "trade_executor": get_port_info("trade_executor"),
+            "active_trade_supervisor": get_port_info("active_trade_supervisor"),
+            "market_watchdog": get_port_info("market_watchdog")
         }
     
     def check_service_health(self, service_name: str, port: int) -> Dict[str, Any]:

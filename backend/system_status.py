@@ -1,30 +1,24 @@
 #!/usr/bin/env python3
 """
 System Status Monitor
-
-Provides comprehensive system status information including:
-- Service health checks
-- Port availability
-- Resource usage
-- Error tracking
+Monitors the health and status of all trading system components.
 """
 
 import os
 import sys
-import time
-import json
 import requests
-import subprocess
-from datetime import datetime
-from typing import Dict, List, Optional, Any
-from backend.core.port_config import get_service_url
+import json
+import time
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+from typing import Dict, Any, List
 
-# Import project utilities
-import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add project root to path for imports
+from backend.util.paths import get_project_root
+sys.path.insert(0, get_project_root())
 
-from backend.core.config.settings import config
-from backend.util.paths import get_logs_dir
+from backend.core.port_config import get_port, get_port_info
+from backend.util.paths import get_data_dir, get_trade_history_dir, get_price_history_dir
 
 class SystemStatusMonitor:
     def __init__(self):
@@ -33,11 +27,11 @@ class SystemStatusMonitor:
         
         # Service URLs using bulletproof port manager
         self.service_urls = {
-            "main_app": get_service_url("main_app"),
-            "trade_manager": get_service_url("trade_manager"),
-            "trade_executor": get_service_url("trade_executor"),
-            "active_trade_supervisor": get_service_url("active_trade_supervisor"),
-            "market_watchdog": get_service_url("market_watchdog")
+            "main_app": get_port_info("main_app")["url"],
+            "trade_manager": get_port_info("trade_manager")["url"],
+            "trade_executor": get_port_info("trade_executor")["url"],
+            "active_trade_supervisor": get_port_info("active_trade_supervisor")["url"],
+            "market_watchdog": get_port_info("market_watchdog")["url"]
         }
     
     def check_port_validation(self) -> Dict[str, Any]:

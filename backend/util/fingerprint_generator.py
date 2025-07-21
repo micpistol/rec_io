@@ -3,6 +3,17 @@ import os
 import sys
 import pandas as pd
 import argparse
+import json
+import sqlite3
+from datetime import datetime, timedelta
+import numpy as np
+from typing import Dict, List, Optional, Tuple
+
+# Add project root to path for imports
+from backend.util.paths import get_project_root
+sys.path.insert(0, get_project_root())
+
+from backend.util.paths import get_data_dir
 
 def generate_directional_fingerprint(df, momentum_value=None, description=""):
     """
@@ -91,7 +102,7 @@ def generate_directional_fingerprint(df, momentum_value=None, description=""):
 
 def get_fingerprint_dir(symbol):
     """Return the directory for a given symbol's fingerprints."""
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'symbol_fingerprints'))
+    base_dir = os.path.join(get_data_dir(), "symbol_fingerprints")
     return os.path.join(base_dir, symbol.lower())
 
 def get_fingerprint_filename(symbol, bucket):
@@ -154,9 +165,9 @@ Examples:
     elif not args.baseline_only:
         print("Warning: No 'momentum' column found. Generating baseline fingerprint only.")
 
-    # Create symbol-specific output directory
+    # Create symbol-specific output directory using centralized paths
     symbol = os.path.basename(args.csv_path).split('_')[0].lower()
-    output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'symbol_fingerprints', symbol))
+    output_dir = os.path.join(get_data_dir(), "symbol_fingerprints", symbol)
     os.makedirs(output_dir, exist_ok=True)
 
     # Determine what to generate

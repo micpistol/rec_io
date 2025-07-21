@@ -17,7 +17,8 @@ from typing import Dict, Any, Optional
 
 # Import project utilities
 import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from backend.util.paths import get_project_root
+sys.path.insert(0, get_project_root())
 
 from backend.account_mode import get_account_mode
 from backend.util.paths import get_data_dir, get_accounts_data_dir

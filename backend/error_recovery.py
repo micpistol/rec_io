@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """
 Error Recovery System
-
-Monitors system health and automatically recovers from common failures.
-Provides centralized error handling and recovery mechanisms.
+Handles error recovery and system restoration.
 """
 
 import os
@@ -11,17 +9,16 @@ import sys
 import time
 import json
 import requests
-import subprocess
-from datetime import datetime
-from typing import Dict, List, Optional, Any
-from backend.core.port_config import get_service_url
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+from typing import Dict, Any, List
 
-# Import project utilities
-import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add project root to path for imports
+from backend.util.paths import get_project_root
+sys.path.insert(0, get_project_root())
 
-from backend.core.config.settings import config
-from backend.util.paths import get_logs_dir
+from backend.core.port_config import get_port, get_port_info
+from backend.util.paths import get_data_dir, get_logs_dir
 
 class ErrorRecoverySystem:
     def __init__(self):
@@ -31,11 +28,11 @@ class ErrorRecoverySystem:
         
         # Service URLs using bulletproof port manager
         self.service_urls = {
-            "main_app": get_service_url("main_app"),
-            "trade_manager": get_service_url("trade_manager"),
-            "trade_executor": get_service_url("trade_executor"),
-            "active_trade_supervisor": get_service_url("active_trade_supervisor"),
-            "market_watchdog": get_service_url("market_watchdog")
+            "main_app": get_port_info("main_app"),
+            "trade_manager": get_port_info("trade_manager"),
+            "trade_executor": get_port_info("trade_executor"),
+            "active_trade_supervisor": get_port_info("active_trade_supervisor"),
+            "market_watchdog": get_port_info("market_watchdog")
         }
     
     def check_port_availability(self, port: int) -> bool:

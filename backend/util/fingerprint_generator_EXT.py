@@ -2,6 +2,18 @@ from datetime import datetime
 import os
 import sys
 import pandas as pd
+import argparse
+import json
+import sqlite3
+from datetime import datetime, timedelta
+import numpy as np
+from typing import Dict, List, Optional, Tuple
+
+# Add project root to path for imports
+from backend.util.paths import get_project_root
+sys.path.insert(0, get_project_root())
+
+from backend.util.paths import get_data_dir
 
 def main():
     # Load the CSV file
@@ -70,11 +82,11 @@ def main():
     output_df = pd.DataFrame(output_data, columns=columns)
     output_df.index = [f"{t}m TTC" for t in range(1, max_lookahead + 1)]
 
-    output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'symbol_fingerprints'))
+    # Create output directory using centralized paths
+    output_dir = os.path.join(get_data_dir(), "symbol_fingerprints", os.path.basename(csv_path).split('_')[0].lower())
     os.makedirs(output_dir, exist_ok=True)
-    symbol = os.path.basename(csv_path).split('_')[0].lower()
     date_str = datetime.now().strftime('%Y%m%d')
-    output_filename = f"{symbol}_fingerprint_{date_str}_EXT.csv"
+    output_filename = f"{os.path.basename(csv_path).split('_')[0].lower()}_fingerprint_{date_str}_EXT.csv"
     output_path = os.path.join(output_dir, output_filename)
     output_df.to_csv(output_path)
     print(f"Output saved to {output_path}")

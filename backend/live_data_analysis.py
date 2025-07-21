@@ -1,22 +1,25 @@
+#!/usr/bin/env python3
 """
-LIVE DATA ANALYSIS SERVICE
-Calculates momentum deltas and scores using live price data from watchdog
+Live Data Analysis
+Real-time analysis of market data and trading signals.
 """
 
-import sqlite3
-import time
 import os
 import sys
-from datetime import datetime, timedelta
-import numpy as np
-from typing import Dict, Optional, Tuple
-import pytz
+import time
+import json
+import requests
+import sqlite3
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
+from typing import Dict, Any, List, Optional
 
-# Add backend to path for imports
+# Add project root to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from util.paths import get_price_history_dir
-from core.config.settings import config
+from backend.core.port_config import get_port, get_port_info
+from backend.util.paths import get_data_dir, get_kalshi_data_dir, get_price_history_dir
+from backend.core.config.settings import config
 
 class LiveDataAnalyzer:
     def __init__(self):
@@ -24,7 +27,7 @@ class LiveDataAnalyzer:
         self.cache = {}
         self.last_update = None
         # Use EST timezone for all calculations
-        self.est_tz = pytz.timezone('US/Eastern')
+        self.est_tz = ZoneInfo('US/Eastern')
         
     def get_price_at_offset(self, minutes_ago: int) -> Optional[float]:
         """Get price from X minutes ago using the watchdog database"""

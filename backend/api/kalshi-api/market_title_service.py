@@ -6,9 +6,9 @@ Dedicated service for serving market title data directly from Kalshi watchdog
 import sys
 import os
 # Add the project root to the Python path
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+from backend.util.paths import get_project_root
+if get_project_root() not in sys.path:
+    sys.path.insert(0, get_project_root())
 
 import json
 from fastapi import FastAPI
@@ -35,8 +35,9 @@ EST = pytz.timezone('US/Eastern')
 async def get_market_title():
     """Get current market title from Kalshi snapshot."""
     try:
-        # Read from the latest market snapshot file
-        snapshot_file = os.path.join("backend", "data", "kalshi", "latest_market_snapshot.json")
+        # Read from the latest market snapshot file using centralized paths
+        from backend.util.paths import get_kalshi_data_dir
+        snapshot_file = os.path.join(get_kalshi_data_dir(), "latest_market_snapshot.json")
         
         if os.path.exists(snapshot_file):
             with open(snapshot_file, 'r') as f:

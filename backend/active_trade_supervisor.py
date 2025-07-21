@@ -23,17 +23,18 @@ from backend.core.port_config import get_port, get_port_info
 ACTIVE_TRADE_SUPERVISOR_PORT = get_port("active_trade_supervisor")
 print(f"[ACTIVE_TRADE_SUPERVISOR] 🚀 Using centralized port: {ACTIVE_TRADE_SUPERVISOR_PORT}")
 
-# Configuration
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ACTIVE_TRADES_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "active_trades", "active_trades.db")
-ACTIVE_TRADES_JSON_PATH = os.path.join(BASE_DIR, "backend", "data", "active_trades", "active_trades.json")
+# Import centralized path utilities
+from backend.util.paths import get_project_root, get_data_dir, get_trade_history_dir, get_kalshi_data_dir, get_service_url
+
+# Configuration using centralized paths
+ACTIVE_TRADES_DB_PATH = os.path.join(get_data_dir(), "active_trades", "active_trades.db")
+ACTIVE_TRADES_JSON_PATH = os.path.join(get_data_dir(), "active_trades", "active_trades.json")
 
 # Ensure directory exists
 os.makedirs(os.path.dirname(ACTIVE_TRADES_DB_PATH), exist_ok=True)
 
 # Import centralized path utilities
 from backend.core.config.settings import config
-from backend.util.paths import get_data_dir, get_trade_history_dir, get_kalshi_data_dir, get_service_url
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -82,7 +83,7 @@ def log(message: str):
     
     # Also write to a dedicated log file for easy tailing
     try:
-        log_dir = os.path.join(BASE_DIR, "logs")
+        log_dir = os.path.join(get_project_root(), "logs")
         os.makedirs(log_dir, exist_ok=True)
         log_file = os.path.join(log_dir, "active_trade_supervisor.log")
         with open(log_file, "a") as f:
@@ -301,7 +302,7 @@ def get_db_connection():
 
 def get_trades_db_connection():
     """Get connection to the main trades database"""
-    trades_db_path = os.path.join(BASE_DIR, "backend", "data", "trade_history", "trades.db")
+    trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
     return sqlite3.connect(trades_db_path, timeout=0.25, check_same_thread=False)
 
 def add_new_active_trade(trade_id: int, ticket_id: str) -> bool:
@@ -529,7 +530,7 @@ def get_current_btc_price() -> Optional[float]:
 def get_kalshi_market_snapshot() -> Optional[Dict[str, Any]]:
     """Get the latest Kalshi market snapshot data"""
     try:
-        snapshot_path = os.path.join(BASE_DIR, "backend", "data", "kalshi", "latest_market_snapshot.json")
+        snapshot_path = os.path.join(get_project_root(), "backend", "data", "kalshi", "latest_market_snapshot.json")
         if not os.path.exists(snapshot_path):
             log("⚠️ Kalshi market snapshot file not found")
             return None

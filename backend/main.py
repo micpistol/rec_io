@@ -21,7 +21,8 @@ from typing import List, Optional, Dict
 # Import the universal centralized port system
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from backend.util.paths import get_project_root
+sys.path.append(get_project_root())
 
 # Use relative imports to avoid ModuleNotFoundError
 from backend.core.port_config import get_port, get_port_info

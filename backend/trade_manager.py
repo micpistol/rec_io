@@ -17,6 +17,15 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from backend.core.port_config import get_port, get_port_info
 
+# Import centralized path utilities
+from backend.util.paths import get_project_root, get_trade_history_dir, get_logs_dir
+from backend.account_mode import get_account_mode
+from backend.util.paths import get_accounts_data_dir
+
+# Get port from centralized system
+TRADE_MANAGER_PORT = get_port("trade_manager")
+print(f"[TRADE_MANAGER] 🚀 Using centralized port: {TRADE_MANAGER_PORT}")
+
 def get_executor_port():
     return get_port("trade_executor")
 
@@ -83,13 +92,9 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
     
     expected_ticker = row[0]
     
-    # Determine positions.db path based on demo mode
-    demo_env = os.environ.get("DEMO_MODE", "false")
-    DEMO_MODE = demo_env.strip().lower() == "true"
-    if DEMO_MODE:
-        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "positions.db")
-    else:
-        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "positions.db")
+    # Use centralized paths for positions database
+    mode = get_account_mode()
+    POSITIONS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "positions.db")
     
     if not os.path.exists(POSITIONS_DB_PATH):
         log_event(ticket_id, f"MANAGER: Positions DB path not found: {POSITIONS_DB_PATH}")
@@ -193,13 +198,9 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
     
     expected_ticker = row[0]
     
-    # Determine positions.db path based on demo mode
-    demo_env = os.environ.get("DEMO_MODE", "false")
-    DEMO_MODE = demo_env.strip().lower() == "true"
-    if DEMO_MODE:
-        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "positions.db")
-    else:
-        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "positions.db")
+    # Use centralized paths for positions database
+    mode = get_account_mode()
+    POSITIONS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "positions.db")
     
     if not os.path.exists(POSITIONS_DB_PATH):
         log_event(ticket_id, f"MANAGER: positions.db not found at {POSITIONS_DB_PATH}")
@@ -244,12 +245,8 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                 
                 original_side = side_row[0] if side_row else None
                 
-                # Get the actual sell price from fills.db
-                # Determine fills.db path based on demo mode
-                if DEMO_MODE:
-                    FILLS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "fills.db")
-                else:
-                    FILLS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "fills.db")
+                # Get the actual sell price from fills.db using centralized paths
+                FILLS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "fills.db")
                 
                 sell_price = 999  # Default fallback
                 
@@ -383,12 +380,11 @@ def finalize_trade(id: int, ticket_id: str) -> None:
         log_event(ticket_id, f"MANAGER: No trade found for ID {id}")
         return
     expected_ticker = row[0]
-    demo_env = os.environ.get("DEMO_MODE", "false")
-    DEMO_MODE = demo_env.strip().lower() == "true"
-    if DEMO_MODE:
-        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "positions.db")
-    else:
-        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "positions.db")
+    
+    # Use centralized paths for positions database
+    mode = get_account_mode()
+    POSITIONS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "positions.db")
+    
     if not os.path.exists(POSITIONS_DB_PATH):
         log_event(ticket_id, f"MANAGER: Positions DB path not found: {POSITIONS_DB_PATH}")
         return
@@ -476,7 +472,7 @@ def finalize_trade(id: int, ticket_id: str) -> None:
                     actual_sell_price = None
                     try:
                         # fills.db is in the prod directory
-                        FILLS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "fills.db")
+                        FILLS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "fills.db")
                         
                         if os.path.exists(FILLS_DB_PATH):
                             conn_fills = sqlite3.connect(FILLS_DB_PATH, timeout=0.25)
@@ -637,15 +633,22 @@ async def manual_expiration_check():
     return {"message": "Manual expiration check triggered"}
 
 def log(msg):
-    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs", "trade_manager.out.log")
-    with open(log_path, "a") as f:
-        f.write(f"{datetime.now().isoformat()} | {msg}\n")
+    """Log messages with timestamp"""
+    timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[TRADE_MANAGER {timestamp}] {msg}")
+    
+    # Also write to a dedicated log file for easy tailing
+    try:
+        log_path = os.path.join(get_logs_dir(), "trade_manager.out.log")
+        with open(log_path, "a") as f:
+            f.write(f"{datetime.now().isoformat()} | {msg}\n")
+    except Exception as e:
+        print(f"Error writing to log file: {e}")
 
 def log_event(ticket_id, message):
     try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         trade_suffix = ticket_id[-5:] if len(ticket_id) >= 5 else ticket_id
-        log_path = os.path.join(base_dir, "backend", "data", "trade_history", "tickets", f"trade_flow_{trade_suffix}.log")
+        log_path = os.path.join(get_trade_history_dir(), "tickets", f"trade_flow_{trade_suffix}.log")
         timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
         log_line = f"[{timestamp}] Ticket {ticket_id[-5:]}: {message}\n"
         with open(log_path, "a") as f:
@@ -701,9 +704,8 @@ def is_trade_expired(trade):
     return now >= expiration
 
 
-# Define path for the trades database file
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_TRADES_PATH = os.path.join(BASE_DIR, "backend", "data", "trade_history", "trades.db")
+# Define path for the trades database file using centralized paths
+DB_TRADES_PATH = os.path.join(get_trade_history_dir(), "trades.db")
 
 # Initialize trades DB and table
 def init_trades_db():
@@ -733,7 +735,6 @@ def init_trades_db():
         momentum REAL DEFAULT NULL,
         prob REAL DEFAULT NULL,
         volatility REAL DEFAULT NULL,
-
         symbol_close REAL DEFAULT NULL,
         win_loss TEXT DEFAULT NULL,
         ticker TEXT DEFAULT NULL,
@@ -786,14 +787,14 @@ def insert_trade(trade):
         """INSERT INTO trades (
             date, time, strike, side, buy_price, position, status,
             contract, ticker, symbol, market, trade_strategy, symbol_open,
-            momentum, prob, volatility, ticket_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            momentum, prob, volatility
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             trade['date'], trade['time'], trade['strike'], trade['side'], trade['buy_price'],
             trade['position'], trade.get('status', 'open'), trade.get('contract'),
             trade.get('ticker'), trade.get('symbol'), trade.get('market'), trade.get('trade_strategy'),
             trade.get('symbol_open'), trade.get('momentum'), trade.get('prob'),
-            trade.get('volatility'), trade.get('ticket_id')
+            trade.get('volatility')
         )
     )
     conn.commit()
@@ -920,13 +921,9 @@ async def add_trade(request: Request):
             
             # Confirm close match in positions.db
             try:
-                # Determine the correct positions.db path
-                demo_env = os.environ.get("DEMO_MODE", "false")
-                DEMO_MODE = demo_env.strip().lower() == "true"
-                if DEMO_MODE:
-                    POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "positions.db")
-                else:
-                    POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "positions.db")
+                # Use centralized paths for positions database
+                mode = get_account_mode()
+                POSITIONS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "positions.db")
 
                 if os.path.exists(POSITIONS_DB_PATH):
                     conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
@@ -1235,17 +1232,12 @@ def check_expired_trades():
 
 def poll_settlements_for_matches(expired_tickers):
     """
-    Poll settlements.db every 2 seconds until all expired trades are closed
+    Poll settlements.db for matches to expired trades.
+    Updates expired trades to closed with sell_price and PnL.
     """
-    print(f"[SETTLEMENTS] Starting to poll for {len(expired_tickers)} expired tickers")
-    
-    # Get settlements.db path
-    demo_env = os.environ.get("DEMO_MODE", "false")
-    DEMO_MODE = demo_env.strip().lower() == "true"
-    if DEMO_MODE:
-        SETTLEMENTS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "settlements.db")
-    else:
-        SETTLEMENTS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "settlements.db")
+    # Use centralized paths for settlements database
+    mode = get_account_mode()
+    SETTLEMENTS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "settlements.db")
     
     if not os.path.exists(SETTLEMENTS_DB_PATH):
         print(f"[SETTLEMENTS] Settlements DB not found: {SETTLEMENTS_DB_PATH}")
@@ -1281,13 +1273,8 @@ def poll_settlements_for_matches(expired_tickers):
                     revenue = row[0]
                     sell_price = 1.00 if revenue > 0 else 0.00
                     
-                    # Get fees from positions.db for this ticker
-                    demo_env = os.environ.get("DEMO_MODE", "false")
-                    DEMO_MODE = demo_env.strip().lower() == "true"
-                    if DEMO_MODE:
-                        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "demo", "positions.db")
-                    else:
-                        POSITIONS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "accounts", "kalshi", "prod", "positions.db")
+                    # Get fees from positions.db for this ticker using centralized paths
+                    POSITIONS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "positions.db")
                     
                     total_fees_paid = 0.0
                     if os.path.exists(POSITIONS_DB_PATH):
