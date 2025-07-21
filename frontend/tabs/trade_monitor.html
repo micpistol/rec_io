@@ -1474,12 +1474,13 @@ document.addEventListener('DOMContentLoaded', () => {
       <!-- Modal for Auto Stop Settings -->
       <div id="autoStopSettingsModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:1000;">
         <div id="autoStopSettingsDim" style="position:absolute; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4);"></div>
-        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; border-radius:8px; min-width:320px; min-height:120px; box-shadow:0 4px 32px rgba(0,0,0,0.25); padding:24px 24px 16px 24px; display:flex; flex-direction:column; align-items:center;">
-          <div style="font-size:18px; font-weight:bold; margin-bottom:18px;">Auto Stop Settings</div>
-          <div style="display:flex; gap:16px; margin-top:16px;">
-            <button id="autoStopSettingsCancel" style="padding:6px 18px; border-radius:4px; border:none; background:#eee; color:#333; font-size:15px; cursor:pointer;">Cancel</button>
-            <button id="autoStopSettingsSave" style="padding:6px 18px; border-radius:4px; border:none; background:#007bff; color:white; font-size:15px; cursor:pointer;">Save</button>
-          </div>
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; border-radius:8px; min-width:320px; min-height:120px; box-shadow:0 4px 32px rgba(0,0,0,0.25); padding:10px 10px 10px 10px; display:flex; flex-direction:column; align-items:stretch;">
+          <div id="autoStopSettingsHeader" style="font-size:14px; font-weight:400; margin-bottom:16px; color:#222; letter-spacing:0.2px; text-align:left;">Auto Stop Settings</div>
+          <div style="flex:1 1 auto;"></div>
+                      <div style="display:flex; gap:8px; justify-content:flex-end; align-items:center; margin-top:12px;">
+              <button id="autoStopSettingsCancel" style="padding:3px 9px; border-radius:4px; border:none; background:#eee; color:#333; font-size: 12px; cursor:pointer;" onmouseover="this.style.background='#e3f2fd'" onmouseout="this.style.background='#eee'">Cancel</button>
+              <button id="autoStopSettingsSave" style="padding:3px 9px; border-radius:4px; border:none; background:#007bff; color:white; font-size: 12px; cursor:pointer;">Save</button>
+            </div>
         </div>
       </div>
       <!-- Recent Fills Panel -->
@@ -2406,5 +2407,45 @@ document.addEventListener('DOMContentLoaded', () => {
   })();
   </script>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const autoStopSettingsIcon = document.getElementById('autoStopSettingsIcon');
+  const autoStopSettingsModal = document.getElementById('autoStopSettingsModal');
+  const autoStopSettingsDim = document.getElementById('autoStopSettingsDim');
+  const autoStopSettingsCancel = document.getElementById('autoStopSettingsCancel');
+  const autoStopSettingsSave = document.getElementById('autoStopSettingsSave');
+
+  function showAutoStopSettingsModal() {
+    if (autoStopSettingsModal) {
+      autoStopSettingsModal.style.display = 'block';
+      document.body.style.overflow = 'hidden';
+    }
+  }
+
+  function hideAutoStopSettingsModal() {
+    if (autoStopSettingsModal) {
+      autoStopSettingsModal.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+  }
+
+  if (autoStopSettingsIcon) {
+    autoStopSettingsIcon.addEventListener('click', showAutoStopSettingsModal);
+  }
+  if (autoStopSettingsCancel) {
+    autoStopSettingsCancel.addEventListener('click', hideAutoStopSettingsModal);
+  }
+  if (autoStopSettingsSave) {
+    autoStopSettingsSave.addEventListener('click', hideAutoStopSettingsModal);
+  }
+  // Remove click-to-close on dimmed area
+  if (autoStopSettingsDim) {
+    autoStopSettingsDim.addEventListener('click', function(e) {
+      // Do nothing
+      e.stopPropagation();
+    });
+  }
+});
+</script>
 
 </html>
