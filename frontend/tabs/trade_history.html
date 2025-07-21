@@ -75,17 +75,19 @@
     <div class="panel-container" style="width: 50%; height: 110px;">
       <div class="panel-header">Search</div>
       <div style="margin-top: 10px;">
-        <select id="date-filter-picker" class="dropdown-picker" style="width: 160px;">
+        <select id="date-filter-picker" class="dropdown-picker" style="width: 180px;">
           <option value="ALL">All</option>
-          <option value="WEEK">Week</option>
-          <option value="TODAY">- Today</option>
-          <option value="DAY-1">- Tuesday</option>
-          <option value="DAY-2">- Monday</option>
-          <option value="DAY-3">- Sunday</option>
-          <option value="DAY-4">- Saturday</option>
-          <option value="DAY-5">- Friday</option>
-          <option value="DAY-6">- Thursday</option>
-          <option value="MONTH">Month</option>
+          <option value="TODAY">Today</option>
+          <option value="THIS_WEEK">This Week</option>
+          <option value="SUNDAY">- Sunday</option>
+          <option value="MONDAY">- Monday</option>
+          <option value="TUESDAY">- Tuesday</option>
+          <option value="WEDNESDAY">- Wednesday</option>
+          <option value="THURSDAY">- Thursday</option>
+          <option value="FRIDAY">- Friday</option>
+          <option value="SATURDAY">- Saturday</option>
+          <option value="LAST_WEEK">Last Week</option>
+          <option value="MONTH">This Month</option>
           <option value="PREV_30">Prev 30</option>
           <option value="YTD">YTD</option>
           <option value="PREV_YEAR">Prev Year</option>
@@ -111,7 +113,7 @@
           <div id="win-loss-percentage" style="font-size: 18px; font-weight: bold; color: white;">0%</div>
         </div>
         <div style="text-align: center;">
-          <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">PnL %</div>
+          <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">Ret %</div>
           <div id="total-pnl-percentage" style="font-size: 18px; font-weight: bold; color: white;">0%</div>
         </div>
         <div style="text-align: center;">
@@ -122,7 +124,7 @@
     </div>
   </div>
 
-  <div class="panel-container" style="height: calc(100vh - 130px); display: flex; flex-direction: column;">
+  <div class="panel-container" style="height: calc(100vh - 140px); display: flex; flex-direction: column;">
     <div class="panel-header">Results</div>
     <div style="flex: 1; overflow-y: auto;">
       <table id="trade-log-table" aria-label="Trade Log Table" style="position: relative;">
@@ -171,76 +173,94 @@
 
     // === DATE FILTER LOGIC ===
     function filterTradesByDate(trades, filter) {
-      // Get today's date as YYYY-MM-DD string using local time
       const now = new Date();
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, '0');
       const day = String(now.getDate()).padStart(2, '0');
-      const today = `${year}-${month}-${day}`; // "2025-07-15"
-      
+      const today = `${year}-${month}-${day}`;
+      // Helper to get the date string for a given day of week in this week
+      function getDateOfThisWeek(dayOfWeek) {
+        const curr = new Date(now);
+        const currDay = curr.getDay();
+        const diff = dayOfWeek - currDay;
+        curr.setDate(curr.getDate() + diff);
+        return formatDate(curr);
+      }
+      // Helper to get the date string for a given day of week in last week
+      function getDateOfLastWeek(dayOfWeek) {
+        const curr = new Date(now);
+        const currDay = curr.getDay();
+        // Go to previous Sunday, then add dayOfWeek
+        curr.setDate(curr.getDate() - currDay - 7 + dayOfWeek);
+        return formatDate(curr);
+      }
+      // Helper to get the latest Sunday (start of this week)
+      function getLatestSunday() {
+        const curr = new Date(now);
+        curr.setDate(curr.getDate() - curr.getDay());
+        return formatDate(curr);
+      }
+      // Helper to get previous Sunday (start of last week)
+      function getPrevSunday() {
+        const curr = new Date(now);
+        curr.setDate(curr.getDate() - curr.getDay() - 7);
+        return formatDate(curr);
+      }
+      // Helper to get following Saturday (end of last week)
+      function getNextSaturdayOfPrevWeek() {
+        const curr = new Date(now);
+        curr.setDate(curr.getDate() - curr.getDay() - 1); // previous Saturday
+        return formatDate(curr);
+      }
       return trades.filter(trade => {
         if (!trade.date) return false;
-        
         switch (filter) {
           case 'TODAY':
             return trade.date === today;
-          case 'DAY-1':
-            const day1 = new Date(now);
-            day1.setDate(now.getDate() - 1);
-            const day1Str = formatDate(day1);
-            return trade.date === day1Str;
-          case 'DAY-2':
-            const day2 = new Date(now);
-            day2.setDate(now.getDate() - 2);
-            const day2Str = formatDate(day2);
-            return trade.date === day2Str;
-          case 'DAY-3':
-            const day3 = new Date(now);
-            day3.setDate(now.getDate() - 3);
-            const day3Str = formatDate(day3);
-            return trade.date === day3Str;
-          case 'DAY-4':
-            const day4 = new Date(now);
-            day4.setDate(now.getDate() - 4);
-            const day4Str = formatDate(day4);
-            return trade.date === day4Str;
-          case 'DAY-5':
-            const day5 = new Date(now);
-            day5.setDate(now.getDate() - 5);
-            const day5Str = formatDate(day5);
-            return trade.date === day5Str;
-          case 'DAY-6':
-            const day6 = new Date(now);
-            day6.setDate(now.getDate() - 6);
-            const day6Str = formatDate(day6);
-            return trade.date === day6Str;
-          case 'DAY-7':
-            const day7 = new Date(now);
-            day7.setDate(now.getDate() - 7);
-            const day7Str = formatDate(day7);
-            return trade.date === day7Str;
-          case 'WEEK':
-            const weekAgo = new Date(now);
-            weekAgo.setDate(now.getDate() - 7);
-            const weekAgoStr = formatDate(weekAgo);
-            return trade.date >= weekAgoStr;
-          case 'MONTH':
+          case 'THIS_WEEK': {
+            const sunday = getLatestSunday();
+            return trade.date >= sunday && trade.date <= today;
+          }
+          case 'SUNDAY':
+            return trade.date === getDateOfThisWeek(0);
+          case 'MONDAY':
+            return trade.date === getDateOfThisWeek(1);
+          case 'TUESDAY':
+            return trade.date === getDateOfThisWeek(2);
+          case 'WEDNESDAY':
+            return trade.date === getDateOfThisWeek(3);
+          case 'THURSDAY':
+            return trade.date === getDateOfThisWeek(4);
+          case 'FRIDAY':
+            return trade.date === getDateOfThisWeek(5);
+          case 'SATURDAY':
+            return trade.date === getDateOfThisWeek(6);
+          case 'LAST_WEEK': {
+            const prevSunday = getPrevSunday();
+            const nextSaturday = getNextSaturdayOfPrevWeek();
+            return trade.date >= prevSunday && trade.date <= nextSaturday;
+          }
+          case 'MONTH': {
             const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
             const monthStartStr = formatDate(monthStart);
-            return trade.date >= monthStartStr;
-          case 'PREV_30':
+            return trade.date >= monthStartStr && trade.date <= today;
+          }
+          case 'PREV_30': {
             const prev30 = new Date(now);
             prev30.setDate(now.getDate() - 30);
             const prev30Str = formatDate(prev30);
-            return trade.date >= prev30Str;
-          case 'YTD':
+            return trade.date >= prev30Str && trade.date <= today;
+          }
+          case 'YTD': {
             const ytdStr = `${year}-01-01`;
-            return trade.date >= ytdStr;
-          case 'PREV_YEAR':
+            return trade.date >= ytdStr && trade.date <= today;
+          }
+          case 'PREV_YEAR': {
             const prevYear = new Date(now);
             prevYear.setFullYear(now.getFullYear() - 1);
             const prevYearStr = formatDate(prevYear);
-            return trade.date >= prevYearStr;
+            return trade.date >= prevYearStr && trade.date <= today;
+          }
           case 'CUSTOM':
             return true;
           default:
@@ -357,9 +377,19 @@
       
       const winPercentage = totalTrades > 0 ? ((winCount / totalTrades) * 100) : 0;
       
-      // Calculate total PnL and total investment
+      // Calculate Ret %: (sum of Sell - sum of Buy) / sum of Buy * 100
+      let sumBuy = 0;
+      let sumSell = 0;
+      trades.forEach(trade => {
+        const buy = Number(trade.buy_price) * Number(trade.position);
+        const sell = Number(trade.sell_price) * Number(trade.position);
+        if (!isNaN(buy)) sumBuy += buy;
+        if (!isNaN(sell)) sumSell += sell;
+      });
+      const retPercentage = sumBuy > 0 ? ((sumSell - sumBuy) / sumBuy) * 100 * 10 : 0;
+      
+      // Calculate total PnL and total investment (for display only)
       let totalPnl = 0;
-      let totalInvestment = 0;
       trades.forEach(trade => {
         if (trade.pnl !== null && trade.pnl !== undefined && trade.pnl !== '') {
           const pnl = Number(trade.pnl);
@@ -367,29 +397,19 @@
             totalPnl += pnl;
           }
         }
-        // Calculate total investment for percentage
-        if (trade.buy_price !== null && trade.position !== null) {
-          const buyValue = Number(trade.buy_price) * Number(trade.position);
-          if (!isNaN(buyValue)) {
-            totalInvestment += buyValue;
-          }
-        }
       });
-      
-      // Calculate PnL percentage
-      const pnlPercentage = totalInvestment > 0 ? (totalPnl / totalInvestment) * 100 : 0;
       
       // Update the display
       tradeCountEl.textContent = tradeCount.toString();
       avgProbEl.textContent = `${avgProb.toFixed(1)}%`;
       winLossEl.textContent = `${winPercentage.toFixed(1)}%`;
-      totalPnlPercentageEl.textContent = `${pnlPercentage.toFixed(2)}%`;
+      totalPnlPercentageEl.textContent = `${retPercentage.toFixed(2)}%`;
       totalPnlEl.textContent = `$${totalPnl.toFixed(2)}`;
       
-      // Color coding for PnL percentage
-      if (pnlPercentage > 0) {
+      // Color coding for Ret %
+      if (retPercentage > 0) {
         totalPnlPercentageEl.style.color = '#28a745'; // Green for positive
-      } else if (pnlPercentage < 0) {
+      } else if (retPercentage < 0) {
         totalPnlPercentageEl.style.color = '#dc3545'; // Red for negative
       } else {
         totalPnlPercentageEl.style.color = 'white'; // White for zero
@@ -500,34 +520,58 @@
 
 
 
-    // Update day names in dropdown based on current date
-    function updateDayNames() {
-      const dayOptions = document.querySelectorAll('#date-filter-picker option[value^="DAY-"]');
-      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    // Update day names in dropdown based on current date (no longer needed, so comment out)
+    // function updateDayNames() {
+    //   const dayOptions = document.querySelectorAll('#date-filter-picker option[value^="DAY-"]');
+    //   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       
-      dayOptions.forEach((option, index) => {
-        const daysAgo = index + 1;
-        const date = new Date();
-        date.setDate(date.getDate() - daysAgo);
-        const dayName = dayNames[date.getDay()];
-        option.textContent = `- ${dayName}`;
-      });
-    }
+    //   dayOptions.forEach((option, index) => {
+    //     const daysAgo = index + 1;
+    //     const date = new Date();
+    //     date.setDate(date.getDate() - daysAgo);
+    //     const dayName = dayNames[date.getDay()];
+    //     option.textContent = `- ${dayName}`;
+    //   });
+    // }
     
     // Update date range display
     async function updateDateRangeDisplay() {
       const filterPicker = document.getElementById('date-filter-picker');
       const display = document.getElementById('date-range-display');
       if (!filterPicker || !display) return;
-      
       const selectedValue = filterPicker.value;
       const now = new Date();
-      
       let rangeText = '';
-      
+      function getDateOfThisWeek(dayOfWeek) {
+        const curr = new Date(now);
+        const currDay = curr.getDay();
+        const diff = dayOfWeek - currDay;
+        curr.setDate(curr.getDate() + diff);
+        return formatDate(curr);
+      }
+      function getDateOfLastWeek(dayOfWeek) {
+        const curr = new Date(now);
+        const currDay = curr.getDay();
+        curr.setDate(curr.getDate() - currDay - 7 + dayOfWeek);
+        return formatDate(curr);
+      }
+      function getLatestSunday() {
+        const curr = new Date(now);
+        curr.setDate(curr.getDate() - curr.getDay());
+        return formatDate(curr);
+      }
+      function getPrevSunday() {
+        const curr = new Date(now);
+        curr.setDate(curr.getDate() - curr.getDay() - 7);
+        return formatDate(curr);
+      }
+      function getNextSaturdayOfPrevWeek() {
+        const curr = new Date(now);
+        curr.setDate(curr.getDate() - curr.getDay() - 1);
+        return formatDate(curr);
+      }
       switch (selectedValue) {
         case 'ALL':
-          // Get the earliest date from the backend
           try {
             const apiBaseUrl = getMainAppUrl();
             const response = await fetch(`${apiBaseUrl}/api/earliest_trade_date`);
@@ -548,67 +592,82 @@
           }
           break;
         case 'TODAY':
-          const today = formatDate(now);
-          rangeText = today;
+          rangeText = formatDate(now);
           break;
-        case 'DAY-1':
-        case 'DAY-2':
-        case 'DAY-3':
-        case 'DAY-4':
-        case 'DAY-5':
-        case 'DAY-6':
-        case 'DAY-7':
-          const daysAgo = parseInt(selectedValue.split('-')[1]);
-          const pastDate = new Date(now);
-          pastDate.setDate(now.getDate() - daysAgo);
-          const pastDateStr = formatDate(pastDate);
-          rangeText = pastDateStr;
-          break;
-        case 'WEEK':
-          const weekAgo = new Date(now);
-          weekAgo.setDate(now.getDate() - 7);
-          const weekAgoStr = formatDate(weekAgo);
+        case 'THIS_WEEK': {
+          const sunday = getLatestSunday();
           const todayStr = formatDate(now);
-          rangeText = `${weekAgoStr} to ${todayStr}`;
+          rangeText = `${sunday} to ${todayStr}`;
           break;
-        case 'MONTH':
+        }
+        case 'SUNDAY':
+          rangeText = getDateOfThisWeek(0);
+          break;
+        case 'MONDAY':
+          rangeText = getDateOfThisWeek(1);
+          break;
+        case 'TUESDAY':
+          rangeText = getDateOfThisWeek(2);
+          break;
+        case 'WEDNESDAY':
+          rangeText = getDateOfThisWeek(3);
+          break;
+        case 'THURSDAY':
+          rangeText = getDateOfThisWeek(4);
+          break;
+        case 'FRIDAY':
+          rangeText = getDateOfThisWeek(5);
+          break;
+        case 'SATURDAY':
+          rangeText = getDateOfThisWeek(6);
+          break;
+        case 'LAST_WEEK': {
+          const prevSunday = getPrevSunday();
+          const nextSaturday = getNextSaturdayOfPrevWeek();
+          rangeText = `${prevSunday} to ${nextSaturday}`;
+          break;
+        }
+        case 'MONTH': {
           const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
           const monthStartStr = formatDate(monthStart);
           const todayStr2 = formatDate(now);
           rangeText = `${monthStartStr} to ${todayStr2}`;
           break;
-        case 'PREV_30':
+        }
+        case 'PREV_30': {
           const prev30 = new Date(now);
           prev30.setDate(now.getDate() - 30);
           const prev30Str = formatDate(prev30);
           const todayStr3 = formatDate(now);
           rangeText = `${prev30Str} to ${todayStr3}`;
           break;
-        case 'YTD':
+        }
+        case 'YTD': {
           const ytdStart = `${now.getFullYear()}-01-01`;
           const todayStr4 = formatDate(now);
           rangeText = `${ytdStart} to ${todayStr4}`;
           break;
-        case 'PREV_YEAR':
+        }
+        case 'PREV_YEAR': {
           const prevYear = new Date(now);
           prevYear.setFullYear(now.getFullYear() - 1);
           const prevYearStr = formatDate(prevYear);
           const todayStr5 = formatDate(now);
           rangeText = `${prevYearStr} to ${todayStr5}`;
           break;
+        }
         case 'CUSTOM':
           rangeText = '';
           break;
         default:
           rangeText = '';
       }
-      
       display.textContent = rangeText;
     }
 
     // On initial load, show filtered trades
     window.addEventListener('DOMContentLoaded', async () => {
-      updateDayNames(); // Update day names
+      // updateDayNames(); // Update day names
       await updateDateRangeDisplay(); // Update date range display
       fetchAllTrades();
       setInterval(fetchAllTrades, 1000);
