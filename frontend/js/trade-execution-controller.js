@@ -60,6 +60,13 @@ window.executeTrade = async function(tradeData) {
     const easternDate = easternTime.toLocaleDateString('en-CA'); // YYYY-MM-DD format
     const easternTimeString = easternTime.toLocaleTimeString('en-US', { hour12: false });
     
+    // Patch: Format momentum as integer (e.g., 0.04 -> 4)
+    let rawMomentum = tradeData.momentum;
+    let momentum = 0;
+    if (rawMomentum !== undefined && rawMomentum !== null && rawMomentum !== "") {
+      momentum = Math.round(parseFloat(rawMomentum) * 100);
+    }
+
     const payload = {
       ticket_id: ticket_id,
       status: "pending",
@@ -75,9 +82,9 @@ window.executeTrade = async function(tradeData) {
       buy_price: tradeData.buy_price,
       symbol_open: tradeData.symbol_open,
       symbol_close: null,
-      momentum: tradeData.momentum,
+      momentum: momentum, // PATCHED: send formatted integer
       prob: tradeData.prob,
-
+      
       
       win_loss: null
     };

@@ -114,7 +114,7 @@
         </div>
         <div style="text-align: center;">
           <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">Ret %</div>
-          <div id="total-pnl-percentage" style="font-size: 18px; font-weight: bold; color: white;">0%</div>
+          <div id="ret-percentage" style="font-size: 18px; font-weight: bold; color: white;">0.00%</div>
         </div>
         <div style="text-align: center;">
           <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">PnL</div>
@@ -332,14 +332,14 @@
       const tradeCountEl = document.getElementById('trade-count');
       const avgProbEl = document.getElementById('avg-prob');
       const winLossEl = document.getElementById('win-loss-percentage');
-      const totalPnlPercentageEl = document.getElementById('total-pnl-percentage');
+      const retPercentageEl = document.getElementById('ret-percentage');
       const totalPnlEl = document.getElementById('total-pnl');
       
       if (!Array.isArray(trades) || trades.length === 0) {
         tradeCountEl.textContent = '0';
         avgProbEl.textContent = '0.00';
         winLossEl.textContent = '0%';
-        totalPnlPercentageEl.textContent = '0%';
+        retPercentageEl.textContent = '0.00%';
         totalPnlEl.textContent = '$0.00';
         return;
       }
@@ -377,24 +377,33 @@
       
       const winPercentage = totalTrades > 0 ? ((winCount / totalTrades) * 100) : 0;
       
-      // Calculate Ret %: (sum of Sell - sum of Buy) / sum of Buy * 100
-      let sumBuy = 0;
-      let sumSell = 0;
-      trades.forEach(trade => {
-        const buy = Number(trade.buy_price) * Number(trade.position);
-        const sell = Number(trade.sell_price) * Number(trade.position);
-        if (!isNaN(buy)) sumBuy += buy;
-        if (!isNaN(sell)) sumSell += sell;
-      });
-      const retPercentage = sumBuy > 0 ? ((sumSell - sumBuy) / sumBuy) * 100 * 10 : 0;
-      
-      // Calculate total PnL and total investment (for display only)
+      // Calculate Ret %: total PNL + FEES PAID, display as percent (e.g., $5.00 is 5.00%)
       let totalPnl = 0;
+      let totalFees = 0;
       trades.forEach(trade => {
         if (trade.pnl !== null && trade.pnl !== undefined && trade.pnl !== '') {
           const pnl = Number(trade.pnl);
           if (!isNaN(pnl)) {
             totalPnl += pnl;
+          }
+        }
+        if (trade.fees !== null && trade.fees !== undefined && trade.fees !== '') {
+          const fees = Number(trade.fees);
+          if (!isNaN(fees)) {
+            totalFees += fees;
+          }
+        }
+      });
+      const retValue = totalPnl + totalFees;
+      const retPercentage = retValue.toFixed(2) + '%';
+      
+      // Calculate total PnL and total investment (for display only)
+      let totalPnlDisplay = 0;
+      trades.forEach(trade => {
+        if (trade.pnl !== null && trade.pnl !== undefined && trade.pnl !== '') {
+          const pnl = Number(trade.pnl);
+          if (!isNaN(pnl)) {
+            totalPnlDisplay += pnl;
           }
         }
       });
@@ -403,22 +412,21 @@
       tradeCountEl.textContent = tradeCount.toString();
       avgProbEl.textContent = `${avgProb.toFixed(1)}%`;
       winLossEl.textContent = `${winPercentage.toFixed(1)}%`;
-      totalPnlPercentageEl.textContent = `${retPercentage.toFixed(2)}%`;
-      totalPnlEl.textContent = `$${totalPnl.toFixed(2)}`;
+      retPercentageEl.textContent = retPercentage;
+      totalPnlEl.textContent = `$${totalPnlDisplay.toFixed(2)}`;
       
       // Color coding for Ret %
-      if (retPercentage > 0) {
-        totalPnlPercentageEl.style.color = '#28a745'; // Green for positive
-      } else if (retPercentage < 0) {
-        totalPnlPercentageEl.style.color = '#dc3545'; // Red for negative
+      if (retValue > 0) {
+        retPercentageEl.style.color = '#28a745'; // Green for positive
+      } else if (retValue < 0) {
+        retPercentageEl.style.color = '#dc3545'; // Red for negative
       } else {
-        totalPnlPercentageEl.style.color = 'white'; // White for zero
+        retPercentageEl.style.color = 'white'; // White for zero
       }
-      
       // Color coding for PnL
-      if (totalPnl > 0) {
+      if (totalPnlDisplay > 0) {
         totalPnlEl.style.color = '#28a745'; // Green for positive
-      } else if (totalPnl < 0) {
+      } else if (totalPnlDisplay < 0) {
         totalPnlEl.style.color = '#dc3545'; // Red for negative
       } else {
         totalPnlEl.style.color = 'white'; // White for zero
