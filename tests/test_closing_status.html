@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Closing Status Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        .closing-trade { background-color: #1e3a8a !important; color: #ffffff !important; }
+    </style>
+</head>
+<body>
+    <h1>Closing Status Test</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Active Trade Supervisor Status Check</h2>
+        <div id="status-test"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 2: Closing Status Display</h2>
+        <div id="display-test"></div>
+        <table id="testTable" style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+            <thead>
+                <tr>
+                    <th>Trade ID</th>
+                    <th>Ticker</th>
+                    <th>Side</th>
+                    <th>Strike</th>
+                    <th>Status</th>
+                    <th>Background</th>
+                </tr>
+            </thead>
+            <tbody id="testTableBody">
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Test 1: Check if active trade supervisor can handle closing status
+        async function testClosingStatus() {
+            const div = document.getElementById('status-test');
+            try {
+                // First, get the active trades to see current status
+                const response = await fetch('/api/active_trades');
+                if (response.ok) {
+                    const data = await response.json();
+                    const trades = data.active_trades || [];
+                    
+                    // Check if any trades have closing status
+                    const closingTrades = trades.filter(trade => trade.status === 'closing');
+                    
+                    div.innerHTML = `
+                        <div class="success">✅ Active Trade Supervisor API working</div>
+                        <div class="info">📊 Total trades: ${trades.length}</div>
+                        <div class="info">🔄 Closing trades: ${closingTrades.length}</div>
+                    `;
+                    
+                    return trades;
+                } else {
+                    div.innerHTML = `<div class="error">❌ API failed: ${response.status}</div>`;
+                    return null;
+                }
+            } catch (error) {
+                div.innerHTML = `<div class="error">❌ API error: ${error.message}</div>`;
+                return null;
+            }
+        }
+
+        // Test 2: Display trades with status highlighting
+        function displayTradesWithStatus(trades) {
+            const div = document.getElementById('display-test');
+            const tbody = document.getElementById('testTableBody');
+            
+            if (!trades || trades.length === 0) {
+                div.innerHTML = '<div class="info">📝 No active trades found</div>';
+                tbody.innerHTML = '<tr><td colspan="6">No trades found</td></tr>';
+                return;
+            }
+            
+            div.innerHTML = `<div class="success">✅ Displaying ${trades.length} trades</div>`;
+            
+            tbody.innerHTML = '';
+            trades.forEach(trade => {
+                const row = document.createElement('tr');
+                
+                // Apply closing status styling
+                if (trade.status === 'closing') {
+                    row.classList.add('closing-trade');
+                }
+                
+                row.innerHTML = `
+                    <td>${trade.trade_id || 'N/A'}</td>
+                    <td>${trade.ticker || 'N/A'}</td>
+                    <td>${trade.side || 'N/A'}</td>
+                    <td>${trade.strike || 'N/A'}</td>
+                    <td>${trade.status || 'active'}</td>
+                    <td>${trade.status === 'closing' ? 'Blue (#1e3a8a)' : 'Default'}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        // Run tests
+        async function runTests() {
+            console.log('Starting closing status tests...');
+            
+            const trades = await testClosingStatus();
+            displayTradesWithStatus(trades);
+            
+            console.log('Tests completed');
+        }
+
+        // Run tests when page loads
+        document.addEventListener('DOMContentLoaded', runTests);
+    </script>
+</body>
+</html> 

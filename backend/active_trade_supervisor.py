@@ -445,6 +445,53 @@ def remove_closed_trade(trade_id: int) -> bool:
         log(f"❌ Error removing closed trade {trade_id}: {e}")
         return False
 
+def update_trade_status_to_closing(trade_id: int) -> bool:
+    """
+    Update a trade's status to 'closing' in active_trades.db.
+    
+    Args:
+        trade_id: The ID from trades.db
+        
+    Returns:
+        bool: True if successfully updated, False otherwise
+    """
+    try:
+        # Check if trade exists in active_trades.db
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM active_trades WHERE trade_id = ?", (trade_id,))
+        exists = cursor.fetchone()[0] > 0
+        conn.close()
+        
+        if not exists:
+            log(f"⚠️ No active trade found to update status: id={trade_id}")
+            return False
+        
+        # Update the trade status to 'closing'
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE active_trades SET status = 'closing' WHERE trade_id = ?", (trade_id,))
+        updated_count = cursor.rowcount
+        conn.commit()
+        conn.close()
+        
+        if updated_count > 0:
+            log(f"🔄 TRADE STATUS UPDATED TO CLOSING IN ACTIVE_TRADES.DB")
+            log(f"   Trade ID: {trade_id}")
+            log(f"   ========================================")
+            
+            # Export updated JSON after updating trade
+            export_active_trades_to_json()
+            
+            return True
+        else:
+            log(f"⚠️ No active trade found to update status: id={trade_id}")
+            return False
+            
+    except Exception as e:
+        log(f"❌ Error updating trade status to closing {trade_id}: {e}")
+        return False
+
 def get_current_btc_price() -> Optional[float]:
     """Get the current BTC price from the price_log table"""
     try:

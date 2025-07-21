@@ -54,11 +54,17 @@ window.executeTrade = async function(tradeData) {
 
   try {
     // Create the trade payload
+    // Force Eastern Time Zone for all dates and times
+    const now = new Date();
+    const easternTime = new Date(now.toLocaleString("en-US", {timeZone: "America/New_York"}));
+    const easternDate = easternTime.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+    const easternTimeString = easternTime.toLocaleTimeString('en-US', { hour12: false });
+    
     const payload = {
       ticket_id: ticket_id,
       status: "pending",
-      date: new Date().toISOString().split("T")[0],
-      time: new Date().toLocaleTimeString('en-US', { hour12: false }),
+      date: easternDate,
+      time: easternTimeString,
       symbol: tradeData.symbol,
       market: "Kalshi",
       trade_strategy: tradeData.trade_strategy || "Hourly HTC",

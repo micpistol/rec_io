@@ -6,6 +6,32 @@
 // Global active trade supervisor state
 window.activeTradeSupervisorRowsMap = new Map();
 
+// Helper function to insert row in correct sorted position
+function insertRowInSortedPosition(tableBody, newRow, newStrike) {
+  const allRows = Array.from(tableBody.children);
+  let insertIndex = allRows.length; // default to end
+  
+  for (let i = 0; i < allRows.length; i++) {
+    const row = allRows[i];
+    if (row.classList.contains('spanner-row')) continue;
+    
+    const strikeCell = row.querySelector('td');
+    if (strikeCell) {
+      const strike = parseFloat(strikeCell.textContent.replace(/[\$,]/g, ''));
+      if (newStrike < strike) {
+        insertIndex = i;
+        break;
+      }
+    }
+  }
+  
+  if (insertIndex === allRows.length) {
+    tableBody.appendChild(newRow);
+  } else {
+    tableBody.insertBefore(newRow, allRows[insertIndex]);
+  }
+}
+
 // Wait for port configuration to load before initializing
 async function waitForPortConfig() {
     let attempts = 0;
@@ -94,6 +120,13 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
     return;
   }
   
+  // Sort trades by strike price in ascending order
+  activeTrades.sort((a, b) => {
+    const strikeA = parseFloat(a.strike.toString().replace(/[\$,]/g, ''));
+    const strikeB = parseFloat(b.strike.toString().replace(/[\$,]/g, ''));
+    return strikeA - strikeB;
+  });
+  
   // Remove rows for trades that no longer exist
   const activeTradeIds = new Set(activeTrades.map(trade => trade.trade_id));
   
@@ -161,7 +194,7 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
       // Probability (from active_trades.db)
       const probCell = document.createElement("td");
       if (trade.current_probability !== null) {
-        probCell.textContent = `${trade.current_probability.toFixed(1)}%`;
+        probCell.textContent = trade.current_probability.toFixed(1);
       } else {
         probCell.textContent = "N/A";
       }
@@ -203,8 +236,14 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
       rowObj = { tr: row };
       window.activeTradeSupervisorRowsMap.set(tradeId, rowObj);
       
-      // Add the row to the table
-      activeTradeSupervisorTableBody.appendChild(row);
+      // Apply status-based styling
+      if (trade.status === 'closing') {
+        row.classList.add('closing-trade');
+      }
+      
+      // Add the row to the table in sorted position
+      const newStrike = parseFloat(trade.strike.toString().replace(/[\$,]/g, ''));
+      insertRowInSortedPosition(activeTradeSupervisorTableBody, row, newStrike);
     } else {
       // Update existing row with new data
       const row = rowObj.tr;
@@ -226,7 +265,13 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
       
       // Update probability
       if (cells.length > 5 && trade.current_probability !== null) {
-        cells[5].textContent = `${trade.current_probability.toFixed(1)}%`;
+        cells[5].textContent = trade.current_probability.toFixed(1);
+      }
+      
+      // Update status-based styling
+      row.classList.remove('closing-trade');
+      if (trade.status === 'closing') {
+        row.classList.add('closing-trade');
       }
       
       // Update PnL on close button
@@ -247,8 +292,9 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
     }
   });
 
-  // Add spanner row if no trades
+  // Add spanner row logic
   if (activeTrades.length === 0) {
+    // No active trades - show "No active trades" message
     const spannerRow = document.createElement("tr");
     spannerRow.className = "spanner-row";
     const spannerCell = document.createElement("td");
@@ -256,6 +302,45 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
     spannerCell.textContent = "No active trades";
     spannerRow.appendChild(spannerCell);
     activeTradeSupervisorTableBody.appendChild(spannerRow);
+  } else {
+    // There are active trades - add current price spanner row
+    // Try to get current BTC price, with fallback
+    let currentBTCPrice = typeof getCurrentBTCTickerPrice === 'function' ? getCurrentBTCTickerPrice() : null;
+    
+    // If we don't have a current price, try to get it from the first trade's strike as a fallback
+    if (currentBTCPrice === null || currentBTCPrice === "") {
+      if (activeTrades.length > 0 && activeTrades[0].strike) {
+        // Use the first trade's strike as a rough estimate
+        currentBTCPrice = parseFloat(activeTrades[0].strike.toString().replace(/[\$,]/g, ''));
+      }
+    }
+    
+    if (currentBTCPrice !== null && currentBTCPrice !== "" && !isNaN(currentBTCPrice)) {
+      const spannerRow = createActiveTradeSupervisorSpannerRow(currentBTCPrice);
+      
+      // Find the correct position to insert the spanner row
+      const allRows = Array.from(activeTradeSupervisorTableBody.children);
+      let insertIndex = allRows.length; // default to end
+      
+      for (let i = 0; i < allRows.length; i++) {
+        const row = allRows[i];
+        if (row.classList.contains('spanner-row')) continue;
+        const strikeCell = row.querySelector('td');
+        if (strikeCell) {
+          const strike = parseFloat(strikeCell.textContent.replace(/[\$,]/g, ''));
+          if (currentBTCPrice < strike) {
+            insertIndex = i;
+            break;
+          }
+        }
+      }
+      
+      if (insertIndex < allRows.length) {
+        activeTradeSupervisorTableBody.insertBefore(spannerRow, allRows[insertIndex]);
+      } else {
+        activeTradeSupervisorTableBody.appendChild(spannerRow);
+      }
+    }
   }
 
 }
@@ -328,6 +413,41 @@ if (document.readyState === 'loading') {
     initializeActiveTradeSupervisorTable();
     startActiveTradeSupervisorRefresh();
   });
+}
+
+// === Spanner Row Helper for Active Trade Supervisor ===
+function createActiveTradeSupervisorSpannerRow(currentPrice) {
+  const spannerRow = document.createElement("tr");
+  spannerRow.className = "spanner-row";
+  const spannerTd = document.createElement("td");
+  spannerTd.colSpan = 7; // Match the number of columns in active trade supervisor table
+  // SVGs for straight arrows (no margin)
+  const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  // Helper to get current momentum score from DOM
+  function getCurrentMomentumScoreForArrow() {
+    const el = document.getElementById('momentum-score-value');
+    if (el && el.textContent) {
+      const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
+      return isNaN(val) ? 0 : val;
+    }
+    return 0;
+  }
+  let momentumScore = getCurrentMomentumScoreForArrow();
+  let arrowBlock = '';
+  const absMomentum = Math.abs(momentumScore);
+  if (absMomentum < 5) {
+    arrowBlock = '-';
+  } else if (absMomentum < 10) {
+    arrowBlock = momentumScore > 0 ? svgDown : svgUp;
+  } else if (absMomentum < 20) {
+    arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(2);
+  } else {
+    arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(3);
+  }
+  spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
+  spannerRow.appendChild(spannerTd);
+  return spannerRow;
 }
 
 // Export functions for global access

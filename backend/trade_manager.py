@@ -659,13 +659,19 @@ def notify_active_trade_supervisor(trade_id: int, ticket_id: str, status: str) -
     Calls the active trade supervisor to add or remove the trade as needed.
     """
     try:
-        from active_trade_supervisor import add_new_active_trade, remove_closed_trade
+        from active_trade_supervisor import add_new_active_trade, remove_closed_trade, update_trade_status_to_closing
         if status == "open":
             success = add_new_active_trade(trade_id, ticket_id)
             if success:
                 log(f"✅ Notified active trade supervisor about new open trade: id={trade_id}, ticket_id={ticket_id}")
             else:
                 log(f"⚠️ Failed to notify active trade supervisor about trade: id={trade_id}, ticket_id={ticket_id}")
+        elif status == "closing":
+            success = update_trade_status_to_closing(trade_id)
+            if success:
+                log(f"✅ Notified active trade supervisor to update trade status to closing: id={trade_id}, ticket_id={ticket_id}")
+            else:
+                log(f"⚠️ Failed to notify active trade supervisor to update trade status: id={trade_id}, ticket_id={ticket_id}")
         elif status in ("closed", "expired"):
             success = remove_closed_trade(trade_id)
             if success:
@@ -900,6 +906,18 @@ async def add_trade(request: Request):
             conn.commit()
             conn.close()
             log(f"[DEBUG] Trade status set to 'closing' for ticker: {ticker}")
+            
+            # Notify active trade supervisor about the closing status
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM trades WHERE ticker = ?", (ticker,))
+            row = cursor.fetchone()
+            conn.close()
+            
+            if row:
+                trade_id = row[0]
+                notify_active_trade_supervisor(trade_id, data.get('ticket_id'), "closing")
+            
             # Confirm close match in positions.db
             try:
                 # Determine the correct positions.db path

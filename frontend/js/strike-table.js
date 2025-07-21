@@ -440,7 +440,7 @@ function getSelectedSymbol() {
 // Utility function to get truncated market title, e.g., "BTC 11am"
 function getTruncatedMarketTitle() {
   if (window.CurrentMarketTitleRaw && typeof window.CurrentMarketTitleRaw === "string") {
-    const contractMatch = window.CurrentMarketTitleRaw.match(/at\s(.+?)\s*(?:EDT|EST|PDT|PST)?\?/i);
+    const contractMatch = window.CurrentMarketTitleRaw.match(/at\s(.+?)\s*(?:EDT|EST)?\?/i);
     if (contractMatch) {
       return `BTC ${contractMatch[1].trim()}`;
     } else {

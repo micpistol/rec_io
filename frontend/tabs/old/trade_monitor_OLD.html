@@ -1178,8 +1178,8 @@
       // Extract contract string from market title shown on page
       const marketTitle = document.getElementById('current-market-title').textContent || '';
       // Expected format: "Bitcoin price today at 6pm?" or similar
-      // Remove trailing timezone abbreviation (EDT, EST, PDT, PST, etc.) after time part
-      const contractMatch = marketTitle.match(/Bitcoin price today at (.+?)\s*(?:EDT|EST|PDT|PST)?\?/i);
+      // Remove trailing timezone abbreviation (EDT, EST) after time part
+      const contractMatch = marketTitle.match(/Bitcoin price today at (.+?)\s*(?:EDT|EST)?\?/i);
       const contract = contractMatch ? `BTC ${contractMatch[1].trim()}` : '';
 
       const tradeData = {
