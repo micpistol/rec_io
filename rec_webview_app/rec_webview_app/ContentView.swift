@@ -39,7 +39,7 @@ struct WebView: UIViewRepresentable {
 
 struct ContentView: View {
     var body: some View {
-        WebView(url: URL(string: "http://192.168.86.42:5001/")!)
+        WebView(url: URL(string: "http://192.168.86.42:3000/")!)
             .ignoresSafeArea()
             
     }
