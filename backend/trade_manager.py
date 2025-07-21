@@ -787,14 +787,14 @@ def insert_trade(trade):
         """INSERT INTO trades (
             date, time, strike, side, buy_price, position, status,
             contract, ticker, symbol, market, trade_strategy, symbol_open,
-            momentum, prob, volatility
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            momentum, prob, volatility, ticket_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             trade['date'], trade['time'], trade['strike'], trade['side'], trade['buy_price'],
             trade['position'], trade.get('status', 'open'), trade.get('contract'),
             trade.get('ticker'), trade.get('symbol'), trade.get('market'), trade.get('trade_strategy'),
             trade.get('symbol_open'), trade.get('momentum'), trade.get('prob'),
-            trade.get('volatility')
+            trade.get('volatility'), trade.get('ticket_id')
         )
     )
     conn.commit()

@@ -298,12 +298,12 @@ def init_active_trades_db():
 
 def get_db_connection():
     """Get database connection with appropriate timeout"""
-    return sqlite3.connect(ACTIVE_TRADES_DB_PATH, timeout=0.25, check_same_thread=False)
+    return sqlite3.connect(ACTIVE_TRADES_DB_PATH, timeout=5.0, check_same_thread=False)
 
 def get_trades_db_connection():
     """Get connection to the main trades database"""
     trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
-    return sqlite3.connect(trades_db_path, timeout=0.25, check_same_thread=False)
+    return sqlite3.connect(trades_db_path, timeout=5.0, check_same_thread=False)
 
 def add_new_active_trade(trade_id: int, ticket_id: str) -> bool:
     """
