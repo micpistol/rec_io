@@ -763,6 +763,7 @@ def start_monitoring_loop():
             
             # === AUTO STOP LOGIC ===
             if is_auto_stop_enabled():
+                threshold = get_auto_stop_threshold()
                 for trade in active_trades:
                     prob = trade.get('current_probability')
                     trade_id = trade.get('trade_id')
@@ -770,7 +771,7 @@ def start_monitoring_loop():
                     if (
                         prob is not None and
                         isinstance(prob, (int, float)) and
-                        prob < 25 and
+                        prob < threshold and
                         trade.get('status') == 'active' and
                         trade_id not in auto_stop_triggered_trades
                     ):
@@ -945,7 +946,7 @@ def is_auto_stop_enabled():
     """Check if AUTO STOP is enabled in trade_preferences.json"""
     from backend.util.paths import get_data_dir
     import json
-    prefs_path = os.path.join(get_data_dir(), "trade_preferences.json")
+    prefs_path = os.path.join(get_data_dir(), "preferences", "trade_preferences.json")
     if os.path.exists(prefs_path):
         try:
             with open(prefs_path, "r") as f:
@@ -992,6 +993,21 @@ def trigger_auto_stop_close(trade):
             log(f"[AUTO STOP] Failed to trigger close for trade {trade['trade_id']}: {resp.status_code} {resp.text}")
     except Exception as e:
         log(f"[AUTO STOP] Exception posting close for trade {trade['trade_id']}: {e}")
+
+import os
+import json
+
+AUTO_STOP_SETTINGS_PATH = os.path.join(get_data_dir(), "preferences", "auto_stop_settings.json")
+
+def get_auto_stop_threshold():
+    try:
+        if os.path.exists(AUTO_STOP_SETTINGS_PATH):
+            with open(AUTO_STOP_SETTINGS_PATH, "r") as f:
+                data = json.load(f)
+                return int(data.get("current_probability", 25))
+    except Exception as e:
+        log(f"[AUTO STOP] Error reading threshold: {e}")
+    return 25
 
 if __name__ == "__main__":
     # Start the event-driven supervisor

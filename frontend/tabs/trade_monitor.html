@@ -1476,11 +1476,17 @@ document.addEventListener('DOMContentLoaded', () => {
         <div id="autoStopSettingsDim" style="position:absolute; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4);"></div>
         <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; border-radius:8px; min-width:320px; min-height:120px; box-shadow:0 4px 32px rgba(0,0,0,0.25); padding:10px 10px 10px 10px; display:flex; flex-direction:column; align-items:stretch;">
           <div id="autoStopSettingsHeader" style="font-size:14px; font-weight:400; margin-bottom:16px; color:#222; letter-spacing:0.2px; text-align:left;">Auto Stop Settings</div>
-          <div style="flex:1 1 auto;"></div>
-                      <div style="display:flex; gap:8px; justify-content:flex-end; align-items:center; margin-top:12px;">
-              <button id="autoStopSettingsCancel" style="padding:3px 9px; border-radius:4px; border:none; background:#eee; color:#333; font-size: 12px; cursor:pointer;" onmouseover="this.style.background='#e3f2fd'" onmouseout="this.style.background='#eee'">Cancel</button>
-              <button id="autoStopSettingsSave" style="padding:3px 9px; border-radius:4px; border:none; background:#007bff; color:white; font-size: 12px; cursor:pointer;">Save</button>
+          <div style="flex:1 1 auto; display:flex; flex-direction:column; justify-content:center; align-items:stretch;">
+            <label for="autoStopProbabilitySlider" style="font-size:13px; color:#333; margin-bottom:30px;">Current Win Probability:</label>
+            <div style="position:relative; margin-bottom:8px; width:100%;">
+              <input type="range" id="autoStopProbabilitySlider" min="0" max="100" value="25" style="width:100%; height:20px; z-index:1; position:relative;" />
+              <div id="sliderValueDisplay" style="position:absolute; top:-28px; left:0; font-size:12px; color:#222; background:white; padding:5px 6px; border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,0.08); pointer-events:none; z-index:2; transform:translateX(-50%);">25%</div>
             </div>
+          </div>
+          <div style="display:flex; gap:8px; justify-content:flex-end; align-items:center; margin-top:12px;">
+            <button id="autoStopSettingsCancel" style="padding:3px 9px; border-radius:4px; border:none; background:#eee; color:#333; font-size: 12px; cursor:pointer;" onmouseover="this.style.background='#e3f2fd'" onmouseout="this.style.background='#eee'">Cancel</button>
+            <button id="autoStopSettingsSave" style="padding:3px 9px; border-radius:4px; border:none; background:#007bff; color:white; font-size: 12px; cursor:pointer;">Save</button>
+          </div>
         </div>
       </div>
       <!-- Recent Fills Panel -->
@@ -2414,11 +2420,45 @@ document.addEventListener('DOMContentLoaded', function() {
   const autoStopSettingsDim = document.getElementById('autoStopSettingsDim');
   const autoStopSettingsCancel = document.getElementById('autoStopSettingsCancel');
   const autoStopSettingsSave = document.getElementById('autoStopSettingsSave');
+  const autoStopProbabilitySlider = document.getElementById('autoStopProbabilitySlider');
+  const sliderValueDisplay = document.getElementById('sliderValueDisplay');
+  let lastSavedProbability = 25;
+
+  function updateSliderDisplay(value) {
+    if (sliderValueDisplay && autoStopProbabilitySlider) {
+      sliderValueDisplay.textContent = value + '%';
+      // Calculate thumb position in px
+      const min = parseInt(autoStopProbabilitySlider.min, 10);
+      const max = parseInt(autoStopProbabilitySlider.max, 10);
+      const percent = (value - min) / (max - min);
+      const sliderWidth = autoStopProbabilitySlider.offsetWidth;
+      // 16px is approx thumb width, adjust as needed
+      const thumbWidth = 16;
+      const offset = percent * (sliderWidth - thumbWidth) + thumbWidth / 2;
+      sliderValueDisplay.style.left = `${offset}px`;
+    }
+  }
+
+  async function fetchAutoStopSettings() {
+    try {
+      const resp = await fetch('/api/get_auto_stop_settings');
+      if (resp.ok) {
+        const data = await resp.json();
+        return data.current_probability ?? 25;
+      }
+    } catch {}
+    return 25;
+  }
 
   function showAutoStopSettingsModal() {
     if (autoStopSettingsModal) {
       autoStopSettingsModal.style.display = 'block';
       document.body.style.overflow = 'hidden';
+      fetchAutoStopSettings().then(prob => {
+        lastSavedProbability = prob;
+        autoStopProbabilitySlider.value = prob;
+        updateSliderDisplay(prob);
+      });
     }
   }
 
@@ -2433,10 +2473,37 @@ document.addEventListener('DOMContentLoaded', function() {
     autoStopSettingsIcon.addEventListener('click', showAutoStopSettingsModal);
   }
   if (autoStopSettingsCancel) {
-    autoStopSettingsCancel.addEventListener('click', hideAutoStopSettingsModal);
+    autoStopSettingsCancel.addEventListener('click', function() {
+      // Reset slider to last saved value
+      autoStopProbabilitySlider.value = lastSavedProbability;
+      updateSliderDisplay(lastSavedProbability);
+      hideAutoStopSettingsModal();
+    });
   }
   if (autoStopSettingsSave) {
-    autoStopSettingsSave.addEventListener('click', hideAutoStopSettingsModal);
+    autoStopSettingsSave.addEventListener('click', async function() {
+      const newProb = parseInt(autoStopProbabilitySlider.value, 10);
+      if (!isNaN(newProb)) {
+        await fetch('/api/set_auto_stop_settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ current_probability: newProb })
+        });
+        lastSavedProbability = newProb;
+      }
+      hideAutoStopSettingsModal();
+    });
+  }
+  if (autoStopProbabilitySlider && sliderValueDisplay) {
+    autoStopProbabilitySlider.addEventListener('input', function() {
+      updateSliderDisplay(this.value);
+    });
+    // On resize, keep value display in sync
+    window.addEventListener('resize', function() {
+      updateSliderDisplay(autoStopProbabilitySlider.value);
+    });
+    // Initial position
+    updateSliderDisplay(autoStopProbabilitySlider.value);
   }
   // Remove click-to-close on dimmed area
   if (autoStopSettingsDim) {

@@ -41,7 +41,7 @@ connected_clients = set()
 db_change_clients = set()
 
 # Global auto_stop state
-PREFERENCES_PATH = os.path.join(get_data_dir(), "trade_preferences.json")
+PREFERENCES_PATH = os.path.join(get_data_dir(), "preferences", "trade_preferences.json")
 
 def load_preferences():
     if os.path.exists(PREFERENCES_PATH):
@@ -875,6 +875,39 @@ async def get_preferences():
 async def get_auto_stop():
     prefs = load_preferences()
     return {"enabled": prefs.get("auto_stop", True)}
+
+import os
+import json
+AUTO_STOP_SETTINGS_PATH = os.path.join(get_data_dir(), "preferences", "auto_stop_settings.json")
+
+def load_auto_stop_settings():
+    if os.path.exists(AUTO_STOP_SETTINGS_PATH):
+        try:
+            with open(AUTO_STOP_SETTINGS_PATH, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"current_probability": 25}
+
+def save_auto_stop_settings(settings):
+    try:
+        with open(AUTO_STOP_SETTINGS_PATH, "w") as f:
+            json.dump(settings, f)
+    except Exception as e:
+        print(f"[Auto Stop Settings Save Error] {e}")
+
+@app.get("/api/get_auto_stop_settings")
+async def get_auto_stop_settings():
+    return load_auto_stop_settings()
+
+@app.post("/api/set_auto_stop_settings")
+async def set_auto_stop_settings(request: Request):
+    data = await request.json()
+    settings = load_auto_stop_settings()
+    if "current_probability" in data:
+        settings["current_probability"] = int(data["current_probability"])
+        save_auto_stop_settings(settings)
+    return {"status": "ok", "current_probability": settings["current_probability"]}
 
 @app.get("/frontend-changes")
 def frontend_changes():

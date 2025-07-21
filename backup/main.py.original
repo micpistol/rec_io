@@ -57,7 +57,7 @@ connected_clients = set()
 db_change_clients = set()
 
 # Global auto_stop state
-PREFERENCES_PATH = os.path.join(get_data_dir(), "trade_preferences.json")
+PREFERENCES_PATH = os.path.join(get_data_dir(), "preferences", "trade_preferences.json")
 
 def load_preferences():
     if os.path.exists(PREFERENCES_PATH):
