@@ -180,12 +180,15 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
         const buffer = trade.buffer_from_entry;
         bufferCell.textContent = buffer.toLocaleString(undefined, {maximumFractionDigits: 0});
         
-        // Apply risk color classes based on buffer
-        if (Math.abs(buffer) >= 300) row.classList.add('ultra-safe');
-        else if (Math.abs(buffer) >= 200) row.classList.add('safe');
-        else if (Math.abs(buffer) >= 100) row.classList.add('caution');
-        else if (Math.abs(buffer) >= 50) row.classList.add('high-risk');
-        else row.classList.add('danger-stop');
+        // Apply risk color classes based on probability
+        if (trade.current_probability !== null && trade.current_probability !== undefined) {
+          const prob = trade.current_probability;
+          if (prob >= 95) row.classList.add('ultra-safe');
+          else if (prob >= 80) row.classList.add('safe');
+          else if (prob >= 50) row.classList.add('caution');
+          else if (prob >= 25) row.classList.add('high-risk');
+          else row.classList.add('danger-stop');
+        }
       } else {
         bufferCell.textContent = "N/A";
       }
@@ -254,13 +257,16 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
         const buffer = trade.buffer_from_entry;
         cells[4].textContent = buffer.toLocaleString(undefined, {maximumFractionDigits: 0});
         
-        // Update risk color classes
+        // Update risk color classes based on probability
         row.classList.remove('ultra-safe', 'safe', 'caution', 'high-risk', 'danger-stop');
-        if (Math.abs(buffer) >= 300) row.classList.add('ultra-safe');
-        else if (Math.abs(buffer) >= 200) row.classList.add('safe');
-        else if (Math.abs(buffer) >= 100) row.classList.add('caution');
-        else if (Math.abs(buffer) >= 50) row.classList.add('high-risk');
-        else row.classList.add('danger-stop');
+        if (trade.current_probability !== null && trade.current_probability !== undefined) {
+          const prob = trade.current_probability;
+          if (prob >= 95) row.classList.add('ultra-safe');
+          else if (prob >= 80) row.classList.add('safe');
+          else if (prob >= 50) row.classList.add('caution');
+          else if (prob >= 25) row.classList.add('high-risk');
+          else row.classList.add('danger-stop');
+        }
       }
       
       // Update probability

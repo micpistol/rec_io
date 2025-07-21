@@ -694,6 +694,14 @@ def update_active_trade_monitoring_data():
                 # Get current probability from API using the current BTC price
                 current_probability = get_current_probability(strike_price, current_btc_price, ttc_seconds, momentum_score)
                 
+                # Apply probability logic based on buffer
+                # When buffer is positive: use probability as-is (direct passthrough)
+                # When buffer is negative: subtract probability from 100
+                if current_probability is not None:
+                    if buffer_from_strike < 0:
+                        # Negative buffer: subtract probability from 100
+                        current_probability = 100 - current_probability
+                
                 # Calculate PnL: 1 - current_close_price - buy_price
                 # For YES trades: PnL = 1 - current_close_price - buy_price
                 # For NO trades: PnL = 1 - current_close_price - buy_price (same formula)
