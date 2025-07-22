@@ -828,16 +828,35 @@ def frontend_changes():
 
 @app.get("/api/live_probabilities")
 async def get_live_probabilities():
-    """Serve the latest BTC live probabilities JSON (from probability_writer)."""
+    """Get live probabilities from the unified probability endpoint"""
     try:
-        live_json_path = os.path.join(get_data_dir(), "live_probabilities", "btc_live_probabilities.json")
-        if os.path.exists(live_json_path):
-            with open(live_json_path, "r") as f:
-                return json.load(f)
+        live_prob_file = os.path.join(get_data_dir(), "live_probabilities", "btc_live_probabilities.json")
+        
+        if os.path.exists(live_prob_file):
+            with open(live_prob_file, 'r') as f:
+                data = json.load(f)
+            return data
         else:
-            return {"error": "btc_live_probabilities.json not found"}
+            return {"error": "Live probabilities file not found"}
     except Exception as e:
-        return {"error": f"Failed to read live probabilities: {e}"}
+        return {"error": f"Error loading live probabilities: {str(e)}"}
+
+@app.get("/api/strike_tables/{symbol}")
+async def get_strike_table(symbol: str):
+    """Get strike table data for a specific symbol"""
+    try:
+        # Convert symbol to lowercase for consistency
+        symbol_lower = symbol.lower()
+        strike_table_file = os.path.join(get_data_dir(), "strike_tables", f"{symbol_lower}_strike_table.json")
+        
+        if os.path.exists(strike_table_file):
+            with open(strike_table_file, 'r') as f:
+                data = json.load(f)
+            return data
+        else:
+            return {"error": f"Strike table file not found for {symbol}"}
+    except Exception as e:
+        return {"error": f"Error loading strike table for {symbol}: {str(e)}"}
 
 # Startup and shutdown events
 @app.on_event("startup")
