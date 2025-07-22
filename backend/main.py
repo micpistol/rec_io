@@ -495,86 +495,25 @@ async def create_trade(trade_data: dict):
 # Additional endpoints for other data
 @app.get("/btc_price_changes")
 async def get_btc_changes():
-    """Get BTC price changes from watchdog data."""
+    """Get BTC price changes from btc_price_change.json if available, else fallback."""
     try:
-        # Try to get current price from watchdog database
-        from backend.util.paths import get_price_history_dir
-        btc_price_history_db = os.path.join(get_price_history_dir(), "btc_price_history.db")
-        
-        if os.path.exists(btc_price_history_db):
-            conn = sqlite3.connect(btc_price_history_db)
-            cursor = conn.cursor()
-            
-            # Get current price
-            cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
-            current_result = cursor.fetchone()
-            
-            if current_result:
-                current_price = float(current_result[0])
-                
-                # Calculate changes based on historical data in the database
-                changes = {}
-                
-                # Get prices from different time periods
-                for period in ['1h', '3h', '1d']:
-                    if period == '1h':
-                        cursor.execute("SELECT price FROM price_log WHERE timestamp <= datetime('now', '-1 hour') ORDER BY timestamp DESC LIMIT 1")
-                    elif period == '3h':
-                        cursor.execute("SELECT price FROM price_log WHERE timestamp <= datetime('now', '-3 hours') ORDER BY timestamp DESC LIMIT 1")
-                    else:  # 1d
-                        cursor.execute("SELECT price FROM price_log WHERE timestamp <= datetime('now', '-1 day') ORDER BY timestamp DESC LIMIT 1")
-                    
-                    old_result = cursor.fetchone()
-                    if old_result:
-                        old_price = float(old_result[0])
-                        change = (current_price - old_price) / old_price
-                        changes[f"change{period}"] = change
-                    else:
-                        changes[f"change{period}"] = 0.0
-                
-                conn.close()
-                print(f"[Watchdog Changes] {changes}")
-                return changes
-            else:
-                conn.close()
-                # Fallback to API if no watchdog data
-                return await _get_api_changes()
-        else:
-            # Fallback to API if watchdog DB doesn't exist
-            return await _get_api_changes()
-            
+        from backend.util.paths import get_coinbase_data_dir
+        import json as _json
+        import os as _os
+        change_path = _os.path.join(get_coinbase_data_dir(), "btc_price_change.json")
+        if _os.path.exists(change_path):
+            with open(change_path, "r") as f:
+                data = _json.load(f)
+            return {
+                "change1h": data.get("change1h"),
+                "change3h": data.get("change3h"),
+                "change1d": data.get("change1d"),
+                "timestamp": data.get("timestamp")
+            }
     except Exception as e:
-        print(f"Error getting BTC changes from watchdog: {e}")
-        # Final fallback to API
-        return await _get_api_changes()
-
-async def _get_api_changes():
-    """Fallback function to get changes from API."""
-    try:
-        response = requests.get("https://api.kraken.com/0/public/Ticker?pair=BTCUSD", timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            ticker = data['result']['XXBTZUSD']
-            
-            current_price = float(ticker['c'][0])
-            changes = {}
-            
-            for period in ['1h', '3h', '1d']:
-                if period == '1h':
-                    old_price = float(ticker['p'][0])
-                elif period == '3h':
-                    old_price = float(ticker['p'][0])
-                else:
-                    old_price = float(ticker['p'][0])
-                
-                change = (current_price - old_price) / old_price
-                changes[f"change{period}"] = change
-            
-            print(f"[API Fallback Changes] {changes}")
-            return changes
-    except Exception as e:
-        print(f"Error getting BTC changes from API: {e}")
-        return {}
+        print(f"[btc_price_changes API] Error reading btc_price_change.json: {e}")
+    # fallback: return nulls if file missing or error
+    return {"change1h": None, "change3h": None, "change1d": None, "timestamp": None}
 
 @app.get("/kalshi_market_snapshot")
 async def get_kalshi_snapshot():

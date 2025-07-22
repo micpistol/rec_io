@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 import sqlite3
 import os
 import sys
+import aiohttp
 
 # Add the project root to the Python path (permanent scalable fix)
 from backend.util.paths import get_project_root
@@ -28,6 +29,8 @@ BTC_PRICE_HISTORY_DB = os.path.join(get_price_history_dir(), "btc_price_history.
 COINBASE_WS_URL = "wss://ws-feed.exchange.coinbase.com"
 
 last_logged_second = None
+
+BTC_PRICE_CHANGE_PATH = os.path.join(get_coinbase_data_dir(), "btc_price_change.json")
 
 def insert_tick(timestamp: str, price: float):
     conn = sqlite3.connect(BTC_PRICE_HISTORY_DB)
@@ -100,5 +103,44 @@ async def log_btc_price():
             traceback.print_exc()
             await asyncio.sleep(5)
 
+async def poll_kraken_price_changes():
+    while True:
+        try:
+            url = "https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=60"
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=10) as resp:
+                    if resp.status == 200:
+                        json_data = await resp.json()
+                        result = json_data.get("result", {})
+                        pair_key = next((key for key in result.keys() if key != "last"), None)
+                        if pair_key and pair_key in result:
+                            data = result[pair_key]
+                            if len(data) >= 25:
+                                close_now = float(data[-1][4])
+                                close_1h = float(data[-2][4])
+                                close_3h = float(data[-4][4])
+                                close_1d = float(data[-25][4])
+                                def pct_change(from_val, to_val):
+                                    return (to_val - from_val) / from_val * 100 if from_val else None
+                                changes = {
+                                    "change1h": pct_change(close_1h, close_now),
+                                    "change3h": pct_change(close_3h, close_now),
+                                    "change1d": pct_change(close_1d, close_now),
+                                    "timestamp": datetime.now(ZoneInfo("America/New_York")).isoformat()
+                                }
+                                # Write to JSON file
+                                os.makedirs(os.path.dirname(BTC_PRICE_CHANGE_PATH), exist_ok=True)
+                                with open(BTC_PRICE_CHANGE_PATH, "w") as f:
+                                    json.dump(changes, f)
+        except Exception as e:
+            print("[Kraken Poll Error]", e)
+        await asyncio.sleep(60)
+
+async def main():
+    await asyncio.gather(
+        log_btc_price(),
+        poll_kraken_price_changes()
+    )
+
 if __name__ == "__main__":
-    asyncio.run(log_btc_price())
+    asyncio.run(main())

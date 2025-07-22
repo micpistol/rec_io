@@ -102,24 +102,18 @@ async function fetchBTCPriceChanges() {
     const res = await fetch('/btc_price_changes');
     if (!res.ok) throw new Error('Failed to fetch BTC price changes');
     const data = await res.json();
-    
+    // Update 1h, 3h, 1d change numbers in the price panel
     if ('change1h' in data) {
       const el = document.getElementById('change-1h');
-      if (el) {
-        decorateChange(el, data.change1h);
-      }
+      if (el) decorateChange(el, data.change1h);
     }
     if ('change3h' in data) {
       const el = document.getElementById('change-3h');
-      if (el) {
-        decorateChange(el, data.change3h);
-      }
+      if (el) decorateChange(el, data.change3h);
     }
     if ('change1d' in data) {
       const el = document.getElementById('change-1d');
-      if (el) {
-        decorateChange(el, data.change1d);
-      }
+      if (el) decorateChange(el, data.change1d);
     }
   } catch (error) {
     console.error('Error fetching BTC price changes:', error);
@@ -330,7 +324,15 @@ document.addEventListener('DOMContentLoaded', () => {
       window.fetchAndRenderTrades();
     }
   }, 2000); // Active trades every 2 seconds
+
+  // Start BTC price change polling
+  startBTCChangePolling();
 });
+
+function startBTCChangePolling() {
+  fetchBTCPriceChanges(); // initial fetch
+  setInterval(fetchBTCPriceChanges, 60000); // fetch every 60 seconds
+}
 
 // Export functions for use by other modules
 window.liveData = {
