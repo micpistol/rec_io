@@ -336,7 +336,51 @@ def main():
             with open(output_file, 'w') as f:
                 json.dump(output, f, indent=2)
             
+            # Create filtered watchlist
+            filtered_strikes = []
+            for strike in strike_data:
+                volume = strike.get("volume", 0)
+                probability = strike.get("probability", 0)
+                yes_ask = strike.get("yes_ask", 0)
+                no_ask = strike.get("no_ask", 0)
+                
+                # Get the higher of yes_ask and no_ask
+                max_ask = max(yes_ask, no_ask)
+                
+                # Filter by volume >= 1000, probability > 85, and max ask <= 98
+                if volume >= 1000 and probability > 85 and max_ask <= 98:
+                    filtered_strikes.append(strike)
+            
+            # Sort by probability (highest to lowest)
+            filtered_strikes.sort(key=lambda x: x.get("probability", 0), reverse=True)
+            
+            # Create watchlist JSON
+            watchlist_output = {
+                "symbol": "BTC",
+                "current_price": btc_price,
+                "ttc": ttc,
+                "broker": "Kalshi",
+                "event_ticker": market_snapshot.get("event_ticker", ""),
+                "market_title": market_snapshot.get("event_title", ""),
+                "strike_tier": market_snapshot.get("strike_tier", 250),
+                "market_status": market_snapshot.get("market_status", "unknown"),
+                "last_updated": datetime.now().isoformat(),
+                "filter_criteria": {
+                    "min_volume": 1000,
+                    "min_probability": 85,
+                    "max_ask": 98,
+                    "description": "Strikes with volume >= 1000, probability > 85, and max ask <= 98, ordered by probability (highest to lowest)"
+                },
+                "strikes": filtered_strikes
+            }
+            
+            # Write watchlist to file
+            watchlist_file = os.path.join(output_dir, "btc_watchlist.json")
+            with open(watchlist_file, 'w') as f:
+                json.dump(watchlist_output, f, indent=2)
+            
             print(f"📊 Updated strike table - BTC: ${btc_price:,.2f}, TTC: {ttc_display} ({ttc}s), Event: {market_snapshot.get('event_ticker', 'N/A')}")
+            print(f"🔍 Watchlist filtered: {len(filtered_strikes)} strikes (volume >= 1000, prob > 85, max ask <= 98)")
             
             # Wait 1 second before next update
             time.sleep(1)
