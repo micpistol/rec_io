@@ -390,10 +390,10 @@ function startActiveTradeSupervisorRefresh() {
   // Initial load
   fetchAndRenderActiveTradeSupervisorTrades();
   
-  // Set up periodic refresh (every 5 seconds - REDUCED to prevent resource exhaustion)
+  // Set up periodic refresh (every 1 second)
   setInterval(() => {
     fetchAndRenderActiveTradeSupervisorTrades();
-  }, 5000);
+  }, 1000);
 }
 
 // === INITIALIZATION ===

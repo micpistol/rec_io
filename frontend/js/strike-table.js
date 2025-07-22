@@ -109,10 +109,21 @@ function initializeStrikeTable(basePrice) {
 
 async function fetchProbabilities(symbol, currentPrice, ttcMinutes, strikes, year = null) {
   try {
-    // Get current momentum score from the UI
+    // Try new live probabilities endpoint first
+    const res = await fetch(window.location.origin + '/api/live_probabilities');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.probabilities)) {
+        const probMap = new Map();
+        data.probabilities.forEach(row => {
+          probMap.set(Math.round(row.strike), row.prob_within);
+        });
+        return probMap;
+      }
+    }
+    // Fallback to old API if live endpoint fails
     const momentumScore = getCurrentMomentumScore();
-    
-    const res = await fetch(window.location.origin + '/api/strike_probabilities', {
+    const fallbackRes = await fetch(window.location.origin + '/api/strike_probabilities', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -121,11 +132,10 @@ async function fetchProbabilities(symbol, currentPrice, ttcMinutes, strikes, yea
         momentum_score: momentumScore
       })
     });
-    const data = await res.json();
-    if (data.status === 'ok' && Array.isArray(data.probabilities)) {
-      // Map: strike -> probability (using prob_within for display)
+    const fallbackData = await fallbackRes.json();
+    if (fallbackData.status === 'ok' && Array.isArray(fallbackData.probabilities)) {
       const probMap = new Map();
-      data.probabilities.forEach(row => {
+      fallbackData.probabilities.forEach(row => {
         probMap.set(Math.round(row.strike), row.prob_within);
       });
       return probMap;

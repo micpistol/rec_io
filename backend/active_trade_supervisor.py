@@ -592,9 +592,24 @@ def get_current_closing_price_for_trade(trade_ticker: str, trade_side: str) -> O
 
 def get_current_probability(strike: float, current_price: float, ttc_seconds: float, momentum_score: Optional[float] = None) -> Optional[float]:
     """
-    Query the backend probability API for the given strike, price, and ttc_seconds.
-    Returns the prob_within value for the strike, or None on error.
+    Get the probability for a strike from the live probabilities JSON file.
+    Fallback to the old API if the file is missing or unreadable.
     """
+    import os
+    import json
+    from backend.util.paths import get_data_dir
+    try:
+        live_json_path = os.path.join(get_data_dir(), "live_probabilities", "btc_live_probabilities.json")
+        if os.path.exists(live_json_path):
+            with open(live_json_path, "r") as f:
+                data = json.load(f)
+            if "probabilities" in data:
+                # Find the closest strike in the JSON
+                closest = min(data["probabilities"], key=lambda row: abs(row["strike"] - strike))
+                return closest.get("prob_within")
+    except Exception as e:
+        log(f"⚠️ Probability JSON exception: {e}")
+    # Fallback to old API if JSON fails
     try:
         host = get_host()
         port = get_port("main_app")

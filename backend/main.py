@@ -617,59 +617,6 @@ async def get_current_fingerprint():
         print(f"Error getting fingerprint: {e}")
         return {"fingerprint": "error", "error": str(e)}
 
-@app.post("/api/strike_probabilities")
-async def calculate_strike_probabilities(data: dict):
-    """Calculate strike probabilities using the probability calculator with live momentum score."""
-    try:
-        current_price = data.get("current_price")
-        strikes = data.get("strikes", [])
-        
-        if not current_price or not strikes:
-            return {"status": "error", "message": "Missing required parameters: current_price, strikes"}
-        
-        # Get TTC directly from live data analyzer
-        ttc_seconds = 0
-        try:
-            from live_data_analysis import get_ttc_data
-            ttc_data = get_ttc_data()
-            ttc_seconds = ttc_data.get('ttc_seconds', 0)
-            print(f"[STRIKE_PROB] Got TTC from live data analyzer: {ttc_seconds}s")
-        except Exception as e:
-            print(f"[STRIKE_PROB] Error getting TTC from live data analyzer: {e}")
-            # Fallback calculation
-            now = datetime.now(pytz.timezone('US/Eastern'))
-            next_hour = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
-            ttc_seconds = int((next_hour - now).total_seconds())
-            print(f"[STRIKE_PROB] Using fallback TTC: {ttc_seconds}s")
-        
-        # Fetch live momentum score from the unified momentum endpoint
-        momentum_score = None
-        try:
-            from backend.live_data_analysis import LiveDataAnalyzer
-            analyzer = LiveDataAnalyzer()
-            momentum_data = analyzer.get_momentum_analysis()
-            momentum_score = momentum_data.get('weighted_momentum_score')
-            print(f"[STRIKE_PROB] Fetched live momentum score: {momentum_score}")
-        except Exception as e:
-            print(f"[STRIKE_PROB] Error fetching live momentum score: {e}")
-            # Fallback to 0 if momentum fetch fails
-            momentum_score = 0
-        
-        print(f"[STRIKE_PROB] Calculating probabilities for {len(strikes)} strikes")
-        print(f"[STRIKE_PROB] Current price: {current_price}, TTC: {ttc_seconds}s, Live Momentum: {momentum_score}")
-        
-        # Import and use the probability calculator
-        from util.probability_calculator import calculate_strike_probabilities as calc_probs
-        
-        probabilities = calc_probs(current_price, ttc_seconds, strikes, momentum_score)
-        
-        print(f"[STRIKE_PROB] Calculated {len(probabilities)} probability results")
-        return {"status": "ok", "probabilities": probabilities}
-        
-    except Exception as e:
-        print(f"Error calculating strike probabilities: {e}")
-        return {"status": "error", "message": str(e), "probabilities": []}
-
 @app.get("/api/momentum")
 async def get_current_momentum():
     """Get current momentum score from the unified API."""
