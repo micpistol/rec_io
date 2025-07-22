@@ -867,25 +867,6 @@ async def get_unified_ttc(symbol: str):
     except Exception as e:
         return {"error": f"Error getting unified TTC: {str(e)}"}
 
-@app.get("/api/watchlist/{symbol}")
-async def get_watchlist(symbol: str):
-    """Get watchlist data for a specific symbol from trade_entry_watcher"""
-    try:
-        import json
-        import os
-        from backend.util.paths import get_data_dir
-        
-        watchlist_file = os.path.join(get_data_dir(), "strike_tables", f"{symbol.lower()}_watchlist.json")
-        
-        if os.path.exists(watchlist_file):
-            with open(watchlist_file, 'r') as f:
-                data = json.load(f)
-            return data
-        else:
-            return {"strikes": [], "current_price": 0, "last_updated": datetime.now().isoformat()}
-    except Exception as e:
-        return {"error": f"Error getting watchlist: {str(e)}"}
-
 # Startup and shutdown events
 @app.on_event("startup")
 async def startup_event():

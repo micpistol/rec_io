@@ -299,7 +299,6 @@ master_restart() {
     pkill -f "python.*kalshi_api_watchdog.py" || true
     pkill -f "python.*market_title_service.py" || true
     pkill -f "python.*probability_writer.py" || true
-    pkill -f "python.*trade_entry_watcher.py" || true
     
     # Kill any processes with our project path in the command line
     print_warning "Killing processes with project path..."
@@ -398,7 +397,6 @@ emergency_restart() {
     pkill -f "python.*kalshi_api_watchdog.py" || true
     pkill -f "python.*market_title_service.py" || true
     pkill -f "python.*probability_writer.py" || true
-    pkill -f "python.*trade_entry_watcher.py" || true
     
     # Kill any processes with our project path in the command line
     print_warning "Killing processes with project path..."
