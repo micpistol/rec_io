@@ -427,6 +427,56 @@ def stop_live_directional_probability_writer():
     print("Stopped live directional probability writer")
 
 
+def generate_btc_live_probabilities_json(
+    current_price: float,
+    ttc_seconds: float,
+    momentum_score: float = 0.0,
+    step: int = 250,
+    num_steps: int = 10,
+    output_dir: str = None
+):
+    """
+    Generate btc_live_probabilities.json in backend/data/live_probabilities/.
+    - current_price: current BTC price
+    - ttc_seconds: time to close in seconds
+    - momentum_score: momentum score for fingerprint selection
+    - step: strike step size (default $250)
+    - num_steps: number of steps above and below (default 10)
+    - output_dir: override output directory (default None)
+    """
+    from backend.util.paths import get_data_dir
+    import json
+    
+    # Round current price to nearest $250
+    base_strike = int(round(current_price / step) * step)
+    strikes = [base_strike + (i * step) for i in range(-num_steps, num_steps + 1)]
+    calculator = get_probability_calculator("btc")
+    probabilities = calculator.calculate_strike_probabilities(
+        current_price, ttc_seconds, strikes, momentum_score
+    )
+    # Get the fingerprint CSV used
+    fingerprint_csv = None
+    if hasattr(calculator, 'current_momentum_bucket') and calculator.current_momentum_bucket is not None:
+        fingerprint_csv = f"btc_fingerprint_directional_momentum_{calculator.current_momentum_bucket:03d}.csv"
+    output = {
+        "timestamp": datetime.now(pytz.UTC).isoformat(),
+        "current_price": current_price,
+        "base_strike": base_strike,
+        "ttc_seconds": ttc_seconds,
+        "momentum_score": momentum_score,
+        "strikes": strikes,
+        "probabilities": probabilities,
+        "fingerprint_csv": fingerprint_csv
+    }
+    if output_dir is None:
+        output_dir = os.path.join(get_data_dir(), "live_probabilities")
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "btc_live_probabilities.json")
+    with open(output_path, "w") as f:
+        json.dump(output, f, indent=2)
+    print(f"[BTC PROB EXPORT] Wrote {output_path}")
+
+
 if __name__ == "__main__":
     # Example usage
     calculator = ProbabilityCalculator()

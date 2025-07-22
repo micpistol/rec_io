@@ -1618,19 +1618,26 @@ document.addEventListener('DOMContentLoaded', () => {
     async function updateFingerprintDisplay() {
       const fingerprintEl = document.getElementById('fingerprint-display');
       if (!fingerprintEl) return;
-      
       try {
-        const response = await fetch('/api/current_fingerprint');
+        // Try new live probabilities endpoint first
+        const response = await fetch('/api/live_probabilities');
         if (response.ok) {
           const data = await response.json();
+          if (data.fingerprint_csv) {
+            fingerprintEl.textContent = `Fingerprint: ${data.fingerprint_csv}`;
+            return;
+          }
+        }
+        // Fallback to old endpoint if not present
+        const fallback = await fetch('/api/current_fingerprint');
+        if (fallback.ok) {
+          const data = await fallback.json();
           if (data.fingerprint) {
             fingerprintEl.textContent = `Fingerprint: ${data.fingerprint}`;
-          } else {
-            fingerprintEl.textContent = "Fingerprint: —";
+            return;
           }
-        } else {
-          fingerprintEl.textContent = "Fingerprint: —";
         }
+        fingerprintEl.textContent = "Fingerprint: —";
       } catch (error) {
         fingerprintEl.textContent = "Fingerprint: —";
       }

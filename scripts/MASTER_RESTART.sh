@@ -44,7 +44,7 @@ export PROJECT_ROOT="$PROJECT_ROOT"
 export VENV_PATH="$VENV_PATH"
 
 # Port assignments from MASTER_PORT_MANIFEST.json
-PORTS=(3000 4000 6000 8001 8002 8003 8004 8005)
+PORTS=(3000 4000 6000 8001 8002 8003 8004 8005 8008)
 
 # Function to print colored output
 print_status() {
@@ -298,6 +298,7 @@ master_restart() {
     pkill -f "python.*kalshi_account_sync.py" || true
     pkill -f "python.*kalshi_api_watchdog.py" || true
     pkill -f "python.*market_title_service.py" || true
+    pkill -f "python.*probability_writer.py" || true
     
     # Kill any processes with our project path in the command line
     print_warning "Killing processes with project path..."
@@ -395,6 +396,7 @@ emergency_restart() {
     pkill -f "python.*kalshi_account_sync.py" || true
     pkill -f "python.*kalshi_api_watchdog.py" || true
     pkill -f "python.*market_title_service.py" || true
+    pkill -f "python.*probability_writer.py" || true
     
     # Kill any processes with our project path in the command line
     print_warning "Killing processes with project path..."

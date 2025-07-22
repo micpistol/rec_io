@@ -879,6 +879,19 @@ def frontend_changes():
                 pass
     return {"last_modified": latest}
 
+@app.get("/api/live_probabilities")
+async def get_live_probabilities():
+    """Serve the latest BTC live probabilities JSON (from probability_writer)."""
+    try:
+        live_json_path = os.path.join(get_data_dir(), "live_probabilities", "btc_live_probabilities.json")
+        if os.path.exists(live_json_path):
+            with open(live_json_path, "r") as f:
+                return json.load(f)
+        else:
+            return {"error": "btc_live_probabilities.json not found"}
+    except Exception as e:
+        return {"error": f"Failed to read live probabilities: {e}"}
+
 # Startup and shutdown events
 @app.on_event("startup")
 async def startup_event():

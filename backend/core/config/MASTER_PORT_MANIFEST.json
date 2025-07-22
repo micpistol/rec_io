@@ -51,6 +51,11 @@
       "port": 8005,
       "description": "Kalshi API monitoring",
       "status": "RUNNING"
+    },
+    "probability_writer": {
+      "port": 8008,
+      "description": "Probability JSON writer",
+      "status": "RUNNING"
     }
   },
   
