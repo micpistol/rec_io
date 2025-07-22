@@ -5,7 +5,8 @@ if (typeof window.updateClickHandlersForReco !== 'function') {
 }
 
 // === STRIKE TABLE MODULE ===
-// This module handles all strike table creation, updates, and maintenance
+// This module handles middle column data: strike table, TTC, market title
+// All data now comes from unified backend endpoints
 
 // --- Row Flash CSS ---
 if (!window._rowFlashStyleInjected) {
@@ -27,9 +28,130 @@ if (!window._rowFlashStyleInjected) {
 // Global strike table state
 window.strikeRowsMap = new Map();
 
+// === UNIFIED DATA FETCHING ===
+
+// Fetch unified TTC data
+async function fetchUnifiedTTC() {
+  try {
+    const response = await fetch('/api/unified_ttc/btc');
+    const data = await response.json();
+    return data.ttc_seconds || 0;
+  } catch (error) {
+    console.error('Error fetching unified TTC:', error);
+    return 0;
+  }
+}
+
+// Fetch strike table data from unified endpoint
+async function fetchStrikeTableData() {
+  try {
+    const response = await fetch('/api/strike_tables/btc');
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching strike table data:', error);
+    return null;
+  }
+}
+
+// Update TTC display from unified endpoint
+async function updateTTCDisplay() {
+  try {
+    const ttcSeconds = await fetchUnifiedTTC();
+    const ttcEl = document.getElementById('strikePanelTTC');
+    if (!ttcEl) return;
+
+    // Format TTC for display
+    const formatTTC = (seconds) => {
+      if (seconds === null || seconds === undefined || isNaN(seconds)) {
+        return '--:--';
+      }
+      
+      const totalMinutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      
+      if (totalMinutes >= 60) {
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+      } else {
+        return `${totalMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+      }
+    };
+
+    ttcEl.textContent = formatTTC(ttcSeconds);
+
+    // Apply color coding
+    ttcEl.style.backgroundColor = '';
+    ttcEl.style.color = '';
+    ttcEl.style.borderRadius = '';
+    ttcEl.style.padding = '';
+
+    if (ttcSeconds >= 0 && ttcSeconds <= 180) {
+      ttcEl.style.backgroundColor = '#d2372b';
+      ttcEl.style.color = '#fff';
+      ttcEl.style.borderRadius = '6px';
+      ttcEl.style.padding = '0 10px';
+    } else if (ttcSeconds <= 300) {
+      ttcEl.style.backgroundColor = '#ffc107';
+      ttcEl.style.color = '#fff';
+      ttcEl.style.borderRadius = '6px';
+      ttcEl.style.padding = '0 10px';
+    } else if (ttcSeconds <= 720) {
+      ttcEl.style.backgroundColor = '#45d34a';
+      ttcEl.style.color = '#fff';
+      ttcEl.style.borderRadius = '6px';
+      ttcEl.style.padding = '0 10px';
+    } else if (ttcSeconds <= 900) {
+      ttcEl.style.backgroundColor = '#45d34a';
+      ttcEl.style.color = '#fff';
+      ttcEl.style.borderRadius = '6px';
+      ttcEl.style.padding = '0 10px';
+    }
+  } catch (error) {
+    console.error('Error updating TTC display:', error);
+  }
+}
+
+// Update market title from strike table data
+function updateMarketTitle(strikeTableData) {
+  if (!strikeTableData) return;
+  
+  const cell = document.getElementById('strikePanelMarketTitleCell');
+  if (!cell) return;
+  
+  // Extract time from market_title (e.g., "Bitcoin price on Jul 22, 2025 at 3pm EDT?" -> "3pm")
+  const marketTitle = strikeTableData.market_title || '';
+  const timeMatch = marketTitle.match(/at\s+(.+?)\s+(?:EDT|EST)\?/i);
+  const timeStr = timeMatch ? timeMatch[1].trim() : '11pm';
+  
+  // Format as "<symbol> price today at <time>?"
+  const symbol = strikeTableData.symbol || 'BTC';
+  const formattedTitle = `${symbol} price today at ${timeStr}?`;
+  
+  cell.textContent = formattedTitle;
+  cell.style.color = "white";
+}
+
+// Main function to update middle column data
+async function updateMiddleColumnData() {
+  try {
+    // Fetch strike table data (includes market title)
+    const strikeTableData = await fetchStrikeTableData();
+    
+    // Update market title
+    updateMarketTitle(strikeTableData);
+    
+    // Update TTC display
+    await updateTTCDisplay();
+    
+    console.log('[STRIKE-TABLE] Updated middle column data');
+  } catch (error) {
+    console.error('Error updating middle column data:', error);
+  }
+}
+
 // === STRIKE TABLE INITIALIZATION ===
-
-
 
 function buildStrikeTableRows(basePrice) {
   const step = 250;
@@ -39,6 +161,40 @@ function buildStrikeTableRows(basePrice) {
     rows.push(i);
   }
   return rows;
+}
+
+function createSpannerRow(currentPrice) {
+  const spannerRow = document.createElement("tr");
+  spannerRow.className = "spanner-row";
+  const spannerTd = document.createElement("td");
+  spannerTd.colSpan = 6; // Match the number of columns in strike table
+  // SVGs for straight arrows (no margin)
+  const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  // Helper to get current momentum score from DOM
+  function getCurrentMomentumScoreForArrow() {
+    const el = document.getElementById('momentum-score-value');
+    if (el && el.textContent) {
+      const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
+      return isNaN(val) ? 0 : val;
+    }
+    return 0;
+  }
+  let momentumScore = getCurrentMomentumScoreForArrow();
+  let arrowBlock = '';
+  const absMomentum = Math.abs(momentumScore);
+  if (absMomentum < 5) {
+    arrowBlock = '-';
+  } else if (absMomentum < 10) {
+    arrowBlock = momentumScore > 0 ? svgDown : svgUp;
+  } else if (absMomentum < 20) {
+    arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(2);
+  } else {
+    arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(3);
+  }
+  spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
+  spannerRow.appendChild(spannerTd);
+  return spannerRow;
 }
 
 function initializeStrikeTable(basePrice) {
@@ -63,8 +219,6 @@ function initializeStrikeTable(basePrice) {
     // B/M cell
     const bmTd = document.createElement('td');
     row.appendChild(bmTd);
-
-    
 
     // Risk cell (now Prob Touch (%))
     const probTd = document.createElement('td');
@@ -101,215 +255,211 @@ function initializeStrikeTable(basePrice) {
       noSpan
     });
   });
-  
-
 }
 
 // === STRIKE TABLE UPDATE LOGIC ===
 
-async function fetchProbabilities(symbol, currentPrice, ttcMinutes, strikes, year = null) {
+// Update strike table with data from unified endpoint
+async function updateStrikeTable() {
   try {
-    // Try new live probabilities endpoint first
-    const res = await fetch(window.location.origin + '/api/live_probabilities');
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data.probabilities)) {
-        const probMap = new Map();
-        data.probabilities.forEach(row => {
-          probMap.set(Math.round(row.strike), row.prob_within);
-        });
-        return probMap;
+    // Fetch strike table data from unified endpoint
+    const strikeTableData = await fetchStrikeTableData();
+    if (!strikeTableData || !strikeTableData.strikes) {
+      console.error('No strike table data available');
+      return;
+    }
+
+    const strikes = strikeTableData.strikes;
+    const currentPrice = strikeTableData.current_price;
+    const symbol = strikeTableData.symbol || 'BTC';
+
+    // Initialize strike table if needed
+    if (!window.strikeRowsMap || window.strikeRowsMap.size === 0) {
+      const base = Math.round(currentPrice / 250) * 250;
+      initializeStrikeTable(base);
+    }
+
+    // Update each strike row with pre-calculated data
+    window.strikeRowsMap.forEach((cells, strike) => {
+      const { row, bufferTd, bmTd, probTd, yesSpan, noSpan } = cells;
+
+      // Find matching strike data from JSON
+      const strikeData = strikes.find(s => s.strike === strike);
+      
+      if (strikeData) {
+        // Buffer (pre-calculated)
+        bufferTd.textContent = strikeData.buffer.toLocaleString(undefined, {maximumFractionDigits: 0});
+
+        // Buffer % (pre-calculated)
+        bmTd.textContent = strikeData.buffer_pct.toFixed(2);
+
+        // Probability (pre-calculated)
+        const prob = strikeData.probability;
+        probTd.textContent = prob.toFixed(1);
+        
+        // Risk color coding
+        row.classList.remove('ultra-safe', 'safe', 'caution', 'high-risk', 'danger-stop');
+        let riskClass = '';
+        if (prob >= 98) riskClass = 'ultra-safe';
+        else if (prob >= 95) riskClass = 'safe';
+        else if (prob >= 80) riskClass = 'caution';
+        else riskClass = 'high-risk';
+        row.classList.add(riskClass);
+
+        // Yes/No ask prices (pre-calculated)
+        const yesAsk = strikeData.yes_ask;
+        const noAsk = strikeData.no_ask;
+        const yesDiff = strikeData.yes_diff;
+        const noDiff = strikeData.no_diff;
+        const volume = strikeData.volume;
+
+        // Get current diff mode state
+        const diffMode = window.diffMode || false;
+
+        // Simplified button enabling logic
+        const volumeNum = parseInt(volume) || 0;
+        const volumeOk = volumeNum >= 1000;
+        const yesPriceOk = yesAsk <= 98;
+        const noPriceOk = noAsk <= 98;
+        const currentPrice = strikeTableData.current_price;
+        const isAboveMoneyLine = strike > currentPrice;
+        
+        // Debug logging for button enabling logic
+        console.log(`🔍 DEBUG: Strike ${strike} - Volume: ${volume} (parsed: ${volumeNum}) (${volumeOk ? 'OK' : 'LOW'}), YES: ${yesAsk} (${yesPriceOk ? 'OK' : 'HIGH'}), NO: ${noAsk} (${noPriceOk ? 'OK' : 'HIGH'}), Above money line: ${isAboveMoneyLine}`);
+        
+        // Determine which button should be enabled
+        let yesEnabled = false;
+        let noEnabled = false;
+        
+        if (volumeOk) {
+          if (isAboveMoneyLine) {
+            // Above money line: Only enable NO button if price is good
+            noEnabled = noPriceOk;
+            yesEnabled = false; // Never enable YES above money line
+          } else {
+            // Below money line: Only enable YES button if price is good
+            yesEnabled = yesPriceOk;
+            noEnabled = false; // Never enable NO below money line
+          }
+        }
+        
+        console.log(`🔍 DEBUG: Strike ${strike} - Final: YES enabled: ${yesEnabled}, NO enabled: ${noEnabled}`);
+        
+        // Update both buttons with their correct enabled state
+        updateYesNoButton(yesSpan, strike, "yes", yesAsk, yesEnabled, strikeData.ticker, false, diffMode, yesDiff);
+        updateYesNoButton(noSpan, strike, "no", noAsk, noEnabled, strikeData.ticker, false, diffMode, noDiff);
+        
+        // Update position indicator for this strike
+        const strikeCell = row.querySelector('td:first-child'); // First column is strike price
+        if (strikeCell) {
+          updatePositionIndicator(strikeCell, strike);
+        }
+      } else {
+        // No data for this strike, show placeholders
+        bufferTd.textContent = '—';
+        bmTd.textContent = '—';
+        probTd.textContent = '—';
+        updateYesNoButton(yesSpan, strike, "yes", 0, false, null, false, window.diffMode || false, null);
+        updateYesNoButton(noSpan, strike, "no", 0, false, null, false, window.diffMode || false, null);
+      }
+    });
+
+    // --- SPANNER ROW LOGIC ---
+    const strikeTableBody = document.querySelector('#strike-table tbody');
+    let spannerRow = strikeTableBody.querySelector('.spanner-row');
+    
+    // Create spanner row if it doesn't exist
+    if (!spannerRow) {
+      spannerRow = createSpannerRow(currentPrice);
+      // Ensure the spanner row is added to the table
+      strikeTableBody.appendChild(spannerRow);
+    } else {
+      // Update existing spanner row with current price and momentum arrows
+      const spannerTd = spannerRow.querySelector('td');
+      if (spannerTd) {
+        // Recreate the spanner row content with updated momentum arrows
+        const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        
+        // Helper to get current momentum score from DOM
+        function getCurrentMomentumScoreForArrow() {
+          const el = document.getElementById('momentum-score-value');
+          if (el && el.textContent) {
+            const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
+            return isNaN(val) ? 0 : val;
+          }
+          return 0;
+        }
+        
+        let momentumScore = getCurrentMomentumScoreForArrow();
+        let arrowBlock = '';
+        const absMomentum = Math.abs(momentumScore);
+        if (absMomentum < 5) {
+          arrowBlock = '-';
+        } else if (absMomentum < 10) {
+          arrowBlock = momentumScore > 0 ? svgDown : svgUp;
+        } else if (absMomentum < 20) {
+          arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(2);
+        } else {
+          arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(3);
+        }
+        
+        spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
       }
     }
-    // Fallback to old API if live endpoint fails
-    const momentumScore = getCurrentMomentumScore();
-    const fallbackRes = await fetch(window.location.origin + '/api/strike_probabilities', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        current_price: currentPrice,
-        strikes: strikes,
-        momentum_score: momentumScore
-      })
-    });
-    const fallbackData = await fallbackRes.json();
-    if (fallbackData.status === 'ok' && Array.isArray(fallbackData.probabilities)) {
-      const probMap = new Map();
-      fallbackData.probabilities.forEach(row => {
-        probMap.set(Math.round(row.strike), row.prob_within);
-      });
-      return probMap;
-    }
-    return null;
-  } catch (e) {
-    return null;
-  }
-}
 
-// PATCHED updateStrikeTable to use model-based probabilities for RISK
-async function updateStrikeTable(coreData, latestKalshiMarkets) {
-  // Use local diffMode state if available, otherwise fetch from preferences
-  let diffMode = false;
-  if (window.diffMode !== undefined) {
-    // Use local state for instant response
-    diffMode = window.diffMode;
-  } else {
-    // Fallback to backend preferences
-    try {
-      const response = await fetch('/api/get_preferences');
-      const data = await response.json();
-      diffMode = data.diff_mode || false;
-    } catch (e) {
-      diffMode = false;
-    }
-  }
-
-  const strikeTableBody = document.querySelector('#strike-table tbody');
-  if (!coreData || typeof coreData.btc_price !== 'number') return;
-
-  const base = Math.round(coreData.btc_price / 250) * 250;
-  const ttcSeconds = coreData.ttc_seconds || 1;
-  const ttcMinutes = ttcSeconds / 60;
-  const centerPrice = coreData.btc_price;
-  const symbol = getSelectedSymbol ? getSelectedSymbol() : 'BTC';
-  const year = '2021'; // TODO: make dynamic if needed
-
-
-
-  // Build array of strike rows for proper ordering
-  const strikeRows = [];
-  const strikes = Array.from(window.strikeRowsMap.keys()).sort((a, b) => a - b);
-  strikes.forEach(strike => {
-    const cells = window.strikeRowsMap.get(strike);
-    if (cells && cells.row) {
-      strikeRows.push(cells.row);
-    }
-  });
-
-  // Fetch model-based probabilities for all strikes
-  const probMap = await fetchProbabilities(symbol, centerPrice, ttcMinutes, strikes, year);
-
-  // Update fingerprint display after fetching probabilities with momentum score
-  if (typeof updateFingerprintDisplay === 'function') {
-    updateFingerprintDisplay();
-  }
-
-
-
-  window.strikeRowsMap.forEach((cells, strike) => {
-    const { row, bufferTd, bmTd, probTd, yesSpan, noSpan } = cells;
-
-    // Buffer
-    const buffer = centerPrice - strike;
-    bufferTd.textContent = Math.abs(buffer).toLocaleString(undefined, {maximumFractionDigits: 0});
-
-    // % (Buffer as percentage of one strike level)
-    const strikeLevel = 250; // One strike level is $250
-    const bufferPercent = Math.abs(buffer) / strikeLevel;
-    bmTd.textContent = bufferPercent.toFixed(2);
-
-    // --- PATCH: Use model-based probability for Prob Touch (%) ---
-    let prob = probMap && probMap.has(strike) ? probMap.get(strike) : null;
-    if (prob !== null && prob !== undefined) {
-      // Use the probability directly (already prob_within from API)
-      let displayProb = prob;
-      probTd.textContent = displayProb.toFixed(1);
-      row.className = '';
-      // --- RISK COLOR PATCH (UPDATED BANDS) ---
-      row.classList.remove('ultra-safe', 'safe', 'caution', 'high-risk', 'danger-stop');
-      let riskClass = '';
-      if (displayProb >= 98) riskClass = 'ultra-safe'; // bright green
-      else if (displayProb >= 95) riskClass = 'safe'; // light green
-      else if (displayProb >= 80) riskClass = 'caution'; // yellow
-      else riskClass = 'high-risk'; // red
-      row.classList.add(riskClass);
-      // --- END PATCH ---
-    } else {
-      probTd.textContent = '—';
-      row.className = '';
-      row.classList.remove('ultra-safe', 'safe', 'caution', 'high-risk', 'danger-stop');
-    }
-
-    // Find markets for yes/no asks - use more flexible matching
-    const matchingMarket = latestKalshiMarkets.find(m => {
-      const marketStrike = Math.round(m.floor_strike);
-      return marketStrike === strike || Math.abs(marketStrike - strike) <= 1;
-    });
-    const ticker = matchingMarket ? matchingMarket.ticker : null;
-    const yesAsk = matchingMarket && typeof matchingMarket.yes_ask === "number" ? Math.round(matchingMarket.yes_ask) : 0;
-    const noAsk = matchingMarket && typeof matchingMarket.no_ask === "number" ? Math.round(matchingMarket.no_ask) : 0;
-    const volume = matchingMarket && typeof matchingMarket.volume === "number" ? matchingMarket.volume : 0;
-
-    // --- VOLUME-BASED DISABLING LOGIC ---
-    
-    // If volume < 1000, both buttons are disabled regardless of mode
-    if (volume < 1000) {
-      updateYesNoButton(yesSpan, strike, "yes", yesAsk, false, ticker);
-      updateYesNoButton(noSpan, strike, "no", noAsk, false, ticker);
-    } else {
-      // Volume >= 1000, determine which button is active
-      const isYesActive = (volume >= 1000) && yesAsk > noAsk && yesAsk < 99 && yesAsk >= 40;
-      const isNoActive = (volume >= 1000) && noAsk > yesAsk && noAsk < 99 && noAsk >= 40;
-      
-      // Always pass actual ask prices to updateYesNoButton for trade execution
-      // Display values will be set inside updateYesNoButton based on mode
-      updateYesNoButton(yesSpan, strike, "yes", yesAsk, isYesActive, ticker, false, diffMode, probMap?.get(strike));
-      updateYesNoButton(noSpan, strike, "no", noAsk, isNoActive, ticker, false, diffMode, probMap?.get(strike));
-    }
-    updatePositionIndicator(cells.row.children[0], strike);
-  });
-
-  // --- GUARANTEED SPANNER ROW LOGIC ---
-  if (strikeRows.length > 0) {
-    // Always check for spanner row after all strike rows are rendered
-    let spannerRow = strikeTableBody.querySelector('.spanner-row');
-    const allRows = Array.from(strikeTableBody.children);
+    // Position spanner row correctly
+    const allRows = Array.from(strikeTableBody.children).filter(row => !row.classList.contains('spanner-row'));
     let insertIndex = allRows.length; // default to end
+    
     for (let i = 0; i < allRows.length; i++) {
       const row = allRows[i];
-      if (row.classList.contains('spanner-row')) continue;
       const strikeCell = row.querySelector('td');
-      if (strikeCell) {
-        const strike = parseFloat(strikeCell.textContent.replace(/[\$,]/g, ''));
-        if (centerPrice < strike) {
+      if (strikeCell && strikeCell.textContent) {
+        const strikeText = strikeCell.textContent.replace(/[\$,]/g, '');
+        const strike = parseFloat(strikeText);
+        if (!isNaN(strike) && currentPrice < strike) {
           insertIndex = i;
           break;
         }
       }
     }
-    if (!spannerRow) {
-      spannerRow = createSpannerRow(centerPrice);
-      if (insertIndex < allRows.length) {
-        strikeTableBody.insertBefore(spannerRow, allRows[insertIndex]);
-      } else {
-        strikeTableBody.appendChild(spannerRow);
-      }
-    } else {
-      // Update content
-      const spannerTd = spannerRow.querySelector('td');
-      if (spannerTd) {
-        const priceMatch = spannerTd.innerHTML.match(/Current Price: \$[\d,]+/);
-        if (priceMatch) {
-          const newPriceText = `Current Price: $${Math.round(centerPrice).toLocaleString()}`;
-          spannerTd.innerHTML = spannerTd.innerHTML.replace(priceMatch[0], newPriceText);
-        }
-      }
-      // Move if not at correct position
-      const currentSpannerIndex = allRows.indexOf(spannerRow);
-      if (currentSpannerIndex !== insertIndex) {
-        if (insertIndex < allRows.length) {
-          strikeTableBody.insertBefore(spannerRow, allRows[insertIndex]);
-        } else {
-          strikeTableBody.appendChild(spannerRow);
-        }
-      }
+
+    // Remove spanner row from current position and insert at correct position
+    if (spannerRow.parentNode) {
+      spannerRow.remove();
     }
+    
+    if (insertIndex < allRows.length) {
+      strikeTableBody.insertBefore(spannerRow, allRows[insertIndex]);
+    } else {
+      strikeTableBody.appendChild(spannerRow);
+    }
+
+    // Update fingerprint display if function exists
+    if (typeof updateFingerprintDisplay === 'function') {
+      updateFingerprintDisplay();
+    }
+
+    // Update heat band if function exists
+    if (typeof updateMomentumHeatBandSegmented === 'function') {
+      setTimeout(() => {
+        const strikeTable = document.getElementById('strike-table');
+        const heatBand = document.getElementById('momentum-heat-band');
+        if (strikeTable && heatBand) {
+          heatBand.style.height = strikeTable.offsetHeight + 'px';
+        }
+        updateMomentumHeatBandSegmented();
+      }, 0);
+    }
+
+    console.log('[STRIKE-TABLE] Updated strike table with unified data');
+    
+    // Reset diff mode change flag after update is complete
+    window.diffModeChanged = false;
+  } catch (error) {
+    console.error('Error updating strike table:', error);
   }
-
-
-  
-  if (typeof window.addStrikeTableClickHandlers === 'function') window.addStrikeTableClickHandlers();
-
 }
 
 // === POSITION INDICATOR ===
@@ -364,11 +514,14 @@ function debounce(func, wait) {
 }
 
 // Helper function to update Yes/No button with conditional redraw
-function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = null, forceRefresh = false, diffMode = false, probability = null) {
+function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = null, forceRefresh = false, diffMode = false, diffValue = null) {
   const key = `${strike}-${side}`;
   const prev = lastButtonStates.get(key);
   
-  if (!forceRefresh && !window.forceButtonRefresh && prev && prev.askPrice === askPrice && prev.isActive === isActive) {
+  // Check if diffMode has changed (this forces redraw when switching modes)
+  const diffModeChanged = prev && prev.diffMode !== diffMode;
+  
+  if (!forceRefresh && !window.forceButtonRefresh && !diffModeChanged && !window.diffModeChanged && prev && prev.askPrice === askPrice && prev.isActive === isActive) {
     // No change; skip update
     return;
   }
@@ -376,12 +529,11 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
   // Determine display value based on mode
   let displayValue = '—';
   if (askPrice && askPrice !== '—' && askPrice !== 0) {
-    if (diffMode && probability !== null && isActive) {
-      // DIFF MODE: Show probability - ask price difference for active button
-      const diff = Math.round(probability - askPrice);
-      displayValue = diff > 0 ? `+${diff}` : `${diff}`;
+    if (diffMode && diffValue !== null) {
+      // DIFF MODE: Show pre-calculated diff value (no decimals) for ALL buttons
+      displayValue = diffValue > 0 ? `+${Math.round(diffValue)}` : `${Math.round(diffValue)}`;
     } else {
-      // PRICE MODE or inactive button: Show actual ask price
+      // PRICE MODE: Show actual ask price for ALL buttons
       displayValue = askPrice;
     }
   }
@@ -404,6 +556,9 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
   // Also set data-ticker directly on spanEl for easier access in openTrade
   if (ticker) {
     spanEl.setAttribute('data-ticker', ticker);
+    console.log(`🔍 DEBUG: Set data-ticker="${ticker}" on ${side} button for strike ${strike}`);
+  } else {
+    console.log(`⚠️ DEBUG: No ticker provided for ${side} button for strike ${strike}`);
   }
   // Set data-strike and data-side for easier retrieval in openTrade
   spanEl.setAttribute('data-strike', strike);
@@ -418,18 +573,23 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
 
   if (isActive) {
     spanEl.onclick = debounce(function(event) {
-      // Call master openTrade function
-      if (typeof openTrade === 'function') {
-        openTrade(spanEl);
+      // Use centralized trade execution controller
+      if (typeof window.prepareTradeData === 'function' && typeof window.executeTrade === 'function') {
+        const tradeData = window.prepareTradeData(spanEl);
+        if (tradeData) {
+          window.executeTrade(tradeData);
+        } else {
+          console.error('Failed to prepare trade data');
+        }
       } else {
-        console.error('openTrade function not available');
+        console.error('Trade execution functions not available');
       }
     }, 300);
   } else {
     spanEl.onclick = null;
   }
 
-  lastButtonStates.set(key, { askPrice, isActive });
+  lastButtonStates.set(key, { askPrice, isActive, diffMode });
 }
 
 // === TRADE EXECUTION ===
@@ -441,6 +601,7 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
 
 // Global flag to force refresh on mode changes
 window.forceButtonRefresh = false;
+window.diffModeChanged = false;
 
 // === UTILITY FUNCTIONS ===
 
@@ -452,41 +613,6 @@ function getSelectedSymbol() {
   }
   return "";
 }
-
-// Utility function to get truncated market title, e.g., "BTC 11am"
-function getTruncatedMarketTitle() {
-  if (window.CurrentMarketTitleRaw && typeof window.CurrentMarketTitleRaw === "string") {
-    const contractMatch = window.CurrentMarketTitleRaw.match(/at\s(.+?)\s*(?:EDT|EST)?\?/i);
-    if (contractMatch) {
-      return `BTC ${contractMatch[1].trim()}`;
-    } else {
-      return window.CurrentMarketTitleRaw;
-    }
-  }
-  return 'BTC Unknown';
-}
-
-// Utility function to get current BTC ticker price from the UI
-function getCurrentBTCTickerPrice() {
-  const el = document.getElementById('btc-price-value');
-  if (el && el.textContent) {
-    // Remove $ and commas, parse as float
-    const val = parseFloat(el.textContent.replace(/\$|,/g, ''));
-    return isNaN(val) ? "" : val;
-  }
-  return "";
-}
-
-// Utility function to get current momentum score from the panel
-function getCurrentMomentumScore() {
-  const el = document.getElementById('momentum-score-value');
-  if (el && el.textContent) {
-    const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
-    return isNaN(val) ? "" : val;
-  }
-  return "";
-}
-
 
 
 function showTradeOpenedPopup() {
@@ -510,11 +636,12 @@ function showTradeOpenedPopup() {
 // Make functions available globally for other modules to use
 window.initializeStrikeTable = initializeStrikeTable;
 window.updateStrikeTable = updateStrikeTable;
-// window.openTrade = openTrade; // Removed
 window.updateYesNoButton = updateYesNoButton;
 window.updatePositionIndicator = updatePositionIndicator;
-// window.redrawYesNoButtonsForDIFMode = redrawYesNoButtonsForDIFMode; // REMOVED
 window.addStrikeTableRowClickHandlers = addStrikeTableRowClickHandlers;
+window.updateMiddleColumnData = updateMiddleColumnData;
+window.fetchUnifiedTTC = fetchUnifiedTTC;
+window.fetchStrikeTableData = fetchStrikeTableData;
 
 // === STRIKE TABLE ROW CLICK HANDLERS ===
 function addStrikeTableRowClickHandlers() {
@@ -548,10 +675,16 @@ async function loadDiffModeFromPreferences() {
 if (typeof window !== 'undefined') {
   document.addEventListener('DOMContentLoaded', async () => {
     await loadDiffModeFromPreferences();
-    // Now safe to initialize or update the strike table
-    if (typeof window.fetchAndUpdate === 'function') {
-      window.fetchAndUpdate();
-    }
+    
+    // Initialize middle column data immediately
+    await updateMiddleColumnData();
+    
+    // Set up polling for middle column data
+    setInterval(updateMiddleColumnData, 1000); // Poll every 1 second
+    
+    // Initialize and poll strike table data
+    await updateStrikeTable();
+    setInterval(updateStrikeTable, 1000); // Poll every 1 second
   });
 } 
 
@@ -628,41 +761,6 @@ if (typeof window !== 'undefined') {
       console.log("[WEBSOCKET] ❌ Connection is not open, state:", dbChangeWebSocket ? dbChangeWebSocket.readyState : 'null');
     }
   };
-} 
-
-// === Spanner Row Helper ===
-function createSpannerRow(currentPrice) {
-  const spannerRow = document.createElement("tr");
-  spannerRow.className = "spanner-row";
-  const spannerTd = document.createElement("td");
-  spannerTd.colSpan = 6; // PATCHED: match actual number of columns
-  // SVGs for straight arrows (no margin)
-  const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  // Helper to get current momentum score from DOM
-  function getCurrentMomentumScoreForArrow() {
-    const el = document.getElementById('momentum-score-value');
-    if (el && el.textContent) {
-      const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
-      return isNaN(val) ? 0 : val;
-    }
-    return 0;
-  }
-  let momentumScore = getCurrentMomentumScoreForArrow();
-  let arrowBlock = '';
-  const absMomentum = Math.abs(momentumScore);
-  if (absMomentum < 5) {
-    arrowBlock = '-';
-  } else if (absMomentum < 10) {
-    arrowBlock = momentumScore > 0 ? svgDown : svgUp;
-  } else if (absMomentum < 20) {
-    arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(2);
-  } else {
-    arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(3);
-  }
-  spannerTd.innerHTML = `<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style=\"margin:0 12px;display:inline-block;\">${arrowBlock}</span>`;
-  spannerRow.appendChild(spannerTd);
-  return spannerRow;
 } 
 
  

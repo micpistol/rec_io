@@ -200,10 +200,11 @@ def calculate_strike_data(strike: int, current_price: float, probabilities: Dict
     # Calculate diff
     diff = prob - 50.0
     
-    # Get ask prices from market snapshot
+    # Get ask prices and ticker from market snapshot
     yes_ask = 50  # Default fallback
     no_ask = 50   # Default fallback
     volume = 0    # Default fallback
+    ticker = None # Default fallback
     
     try:
         markets = market_data.get("markets", [])
@@ -216,12 +217,13 @@ def calculate_strike_data(strike: int, current_price: float, probabilities: Dict
                 yes_ask = market.get("yes_ask", 50)  # Keep as cents
                 no_ask = market.get("no_ask", 50)    # Keep as cents
                 volume = market.get("volume", 0)      # Get volume from snapshot
-                print(f"📊 Found ask prices for strike {strike}: YES={yes_ask}, NO={no_ask}, VOL={volume}")
+                ticker = market.get("ticker", None)   # Get ticker from snapshot
+                print(f"📊 Found market data for strike {strike}: YES={yes_ask}, NO={no_ask}, VOL={volume}, TICKER={ticker}")
                 break
         else:
             print(f"⚠️ No market found for strike {strike} (looked for {snapshot_strike})")
     except Exception as e:
-        print(f"Error getting ask prices for strike {strike}: {e}")
+        print(f"Error getting market data for strike {strike}: {e}")
 
     # Calculate yes_diff and no_diff based on money line position
     if strike < current_price:
@@ -242,8 +244,42 @@ def calculate_strike_data(strike: int, current_price: float, probabilities: Dict
         "no_ask": no_ask,
         "yes_diff": round(yes_diff, 2),
         "no_diff": round(no_diff, 2),
-        "volume": volume
+        "volume": volume,
+        "ticker": ticker
     }
+
+def get_unified_ttc(symbol: str = "btc") -> Dict[str, Any]:
+    """Get unified TTC data for a specific symbol"""
+    try:
+        # For now, we only have BTC implementation
+        if symbol.lower() != "btc":
+            return {
+                "symbol": symbol,
+                "ttc_seconds": 0,
+                "error": f"Symbol {symbol} not yet implemented"
+            }
+        
+        market_snapshot = get_kalshi_market_snapshot()
+        strike_date = market_snapshot.get("strike_date", "")
+        ttc_seconds = calculate_ttc(strike_date)
+        
+        return {
+            "symbol": symbol.upper(),
+            "ttc_seconds": ttc_seconds,
+            "strike_date": strike_date,
+            "event_ticker": market_snapshot.get("event_ticker", ""),
+            "market_title": market_snapshot.get("event_title", ""),
+            "market_status": market_snapshot.get("market_status", "unknown"),
+            "last_updated": datetime.now().isoformat()
+        }
+    except Exception as e:
+        print(f"Error getting unified TTC for {symbol}: {e}")
+        return {
+            "symbol": symbol.upper(),
+            "ttc_seconds": 0,
+            "error": str(e),
+            "last_updated": datetime.now().isoformat()
+        }
 
 def main():
     """Main strike table manager loop"""

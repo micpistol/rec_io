@@ -1,23 +1,12 @@
 
 // === LIVE DATA POLLING MODULE ===
-// This module handles all live data fetching and polling for the trade monitor
+// This module handles left column data fetching for the trade monitor
+// Left column: BTC price, price changes, momentum score (all from endpoints)
 
 // Global data holders
 window.momentumData = {
-  deltas: {
-    '1m': null,
-    '2m': null,
-    '3m': null,
-    '4m': null,
-    '15m': null,
-    '30m': null,
-  },
   weightedScore: null,
 };
-
-window.CurrentMarketTitleRaw = "";
-let cachedTTC = null;
-let lastFetchTimestamp = 0;
 
 // === UTILITY FUNCTIONS ===
 
@@ -47,53 +36,27 @@ function decorateChange(el, val) {
 
 // === CORE DATA FETCHING FUNCTIONS ===
 
-// Fetch core data for momentum calculations
+// Fetch core data (BTC price + momentum score)
 function fetchCore() {
   fetch('/core')
     .then(response => response.json())
     .then(data => {
-      window.momentumData.deltas['1m'] = data.delta_1m;
-      window.momentumData.deltas['2m'] = data.delta_2m;
-      window.momentumData.deltas['3m'] = data.delta_3m;
-      window.momentumData.deltas['4m'] = data.delta_4m;
-      window.momentumData.deltas['15m'] = data.delta_15m;
-      window.momentumData.deltas['30m'] = data.delta_30m;
-
-      // Use the weighted momentum score from the backend (single source of truth)
+      // Update weighted momentum score
       window.momentumData.weightedScore = data.weighted_momentum_score;
+
+      // Update BTC price display
+      if ('btc_price' in data) {
+        const price = Number(data.btc_price);
+        const el = document.getElementById('btc-price-value');
+        if (el) el.textContent = formatUSD(price);
+      }
 
       // Trigger momentum panel update if function exists
       if (typeof updateMomentumPanel === 'function') {
         updateMomentumPanel();
       }
-
-      // Also update BTC price display (combined with momentum data)
-      if ('btc_price' in data) {
-        const price = Number(data.btc_price);
-        const el = document.getElementById('btc-price-value');
-        if (el) el.textContent = formatUSD(price);
-      }
     })
     .catch(console.error);
-}
-
-// Fetch BTC price data
-function fetchOtherCoreData() {
-  fetch('/core')
-    .then(response => response.json())
-    .then(data => {
-      // BTC price
-      if ('btc_price' in data) {
-        const price = Number(data.btc_price);
-        const el = document.getElementById('btc-price-value');
-        if (el) el.textContent = formatUSD(price);
-      }
-    })
-    .catch(error => {
-      console.error('Live core fetch error:', error);
-    });
-  
-
 }
 
 // Fetch BTC price changes from backend API and update ticker panel
@@ -102,6 +65,7 @@ async function fetchBTCPriceChanges() {
     const res = await fetch('/btc_price_changes');
     if (!res.ok) throw new Error('Failed to fetch BTC price changes');
     const data = await res.json();
+    
     // Update 1h, 3h, 1d change numbers in the price panel
     if ('change1h' in data) {
       const el = document.getElementById('change-1h');
@@ -120,228 +84,21 @@ async function fetchBTCPriceChanges() {
   }
 }
 
-// === STRIKE TABLE DATA FETCHING ===
-
-// Main periodic fetcher for strike table
-async function fetchAndUpdate() {
-  try {
-    const [coreRes, marketsRes] = await Promise.all([fetch('/core'), fetch('/kalshi_market_snapshot')]);
-    if (!coreRes.ok || !marketsRes.ok) return;
-    const coreData = await coreRes.json();
-    const marketsData = await marketsRes.json();
-    const latestKalshiMarkets = Array.isArray(marketsData.markets) ? marketsData.markets : [];
-
-    // Initialize strike table if needed
-    if (typeof initializeStrikeTable === 'function' && (!window.strikeRowsMap || !window.strikeRowsMap.size)) {
-      const base = Math.round(coreData.btc_price / 250) * 250;
-      initializeStrikeTable(base);
-    }
-
-    // Update strike table if function exists
-    if (typeof updateStrikeTable === 'function') {
-      updateStrikeTable(coreData, latestKalshiMarkets);
-    }
-    
-    // Update active trades after strike table update (since active trades depend on strike table data)
-    if (typeof window.fetchAndRenderTrades === 'function') {
-      window.fetchAndRenderTrades();
-    }
-    
-
-
-    // Update heat band if function exists
-    if (typeof updateMomentumHeatBandSegmented === 'function') {
-      setTimeout(() => {
-        const strikeTable = document.getElementById('strike-table');
-        const heatBand = document.getElementById('momentum-heat-band');
-        if (strikeTable && heatBand) {
-          heatBand.style.height = strikeTable.offsetHeight + 'px';
-        }
-        updateMomentumHeatBandSegmented();
-      }, 0);
-    }
-
-    // Check if ATM strike has drifted more than 2 rows from center
-    if (window.strikeRowsMap && window.strikeRowsMap.size > 0) {
-      const currentCenterStrike = Math.round(coreData.btc_price / 250) * 250;
-      const strikeList = Array.from(window.strikeRowsMap.keys()).sort((a, b) => a - b);
-      const centerIndex = Math.floor(strikeList.length / 2);
-      const currentCenter = strikeList[centerIndex];
-
-      const drift = currentCenterStrike - currentCenter;
-
-      // If ATM strike is more than 2 rows from center, shift table
-      if (drift >= 500 || drift <= -500) {
-        const newBase = currentCenter + (drift > 0 ? 250 : -250);
-        if (typeof initializeStrikeTable === 'function') {
-          initializeStrikeTable(newBase);
-        }
-      }
-    }
-  } catch (e) {
-    console.error("Error fetching or updating strike table:", e);
-  }
-}
-
-// === MARKET TITLE FETCHING ===
-
-// Fetch the raw market title from backend
-async function fetchMarketTitleRaw() {
-  try {
-    // Call the dedicated market title service instead of main.py
-    const res = await fetch(`http://${window.location.hostname}:8006/market_title`);
-    const data = await res.json();
-    window.CurrentMarketTitleRaw = data.title || "";
-    console.log('[MARKET_TITLE] Fetched:', window.CurrentMarketTitleRaw);
-  } catch (e) {
-    window.CurrentMarketTitleRaw = "Bitcoin price today at 11pm EDT?";
-    console.error("Error fetching market title:", e);
-  }
-}
-
-// Update the strike panel market title display with formatting
-function updateStrikePanelMarketTitle() {
-  const cell = document.getElementById('strikePanelMarketTitleCell');
-  
-  if (!cell) {
-    console.error('[MARKET_TITLE] Cell not found');
-    return;
-  }
-
-  if (!window.CurrentMarketTitleRaw) {
-    window.CurrentMarketTitleRaw = "Bitcoin price today at 11pm EDT?";
-  }
-
-  const timeMatch = window.CurrentMarketTitleRaw.match(/at\s(.*)\?/i);
-  const timeStr = timeMatch ? timeMatch[1] : "11pm EDT";
-  const formattedTitle = `Bitcoin price today at ${timeStr}?`;
-  cell.textContent = formattedTitle;
-  cell.style.color = "white";
-  console.log('[MARKET_TITLE] Displayed:', formattedTitle);
-}
-
-// === TTC CLOCK FUNCTIONS ===
-
-function formatTTC(seconds) {
-  if (seconds === null || seconds === undefined || isNaN(seconds)) {
-    return '--:--';
-  }
-  
-  const totalMinutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  
-  if (totalMinutes >= 60) {
-    // Display as HH:MM:SS for times >= 1 hour
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-  } else {
-    // Display as MM:SS for times < 1 hour
-    return `${totalMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-  }
-}
-
-function updateClockDisplay() {
-  const ttcEl = document.getElementById('strikePanelTTC');
-  if (!ttcEl || cachedTTC === null) return;
-
-  ttcEl.textContent = formatTTC(cachedTTC);
-
-  ttcEl.style.backgroundColor = '';
-  ttcEl.style.color = '';
-  ttcEl.style.borderRadius = '';
-  ttcEl.style.padding = '';
-
-  if (cachedTTC >= 0 && cachedTTC <= 180) {
-    ttcEl.style.backgroundColor = '#d2372b';
-    ttcEl.style.color = '#fff';
-    ttcEl.style.borderRadius = '6px';
-    ttcEl.style.padding = '0 10px';
-  } else if (cachedTTC <= 300) {
-    ttcEl.style.backgroundColor = '#ffc107';
-    ttcEl.style.color = '#fff';
-    ttcEl.style.borderRadius = '6px';
-    ttcEl.style.padding = '0 10px';
-  } else if (cachedTTC <= 720) {
-    ttcEl.style.backgroundColor = '#45d34a';
-    ttcEl.style.color = '#fff';
-    ttcEl.style.borderRadius = '6px';
-    ttcEl.style.padding = '0 10px';
-  } else if (cachedTTC <= 900) {
-    ttcEl.style.backgroundColor = '#45d34a';
-    ttcEl.style.color = '#fff';
-    ttcEl.style.borderRadius = '6px';
-    ttcEl.style.padding = '0 10px';
-  }
-}
-
-async function fetchAndCacheTTC() {
-  try {
-    const res = await fetch('/api/ttc');
-    const data = await res.json();
-    cachedTTC = data.ttc_seconds;
-    lastFetchTimestamp = Date.now();
-  } catch {
-    cachedTTC = null;
-  }
-}
-
 // === POLLING SETUP ===
 
 // Initialize polling when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   // Initial data fetches
   fetchCore();
-  fetchAndUpdate();
-  
-  // IMMEDIATE market title fetch and display
-  fetchMarketTitleRaw().then(() => {
-    updateStrikePanelMarketTitle();
-  });
-  
-  fetchAndCacheTTC();
+  fetchBTCPriceChanges();
 
-  // Set up polling intervals - OPTIMIZED to reduce resource usage
-  setInterval(fetchAndUpdate, 1000);           // Strike panel + BTC price + momentum data (combined)
-  setInterval(fetchCore, 1000);                // Momentum data (kept separate for reliability)
-  setInterval(fetchMarketTitleRaw, 60000);     // Market title - every minute
-  setInterval(updateStrikePanelMarketTitle, 60000); // Market title display - every minute
-  setInterval(() => {
-    if (cachedTTC !== null) {
-      cachedTTC = Math.max(0, cachedTTC - 1);
-    }
-    updateClockDisplay();
-
-    if (Date.now() - lastFetchTimestamp > 10000) {
-      fetchAndCacheTTC();
-    }
-  }, 1000); // TTC clock
-  
-  // Dedicated polling for active trades to ensure they update properly
-  setInterval(() => {
-    if (typeof window.fetchAndRenderTrades === 'function') {
-      console.log('[LIVE-DATA] Dedicated active trades polling');
-      window.fetchAndRenderTrades();
-    }
-  }, 2000); // Active trades every 2 seconds
-
-  // Start BTC price change polling
-  startBTCChangePolling();
+  // Set up polling intervals
+  setInterval(fetchCore, 1000);                // Core data (BTC price + momentum) every second
+  setInterval(fetchBTCPriceChanges, 60000);    // Price changes every minute
 });
-
-function startBTCChangePolling() {
-  fetchBTCPriceChanges(); // initial fetch
-  setInterval(fetchBTCPriceChanges, 60000); // fetch every 60 seconds
-}
 
 // Export functions for use by other modules
 window.liveData = {
   fetchCore,
-  fetchOtherCoreData,
-  fetchBTCPriceChanges,
-  fetchAndUpdate,
-  fetchMarketTitleRaw,
-  updateStrikePanelMarketTitle,
-  fetchAndCacheTTC,
-  updateClockDisplay
+  fetchBTCPriceChanges
 }; 

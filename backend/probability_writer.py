@@ -1,6 +1,7 @@
 import time
 import os
 import sys
+import requests
 from datetime import datetime
 
 # Add backend to path for imports
@@ -24,6 +25,30 @@ def log_err(msg):
     with open(ERR_PATH, 'a') as f:
         f.write(f"{datetime.now().isoformat()} | {msg}\n")
 
+def get_unified_ttc(symbol: str = "btc") -> int:
+    """Get unified TTC from strike table manager"""
+    try:
+        response = requests.get(f"http://localhost:3000/api/unified_ttc/{symbol}", timeout=2)
+        if response.ok:
+            data = response.json()
+            ttc_seconds = data.get("ttc_seconds", 0)
+            log(f"Fetched unified TTC for {symbol}: {ttc_seconds}s")
+            return ttc_seconds
+        else:
+            log_err(f"Failed to fetch unified TTC: {response.status_code}")
+    except Exception as e:
+        log_err(f"Error fetching unified TTC: {e}")
+    
+    # Fallback to live_data_analysis if unified TTC fails
+    try:
+        analyzer = LiveDataAnalyzer()
+        fallback_ttc = analyzer.get_ttc_seconds()
+        log(f"Using fallback TTC: {fallback_ttc}s")
+        return fallback_ttc
+    except Exception as e:
+        log_err(f"Fallback TTC also failed: {e}")
+        return 0
+
 def main():
     analyzer = LiveDataAnalyzer()
     port = 8008  # Will be set in port manifest
@@ -31,7 +56,7 @@ def main():
     while True:
         try:
             current_price = analyzer.get_current_price()
-            ttc_seconds = analyzer.get_ttc_seconds()
+            ttc_seconds = get_unified_ttc("btc")  # Use unified TTC
             momentum = analyzer.get_momentum_analysis().get('weighted_momentum_score', 0.0)
             if current_price is not None and ttc_seconds is not None:
                 generate_btc_live_probabilities_json(

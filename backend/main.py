@@ -858,6 +858,15 @@ async def get_strike_table(symbol: str):
     except Exception as e:
         return {"error": f"Error loading strike table for {symbol}: {str(e)}"}
 
+@app.get("/api/unified_ttc/{symbol}")
+async def get_unified_ttc(symbol: str):
+    """Get unified TTC data for a specific symbol from strike table manager"""
+    try:
+        from strike_table_manager import get_unified_ttc
+        return get_unified_ttc(symbol)
+    except Exception as e:
+        return {"error": f"Error getting unified TTC: {str(e)}"}
+
 # Startup and shutdown events
 @app.on_event("startup")
 async def startup_event():

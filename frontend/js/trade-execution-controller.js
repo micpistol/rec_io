@@ -349,9 +349,12 @@ window.prepareTradeData = function(target) {
 
   // Get ticker
   let kalshiTicker = btn.dataset.ticker || null;
+  console.log('🔍 DEBUG: btn.dataset.ticker:', btn.dataset.ticker);
   if (!kalshiTicker && btn.parentElement && btn.parentElement.dataset.ticker) {
     kalshiTicker = btn.parentElement.dataset.ticker;
+    console.log('🔍 DEBUG: Found ticker in parent element:', kalshiTicker);
   }
+  console.log('🔍 DEBUG: Final kalshiTicker:', kalshiTicker);
 
   // Get other data
   const symbol_open = typeof getCurrentBTCTickerPrice === 'function' ? getCurrentBTCTickerPrice() : null;

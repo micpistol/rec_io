@@ -257,14 +257,15 @@
 </style>
 <style>
 
-  #activeTradeSupervisorTable tr.spanner-row td {
-    background-color: #535668;
-    color: #c0c0c0;
-    text-align: center;
-    font-size: 12px;
-    font-style: italic;
-    height: 25px;
-    padding: 2px 4px;
+  /* Unified spanner row styling for ALL tables */
+  tr.spanner-row td {
+    background-color: #535668 !important;
+    color: #c0c0c0 !important;
+    text-align: center !important;
+    font-size: 12px !important;
+    font-style: italic !important;
+    height: 25px !important;
+    padding: 2px 4px !important;
   }
   
   /* Blue background for closing trades */
@@ -274,17 +275,6 @@
   #activeTradeSupervisorTable tr.closing-trade td {
     background-color: #1e3a8a !important;
     color: #ffffff !important;
-  }
-</style>
-<style>
-  #strike-table tr.spanner-row td {
-    background-color: #535668;
-    color: #c0c0c0;
-    text-align: center;
-    font-size: 12px;
-    font-style: italic;
-    height: 25px;
-    padding: 2px 4px;
   }
 </style>
 <style>
@@ -1352,11 +1342,13 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Set local state for instant UI response
       window.diffMode = value;
+      window.diffModeChanged = true; // Flag that diff mode has changed
       
       // Force immediate strike table refresh using local state
-      if (typeof window.fetchAndUpdate === 'function') {
-        console.log('Forcing immediate strike table refresh with local diffMode:', value);
-        window.fetchAndUpdate();
+      console.log('Forcing immediate strike table refresh with local diffMode:', value);
+      if (typeof window.updateStrikeTable === 'function') {
+        // Force a complete redraw of all price buttons
+        window.updateStrikeTable();
       }
       
       // Sync to backend in background
