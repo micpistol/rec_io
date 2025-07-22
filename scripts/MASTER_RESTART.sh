@@ -19,11 +19,29 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Configuration
+# Configuration - Use portable paths
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SUPERVISOR_CONFIG="$PROJECT_ROOT/backend/supervisord.conf"
 SUPERVISOR_SOCKET="/tmp/supervisord.sock"
 SUPERVISOR_PID="/tmp/supervisord.pid"
+
+# Find virtual environment
+if [ -d "$PROJECT_ROOT/venv" ]; then
+    VENV_PATH="$PROJECT_ROOT/venv"
+elif [ -d "$PROJECT_ROOT/.venv" ]; then
+    VENV_PATH="$PROJECT_ROOT/.venv"
+else
+    echo -e "${RED}❌ No virtual environment found${NC}"
+    echo "Please create a virtual environment first:"
+    echo "  python -m venv venv"
+    echo "  source venv/bin/activate"
+    echo "  pip install -r requirements.txt"
+    exit 1
+fi
+
+# Set environment variables for supervisor
+export PROJECT_ROOT="$PROJECT_ROOT"
+export VENV_PATH="$VENV_PATH"
 
 # Port assignments from MASTER_PORT_MANIFEST.json
 PORTS=(3000 4000 6000 8001 8002 8003 8004 8005)
