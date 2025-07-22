@@ -81,7 +81,8 @@ class ConfigManager:
     
     def _get_default_agent_config(self, agent_name: str) -> Dict[str, Any]:
         """Get default configuration for an agent."""
-        base_config = {"enabled": True, "host": "localhost"}
+        from backend.util.paths import get_host
+        base_config = {"enabled": True, "host": get_host()}
         
         # Add port if it's a service that needs one
         if agent_name in ["main", "trade_manager", "trade_executor", "active_trade_supervisor", "market_watchdog", "trade_monitor"]:

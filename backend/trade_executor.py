@@ -31,7 +31,7 @@ TRADE_EXECUTOR_PORT = get_port("trade_executor")
 print(f"[TRADE_EXECUTOR] 🚀 Using centralized port: {TRADE_EXECUTOR_PORT}")
 
 # Import centralized path utilities
-from backend.util.paths import get_accounts_data_dir
+from backend.util.paths import get_accounts_data_dir, get_host
 from backend.account_mode import get_account_mode
 
 # Create Flask app
@@ -204,7 +204,7 @@ def trigger_trade():
             log_event(ticket_id, f"EXECUTOR: TRADE REJECTED — {response.text.strip()}")
             status_payload = {"ticket_id": ticket_id, "status": "error"}
             manager_port = get_manager_port()
-            status_url = f"http://localhost:{manager_port}/api/update_trade_status"
+            status_url = f"http://{get_host()}:{manager_port}/api/update_trade_status"
             def notify_error():
                 try:
                     resp = requests.post(status_url, json=status_payload, timeout=5)
@@ -220,7 +220,7 @@ def trigger_trade():
             # Use the normalized ticket_id
             status_payload = {"ticket_id": ticket_id, "status": "accepted"}
             manager_port = get_manager_port()
-            status_url = f"http://localhost:{manager_port}/api/update_trade_status"
+            status_url = f"http://{get_host()}:{manager_port}/api/update_trade_status"
             def notify_accepted():
                 try:
                     resp = requests.post(status_url, json=status_payload, timeout=5)

@@ -195,11 +195,12 @@ async function fetchAndUpdate() {
 async function fetchMarketTitleRaw() {
   try {
     // Call the dedicated market title service instead of main.py
-    const res = await fetch('http://localhost:8006/market_title');
+    const res = await fetch(`http://${window.location.hostname}:8006/market_title`);
     const data = await res.json();
     window.CurrentMarketTitleRaw = data.title || "";
+    console.log('[MARKET_TITLE] Fetched:', window.CurrentMarketTitleRaw);
   } catch (e) {
-    window.CurrentMarketTitleRaw = "";
+    window.CurrentMarketTitleRaw = "Bitcoin price today at 11pm EDT?";
     console.error("Error fetching market title:", e);
   }
 }
@@ -208,15 +209,21 @@ async function fetchMarketTitleRaw() {
 function updateStrikePanelMarketTitle() {
   const cell = document.getElementById('strikePanelMarketTitleCell');
   
-  if (!cell || !window.CurrentMarketTitleRaw) {
+  if (!cell) {
+    console.error('[MARKET_TITLE] Cell not found');
     return;
   }
 
+  if (!window.CurrentMarketTitleRaw) {
+    window.CurrentMarketTitleRaw = "Bitcoin price today at 11pm EDT?";
+  }
+
   const timeMatch = window.CurrentMarketTitleRaw.match(/at\s(.*)\?/i);
-  const timeStr = timeMatch ? timeMatch[1] : "";
+  const timeStr = timeMatch ? timeMatch[1] : "11pm EDT";
   const formattedTitle = `Bitcoin price today at ${timeStr}?`;
   cell.textContent = formattedTitle;
   cell.style.color = "white";
+  console.log('[MARKET_TITLE] Displayed:', formattedTitle);
 }
 
 // === TTC CLOCK FUNCTIONS ===
@@ -292,8 +299,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initial data fetches
   fetchCore();
   fetchAndUpdate();
-  fetchMarketTitleRaw();
-  updateStrikePanelMarketTitle();
+  
+  // IMMEDIATE market title fetch and display
+  fetchMarketTitleRaw().then(() => {
+    updateStrikePanelMarketTitle();
+  });
+  
   fetchAndCacheTTC();
 
   // Set up polling intervals - OPTIMIZED to reduce resource usage

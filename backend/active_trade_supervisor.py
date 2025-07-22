@@ -17,7 +17,8 @@ from zoneinfo import ZoneInfo
 import requests
 from typing import Dict, List, Optional, Any
 # Import the universal centralized port system
-from backend.core.port_config import get_port, get_port_info
+from backend.core.port_config import get_port
+from backend.util.paths import get_host
 
 # Get port from centralized system
 ACTIVE_TRADE_SUPERVISOR_PORT = get_port("active_trade_supervisor")
@@ -595,7 +596,7 @@ def get_current_probability(strike: float, current_price: float, ttc_seconds: fl
     Returns the prob_within value for the strike, or None on error.
     """
     try:
-        host = "localhost"
+        host = get_host()
         port = get_port("main_app")
         url = f"http://{host}:{port}/api/strike_probabilities"
         payload = {
@@ -938,7 +939,7 @@ def start_event_driven_supervisor():
     # Start HTTP server in a separate thread
     def start_http_server():
         try:
-            host = config.get("agents.active_trade_supervisor.host", "localhost")
+            host = get_host()
             port = ACTIVE_TRADE_SUPERVISOR_PORT
             log(f"🌐 Starting HTTP server on {host}:{port}")
             app.run(host=host, port=port, debug=False, use_reloader=False)

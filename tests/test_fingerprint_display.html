@@ -39,7 +39,7 @@
                     return;
                 }
                 
-                const response = await fetch('http://localhost:3000/api/current_fingerprint');
+                const response = await fetch(`http://${window.location.hostname}:3000/api/current_fingerprint`);
                 
                 if (response.ok) {
                     const data = await response.json();

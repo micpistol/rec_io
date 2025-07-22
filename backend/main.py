@@ -107,10 +107,13 @@ async def broadcast_db_change(db_name: str, change_data: dict):
 # Create FastAPI app
 app = FastAPI(title="Trading System Main App")
 
-# Configure CORS with static origins
+# Import universal host system
+from backend.util.paths import get_host
+
+# Configure CORS with universal host origins
+host = get_host()
 origins = [
-    f"http://localhost:{MAIN_APP_PORT}",
-    f"http://127.0.0.1:{MAIN_APP_PORT}",
+    f"http://{host}:{MAIN_APP_PORT}",
 ]
 
 app.add_middleware(
@@ -439,7 +442,7 @@ async def get_trade(trade_id: int):
     try:
         # Get trade_manager port from centralized system
         trade_manager_port = get_port("trade_manager")
-        trade_manager_url = f"http://localhost:{trade_manager_port}/trades/{trade_id}"
+        trade_manager_url = f"http://{get_host()}:{trade_manager_port}/trades/{trade_id}"
         
         print(f"[MAIN] Forwarding trade GET request to trade_manager at {trade_manager_url}")
         
@@ -466,7 +469,7 @@ async def create_trade(trade_data: dict):
     try:
         # Get trade_manager port from centralized system
         trade_manager_port = get_port("trade_manager")
-        trade_manager_url = f"http://localhost:{trade_manager_port}/trades"
+        trade_manager_url = f"http://{get_host()}:{trade_manager_port}/trades"
         
         print(f"[MAIN] Forwarding trade ticket to trade_manager at {trade_manager_url}")
         
@@ -733,7 +736,7 @@ async def get_current_momentum():
     """Get current momentum score from the unified API."""
     try:
         # Get momentum score from the momentum service
-        momentum_service_url = f"http://localhost:{get_port('momentum_service')}/momentum"
+        momentum_service_url = f"http://{get_host()}:{get_port('momentum_service')}/momentum"
         response = requests.get(momentum_service_url, timeout=5)
         if response.status_code == 200:
             data = response.json()

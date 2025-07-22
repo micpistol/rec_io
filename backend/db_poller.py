@@ -24,6 +24,7 @@ from backend.account_mode import get_account_mode
 from backend.util.paths import get_data_dir, get_accounts_data_dir
 from backend.core.config.settings import config
 from backend.core.port_config import get_port
+from backend.util.paths import get_host
 
 class DatabasePoller:
     def __init__(self):
@@ -36,9 +37,9 @@ class DatabasePoller:
         trade_manager_port = get_port("trade_manager")
         active_trade_supervisor_port = get_port("active_trade_supervisor")
         
-        self.main_app_url = f"http://localhost:{main_app_port}"
-        self.trade_manager_url = f"http://localhost:{trade_manager_port}"
-        self.active_trade_supervisor_url = f"http://localhost:{active_trade_supervisor_port}"
+        self.main_app_url = f"http://{get_host()}:{main_app_port}"
+        self.trade_manager_url = f"http://{get_host()}:{trade_manager_port}"
+        self.active_trade_supervisor_url = f"http://{get_host()}:{active_trade_supervisor_port}"
         
         self.setup_database_paths()
         

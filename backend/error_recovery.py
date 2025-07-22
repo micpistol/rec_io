@@ -19,6 +19,10 @@ sys.path.insert(0, get_project_root())
 
 from backend.core.port_config import get_port, get_port_info
 from backend.util.paths import get_data_dir, get_logs_dir
+import socket
+import subprocess
+import psutil
+from backend.util.paths import get_host
 
 class ErrorRecoverySystem:
     def __init__(self):
@@ -37,10 +41,9 @@ class ErrorRecoverySystem:
     
     def check_port_availability(self, port: int) -> bool:
         """Check if a port is available."""
-        import socket
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(('localhost', port))
+                s.bind((get_host(), port))
                 return True
         except OSError:
             return False
@@ -104,7 +107,6 @@ class ErrorRecoverySystem:
     def check_service_health(self, service_name: str, port: int) -> bool:
         """Check if a service is healthy."""
         try:
-            from backend.util.paths import get_host
             host = get_host()
             response = requests.get(f"http://{host}:{port}/health", timeout=5)
             return response.status_code == 200

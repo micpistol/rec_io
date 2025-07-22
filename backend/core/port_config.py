@@ -7,6 +7,9 @@ import json
 import os
 from typing import Dict, Optional
 
+# Import the universal host system
+from backend.util.paths import get_host, get_service_url
+
 # Central port configuration file - now using MASTER_PORT_MANIFEST.json
 PORT_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config", "MASTER_PORT_MANIFEST.json")
 
@@ -114,9 +117,9 @@ def get_port(service_name: str) -> int:
         return DEFAULT_PORTS.get(service_name, 3000)
 
 def get_service_url(service_name: str, endpoint: str = "") -> str:
-    """Get the full URL for a service endpoint."""
+    """Get the full URL for a service endpoint using universal host system."""
     port = get_port(service_name)
-    return f"http://localhost:{port}{endpoint}"
+    return get_service_url(port) + endpoint
 
 def list_all_ports() -> Dict[str, int]:
     """Get all port assignments from master manifest."""
@@ -142,10 +145,12 @@ def list_all_ports() -> Dict[str, int]:
         return DEFAULT_PORTS
 
 def get_port_info() -> Dict:
-    """Get comprehensive port information for API endpoints."""
+    """Get comprehensive port information for API endpoints using universal host system."""
     ports = list_all_ports()
+    host = get_host()
     return {
         "ports": ports,
-        "service_urls": {name: f"http://localhost:{port}" for name, port in ports.items()},
-        "config_file": PORT_CONFIG_FILE
+        "service_urls": {name: f"http://{host}:{port}" for name, port in ports.items()},
+        "config_file": PORT_CONFIG_FILE,
+        "host": host
     } 

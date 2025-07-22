@@ -9,11 +9,12 @@ async function loadPortConfig() {
         const response = await fetch('/api/ports');
         if (response.ok) {
             const config = await response.json();
+            const host = config.host || window.location.hostname;
             serviceConfig = {
-                mainApp: { port: config.ports.main_app, host: 'localhost' },
-                tradeManager: { port: config.ports.trade_manager, host: 'localhost' },
-                tradeExecutor: { port: config.ports.trade_executor, host: 'localhost' },
-                activeTradeSupervisor: { port: config.ports.active_trade_supervisor, host: 'localhost' }
+                mainApp: { port: config.ports.main_app, host: host },
+                tradeManager: { port: config.ports.trade_manager, host: host },
+                tradeExecutor: { port: config.ports.trade_executor, host: host },
+                activeTradeSupervisor: { port: config.ports.active_trade_supervisor, host: host }
             };
             console.log('[GLOBALS] Loaded centralized port configuration:', serviceConfig);
         } else {

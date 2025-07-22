@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from backend.core.port_config import get_port, get_port_info
 
 # Import centralized path utilities
-from backend.util.paths import get_project_root, get_trade_history_dir, get_logs_dir
+from backend.util.paths import get_project_root, get_trade_history_dir, get_logs_dir, get_host
 from backend.account_mode import get_account_mode
 from backend.util.paths import get_accounts_data_dir
 
@@ -49,7 +49,7 @@ def _wait_for_fill(ticker: str, timeout: int = 10) -> tuple[int | None, float | 
     deadline = time.time() + timeout
     # Use the main agent port for positions API
     port = get_port("main_app")
-    url = f"http://localhost:{port}/api/db/positions"          # host‑relative; no port hard‑coding
+    url = f"http://{get_host()}:{port}/api/db/positions"          # host‑relative; no port hard‑coding
     while time.time() < deadline:
         try:
             r = requests.get(url, timeout=2)
@@ -966,7 +966,7 @@ async def add_trade(request: Request):
                     "symbol_close": symbol_close,
                     "intent": "close"
                 }
-                response = requests.post(f"http://localhost:{executor_port}/trigger_trade", json=close_payload, timeout=5)
+                response = requests.post(f"http://{get_host()}:{executor_port}/trigger_trade", json=close_payload, timeout=5)
                 log(f"[CLOSE EXECUTOR] Executor responded with {response.status_code}: {response.text}")
             except Exception as e:
                 log(f"[CLOSE EXECUTOR ERROR] Failed to send close trade to executor: {e}")
@@ -1003,8 +1003,8 @@ async def add_trade(request: Request):
     try:
         executor_port = get_executor_port()
         log(f"📤 SENDING TO EXECUTOR on port {executor_port}")
-        log(f"📤 FULL URL: http://localhost:{executor_port}/trigger_trade")
-        response = requests.post(f"http://localhost:{executor_port}/trigger_trade", json=data, timeout=5)
+        log(f"📤 FULL URL: http://{get_host()}:{executor_port}/trigger_trade")
+        response = requests.post(f"http://{get_host()}:{executor_port}/trigger_trade", json=data, timeout=5)
         print(f"[EXECUTOR RESPONSE] {response.status_code} — {response.text}")
         # Do not mark as open or error here; status update will come from executor via /api/update_trade_status
     except Exception as e:
@@ -1193,7 +1193,7 @@ def check_expired_trades():
         try:
             import requests
             main_port = get_port("main_app")
-            response = requests.get(f"http://localhost:{main_port}/core", timeout=5)
+            response = requests.get(f"http://{get_host()}:{main_port}/core", timeout=5)
             if response.ok:
                 core_data = response.json()
                 symbol_close = core_data.get('btc_price')
@@ -1358,4 +1358,4 @@ if __name__ == "__main__":
 
     port = get_port("trade_manager")
     print(f"[INFO] Trade Manager running on port {port}")
-    uvicorn.run(app, host="127.0.0.1", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port)

@@ -84,7 +84,7 @@ async function fetchAndRenderActiveTradeSupervisorTrades() {
     } catch (error) {
       console.error('[ACTIVE TRADE SUPERVISOR] Port configuration error:', error);
       // Fallback to hardcoded URL
-      activeTradeSupervisorUrl = 'http://localhost:8007/api/active_trades';
+      activeTradeSupervisorUrl = `http://${window.location.hostname}:8007/api/active_trades`;
     }
     
     // Fetch active trades from the supervisor service
