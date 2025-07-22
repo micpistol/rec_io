@@ -6,6 +6,7 @@
 <link rel="stylesheet" href="/styles/global.css">
 <script src="/js/live-data.js"></script>
 <script src="/js/strike-table.js"></script>
+<script src="/js/watchlist-table.js"></script>
 
         <script src="/js/globals.js"></script>
         
@@ -655,7 +656,6 @@
         </div>
         <div style="display: flex; flex-direction: row; align-items: stretch;">
           <table id="watchlist-table" class="strike-table" style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
-            
             <colgroup>
               <col class="col-strike">
               <col class="col-buffer">
@@ -664,6 +664,16 @@
               <col class="col-yes">
               <col class="col-no">
             </colgroup>
+            <thead>
+              <tr>
+                <th>STRIKE</th>
+                <th>BUFFER</th>
+                <th>%</th>
+                <th>Prob</th>
+                <th>YES</th>
+                <th>NO</th>
+              </tr>
+            </thead>
             <tbody>
               <!-- Watchlist content will be populated later -->
             </tbody>

@@ -858,6 +858,23 @@ async def get_strike_table(symbol: str):
     except Exception as e:
         return {"error": f"Error loading strike table for {symbol}: {str(e)}"}
 
+@app.get("/api/watchlist/{symbol}")
+async def get_watchlist(symbol: str):
+    """Get watchlist data for a specific symbol"""
+    try:
+        # Convert symbol to lowercase for consistency
+        symbol_lower = symbol.lower()
+        watchlist_file = os.path.join(get_data_dir(), "strike_tables", f"{symbol_lower}_watchlist.json")
+        
+        if os.path.exists(watchlist_file):
+            with open(watchlist_file, 'r') as f:
+                data = json.load(f)
+            return data
+        else:
+            return {"error": f"Watchlist file not found for {symbol}"}
+    except Exception as e:
+        return {"error": f"Error loading watchlist for {symbol}: {str(e)}"}
+
 @app.get("/api/unified_ttc/{symbol}")
 async def get_unified_ttc(symbol: str):
     """Get unified TTC data for a specific symbol from strike table manager"""
