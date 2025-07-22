@@ -324,9 +324,6 @@ async function updateStrikeTable() {
         const currentPrice = strikeTableData.current_price;
         const isAboveMoneyLine = strike > currentPrice;
         
-        // Debug logging for button enabling logic
-        console.log(`🔍 DEBUG: Strike ${strike} - Volume: ${volume} (parsed: ${volumeNum}) (${volumeOk ? 'OK' : 'LOW'}), YES: ${yesAsk} (${yesPriceOk ? 'OK' : 'HIGH'}), NO: ${noAsk} (${noPriceOk ? 'OK' : 'HIGH'}), Above money line: ${isAboveMoneyLine}`);
-        
         // Determine which button should be enabled
         let yesEnabled = false;
         let noEnabled = false;
@@ -342,8 +339,6 @@ async function updateStrikeTable() {
             noEnabled = false; // Never enable NO below money line
           }
         }
-        
-        console.log(`🔍 DEBUG: Strike ${strike} - Final: YES enabled: ${yesEnabled}, NO enabled: ${noEnabled}`);
         
         // Update both buttons with their correct enabled state
         updateYesNoButton(yesSpan, strike, "yes", yesAsk, yesEnabled, strikeData.ticker, false, diffMode, yesDiff);
@@ -554,12 +549,9 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
     spanEl.parentElement.setAttribute('data-ticker', ticker);
   }
   // Also set data-ticker directly on spanEl for easier access in openTrade
-  if (ticker) {
-    spanEl.setAttribute('data-ticker', ticker);
-    console.log(`🔍 DEBUG: Set data-ticker="${ticker}" on ${side} button for strike ${strike}`);
-  } else {
-    console.log(`⚠️ DEBUG: No ticker provided for ${side} button for strike ${strike}`);
-  }
+            if (ticker) {
+            spanEl.setAttribute('data-ticker', ticker);
+          }
   // Set data-strike and data-side for easier retrieval in openTrade
   spanEl.setAttribute('data-strike', strike);
   spanEl.setAttribute('data-side', side);
@@ -680,11 +672,11 @@ if (typeof window !== 'undefined') {
     await updateMiddleColumnData();
     
     // Set up polling for middle column data
-    setInterval(updateMiddleColumnData, 1000); // Poll every 1 second
+    setInterval(updateMiddleColumnData, 1000); // Poll every 1 second (unchanged frequency)
     
     // Initialize and poll strike table data
     await updateStrikeTable();
-    setInterval(updateStrikeTable, 1000); // Poll every 1 second
+    setInterval(updateStrikeTable, 1000); // Poll every 1 second (unchanged frequency)
   });
 } 
 

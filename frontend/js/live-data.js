@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Set up polling intervals
   setInterval(fetchCore, 1000);                // Core data (BTC price + momentum) every second
-  setInterval(fetchBTCPriceChanges, 60000);    // Price changes every minute
+  setInterval(fetchBTCPriceChanges, 60000);    // Price changes every minute (unchanged frequency)
 });
 
 // Export functions for use by other modules

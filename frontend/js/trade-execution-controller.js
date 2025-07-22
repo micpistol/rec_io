@@ -28,15 +28,7 @@ window.executeTrade = async function(tradeData) {
   }
 
   // Validate trade data
-  console.log('🔍 DEBUG: executeTrade - validating trade data:', {
-    tradeData: !!tradeData,
-    symbol: tradeData?.symbol,
-    side: tradeData?.side,
-    buy_price: tradeData?.buy_price
-  });
-  
   if (!tradeData || !tradeData.symbol || !tradeData.side || !tradeData.buy_price) {
-    console.log('❌ DEBUG: executeTrade - validation failed');
     return { success: false, error: 'Invalid trade data' };
   }
 
@@ -148,46 +140,33 @@ window.executeTrade = async function(tradeData) {
 // === CENTRALIZED CLOSE TRADE FUNCTION ===
 // This is the ONLY function that should close trades
 window.closeTrade = async function(tradeId, sellPrice, event) {
-  console.log('🔍 DEBUG: closeTrade function ENTRY POINT - called with:', { tradeId, sellPrice, event: !!event });
-  console.log('🔍 DEBUG: closeTrade function STARTING EXECUTION');
   
   // Audio is already played in trade_monitor.html when button was clicked
   
   // Prevent multiple simultaneous executions
   if (window.TRADE_STATE.isExecuting) {
-    console.log('❌ DEBUG: Trade already executing, returning');
     return { success: false, error: 'Trade already executing' };
   }
 
   // Validate inputs
   if (!tradeId || !sellPrice) {
-    console.log('❌ DEBUG: Invalid close trade parameters:', { tradeId, sellPrice });
     return { success: false, error: 'Invalid close trade parameters' };
   }
-  
-  console.log('🔍 DEBUG: closeTrade validation passed, proceeding with execution');
 
   // Generate unique ticket ID
   const ticket_id = 'TICKET-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
-  console.log('🔍 DEBUG: Generated ticket_id:', ticket_id);
   
   // Add to pending trades
   window.TRADE_STATE.pendingTrades.add(ticket_id);
   window.TRADE_STATE.isExecuting = true;
 
   try {
-    console.log('🔍 DEBUG: Fetching trade details for trade ID:', tradeId);
     // Fetch trade details to construct the close ticket
     const tradeRes = await fetch(`/trades/${tradeId}`);
     if (!tradeRes.ok) {
-      console.log('❌ DEBUG: Failed to fetch trade, status:', tradeRes.status);
       throw new Error('Failed to fetch trade for closing');
     }
     const trade = await tradeRes.json();
-    console.log('🔍 DEBUG: Trade details fetched:', trade);
-
-    // === Log the close ticket creation (removed API call since endpoint doesn't exist) ===
-    console.log('🔍 DEBUG: Close ticket initiated:', ticket_id);
 
 
 
@@ -221,7 +200,6 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
       buy_price:        sellPrice,
       symbol_close:     symbolClose
     };
-    console.log('🔍 DEBUG: Close trade payload created:', payload);
 
     // === DEMO MODE CHECK ===
     if (window.TRADE_CONFIG.DEMO_MODE) {
@@ -237,21 +215,17 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
     }
 
     // Execute the actual close trade
-    console.log('🔍 DEBUG: Executing close trade request to /trades');
     const response = await fetch('/trades', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
-    console.log('🔍 DEBUG: Close trade response status:', response.status);
     if (!response.ok) {
-      console.log('❌ DEBUG: Close trade execution failed with status:', response.status);
       throw new Error(`Close trade execution failed: ${response.status}`);
     }
 
     const result = await response.json();
-    console.log('🔍 DEBUG: Close trade result:', result);
     
     // Add to executed trades
     window.TRADE_STATE.executedTrades.add(ticket_id);
@@ -283,42 +257,29 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
 
 // Function to prepare trade data from button click
 window.prepareTradeData = function(target) {
-  console.log('🔍 DEBUG: prepareTradeData called with target:', target);
-  
   const btn = target;
-  console.log('🔍 DEBUG: btn element:', btn);
-  console.log('🔍 DEBUG: btn.disabled:', btn?.disabled);
   
   if (btn?.disabled) {
-    console.log('❌ DEBUG: Button is disabled, returning null');
     return null;
   }
 
   // Get the actual ask price from data attribute (not the display text)
   const askPrice = btn?.dataset?.askPrice;
-  console.log('🔍 DEBUG: askPrice from data attribute:', askPrice);
   
   let buy_price = 0;
   if (askPrice) {
     // Convert from cents to dollars (e.g., "96" becomes 0.96)
     buy_price = parseFloat(askPrice) / 100;
-  } else {
-    console.log('❌ DEBUG: No ask price found in data attribute');
   }
-  
-  console.log('🔍 DEBUG: buy_price calculated:', buy_price);
 
   const posInput = document.getElementById('position-size');
   const rawBasePos = posInput ? parseInt(posInput.value, 10) : NaN;
   const validBase = Number.isFinite(rawBasePos) && rawBasePos > 0 ? rawBasePos : null;
-  console.log('🔍 DEBUG: position input:', { posInput: posInput?.value, rawBasePos, validBase });
 
   const multiplierBtn = document.querySelector('.multiplier-btn.active');
   const multiplier = multiplierBtn ? parseInt(multiplierBtn.dataset.multiplier, 10) : 1;
-  console.log('🔍 DEBUG: multiplier:', { multiplierBtn: multiplierBtn?.dataset?.multiplier, multiplier });
 
   const position = validBase !== null ? validBase * multiplier : null;
-  console.log('🔍 DEBUG: final position:', position);
 
   const symbol = typeof getSelectedSymbol === 'function' ? getSelectedSymbol() : 'BTC';
   const contract = typeof getTruncatedMarketTitle === 'function' ? getTruncatedMarketTitle() : 'BTC Market';
@@ -349,12 +310,9 @@ window.prepareTradeData = function(target) {
 
   // Get ticker
   let kalshiTicker = btn.dataset.ticker || null;
-  console.log('🔍 DEBUG: btn.dataset.ticker:', btn.dataset.ticker);
   if (!kalshiTicker && btn.parentElement && btn.parentElement.dataset.ticker) {
     kalshiTicker = btn.parentElement.dataset.ticker;
-    console.log('🔍 DEBUG: Found ticker in parent element:', kalshiTicker);
   }
-  console.log('🔍 DEBUG: Final kalshiTicker:', kalshiTicker);
 
   // Get other data
   const symbol_open = typeof getCurrentBTCTickerPrice === 'function' ? getCurrentBTCTickerPrice() : null;
@@ -365,45 +323,27 @@ window.prepareTradeData = function(target) {
   let prob = null;
   if (strike) {
     const strikeFormatted = '$' + Number(strike).toLocaleString();
-    console.log('🔍 DEBUG: Looking for strike:', strikeFormatted);
     
     const strikeTableRows = document.querySelectorAll('#strike-table tbody tr');
-    console.log('🔍 DEBUG: Found', strikeTableRows.length, 'strike table rows');
     
     for (const row of strikeTableRows) {
       const firstTd = row.querySelector('td');
       if (!firstTd) continue;
       const firstTdText = firstTd.textContent.trim();
-      console.log('🔍 DEBUG: Checking row with first cell:', firstTdText);
       
       if (firstTdText === strikeFormatted) {
-        console.log('🔍 DEBUG: Found matching strike row!');
         const tds = row.querySelectorAll('td');
-        console.log('🔍 DEBUG: Row has', tds.length, 'cells');
         
         if (tds.length > 3) {
           const probText = tds[3].textContent.trim(); // FIXED: Use the Prob column
-          console.log('🔍 DEBUG: Probability cell text:', probText);
           
           if (probText && probText !== '—') {
             prob = probText; // Keep as string (e.g., "97.6")
-            console.log('🔍 DEBUG: Found probability:', prob);
-          } else {
-            console.log('🔍 DEBUG: Probability cell is empty or "—"');
           }
-        } else {
-          console.log('🔍 DEBUG: Row has fewer than 4 cells');
         }
         break;
       }
     }
-    
-    if (!prob) {
-      console.log('❌ DEBUG: No probability found for strike', strikeFormatted);
-      console.log('❌ DEBUG: Returning null - trade execution will fail');
-    }
-  } else {
-    console.log('❌ DEBUG: No strike found from button context');
   }
 
   if (!prob) {
@@ -451,9 +391,5 @@ window.getTradeState = function() {
 
 // Initialize the controller 
 document.addEventListener('DOMContentLoaded', function() {
-  console.log('Trade execution controller initialized');
-  console.log('window.executeTrade available:', typeof window.executeTrade === 'function');
-  console.log('window.prepareTradeData available:', typeof window.prepareTradeData === 'function');
-  console.log('TRADE_CONFIG:', window.TRADE_CONFIG);
-  console.log('TRADE_STATE:', window.TRADE_STATE);
+  // Controller initialized silently
 }); 
