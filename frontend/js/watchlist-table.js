@@ -61,6 +61,8 @@ async function updateWatchlistTable() {
       const strikeData = data.strikes.find(s => s.strike === strike);
       
       if (strikeData) {
+        // Show the row and update it
+        row.style.display = '';
         // Buffer (pre-calculated)
         bufferTd.textContent = strikeData.buffer.toLocaleString(undefined, {maximumFractionDigits: 0});
         
@@ -120,6 +122,9 @@ async function updateWatchlistTable() {
         
         // Update position indicator for this strike (SAME as main strike table)
         updateWatchlistPositionIndicator(row.querySelector('td'), strike);
+      } else {
+        // Hide the row - strike is not in the watchlist JSON
+        row.style.display = 'none';
       }
     });
     
