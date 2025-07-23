@@ -13,7 +13,9 @@ from backend.core.config.settings import config
 
 def get_btc_price() -> float:
     try:
-        response = requests.get("http://localhost:3000/core", timeout=2)
+        from backend.core.port_config import get_service_url
+        url = get_service_url("main_app", "/core")
+        response = requests.get(url, timeout=2)
         if response.ok:
             data = response.json()
             return float(data["btc_price"])

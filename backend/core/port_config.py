@@ -119,7 +119,8 @@ def get_port(service_name: str) -> int:
 def get_service_url(service_name: str, endpoint: str = "") -> str:
     """Get the full URL for a service endpoint using universal host system."""
     port = get_port(service_name)
-    return get_service_url(port) + endpoint
+    host = get_host()
+    return f"http://{host}:{port}{endpoint}"
 
 def list_all_ports() -> Dict[str, int]:
     """Get all port assignments from master manifest."""

@@ -28,7 +28,9 @@ def log_err(msg):
 def get_unified_ttc(symbol: str = "btc") -> int:
     """Get unified TTC from strike table manager"""
     try:
-        response = requests.get(f"http://localhost:3000/api/unified_ttc/{symbol}", timeout=2)
+        from backend.core.port_config import get_service_url
+        url = get_service_url("main_app", f"/api/unified_ttc/{symbol}")
+        response = requests.get(url, timeout=2)
         if response.ok:
             data = response.json()
             ttc_seconds = data.get("ttc_seconds", 0)
