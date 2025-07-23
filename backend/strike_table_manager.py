@@ -211,22 +211,50 @@ def calculate_ttc(strike_date: str) -> int:
         print(f"Error calculating TTC: {e}")
         raise
 
-def build_strike_table_rows(base_price: float, strike_tier: int, num_levels: int = 10) -> list:
-    """Build strike table rows using detected strike tier spacing"""
+def build_strike_table_rows(base_price: float, strike_tier: int, num_levels: int = 10, probabilities: Dict[str, float] = None) -> list:
+    """Build strike table rows using available probability data and market data"""
     try:
         if strike_tier <= 0:
             raise ValueError(f"Invalid strike tier: {strike_tier}")
         
-        # Find the closest strike tier to the current price
-        closest_tier = round(base_price / strike_tier) * strike_tier
+        # Get available probabilities if not provided
+        if probabilities is None:
+            probabilities = get_live_probabilities()
         
-        # Generate strikes going up and down from the closest tier
-        strikes = []
-        for i in range(-num_levels, num_levels + 1):
-            strike = closest_tier + (i * strike_tier)
-            strikes.append(strike)
+        if not probabilities:
+            raise ValueError("No probability data available")
         
-        print(f"🎯 Generated {len(strikes)} strikes around ${closest_tier:,} (tier: ${strike_tier:,})")
+        # Get market data to check which strikes actually exist
+        market_data = get_kalshi_market_snapshot()
+        markets = market_data.get("markets", [])
+        
+        # Create a set of available market strikes (convert from .99 format)
+        available_market_strikes = set()
+        for market in markets:
+            floor_strike = market.get("floor_strike")
+            if floor_strike:
+                # Convert from 118499.99 format to 118500
+                market_strike = int(float(floor_strike) + 0.01)
+                available_market_strikes.add(market_strike)
+        
+        # Convert probability keys to integers and filter to only those that exist in market data
+        available_strikes = []
+        for strike_str in probabilities.keys():
+            strike = int(strike_str)
+            if strike in available_market_strikes:
+                available_strikes.append(strike)
+        
+        if not available_strikes:
+            raise ValueError("No valid strikes found that exist in both probability and market data")
+        
+        # Sort by distance from base price
+        available_strikes.sort(key=lambda x: abs(x - base_price))
+        
+        # Take the closest strikes (up to num_levels * 2 + 1)
+        max_strikes = min(num_levels * 2 + 1, len(available_strikes))
+        strikes = available_strikes[:max_strikes]
+        
+        print(f"🎯 Generated {len(strikes)} strikes from available probability data (tier: ${strike_tier:,})")
         return strikes
     except Exception as e:
         print(f"Error building strike table rows: {e}")
@@ -265,7 +293,7 @@ def calculate_strike_data(strike: int, current_price: float, probabilities: Dict
         ticker = None
         
         for market in markets:
-            if str(market.get("floor_strike")) == snapshot_strike:
+            if str(market.get("floor_strike")) == snapshot_strike or float(market.get("floor_strike", 0)) == float(snapshot_strike):
                 yes_ask = market.get("yes_ask")
                 no_ask = market.get("no_ask")
                 volume = market.get("volume")

@@ -29,6 +29,13 @@ function initializeWatchlistTable() {
   }
   
   console.log('🔍 Initializing watchlist table...');
+  
+  // Clear any existing state to prevent conflicts
+  if (window.watchlistRowsMap) {
+    window.watchlistRowsMap.clear();
+  }
+  
+  // Initial update
   updateWatchlistTable();
   
   // Set up periodic updates (every 1 second like the main strike table)
@@ -48,9 +55,22 @@ async function updateWatchlistTable() {
     const watchlistTableBody = document.querySelector('#watchlist-table tbody');
     if (!watchlistTableBody) return;
     
-    // Initialize watchlist table if needed
+    // Initialize watchlist table if needed - FIXED LOGIC
     if (!window.watchlistRowsMap || window.watchlistRowsMap.size === 0) {
+      console.log('🔍 Watchlist table not initialized, creating rows...');
       initializeWatchlistTableRows(data.strikes);
+    }
+    
+    // Debug: Log update frequency
+    if (!window.lastWatchlistUpdate) {
+      window.lastWatchlistUpdate = Date.now();
+    } else {
+      const now = Date.now();
+      const timeSinceLastUpdate = now - window.lastWatchlistUpdate;
+      if (timeSinceLastUpdate > 5000) { // Log every 5 seconds
+        console.log('🔍 Watchlist table updating with', data.strikes.length, 'strikes');
+        window.lastWatchlistUpdate = now;
+      }
     }
     
     // Update each watchlist row with data
@@ -63,6 +83,7 @@ async function updateWatchlistTable() {
       if (strikeData) {
         // Show the row and update it
         row.style.display = '';
+        
         // Buffer (pre-calculated)
         bufferTd.textContent = strikeData.buffer.toLocaleString(undefined, {maximumFractionDigits: 0});
         
@@ -153,6 +174,14 @@ async function updateWatchlistTable() {
 
 function initializeWatchlistTableRows(strikes) {
   const watchlistTableBody = document.querySelector('#watchlist-table tbody');
+  if (!watchlistTableBody) {
+    console.error('Watchlist table body not found during row initialization');
+    return;
+  }
+  
+  console.log('🔍 Creating watchlist table rows for', strikes.length, 'strikes');
+  
+  // Clear existing content
   watchlistTableBody.innerHTML = '';
   window.watchlistRowsMap.clear();
   
@@ -203,6 +232,8 @@ function initializeWatchlistTableRows(strikes) {
       buySpan
     });
   });
+  
+  console.log('🔍 Watchlist table rows created:', window.watchlistRowsMap.size, 'rows');
 }
 
 // === WATCHLIST BUY BUTTON FUNCTION ===
@@ -335,10 +366,11 @@ function debounce(func, wait) {
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-  // Wait a bit for the main strike table to initialize first
+  // Wait longer for the main strike table to initialize first and avoid conflicts
   setTimeout(() => {
+    console.log('🔍 Starting watchlist table initialization...');
     initializeWatchlistTable();
-  }, 100);
+  }, 500); // Increased from 100ms to 500ms to avoid race conditions
 });
 
 // Export functions for global access (same as main strike table)
