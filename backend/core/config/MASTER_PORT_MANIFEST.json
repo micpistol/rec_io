@@ -24,6 +24,11 @@
       "description": "Active trade monitoring",
       "status": "RUNNING"
     },
+    "auto_entry_supervisor": {
+      "port": 8009,
+      "description": "Auto entry monitoring and indicators",
+      "status": "RUNNING"
+    },
     "market_title_service": {
       "port": 8006,
       "description": "Market title service",

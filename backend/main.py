@@ -818,6 +818,64 @@ async def set_auto_stop_settings(request: Request):
     save_auto_stop_settings(settings)
     return {"status": "ok", "current_probability": settings["current_probability"], "min_ttc_seconds": settings["min_ttc_seconds"]}
 
+# AUTO ENTRY SETTINGS
+AUTO_ENTRY_SETTINGS_PATH = os.path.join(get_data_dir(), "preferences", "auto_entry_settings.json")
+
+def load_auto_entry_settings():
+    """Load auto entry settings from file"""
+    try:
+        if os.path.exists(AUTO_ENTRY_SETTINGS_PATH):
+            with open(AUTO_ENTRY_SETTINGS_PATH, "r") as f:
+                settings = json.load(f)
+        else:
+            settings = {"min_probability": 25, "min_differential": 0, "min_ttc_seconds": 60, "min_time": 0, "max_time": 3600}
+        return settings
+    except Exception as e:
+        print(f"[Auto Entry Settings Load Error] {e}")
+        return {"min_probability": 25, "min_differential": 0, "min_ttc_seconds": 60, "min_time": 0, "max_time": 3600}
+
+def save_auto_entry_settings(settings):
+    """Save auto entry settings to file"""
+    try:
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(AUTO_ENTRY_SETTINGS_PATH), exist_ok=True)
+        # Set defaults if missing
+        if "min_probability" not in settings:
+            settings["min_probability"] = 25
+        if "min_differential" not in settings:
+            settings["min_differential"] = 0
+        if "min_ttc_seconds" not in settings:
+            settings["min_ttc_seconds"] = 60
+        if "min_time" not in settings:
+            settings["min_time"] = 0
+        if "max_time" not in settings:
+            settings["max_time"] = 3600
+        with open(AUTO_ENTRY_SETTINGS_PATH, "w") as f:
+            json.dump(settings, f)
+    except Exception as e:
+        print(f"[Auto Entry Settings Save Error] {e}")
+
+@app.get("/api/get_auto_entry_settings")
+async def get_auto_entry_settings():
+    return load_auto_entry_settings()
+
+@app.post("/api/set_auto_entry_settings")
+async def set_auto_entry_settings(request: Request):
+    data = await request.json()
+    settings = load_auto_entry_settings()
+    if "min_probability" in data:
+        settings["min_probability"] = int(data["min_probability"])
+    if "min_differential" in data:
+        settings["min_differential"] = int(data["min_differential"])
+    if "min_ttc_seconds" in data:
+        settings["min_ttc_seconds"] = int(data["min_ttc_seconds"])
+    if "min_time" in data:
+        settings["min_time"] = int(data["min_time"])
+    if "max_time" in data:
+        settings["max_time"] = int(data["max_time"])
+    save_auto_entry_settings(settings)
+    return {"status": "ok", "min_probability": settings["min_probability"], "min_differential": settings["min_differential"], "min_ttc_seconds": settings["min_ttc_seconds"], "min_time": settings["min_time"], "max_time": settings["max_time"]}
+
 @app.get("/frontend-changes")
 def frontend_changes():
     """Get the latest modification time of frontend files for cache busting."""
@@ -913,6 +971,21 @@ async def get_unified_ttc(symbol: str):
         return get_unified_ttc(symbol)
     except Exception as e:
         return {"error": f"Error getting unified TTC: {str(e)}"}
+
+@app.get("/api/auto_entry_indicator")
+async def get_auto_entry_indicator():
+    """Proxy endpoint to get auto entry indicator state from auto_entry_supervisor"""
+    try:
+        from backend.core.port_config import get_port
+        port = get_port("auto_entry_supervisor")
+        url = f"http://localhost:{port}/api/auto_entry_indicator"
+        response = requests.get(url, timeout=2)
+        if response.ok:
+            return response.json()
+        else:
+            return {"error": f"Auto entry supervisor returned {response.status_code}"}
+    except Exception as e:
+        return {"error": f"Error getting auto entry indicator: {str(e)}"}
 
 # Startup and shutdown events
 @app.on_event("startup")

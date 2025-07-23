@@ -607,7 +607,13 @@
     <div class="column" id="col2">
       <div class="panel-container" style="height: 50px; min-height: 50px; max-height: 50px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
         <div id="strikePanelMarketTitleCell" style="font-size: 16px; text-align: left;">Loading market title...</div>
-        <div id="strikePanelTTC" style="font-size: 27px; font-weight: bold; text-align: right;">&nbsp;</div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div id="autoEntryIndicator" style="display: none; align-items: center; gap: 6px; margin-right: 20px;padding: 4px 8px; background: #28a745; color: white; border-radius: 4px; font-size: 12px; font-weight: 500;">
+            <div style="width: 8px; height: 8px; background: #fff; border-radius: 50%;"></div>
+            <span>Automated Trading ON</span>
+          </div>
+          <div id="strikePanelTTC" style="font-size: 27px; font-weight: bold; text-align: right;">&nbsp;</div>
+        </div>
       </div>
       <div class="panel-container" style="min-height: 200px; " id="strikePanelContainer">
         <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
@@ -651,10 +657,21 @@
       <div class="panel-container" style="min-height: 100px;" id="watchlistPanel">
         <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
           <span>Watchlist</span>
-          <label style="font-size: 12px; user-select: none; color: white; display: flex; align-items: center; gap: 6px; margin: 0;">
-            AUTO ENTRY
-            <input type="checkbox" id="recoToggle" />
-          </label>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <img 
+              id="autoEntrySettingsIcon"
+              src="../images/icons/panel_settings.png" 
+              alt="Auto Entry Settings" 
+              title="Auto Entry Settings" 
+              style="width: 14px; height: 14px; opacity: 0.7; transition: opacity 0.2s; cursor: pointer; align-self: center;"
+              onmouseover="this.style.opacity='1'" 
+              onmouseout="this.style.opacity='0.7'"
+            />
+            <label style="font-size: 12px; user-select: none; color: white; display: flex; align-items: center; gap: 6px; margin: 0;">
+              AUTO ENTRY
+              <input type="checkbox" id="recoToggle" />
+            </label>
+          </div>
         </div>
         <div style="display: flex; flex-direction: row; align-items: stretch;">
           <table id="watchlist-table" class="strike-table" style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
@@ -1480,28 +1497,70 @@ document.addEventListener('DOMContentLoaded', () => {
       <!-- Modal for Auto Stop Settings -->
       <div id="autoStopSettingsModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:1000;">
         <div id="autoStopSettingsDim" style="position:absolute; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4);"></div>
-        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; border-radius:8px; min-width:320px; min-height:120px; box-shadow:0 4px 32px rgba(0,0,0,0.25); padding:10px 10px 10px 10px; display:flex; flex-direction:column; align-items:stretch;">
-          <div id="autoStopSettingsHeader" style="font-size:14px; font-weight:400; margin-bottom:16px; color:#222; letter-spacing:0.2px; text-align:left;">Auto Stop Settings</div>
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; border-radius:8px; min-width:400px; min-height:200px; box-shadow:0 4px 32px rgba(0,0,0,0.25); padding:20px; display:flex; flex-direction:column; align-items:stretch;">
+          <div id="autoStopSettingsHeader" style="font-size:16px; font-weight:500; margin-bottom:24px; color:#222; letter-spacing:0.2px; text-align:left;">Auto Stop Settings</div>
           <div style="flex:1 1 auto; display:flex; flex-direction:column; justify-content:center; align-items:stretch;">
-            <label for="autoStopProbabilitySlider" style="font-size:13px; color:#333; margin-bottom:30px;">Current Win Probability:</label>
-            <div style="position:relative; margin-bottom:8px; width:100%;">
-              <input type="range" id="autoStopProbabilitySlider" min="0" max="100" value="25" style="width:100%; height:20px; z-index:1; position:relative;" />
-              <div id="sliderValueDisplay" style="position:absolute; top:-28px; left:0; font-size:12px; color:#222; background:white; padding:5px 6px; border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,0.08); pointer-events:none; z-index:2; transform:translateX(-50%);">25%</div>
+            <label for="autoStopProbabilitySlider" style="font-size:14px; color:#333; margin-bottom:12px; font-weight:500;">Current Win Probability:</label>
+            <div style="position:relative; margin-bottom:24px; width:100%;">
+              <input type="range" id="autoStopProbabilitySlider" min="0" max="100" value="25" style="width:100%; height:6px; z-index:1; position:relative; background:#e0e0e0; border-radius:3px; outline:none;" />
+              <div id="sliderValueDisplay" style="position:absolute; top:-32px; left:0; font-size:12px; color:#222; background:white; padding:4px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0;">25%</div>
             </div>
             <!-- New TTC field -->
-            <label for="autoStopMinTTCInput" style="font-size:13px; color:#333; margin-top:18px; margin-bottom:4px;">Minimum Time to Close:</label>
+            <label for="autoStopMinTTCInput" style="font-size:14px; color:#333; margin-bottom:12px; font-weight:500;">Minimum Time to Close:</label>
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-              <div style="display: flex; align-items: center; border: 1px solid #ccc; border-radius: 4px; background: white;">
-                <button id="autoStopMinTTCDown" style="padding: 6px 8px; border: none; background: #f5f5f5; cursor: pointer; border-right: 1px solid #ccc; border-radius: 4px 0 0 4px;">▼</button>
-                <span id="autoStopMinTTCDisplay" style="padding: 6px 12px; font-size: 13px; color: #333; min-width: 50px; text-align: center;">01:00</span>
-                <button id="autoStopMinTTCUp" style="padding: 6px 8px; border: none; background: #f5f5f5; cursor: pointer; border-left: 1px solid #ccc; border-radius: 0 4px 4px 0;">▲</button>
+              <div style="display: flex; align-items: center; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                <button id="autoStopMinTTCDown" style="padding: 8px 12px; border: none; background: #f8f9fa; cursor: pointer; border-right: 1px solid #ddd; border-radius: 4px 0 0 4px; font-size:12px;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">▼</button>
+                <span id="autoStopMinTTCDisplay" style="padding: 8px 16px; font-size: 13px; color: #333; min-width: 60px; text-align: center; font-weight:500;">01:00</span>
+                <button id="autoStopMinTTCUp" style="padding: 8px 12px; border: none; background: #f8f9fa; cursor: pointer; border-left: 1px solid #ddd; border-radius: 0 4px 4px 0; font-size:12px;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">▲</button>
               </div>
               <input type="hidden" id="autoStopMinTTCInput" value="60" />
             </div>
           </div>
-          <div style="display:flex; gap:8px; justify-content:flex-end; align-items:center; margin-top:12px;">
-            <button id="autoStopSettingsCancel" style="padding:3px 9px; border-radius:4px; border:none; background:#eee; color:#333; font-size: 12px; cursor:pointer;" onmouseover="this.style.background='#e3f2fd'" onmouseout="this.style.background='#eee'">Cancel</button>
-            <button id="autoStopSettingsSave" style="padding:3px 9px; border-radius:4px; border:none; background:#007bff; color:white; font-size: 12px; cursor:pointer;">Save</button>
+          <div style="display:flex; gap:12px; justify-content:flex-end; align-items:center; margin-top:20px;">
+            <button id="autoStopSettingsCancel" style="padding:8px 16px; border-radius:4px; border:1px solid #ddd; background:#f8f9fa; color:#333; font-size:13px; cursor:pointer; font-weight:500;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">Cancel</button>
+            <button id="autoStopSettingsSave" style="padding:8px 16px; border-radius:4px; border:none; background:#007bff; color:white; font-size:13px; cursor:pointer; font-weight:500;" onmouseover="this.style.background='#0056b3'" onmouseout="this.style.background='#007bff'">Save</button>
+          </div>
+        </div>
+      </div>
+      <!-- Modal for Auto Entry Settings -->
+      <div id="autoEntrySettingsModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:1000;">
+        <div id="autoEntrySettingsDim" style="position:absolute; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4);"></div>
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; border-radius:8px; min-width:400px; min-height:200px; box-shadow:0 4px 32px rgba(0,0,0,0.25); padding:20px; display:flex; flex-direction:column; align-items:stretch;">
+          <div id="autoEntrySettingsHeader" style="font-size:16px; font-weight:500; margin-bottom:24px; color:#222; letter-spacing:0.2px; text-align:left;">Auto Entry Settings</div>
+          <div style="flex:1 1 auto; display:flex; flex-direction:column; justify-content:center; align-items:stretch;">
+            <label for="timeWindowSlider" style="font-size:14px; color:#333; margin-bottom:12px; font-weight:500;">Time Window:</label>
+            <div style="position:relative; margin-bottom:24px; width:100%;">
+              <!-- Time Window Slider Container -->
+              <div id="timeWindowSliderContainer" style="position:relative; width:100%; height:6px; background:#e0e0e0; border-radius:3px; margin-top:8px;">
+                <!-- Min Time Handle -->
+                <div id="minTimeHandle" style="position:absolute; top:-5px; width:15px; height:15px; background:#007bff; border-radius:50%; cursor:pointer; z-index:10; transform:translateX(-50%); box-shadow:0 2px 4px rgba(0,0,0,0.2);" draggable="true"></div>
+                <!-- Max Time Handle -->
+                <div id="maxTimeHandle" style="position:absolute; top:-5px; width:15px; height:15px; background:#007bff; border-radius:50%; cursor:pointer; z-index:10; transform:translateX(-50%); box-shadow:0 2px 4px rgba(0,0,0,0.2);" draggable="true"></div>
+                <!-- Selected Range -->
+                <div id="timeWindowRange" style="position:absolute; top:0; height:6px; background:#007bff; border-radius:3px; z-index:5;"></div>
+              </div>
+              <!-- Time Display -->
+              <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:12px; color:#666;">
+                <span id="timeWindowMinDisplay">00:00</span>
+                <span id="timeWindowMaxDisplay">60:00</span>
+              </div>
+            </div>
+            
+            <label for="autoEntryProbabilitySlider" style="font-size:14px; color:#333; margin-bottom:12px; font-weight:500;">Minimum Win Probability:</label>
+            <div style="position:relative; margin-bottom:24px; width:100%;">
+              <input type="range" id="autoEntryProbabilitySlider" min="0" max="100" value="25" style="width:100%; height:6px; z-index:1; position:relative; background:#e0e0e0; border-radius:3px; outline:none;" />
+              <div id="autoEntrySliderValueDisplay" style="position:absolute; top:-32px; left:0; font-size:12px; color:#222; background:white; padding:4px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0;">25%</div>
+            </div>
+            
+            <label for="autoEntryDifferentialSlider" style="font-size:14px; color:#333; margin-bottom:12px; font-weight:500;">Minimum Differential:</label>
+            <div style="position:relative; margin-bottom:8px; width:100%;">
+              <input type="range" id="autoEntryDifferentialSlider" min="-10" max="10" value="0" style="width:100%; height:6px; z-index:1; position:relative; background:#e0e0e0; border-radius:3px; outline:none;" />
+              <div id="autoEntryDifferentialValueDisplay" style="position:absolute; top:-32px; left:0; font-size:12px; color:#222; background:white; padding:4px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0;">0</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:12px; justify-content:flex-end; align-items:center; margin-top:20px;">
+            <button id="autoEntrySettingsCancel" style="padding:8px 16px; border-radius:4px; border:1px solid #ddd; background:#f8f9fa; color:#333; font-size:13px; cursor:pointer; font-weight:500;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">Cancel</button>
+            <button id="autoEntrySettingsSave" style="padding:8px 16px; border-radius:4px; border:none; background:#007bff; color:white; font-size:13px; cursor:pointer; font-weight:500;" onmouseover="this.style.background='#0056b3'" onmouseout="this.style.background='#007bff'">Save</button>
           </div>
         </div>
       </div>
@@ -2530,7 +2589,7 @@ document.addEventListener('DOMContentLoaded', function() {
           const response = await fetch('/api/set_auto_stop_settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ current_probability: newProb, min_ttc_seconds: minTTC })
+            body: JSON.stringify({ enabled: true, current_probability: newProb, min_ttc_seconds: minTTC })
           });
           if (response.ok) {
             console.log('Auto stop settings saved successfully');
@@ -2593,6 +2652,312 @@ if (minTTCDisplay && minTTCInput && minTTCUp && minTTCDown) {
     minTTCInput.value = newVal;
     minTTCDisplay.textContent = formatSecondsToMMSS(newVal);
   });
+}
+
+// AUTO ENTRY SETTINGS FUNCTIONALITY
+document.addEventListener('DOMContentLoaded', function() {
+  const autoEntrySettingsIcon = document.getElementById('autoEntrySettingsIcon');
+  const autoEntrySettingsModal = document.getElementById('autoEntrySettingsModal');
+  const autoEntrySettingsDim = document.getElementById('autoEntrySettingsDim');
+  const autoEntrySettingsCancel = document.getElementById('autoEntrySettingsCancel');
+  const autoEntrySettingsSave = document.getElementById('autoEntrySettingsSave');
+  const autoEntryProbabilitySlider = document.getElementById('autoEntryProbabilitySlider');
+  const autoEntrySliderValueDisplay = document.getElementById('autoEntrySliderValueDisplay');
+  const autoEntryDifferentialSlider = document.getElementById('autoEntryDifferentialSlider');
+  const autoEntryDifferentialValueDisplay = document.getElementById('autoEntryDifferentialValueDisplay');
+  let lastSavedAutoEntryProbability = 25;
+  let lastSavedAutoEntryDifferential = 0;
+
+  function updateAutoEntrySliderDisplay(value) {
+    if (autoEntrySliderValueDisplay && autoEntryProbabilitySlider) {
+      autoEntrySliderValueDisplay.textContent = value + '%';
+      // Calculate thumb position in px
+      const min = parseInt(autoEntryProbabilitySlider.min, 10);
+      const max = parseInt(autoEntryProbabilitySlider.max, 10);
+      const percent = (value - min) / (max - min);
+      const sliderWidth = autoEntryProbabilitySlider.offsetWidth;
+      // 16px is approx thumb width, adjust as needed
+      const thumbWidth = 16;
+      const offset = percent * (sliderWidth - thumbWidth) + thumbWidth / 2;
+      autoEntrySliderValueDisplay.style.left = `${offset}px`;
+    }
+  }
+
+  function updateAutoEntryDifferentialDisplay(value) {
+    if (autoEntryDifferentialValueDisplay && autoEntryDifferentialSlider) {
+      // Add + sign for positive numbers, keep negative numbers as is
+      const displayValue = parseInt(value) >= 0 ? `+${value}` : value;
+      autoEntryDifferentialValueDisplay.textContent = displayValue;
+      // Calculate thumb position in px
+      const min = parseInt(autoEntryDifferentialSlider.min, 10);
+      const max = parseInt(autoEntryDifferentialSlider.max, 10);
+      const percent = (value - min) / (max - min);
+      const sliderWidth = autoEntryDifferentialSlider.offsetWidth;
+      // 16px is approx thumb width, adjust as needed
+      const thumbWidth = 16;
+      const offset = percent * (sliderWidth - thumbWidth) + thumbWidth / 2;
+      autoEntryDifferentialValueDisplay.style.left = `${offset}px`;
+    }
+  }
+
+  async function fetchAutoEntrySettings() {
+    try {
+      const resp = await fetch('/api/get_auto_entry_settings');
+      if (resp.ok) {
+        const data = await resp.json();
+        return {
+          min_probability: data.min_probability ?? 25,
+          min_differential: data.min_differential ?? 0
+        };
+      }
+    } catch {}
+    return { min_probability: 25, min_differential: 0 };
+  }
+
+  function showAutoEntrySettingsModal() {
+    if (autoEntrySettingsModal) {
+      autoEntrySettingsModal.style.display = 'block';
+      document.body.style.overflow = 'hidden';
+      fetchAutoEntrySettings().then(settings => {
+        lastSavedAutoEntryProbability = settings.min_probability;
+        lastSavedAutoEntryDifferential = settings.min_differential;
+        autoEntryProbabilitySlider.value = settings.min_probability;
+        autoEntryDifferentialSlider.value = settings.min_differential;
+        updateAutoEntrySliderDisplay(settings.min_probability);
+        updateAutoEntryDifferentialDisplay(settings.min_differential);
+      });
+      // Fetch all settings
+      fetch('/api/get_auto_entry_settings').then(r => r.json()).then(data => {
+        const minTTC = data.min_ttc_seconds !== undefined ? data.min_ttc_seconds : 60;
+        const minTime = data.min_time !== undefined ? data.min_time : 0;
+        const maxTime = data.max_time !== undefined ? data.max_time : 3600;
+        
+        // Set Time Window slider values
+        minTimeSeconds = minTime;
+        maxTimeSeconds = maxTime;
+        
+        // Initialize slider after modal is shown
+        setTimeout(() => {
+          initTimeWindowSlider();
+        }, 100);
+        
+        // Store last saved values for cancel functionality
+        window.lastSavedAutoEntryMinTime = minTime;
+        window.lastSavedAutoEntryMaxTime = maxTime;
+      });
+    }
+  }
+
+  function hideAutoEntrySettingsModal() {
+    if (autoEntrySettingsModal) {
+      autoEntrySettingsModal.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+  }
+
+  if (autoEntrySettingsIcon) {
+    autoEntrySettingsIcon.addEventListener('click', showAutoEntrySettingsModal);
+  }
+  if (autoEntrySettingsCancel) {
+    autoEntrySettingsCancel.addEventListener('click', function() {
+      // Reset sliders to last saved values
+      autoEntryProbabilitySlider.value = lastSavedAutoEntryProbability;
+      autoEntryDifferentialSlider.value = lastSavedAutoEntryDifferential;
+      updateAutoEntrySliderDisplay(lastSavedAutoEntryProbability);
+      updateAutoEntryDifferentialDisplay(lastSavedAutoEntryDifferential);
+      
+      // Reset Time Window slider to last saved values
+      if (window.lastSavedAutoEntryMinTime !== undefined && window.lastSavedAutoEntryMaxTime !== undefined) {
+        minTimeSeconds = window.lastSavedAutoEntryMinTime;
+        maxTimeSeconds = window.lastSavedAutoEntryMaxTime;
+        updateTimeWindowSlider();
+      }
+      
+      autoEntrySettingsModal.style.display = 'none';
+      document.body.style.overflow = 'auto';
+    });
+  }
+  if (autoEntrySettingsSave) {
+    autoEntrySettingsSave.addEventListener('click', async function() {
+      const newProb = parseInt(autoEntryProbabilitySlider.value, 10);
+      const newDifferential = parseInt(autoEntryDifferentialSlider.value, 10);
+      
+      if (!isNaN(newProb) && !isNaN(newDifferential)) {
+        try {
+          const response = await fetch('/api/set_auto_entry_settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              min_probability: newProb,
+              min_differential: newDifferential,
+              min_ttc_seconds: 60, // Keep default TTC for now
+              min_time: minTimeSeconds,
+              max_time: maxTimeSeconds
+            })
+          });
+          
+          if (response.ok) {
+            lastSavedAutoEntryProbability = newProb;
+            lastSavedAutoEntryDifferential = newDifferential;
+            window.lastSavedAutoEntryMinTime = minTimeSeconds;
+            window.lastSavedAutoEntryMaxTime = maxTimeSeconds;
+            autoEntrySettingsModal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+          } else {
+            console.error('Failed to save auto entry settings');
+          }
+        } catch (error) {
+          console.error('Error saving auto entry settings:', error);
+        }
+      }
+    });
+  }
+  if (autoEntryProbabilitySlider && autoEntrySliderValueDisplay) {
+    autoEntryProbabilitySlider.addEventListener('input', function() {
+      updateAutoEntrySliderDisplay(this.value);
+    });
+    // On resize, keep value display in sync
+    window.addEventListener('resize', function() {
+      updateAutoEntrySliderDisplay(autoEntryProbabilitySlider.value);
+    });
+    // Initial position
+    updateAutoEntrySliderDisplay(autoEntryProbabilitySlider.value);
+  }
+  
+  if (autoEntryDifferentialSlider && autoEntryDifferentialValueDisplay) {
+    autoEntryDifferentialSlider.addEventListener('input', function() {
+      updateAutoEntryDifferentialDisplay(this.value);
+    });
+    // On resize, keep value display in sync
+    window.addEventListener('resize', function() {
+      updateAutoEntryDifferentialDisplay(autoEntryDifferentialSlider.value);
+    });
+    // Initial position
+    updateAutoEntryDifferentialDisplay(autoEntryDifferentialSlider.value);
+  }
+  // Remove click-to-close on dimmed area
+  if (autoEntrySettingsDim) {
+    autoEntrySettingsDim.addEventListener('click', function(e) {
+      // Do nothing
+      e.stopPropagation();
+    });
+  }
+});
+
+// AUTO ENTRY TTC CONTROLS
+const autoEntryMinTTCDisplay = document.getElementById('autoEntryMinTTCDisplay');
+const autoEntryMinTTCInput = document.getElementById('autoEntryMinTTCInput');
+const autoEntryMinTTCUp = document.getElementById('autoEntryMinTTCUp');
+const autoEntryMinTTCDown = document.getElementById('autoEntryMinTTCDown');
+
+if (autoEntryMinTTCDisplay && autoEntryMinTTCInput && autoEntryMinTTCUp && autoEntryMinTTCDown) {
+  autoEntryMinTTCUp.addEventListener('click', function() {
+    const currentVal = parseInt(autoEntryMinTTCInput.value, 10) || 0;
+    const newVal = currentVal + 15; // Increment by 15 seconds
+    autoEntryMinTTCInput.value = newVal;
+    autoEntryMinTTCDisplay.textContent = formatSecondsToMMSS(newVal);
+  });
+  
+  autoEntryMinTTCDown.addEventListener('click', function() {
+    const currentVal = parseInt(autoEntryMinTTCInput.value, 10) || 0;
+    const newVal = Math.max(0, currentVal - 30); // Decrement by 30 seconds, minimum 0
+    autoEntryMinTTCInput.value = newVal;
+    autoEntryMinTTCDisplay.textContent = formatSecondsToMMSS(newVal);
+  });
+}
+
+
+
+
+
+
+
+// AUTO ENTRY TIME WINDOW CONTROLS
+const timeWindowSliderContainer = document.getElementById('timeWindowSliderContainer');
+const minTimeHandle = document.getElementById('minTimeHandle');
+const maxTimeHandle = document.getElementById('maxTimeHandle');
+const timeWindowRange = document.getElementById('timeWindowRange');
+const timeWindowMinDisplay = document.getElementById('timeWindowMinDisplay');
+const timeWindowMaxDisplay = document.getElementById('timeWindowMaxDisplay');
+
+let isDragging = false;
+let currentHandle = null;
+let sliderWidth = 0;
+let minTimeSeconds = 0;
+let maxTimeSeconds = 3600;
+
+// Initialize slider
+function initTimeWindowSlider() {
+  if (!timeWindowSliderContainer) return;
+  
+  sliderWidth = timeWindowSliderContainer.offsetWidth - 20; // Account for handle width
+  updateTimeWindowSlider();
+}
+
+// Update slider positions and range
+function updateTimeWindowSlider() {
+  if (!sliderWidth) return;
+  
+  const minPercent = (minTimeSeconds / 3600) * 100;
+  const maxPercent = (maxTimeSeconds / 3600) * 100;
+  
+  minTimeHandle.style.left = `${minPercent}%`;
+  maxTimeHandle.style.left = `${maxPercent}%`;
+  
+  timeWindowRange.style.left = `${minPercent}%`;
+  timeWindowRange.style.width = `${maxPercent - minPercent}%`;
+  
+  timeWindowMinDisplay.textContent = formatSecondsToMMSS(minTimeSeconds);
+  timeWindowMaxDisplay.textContent = formatSecondsToMMSS(maxTimeSeconds);
+}
+
+// Handle mouse events for dragging
+function handleMouseDown(e) {
+  isDragging = true;
+  currentHandle = e.target;
+  document.addEventListener('mousemove', handleMouseMove);
+  document.addEventListener('mouseup', handleMouseUp);
+  e.preventDefault();
+}
+
+function handleMouseMove(e) {
+  if (!isDragging || !currentHandle) return;
+  
+  const rect = timeWindowSliderContainer.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const percent = Math.max(0, Math.min(100, (x / rect.width) * 100));
+  const seconds = Math.round((percent / 100) * 3600);
+  
+  // Snap to 5-second intervals
+  const snappedSeconds = Math.round(seconds / 5) * 5;
+  
+  if (currentHandle === minTimeHandle) {
+    if (snappedSeconds >= maxTimeSeconds) return;
+    minTimeSeconds = snappedSeconds;
+  } else if (currentHandle === maxTimeHandle) {
+    if (snappedSeconds <= minTimeSeconds) return;
+    maxTimeSeconds = snappedSeconds;
+  }
+  
+  updateTimeWindowSlider();
+}
+
+function handleMouseUp() {
+  isDragging = false;
+  currentHandle = null;
+  document.removeEventListener('mousemove', handleMouseMove);
+  document.removeEventListener('mouseup', handleMouseUp);
+}
+
+// Add event listeners
+if (minTimeHandle && maxTimeHandle) {
+  minTimeHandle.addEventListener('mousedown', handleMouseDown);
+  maxTimeHandle.addEventListener('mousedown', handleMouseDown);
+}
+
+// Initialize slider when modal is shown
+function initTimeWindowSliderOnShow() {
+  setTimeout(initTimeWindowSlider, 100);
 }
 </script>
 
