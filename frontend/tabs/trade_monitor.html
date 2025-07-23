@@ -2058,12 +2058,13 @@ function getSelectedSymbol() {
 
 // Utility function to get truncated market title, e.g., "BTC 11am"
 function getTruncatedMarketTitle() {
-  if (window.CurrentMarketTitleRaw && typeof window.CurrentMarketTitleRaw === "string") {
-    const contractMatch = window.CurrentMarketTitleRaw.match(/at\s(.+?)\s*(?:EDT|EST)?\?/i);
-    if (contractMatch) {
-      return `BTC ${contractMatch[1].trim()}`;
-    } else {
-      return window.CurrentMarketTitleRaw;
+  const cell = document.getElementById('strikePanelMarketTitleCell');
+  if (cell && cell.textContent && cell.textContent !== 'Loading market title...') {
+    const marketTitle = cell.textContent.trim();
+    // Extract time from "BTC price today at 5pm?" -> "5pm"
+    const timeMatch = marketTitle.match(/at\s+(.+?)\?/i);
+    if (timeMatch) {
+      return `BTC ${timeMatch[1].trim()}`;
     }
   }
   return 'BTC Unknown';

@@ -349,8 +349,7 @@ def main():
                 # Get the higher of yes_ask and no_ask
                 max_ask = max(yes_ask, no_ask)
                 
-                # Filter by volume >= 1000, probability > 85, and max ask <= 98
-                if volume >= 1000 and probability > 85 and max_ask <= 98:
+                if volume >= 1000 and probability > 90 and max_ask <= 98:
                     filtered_strikes.append(strike)
             
             # Sort by probability (highest to lowest)
@@ -367,12 +366,6 @@ def main():
                 "strike_tier": market_snapshot.get("strike_tier", 250),
                 "market_status": market_snapshot.get("market_status", "unknown"),
                 "last_updated": datetime.now().isoformat(),
-                "filter_criteria": {
-                    "min_volume": 1000,
-                    "min_probability": 85,
-                    "max_ask": 98,
-                    "description": "Strikes with volume >= 1000, probability > 85, and max ask <= 98, ordered by probability (highest to lowest)"
-                },
                 "strikes": filtered_strikes
             }
             
@@ -382,7 +375,6 @@ def main():
                 json.dump(watchlist_output, f, indent=2)
             
             print(f"📊 Updated strike table - BTC: ${btc_price:,.2f}, TTC: {ttc_display} ({ttc}s), Event: {market_snapshot.get('event_ticker', 'N/A')}")
-            print(f"🔍 Watchlist filtered: {len(filtered_strikes)} strikes (volume >= 1000, prob > 85, max ask <= 98)")
             
             # Wait 1 second before next update
             time.sleep(1)
