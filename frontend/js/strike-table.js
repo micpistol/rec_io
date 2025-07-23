@@ -566,15 +566,10 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
   if (isActive) {
     spanEl.onclick = debounce(function(event) {
       // Use centralized trade execution controller
-      if (typeof window.prepareTradeData === 'function' && typeof window.executeTrade === 'function') {
-        const tradeData = window.prepareTradeData(spanEl);
-        if (tradeData) {
-          window.executeTrade(tradeData);
-        } else {
-          console.error('Failed to prepare trade data');
-        }
+      if (typeof openTrade === 'function') {
+        openTrade(spanEl);
       } else {
-        console.error('Trade execution functions not available');
+        console.error('openTrade function not available');
       }
     }, 300);
   } else {
