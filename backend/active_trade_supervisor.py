@@ -43,6 +43,10 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
+# Global variable to track monitoring thread
+monitoring_thread = None
+monitoring_thread_lock = threading.Lock()
+
 # Health check endpoint
 @app.route("/health")
 def health_check():
@@ -143,14 +147,14 @@ def check_for_open_trades():
         if new_trades_added > 0:
             log(f"🆕 CHECKING: Added {new_trades_added} new trades to active monitoring")
             
-            # Start monitoring loop if this is the first active trade
+            # Start monitoring loop if there are any active trades
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
             active_count = cursor.fetchone()[0]
             conn.close()
             
-            if active_count == new_trades_added:  # These are the first active trades
+            if active_count > 0:  # Start monitoring if there are any active trades
                 start_monitoring_loop()
         else:
             log("🔍 CHECKING: No new trades to add to active monitoring")
@@ -756,7 +760,16 @@ def start_monitoring_loop():
     Start monitoring loop when there are active trades.
     This should be called when trades are added to active_trades.
     """
+    global monitoring_thread
+    
+    # Check if monitoring thread is already running
+    with monitoring_thread_lock:
+        if monitoring_thread is not None and monitoring_thread.is_alive():
+            log("📊 MONITORING: Monitoring thread already running, skipping")
+            return
+    
     def monitoring_worker():
+        global monitoring_thread
         log("📊 MONITORING: Starting monitoring loop for active trades")
         auto_stop_triggered_trades = set()
         while True:
@@ -815,11 +828,17 @@ def start_monitoring_loop():
         
         # Export final JSON after monitoring stops
         export_active_trades_to_json()
+        
+        # Clear the global monitoring thread reference when done
+        with monitoring_thread_lock:
+            monitoring_thread = None
+        log("📊 MONITORING: Monitoring thread finished")
     
     # Start monitoring in a separate thread
-    monitoring_thread = threading.Thread(target=monitoring_worker, daemon=True)
-    monitoring_thread.start()
-    log("📊 MONITORING: Monitoring thread started")
+    with monitoring_thread_lock:
+        monitoring_thread = threading.Thread(target=monitoring_worker, daemon=True)
+        monitoring_thread.start()
+        log("📊 MONITORING: Monitoring thread started")
 
 def update_monitoring_on_demand():
     """
