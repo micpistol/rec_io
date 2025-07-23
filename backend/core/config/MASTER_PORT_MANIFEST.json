@@ -56,6 +56,11 @@
       "port": 8008,
       "description": "Probability JSON writer",
       "status": "RUNNING"
+    },
+    "unified_production_coordinator": {
+      "port": 8010,
+      "description": "Unified data production coordinator",
+      "status": "RUNNING"
     }
   },
   

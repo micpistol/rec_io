@@ -23,7 +23,8 @@ DEFAULT_PORTS = {
     "db_poller": 8003,
     "kalshi_account_sync": 8004,
     "kalshi_api_watchdog": 8005,
-    "market_title_service": 8006
+    "market_title_service": 8006,
+    "unified_production_coordinator": 8010
 }
 
 def ensure_port_config_exists():
