@@ -387,15 +387,25 @@ class UnifiedProductionCoordinator:
                 probability = strike.get("probability")
                 yes_ask = strike.get("yes_ask")
                 no_ask = strike.get("no_ask")
+                yes_diff = strike.get("yes_diff")
+                no_diff = strike.get("no_diff")
                 
                 if (volume is None or probability is None or 
-                    yes_ask is None or no_ask is None):
+                    yes_ask is None or no_ask is None or
+                    yes_diff is None or no_diff is None):
                     continue
                 
                 # Get the higher of yes_ask and no_ask
                 max_ask = max(yes_ask, no_ask)
                 
-                if volume >= 1000 and probability > 90 and max_ask <= 98:
+                # Determine which side would be the active buy button
+                is_above_money_line = strike.get("strike", 0) > btc_price
+                
+                # Get the active button's differential
+                active_diff = no_diff if is_above_money_line else yes_diff
+                
+                # Only include strikes where active buy button differential is -2 or greater
+                if (volume >= 1000 and probability > 90 and max_ask <= 98 and active_diff >= -2):
                     filtered_strikes.append(strike)
             
             # Sort by probability (highest to lowest)

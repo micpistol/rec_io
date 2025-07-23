@@ -57,10 +57,15 @@ def load_preferences():
                     prefs["diff_mode"] = prefs.pop("plus_minus_mode")
                     # Save the migrated preferences
                     save_preferences(prefs)
+                # Migrate old reco to auto_entry if needed
+                if "reco" in prefs and "auto_entry" not in prefs:
+                    prefs["auto_entry"] = prefs.pop("reco")
+                    # Save the migrated preferences
+                    save_preferences(prefs)
                 return prefs
         except Exception:
             pass
-    return {"auto_stop": True, "reco": False, "diff_mode": False, "position_size": 1, "multiplier": 1}
+    return {"auto_stop": True, "auto_entry": False, "diff_mode": False, "position_size": 1, "multiplier": 1}
 
 def save_preferences(prefs):
     try:
@@ -693,11 +698,11 @@ async def set_auto_stop(request: Request):
     await broadcast_preferences_update()
     return {"status": "ok"}
 
-@app.post("/api/set_reco")
-async def set_reco(request: Request):
+@app.post("/api/set_auto_entry")
+async def set_auto_entry(request: Request):
     data = await request.json()
     prefs = load_preferences()
-    prefs["reco"] = bool(data.get("enabled", False))
+    prefs["auto_entry"] = bool(data.get("enabled", False))
     save_preferences(prefs)
     await broadcast_preferences_update()
     return {"status": "ok"}

@@ -652,7 +652,7 @@
         <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
           <span>Watchlist</span>
           <label style="font-size: 12px; user-select: none; color: white; display: flex; align-items: center; gap: 6px; margin: 0;">
-            RECO
+            AUTO ENTRY
             <input type="checkbox" id="recoToggle" />
           </label>
         </div>
@@ -1131,18 +1131,18 @@ document.addEventListener('DOMContentLoaded', () => {
       if (autoStopSupervisorToggle && data.auto_stop !== undefined) {
         autoStopSupervisorToggle.checked = data.auto_stop;
       }
-      if (recoToggle && data.reco !== undefined) {
-        recoToggle.checked = data.reco;
-        window.recoEnabled = data.reco;
+      if (recoToggle && data.auto_entry !== undefined) {
+        recoToggle.checked = data.auto_entry;
+        window.recoEnabled = data.auto_entry;
         
-        // If RECO is enabled on initial load, apply filtering
-        if (data.reco) {
-          console.log('RECO enabled on initial load - applying automatic filtering');
+        // If AUTO ENTRY is enabled on initial load, apply filtering
+        if (data.auto_entry) {
+          console.log('AUTO ENTRY enabled on initial load - applying automatic filtering');
           setTimeout(() => {
             updateClickHandlersForReco(); // Disable click handlers
           }, 1000); // Delay to ensure strike table is loaded
         } else {
-          // If RECO is disabled on initial load, enable click handlers
+          // If AUTO ENTRY is disabled on initial load, enable click handlers
           setTimeout(() => {
             updateClickHandlersForReco(); // Enable click handlers
           }, 1000); // Delay to ensure strike table is loaded
@@ -1202,19 +1202,19 @@ document.addEventListener('DOMContentLoaded', () => {
         ignoreWsUpdates = false;
       }
 
-      if (recoToggle && data.reco !== undefined && document.activeElement !== recoToggle) {
+      if (recoToggle && data.auto_entry !== undefined && document.activeElement !== recoToggle) {
         ignoreWsUpdates = true;
-        console.log('Received RECO update via WebSocket:', data.reco);
-        recoToggle.checked = data.reco;
-        window.recoEnabled = data.reco;
+        console.log('Received AUTO ENTRY update via WebSocket:', data.auto_entry);
+        recoToggle.checked = data.auto_entry;
+        window.recoEnabled = data.auto_entry;
         
-        // If RECO is being turned ON, apply filtering immediately
-        if (data.reco) {
-          console.log('RECO enabled - applying automatic filtering');
+        // If AUTO ENTRY is being turned ON, apply filtering immediately
+        if (data.auto_entry) {
+          console.log('AUTO ENTRY enabled - applying automatic filtering');
           updateClickHandlersForReco(); // Disable click handlers
         } else {
-          // If RECO is being turned OFF, re-enable click handlers
-          console.log('RECO disabled - re-enabling click handlers');
+          // If AUTO ENTRY is being turned OFF, re-enable click handlers
+          console.log('AUTO ENTRY disabled - re-enabling click handlers');
           updateClickHandlersForReco(); // Re-enable click handlers
         }
         
@@ -1314,31 +1314,31 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (recoToggle) {
-    console.log('Adding RECO event listener');
+    console.log('Adding AUTO ENTRY event listener');
     recoToggle.addEventListener('change', () => {
-      console.log('RECO event handler triggered, ignoreWsUpdates:', ignoreWsUpdates);
+      console.log('AUTO ENTRY event handler triggered, ignoreWsUpdates:', ignoreWsUpdates);
       if (ignoreWsUpdates) {
-        console.log('Ignoring RECO change due to WebSocket update');
+        console.log('Ignoring AUTO ENTRY change due to WebSocket update');
         return;
       }
       const value = recoToggle.checked;
-      console.log('RECO toggle changed to:', value);
+      console.log('AUTO ENTRY toggle changed to:', value);
       window.recoEnabled = value;
       
       // Watchlist functionality removed
       
-      console.log('Sending RECO update to backend:', { enabled: value });
-      fetch(window.location.origin + '/api/set_reco', {
+      console.log('Sending AUTO ENTRY update to backend:', { enabled: value });
+      fetch(window.location.origin + '/api/set_auto_entry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: value })
       }).then(response => {
-        console.log('RECO backend response:', response.status);
+        console.log('AUTO ENTRY backend response:', response.status);
         return response.json();
       }).then(data => {
-        console.log('RECO backend data:', data);
+        console.log('AUTO ENTRY backend data:', data);
       }).catch(error => {
-        console.error('RECO backend error:', error);
+        console.error('AUTO ENTRY backend error:', error);
       });
     });
   }
