@@ -580,9 +580,8 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
 }
 
 // === TRADE EXECUTION ===
-// Remove legacy openTrade and ticket logic. All trade tickets must go through the centralized controller.
-// Remove function openTrade and any code that builds or sends tickets directly.
-// Only keep UI logic and event handlers that call window.executeTrade and window.prepareTradeData from trade-execution-controller.js.
+// All trade execution goes through the single openTrade function in trade_monitor.html
+// This ensures audio alerts and popup displays work correctly
 
 // === IMMEDIATE DIF MODE REDRAW ===
 
