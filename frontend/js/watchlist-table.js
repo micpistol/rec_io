@@ -55,7 +55,7 @@ async function updateWatchlistTable() {
     
     // Update each watchlist row with data
     window.watchlistRowsMap.forEach((cells, strike) => {
-      const { row, bufferTd, bmTd, probTd, yesSpan, noSpan } = cells;
+      const { row, sideTd, bufferTd, bmTd, probTd, buySpan } = cells;
       
       // Find matching strike data from JSON
       const strikeData = data.strikes.find(s => s.strike === strike);
@@ -82,7 +82,7 @@ async function updateWatchlistTable() {
         else riskClass = 'high-risk';
         row.classList.add(riskClass);
         
-        // Update Yes/No buttons using the SAME function as main strike table
+        // Get market data
         const yesAsk = strikeData.yes_ask;
         const noAsk = strikeData.no_ask;
         const yesDiff = strikeData.yes_diff;
@@ -100,25 +100,41 @@ async function updateWatchlistTable() {
         const noPriceOk = noAsk <= 98;
         const isAboveMoneyLine = strike > data.current_price;
         
-        // Determine which button should be enabled (SAME logic as main strike table)
-        let yesEnabled = false;
-        let noEnabled = false;
+        // Determine which side should be active and enabled
+        let activeSide = null;
+        let activeAsk = null;
+        let activeDiff = null;
+        let activeEnabled = false;
         
         if (volumeOk) {
           if (isAboveMoneyLine) {
             // Above money line: Only enable NO button if price is good
-            noEnabled = noPriceOk;
-            yesEnabled = false; // Never enable YES above money line
+            if (noPriceOk) {
+              activeSide = "no";
+              activeAsk = noAsk;
+              activeDiff = noDiff;
+              activeEnabled = true;
+            }
           } else {
             // Below money line: Only enable YES button if price is good
-            yesEnabled = yesPriceOk;
-            noEnabled = false; // Never enable NO below money line
+            if (yesPriceOk) {
+              activeSide = "yes";
+              activeAsk = yesAsk;
+              activeDiff = yesDiff;
+              activeEnabled = true;
+            }
           }
         }
         
-        // Update both buttons with their correct enabled state (SAME as main strike table)
-        updateWatchlistYesNoButton(yesSpan, strike, "yes", yesAsk, yesEnabled, ticker, false, diffMode, yesDiff);
-        updateWatchlistYesNoButton(noSpan, strike, "no", noAsk, noEnabled, ticker, false, diffMode, noDiff);
+        // Update side column
+        if (activeSide) {
+          sideTd.textContent = activeSide.toUpperCase();
+        } else {
+          sideTd.textContent = '—';
+        }
+        
+        // Update single buy button
+        updateWatchlistBuyButton(buySpan, strike, activeSide, activeAsk, activeEnabled, ticker, false, diffMode, activeDiff);
         
         // Update position indicator for this strike (SAME as main strike table)
         updateWatchlistPositionIndicator(row.querySelector('td'), strike);
@@ -164,42 +180,40 @@ function initializeWatchlistTableRows(strikes) {
     const probTd = document.createElement('td');
     row.appendChild(probTd);
     
-    // Yes button cell and span (EXACT SAME as main strike table)
-    const yesTd = document.createElement('td');
-    yesTd.setAttribute('data-ticker', '');
-    const yesSpan = document.createElement('span');
-    yesTd.appendChild(yesSpan);
-    row.appendChild(yesTd);
+    // Side cell (NEW - shows YES/NO)
+    const sideTd = document.createElement('td');
+    sideTd.classList.add('center');
+    row.appendChild(sideTd);
     
-    // No button cell and span (EXACT SAME as main strike table)
-    const noTd = document.createElement('td');
-    noTd.setAttribute('data-ticker', '');
-    const noSpan = document.createElement('span');
-    noTd.appendChild(noSpan);
-    row.appendChild(noTd);
+    // Buy button cell and span (NEW - single button)
+    const buyTd = document.createElement('td');
+    buyTd.setAttribute('data-ticker', '');
+    const buySpan = document.createElement('span');
+    buyTd.appendChild(buySpan);
+    row.appendChild(buyTd);
     
     // Add row to table
     watchlistTableBody.appendChild(row);
     
-    // Store row data for updates (EXACT SAME as main strike table)
+    // Store row data for updates
     window.watchlistRowsMap.set(strike, {
       row,
+      sideTd,
       bufferTd,
       bmTd,
       probTd,
-      yesSpan,
-      noSpan
+      buySpan
     });
   });
 }
 
-// === WATCHLIST YES/NO BUTTON FUNCTION (EXACT SAME AS MAIN STRIKE TABLE) ===
+// === WATCHLIST BUY BUTTON FUNCTION ===
 
-// Global state for button updates (SAME as main strike table)
+// Global state for button updates
 const lastWatchlistButtonStates = new Map();
 
-function updateWatchlistYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = null, forceRefresh = false, diffMode = false, diffValue = null) {
-  const key = `${strike}-${side}`;
+function updateWatchlistBuyButton(spanEl, strike, side, askPrice, isActive, ticker = null, forceRefresh = false, diffMode = false, diffValue = null) {
+  const key = `${strike}-buy`;
   const prev = lastWatchlistButtonStates.get(key);
   
   // Check if diffMode has changed (this forces redraw when switching modes)
@@ -210,14 +224,14 @@ function updateWatchlistYesNoButton(spanEl, strike, side, askPrice, isActive, ti
     return;
   }
 
-  // Determine display value based on mode (EXACT SAME as main strike table)
+  // Determine display value based on mode
   let displayValue = '—';
   if (askPrice && askPrice !== '—' && askPrice !== 0) {
     if (diffMode && diffValue !== null) {
-      // DIFF MODE: Show pre-calculated diff value (no decimals) for ALL buttons
+      // DIFF MODE: Show pre-calculated diff value (no decimals)
       displayValue = diffValue > 0 ? `+${Math.round(diffValue)}` : `${Math.round(diffValue)}`;
     } else {
-      // PRICE MODE: Show actual ask price for ALL buttons
+      // PRICE MODE: Show actual ask price
       displayValue = askPrice;
     }
   }
@@ -226,28 +240,28 @@ function updateWatchlistYesNoButton(spanEl, strike, side, askPrice, isActive, ti
   spanEl.className = isActive ? 'price-box' : 'price-box disabled';
   spanEl.style.cursor = isActive ? 'pointer' : 'default';
   
-  // Force cursor style with higher specificity (SAME as main strike table)
+  // Force cursor style with higher specificity
   if (isActive) {
     spanEl.style.setProperty('cursor', 'pointer', 'important');
   } else {
     spanEl.style.setProperty('cursor', 'default', 'important');
   }
 
-  // Set data-ticker on the YES/NO cell's parent td (SAME as main strike table)
+  // Set data-ticker on the buy cell's parent td
   if (spanEl.parentElement && ticker) {
     spanEl.parentElement.setAttribute('data-ticker', ticker);
   }
   
-  // Also set data-ticker directly on spanEl for easier access in openTrade (SAME as main strike table)
+  // Also set data-ticker directly on spanEl for easier access in openTrade
   if (ticker) {
     spanEl.setAttribute('data-ticker', ticker);
   }
   
-  // Set data-strike and data-side for easier retrieval in openTrade (SAME as main strike table)
+  // Set data-strike and data-side for easier retrieval in openTrade
   spanEl.setAttribute('data-strike', strike);
-  spanEl.setAttribute('data-side', side);
+  spanEl.setAttribute('data-side', side || '');
   
-  // Store the actual ask price for trade execution (not the display value) (SAME as main strike table)
+  // Store the actual ask price for trade execution (not the display value)
   if (askPrice && askPrice !== '—' && askPrice !== 0) {
     spanEl.setAttribute('data-ask-price', askPrice);
   } else {
@@ -256,7 +270,7 @@ function updateWatchlistYesNoButton(spanEl, strike, side, askPrice, isActive, ti
 
   if (isActive) {
     spanEl.onclick = debounce(function(event) {
-      // Use centralized trade execution controller (SAME as main strike table)
+      // Use centralized trade execution controller
       if (typeof openTrade === 'function') {
         openTrade(spanEl);
       } else {
