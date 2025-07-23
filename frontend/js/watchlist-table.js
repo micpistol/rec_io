@@ -144,8 +144,6 @@ async function updateWatchlistTable() {
       }
     });
     
-    console.log(`📊 Updated watchlist table with ${data.strikes.length} strikes`);
-    
   } catch (error) {
     console.error('Error updating watchlist table:', error);
   }

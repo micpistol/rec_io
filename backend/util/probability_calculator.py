@@ -4,12 +4,42 @@ import os
 import json
 import time
 import threading
+import fcntl
 from typing import List, Dict, Tuple, Optional, Union, Sequence, Callable
 from scipy.interpolate import griddata
 from datetime import datetime
 import pytz
 import glob
 from .fingerprint_generator_directional import get_fingerprint_dir, get_fingerprint_filename
+
+# Add backend to path for imports
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from backend.util.paths import get_project_root, get_data_dir
+
+
+def safe_write_json(data: dict, filepath: str, timeout: float = 0.1):
+    """Write JSON data with file locking to prevent race conditions"""
+    try:
+        with open(filepath, 'w') as f:
+            # Try to acquire a lock with timeout
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            try:
+                json.dump(data, f, indent=2)
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        return True
+    except (IOError, OSError) as e:
+        # If locking fails, fall back to normal write (rare)
+        print(f"Warning: File locking failed for {filepath}: {e}")
+        try:
+            with open(filepath, 'w') as f:
+                json.dump(data, f, indent=2)
+            return True
+        except Exception as write_error:
+            print(f"Error writing JSON to {filepath}: {write_error}")
+            return False
 
 
 class ProbabilityCalculator:
@@ -240,7 +270,6 @@ class ProbabilityCalculator:
         self.last_used_momentum_bucket = self.current_momentum_bucket
         # LOGGING
         try:
-            from backend.util.paths import get_data_dir
             log_path = os.path.join(get_data_dir(), "fingerprint_debug.log")
             
             timestamp = datetime.now().isoformat()
@@ -472,8 +501,7 @@ def generate_btc_live_probabilities_json(
         output_dir = os.path.join(get_data_dir(), "live_probabilities")
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, "btc_live_probabilities.json")
-    with open(output_path, "w") as f:
-        json.dump(output, f, indent=2)
+    safe_write_json(output, output_path)
     print(f"[BTC PROB EXPORT] Wrote {output_path}")
 
 

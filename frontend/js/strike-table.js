@@ -145,9 +145,14 @@ async function updateMiddleColumnData() {
     // Update TTC display
     await updateTTCDisplay();
     
-    console.log('[STRIKE-TABLE] Updated middle column data');
   } catch (error) {
     console.error('Error updating middle column data:', error);
+    // Show error state in market title
+    const cell = document.getElementById('strikePanelMarketTitleCell');
+    if (cell) {
+      cell.textContent = 'SYSTEM ERROR';
+      cell.style.color = '#dc3545';
+    }
   }
 }
 
@@ -448,8 +453,6 @@ async function updateStrikeTable() {
       }, 0);
     }
 
-    console.log('[STRIKE-TABLE] Updated strike table with unified data');
-    
     // Reset diff mode change flag after update is complete
     window.diffModeChanged = false;
   } catch (error) {

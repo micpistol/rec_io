@@ -1,8 +1,11 @@
-import time
 import os
 import sys
+import time
+import json
 import requests
+import fcntl
 from datetime import datetime
+from typing import Dict, Any
 
 # Add backend to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -50,6 +53,28 @@ def get_unified_ttc(symbol: str = "btc") -> int:
     except Exception as e:
         log_err(f"Fallback TTC also failed: {e}")
         return 0
+
+def safe_write_json(data: dict, filepath: str, timeout: float = 0.1):
+    """Write JSON data with file locking to prevent race conditions"""
+    try:
+        with open(filepath, 'w') as f:
+            # Try to acquire a lock with timeout
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            try:
+                json.dump(data, f, indent=2)
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        return True
+    except (IOError, OSError) as e:
+        # If locking fails, fall back to normal write (rare)
+        print(f"Warning: File locking failed for {filepath}: {e}")
+        try:
+            with open(filepath, 'w') as f:
+                json.dump(data, f, indent=2)
+            return True
+        except Exception as write_error:
+            print(f"Error writing JSON to {filepath}: {write_error}")
+            return False
 
 def main():
     analyzer = LiveDataAnalyzer()

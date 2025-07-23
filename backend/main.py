@@ -17,6 +17,9 @@ import pytz
 import requests
 import sqlite3
 from typing import List, Optional, Dict
+import fcntl
+from datetime import datetime, timezone
+from typing import Optional, Dict, Any
 
 # Import the universal centralized port system
 import sys
@@ -841,6 +844,26 @@ async def get_live_probabilities():
     except Exception as e:
         return {"error": f"Error loading live probabilities: {str(e)}"}
 
+def safe_read_json(filepath: str, timeout: float = 0.1):
+    """Read JSON data with file locking to prevent race conditions"""
+    try:
+        with open(filepath, 'r') as f:
+            # Try to acquire a shared lock with timeout
+            fcntl.flock(f.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+            try:
+                return json.load(f)
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+    except (IOError, OSError) as e:
+        # If locking fails, fall back to normal read (rare)
+        print(f"Warning: File locking failed for {filepath}: {e}")
+        try:
+            with open(filepath, 'r') as f:
+                return json.load(f)
+        except Exception as read_error:
+            print(f"Error reading JSON from {filepath}: {read_error}")
+            return None
+
 @app.get("/api/strike_tables/{symbol}")
 async def get_strike_table(symbol: str):
     """Get strike table data for a specific symbol"""
@@ -850,8 +873,9 @@ async def get_strike_table(symbol: str):
         strike_table_file = os.path.join(get_data_dir(), "strike_tables", f"{symbol_lower}_strike_table.json")
         
         if os.path.exists(strike_table_file):
-            with open(strike_table_file, 'r') as f:
-                data = json.load(f)
+            data = safe_read_json(strike_table_file)
+            if data is None:
+                return {"error": f"Error reading strike table file for {symbol}"}
             return data
         else:
             return {"error": f"Strike table file not found for {symbol}"}
@@ -867,8 +891,9 @@ async def get_watchlist(symbol: str):
         watchlist_file = os.path.join(get_data_dir(), "strike_tables", f"{symbol_lower}_watchlist.json")
         
         if os.path.exists(watchlist_file):
-            with open(watchlist_file, 'r') as f:
-                data = json.load(f)
+            data = safe_read_json(watchlist_file)
+            if data is None:
+                return {"error": f"Error reading watchlist file for {symbol}"}
             return data
         else:
             return {"error": f"Watchlist file not found for {symbol}"}
