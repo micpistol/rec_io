@@ -1589,7 +1589,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; border-radius:8px; min-width:400px; min-height:200px; box-shadow:0 4px 32px rgba(0,0,0,0.25); padding:20px; display:flex; flex-direction:column; align-items:stretch;">
           <div id="autoEntrySettingsHeader" style="font-size:16px; font-weight:500; margin-bottom:24px; color:#222; letter-spacing:0.2px; text-align:left;">Auto Entry Settings</div>
           <div style="flex:1 1 auto; display:flex; flex-direction:column; justify-content:center; align-items:stretch;">
-            <label for="timeWindowSlider" style="font-size:14px; color:#333; margin-bottom:12px; font-weight:500;">Time Window:</label>
+            <label for="timeWindowSlider" style="font-size:14px; color:#333; margin-bottom:34px; font-weight:500;">Time Window:</label>
             <div style="position:relative; margin-bottom:24px; width:100%;">
               <!-- Time Window Slider Container -->
               <div id="timeWindowSliderContainer" style="position:relative; width:100%; height:6px; background:#e0e0e0; border-radius:3px; margin-top:8px;">
@@ -1599,21 +1599,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div id="maxTimeHandle" style="position:absolute; top:-5px; width:15px; height:15px; background:#007bff; border-radius:50%; cursor:pointer; z-index:10; transform:translateX(-50%); box-shadow:0 2px 4px rgba(0,0,0,0.2);" draggable="true"></div>
                 <!-- Selected Range -->
                 <div id="timeWindowRange" style="position:absolute; top:0; height:6px; background:#007bff; border-radius:3px; z-index:5;"></div>
+                <!-- Min Time Display -->
+                <div id="timeWindowMinDisplay" style="position:absolute; top:-32px; left:0; font-size:12px; color:#222; background:white; padding:4px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0;">00:00</div>
+                <!-- Max Time Display -->
+                <div id="timeWindowMaxDisplay" style="position:absolute; top:-32px; left:0; font-size:12px; color:#222; background:white; padding:4px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0;">60:00</div>
               </div>
-              <!-- Time Display -->
-              <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:12px; color:#666;">
-                <span id="timeWindowMinDisplay">00:00</span>
-                <span id="timeWindowMaxDisplay">60:00</span>
-              </div>
+             
             </div>
             
-            <label for="autoEntryProbabilitySlider" style="font-size:14px; color:#333; margin-bottom:12px; font-weight:500;">Minimum Win Probability:</label>
+            <label for="autoEntryProbabilitySlider" style="font-size:14px; color:#333; margin-bottom:34px; font-weight:500;">Minimum Win Probability:</label>
             <div style="position:relative; margin-bottom:24px; width:100%;">
               <input type="range" id="autoEntryProbabilitySlider" min="0" max="100" value="25" style="width:100%; height:6px; z-index:1; position:relative; background:#e0e0e0; border-radius:3px; outline:none;" />
               <div id="autoEntrySliderValueDisplay" style="position:absolute; top:-32px; left:0; font-size:12px; color:#222; background:white; padding:4px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0;">25%</div>
             </div>
             
-            <label for="autoEntryDifferentialSlider" style="font-size:14px; color:#333; margin-bottom:12px; font-weight:500;">Minimum Differential:</label>
+            <label for="autoEntryDifferentialSlider" style="font-size:14px; color:#333; margin-bottom:34px; font-weight:500;">Minimum Differential:</label>
             <div style="position:relative; margin-bottom:8px; width:100%;">
               <input type="range" id="autoEntryDifferentialSlider" min="-10" max="10" value="0" style="width:100%; height:6px; z-index:1; position:relative; background:#e0e0e0; border-radius:3px; outline:none;" />
               <div id="autoEntryDifferentialValueDisplay" style="position:absolute; top:-32px; left:0; font-size:12px; color:#222; background:white; padding:4px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0;">0</div>
@@ -3097,7 +3097,8 @@ let maxTimeSeconds = 3600;
 function initTimeWindowSlider() {
   if (!timeWindowSliderContainer) return;
   
-  sliderWidth = timeWindowSliderContainer.offsetWidth - 20; // Account for handle width
+  // Get the actual slider width more accurately
+  sliderWidth = timeWindowSliderContainer.offsetWidth;
   updateTimeWindowSlider();
 }
 
@@ -3114,8 +3115,12 @@ function updateTimeWindowSlider() {
   timeWindowRange.style.left = `${minPercent}%`;
   timeWindowRange.style.width = `${maxPercent - minPercent}%`;
   
+  // Update time display boxes to align with handles
   timeWindowMinDisplay.textContent = formatSecondsToMMSS(minTimeSeconds);
   timeWindowMaxDisplay.textContent = formatSecondsToMMSS(maxTimeSeconds);
+  
+  timeWindowMinDisplay.style.left = `${minPercent}%`;
+  timeWindowMaxDisplay.style.left = `${maxPercent}%`;
 }
 
 // Handle mouse events for dragging
@@ -3133,10 +3138,19 @@ function handleMouseMove(e) {
   const rect = timeWindowSliderContainer.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const percent = Math.max(0, Math.min(100, (x / rect.width) * 100));
-  const seconds = Math.round((percent / 100) * 3600);
   
-  // Snap to 5-second intervals
-  const snappedSeconds = Math.round(seconds / 5) * 5;
+  // Map percentage directly to 15-second intervals (240 total intervals: 0-3600 seconds)
+  const intervalIndex = Math.round((percent / 100) * 240);
+  const snappedSeconds = Math.max(0, Math.min(3600, intervalIndex * 15));
+  
+  // Debug logging
+  console.log('Slider Debug:', {
+    x: x,
+    percent: percent,
+    intervalIndex: intervalIndex,
+    snappedSeconds: snappedSeconds,
+    isMultipleOf15: snappedSeconds % 15 === 0
+  });
   
   if (currentHandle === minTimeHandle) {
     if (snappedSeconds >= maxTimeSeconds) return;
