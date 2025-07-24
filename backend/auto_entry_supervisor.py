@@ -147,6 +147,25 @@ def get_watchlist_data():
         log(f"[AUTO ENTRY] Error reading watchlist data: {e}")
     return None
 
+def get_position_size():
+    """Get position size from trade preferences including multiplier"""
+    try:
+        preferences_file = os.path.join(get_data_dir(), "preferences", "trade_preferences.json")
+        if os.path.exists(preferences_file):
+            with open(preferences_file, 'r') as f:
+                data = json.load(f)
+                position_size = data.get("position_size", 1)
+                multiplier = data.get("multiplier", 1)
+                total_position = position_size * multiplier
+                log(f"[AUTO ENTRY DEBUG] 📊 Position size: {position_size}, Multiplier: {multiplier}, Total: {total_position}")
+                return total_position
+        else:
+            log(f"[AUTO ENTRY DEBUG] ❌ Trade preferences file not found: {preferences_file}")
+            return None
+    except Exception as e:
+        log(f"[AUTO ENTRY DEBUG] ❌ Error loading position size: {e}")
+        return None
+
 def trigger_auto_entry_trade(strike_data):
     """Trigger a buy trade by calling the trade_initiator service - exactly like a human user clicking a buy button."""
     import requests
@@ -158,6 +177,16 @@ def trigger_auto_entry_trade(strike_data):
         port = get_port("trade_initiator")
         url = get_service_url(port) + "/api/initiate_trade"
         
+        # Get contract name from watchlist market_title
+        watchlist_data = get_watchlist_data()
+        contract_name = watchlist_data.get("market_title", "BTC Market") if watchlist_data else "BTC Market"
+        
+        # Get position size from trade preferences
+        position_size = get_position_size()
+        if position_size is None:
+            log(f"[AUTO ENTRY] ❌ Cannot trigger trade - no valid position size found")
+            return False
+        
         # Prepare the trade data exactly like prepareTradeData does
         trade_payload = {
             "symbol": "BTC",
@@ -166,30 +195,22 @@ def trigger_auto_entry_trade(strike_data):
             "ticker": strike_data.get("ticker"),
             "buy_price": strike_data.get("buy_price"),
             "prob": strike_data.get("probability"),
-            "trade_strategy": "Hourly HTC",
-            "contract": "BTC Market",
-            "position": 1,  # Default position size
-            "symbol_open": None,  # Will be filled by trade_initiator
+            "contract": contract_name,
+            "position": position_size,
             "momentum": None  # Will be filled by trade_initiator
         }
         
         log(f"[AUTO ENTRY] 📤 Sending trade to trade_initiator: {trade_payload}")
         
-        # TEMPORARILY COMMENTED OUT FOR TESTING
-        # response = requests.post(url, json=trade_payload, timeout=10)
+        response = requests.post(url, json=trade_payload, timeout=10)
         
-        # TEMPORARILY COMMENTED OUT FOR TESTING
-        # if response.ok:
-        #     result = response.json()
-        #     log(f"[AUTO ENTRY] ✅ Trade initiated successfully via trade_initiator: {result}")
-        #     return True
-        # else:
-        #     log(f"[AUTO ENTRY] ❌ Trade initiation failed: {response.status_code} - {response.text}")
-        #     return False
-        
-        # TEMPORARILY RETURN TRUE FOR TESTING
-        log(f"[AUTO ENTRY] ✅ Trade initiation SIMULATED successfully (commented out for testing)")
-        return True
+        if response.ok:
+            result = response.json()
+            log(f"[AUTO ENTRY] ✅ Trade initiated successfully via trade_initiator: {result}")
+            return True
+        else:
+            log(f"[AUTO ENTRY] ❌ Trade initiation failed: {response.status_code} - {response.text}")
+            return False
         
     except Exception as e:
         log(f"[AUTO ENTRY] ❌ Error initiating trade via trade_initiator: {e}")

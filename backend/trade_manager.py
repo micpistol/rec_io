@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from backend.core.port_config import get_port, get_port_info
 
 # Import centralized path utilities
-from backend.util.paths import get_project_root, get_trade_history_dir, get_logs_dir, get_host
+from backend.util.paths import get_project_root, get_trade_history_dir, get_logs_dir, get_host, get_data_dir
 from backend.account_mode import get_account_mode
 from backend.util.paths import get_accounts_data_dir
 
@@ -780,9 +780,56 @@ def fetch_all_trades():
     conn.close()
     return [dict(zip(columns, row)) for row in rows]
 
+def truncate_contract_name(contract_name):
+    """Truncate contract name to short form like 'BTC 5pm'"""
+    if not contract_name:
+        return contract_name
+    
+    # If it's already in short form (like "BTC 5pm"), return as-is
+    if contract_name.startswith("BTC ") and len(contract_name) < 20:
+        return contract_name
+    
+    # Extract time from full title like "Bitcoin price on Jul 24, 2025 at 5pm EDT?"
+    # Look for patterns like "at 5pm", "at 4pm", etc.
+    import re
+    time_match = re.search(r'at (\d+)(am|pm)', contract_name, re.IGNORECASE)
+    if time_match:
+        hour = time_match.group(1)
+        ampm = time_match.group(2).lower()
+        return f"BTC {hour}{ampm}"
+    
+    # Fallback: return as-is if we can't parse it
+    return contract_name
+
 def insert_trade(trade):
     log(f"[DEBUG] TRADES DB PATH (insert_trade): {DB_TRADES_PATH}")
     print("[DEBUG] Inserting trade data:", trade)
+    
+    # ALWAYS get current BTC price for symbol_open
+    try:
+        btc_price_log = os.path.join(get_data_dir(), "coinbase", "btc_price_log.txt")
+        if os.path.exists(btc_price_log):
+            with open(btc_price_log, 'r') as f:
+                lines = f.readlines()
+                if lines:
+                    last_line = lines[-1].strip()
+                    # Extract price from format: "2025-07-24T15:45:12 | $119,098.68"
+                    if " | $" in last_line:
+                        price_str = last_line.split(" | $")[1]
+                        symbol_open = float(price_str.replace(",", ""))
+                        print(f"[TRADE_MANAGER] Got symbol_open from log: {symbol_open}")
+                    else:
+                        print(f"[TRADE_MANAGER] Warning: Could not parse price from log line: {last_line}")
+                        symbol_open = None
+                else:
+                    print(f"[TRADE_MANAGER] Warning: BTC price log is empty")
+                    symbol_open = None
+        else:
+            print(f"[TRADE_MANAGER] Warning: BTC price log not found: {btc_price_log}")
+            symbol_open = None
+    except Exception as e:
+        print(f"[TRADE_MANAGER] Error getting BTC price: {e}")
+        symbol_open = None
     
     # Get current momentum from API and format it correctly for database
     momentum_for_db = None
@@ -806,6 +853,9 @@ def insert_trade(trade):
     
     conn = get_db_connection()
     cursor = conn.cursor()
+    # Truncate contract name to short form
+    contract_name = truncate_contract_name(trade.get('contract'))
+    
     cursor.execute(
         """INSERT INTO trades (
             date, time, strike, side, buy_price, position, status,
@@ -814,9 +864,9 @@ def insert_trade(trade):
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             trade['date'], trade['time'], trade['strike'], trade['side'], trade['buy_price'],
-            trade['position'], trade.get('status', 'open'), trade.get('contract'),
+            trade['position'], trade.get('status', 'open'), contract_name,
             trade.get('ticker'), trade.get('symbol'), trade.get('market'), trade.get('trade_strategy'),
-            trade.get('symbol_open'), momentum_for_db, trade.get('prob'),
+            symbol_open, momentum_for_db, trade.get('prob'),
             trade.get('volatility'), trade.get('ticket_id')
         )
     )

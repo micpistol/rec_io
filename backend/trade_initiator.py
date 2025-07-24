@@ -119,7 +119,7 @@ def create_open_trade_ticket(trade_data: Dict[str, Any]) -> Dict[str, Any]:
     # Get current data
     symbol_open = trade_data.get('symbol_open') or get_current_btc_price()
     momentum = trade_data.get('momentum')  # NO FALLBACK - must come from frontend
-    position = trade_data.get('position', get_position_size())
+    position = trade_data.get('position')  # Use position from trade data, no fallback
     
     # Convert side format (yes/no to Y/N)
     side = trade_data.get("side")
