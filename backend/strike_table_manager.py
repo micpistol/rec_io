@@ -397,6 +397,9 @@ def main():
             strike_data = []
             for strike in strikes:
                 data = calculate_strike_data(strike, btc_price, probabilities, market_snapshot)
+                # Add explicit active_side field to every strike
+                is_above_money_line = data.get("strike", 0) > btc_price
+                data["active_side"] = "N" if is_above_money_line else "Y"
                 strike_data.append(data)
             
             # Create unified JSON output
@@ -422,11 +425,11 @@ def main():
                 volume = strike.get("volume")
                 if volume is None:
                     continue
-                    
+                
                 probability = strike.get("probability")
                 if probability is None:
                     continue
-                    
+                
                 yes_ask = strike.get("yes_ask")
                 no_ask = strike.get("no_ask")
                 yes_diff = strike.get("yes_diff")
@@ -439,9 +442,11 @@ def main():
                 
                 # Determine which side would be the active buy button
                 is_above_money_line = strike.get("strike", 0) > btc_price
-                
-                # Get the active button's differential
                 active_diff = no_diff if is_above_money_line else yes_diff
+                
+                # Add explicit active_side field
+                strike = dict(strike)  # Make a copy to avoid mutating original
+                strike["active_side"] = "N" if is_above_money_line else "Y"
                 
                 # Only include strikes where active buy button differential is -2 or greater
                 if volume >= 1000 and probability > 90 and max_ask <= 98 and active_diff >= -2:

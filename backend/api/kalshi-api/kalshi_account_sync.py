@@ -103,6 +103,7 @@ last_failed_ticker = None  # Global tracker
 # === PATCH: Initialize global hashes to prevent crash ===
 LAST_POSITIONS_HASH = None
 LAST_FILLS_HASH = None
+LAST_ORDERS_HASH = None
 
 def get_current_event_ticker():
     global last_failed_ticker
@@ -645,6 +646,169 @@ def sync_settlements():
         print(f"❌ Failed to write settlements.json: {e}")
 
 
+def sync_orders():
+    ORDERS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", get_account_mode(), "orders.db")
+    os.makedirs(os.path.dirname(ORDERS_DB_PATH), exist_ok=True)
+    # Ensure orders table exists
+    with sqlite3.connect(ORDERS_DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id TEXT UNIQUE,
+                user_id TEXT,
+                ticker TEXT,
+                status TEXT,
+                action TEXT,
+                side TEXT,
+                type TEXT,
+                yes_price INTEGER,
+                no_price INTEGER,
+                initial_count INTEGER,
+                remaining_count INTEGER,
+                fill_count INTEGER,
+                created_time TEXT,
+                expiration_time TEXT,
+                last_update_time TEXT,
+                client_order_id TEXT,
+                order_group_id TEXT,
+                queue_position INTEGER,
+                self_trade_prevention_type TEXT,
+                maker_fees INTEGER,
+                taker_fees INTEGER,
+                maker_fill_cost INTEGER,
+                taker_fill_cost INTEGER,
+                raw_json TEXT
+            )
+        """)
+        conn.commit()
+    print("⏱ Syncing all orders...")
+    method = "GET"
+    path = "/portfolio/orders"
+    all_orders = []
+    cursor = ""
+
+    while True:
+        print(f"➡️ Cursor: {cursor}")
+        timestamp = str(int(time.time() * 1000))
+        query = f"?limit=100"
+        if cursor:
+            query += f"&cursor={cursor}"
+        url = f"{get_base_url()}{path}{query}"
+        print(f"🔗 Requesting: {url}")
+
+        full_path_for_signature = f"/trade-api/v2{path}"
+        signature = generate_kalshi_signature(method, full_path_for_signature, timestamp, str(KEY_PATH))
+
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": "KalshiWatcher/1.0",
+            "KALSHI-ACCESS-KEY": KEY_ID,
+            "KALSHI-ACCESS-TIMESTAMP": timestamp,
+            "KALSHI-ACCESS-SIGNATURE": signature,
+        }
+
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            print("Response keys:", data.keys())
+            if "error" in data:
+                print("⚠️ API error:", data["error"])
+            all_orders.extend(data.get("orders", []))
+            cursor = data.get("cursor")
+            if not cursor:
+                break
+        except Exception as e:
+            print(f"❌ Failed to fetch orders: {e}")
+            break
+
+    # ----- CHANGE-DETECTION: skip writes if nothing changed -----
+    global LAST_ORDERS_HASH
+    try:
+        orders_snapshot_hash = hashlib.md5(
+            json.dumps(all_orders, sort_keys=True).encode()
+        ).hexdigest()
+    except Exception as e:
+        print(f"❌ Failed to hash orders snapshot: {e}")
+        orders_snapshot_hash = None
+
+    if orders_snapshot_hash and orders_snapshot_hash == LAST_ORDERS_HASH:
+        print("🔁 No changes in orders — skipping DB/JSON write.")
+        return
+
+    LAST_ORDERS_HASH = orders_snapshot_hash
+
+    if all_orders:
+        latest_time = all_orders[0].get("created_time")
+        oldest_time = all_orders[-1].get("created_time")
+        print(f"🕒 Orders range — newest: {latest_time}, oldest: {oldest_time}, total: {len(all_orders)}")
+    else:
+        print("⚠️ API returned zero orders.")
+    # ------------------------------------------------------------
+
+    # Deduplicate/appends to orders.db by order_id
+    with sqlite3.connect(ORDERS_DB_PATH) as conn:
+        c = conn.cursor()
+        # Get all existing order_ids
+        c.execute("SELECT order_id FROM orders")
+        existing_ids = set(row[0] for row in c.fetchall())
+        new_count = 0
+        for order in all_orders:
+            order_id = order.get("order_id")
+            if not order_id or order_id in existing_ids:
+                continue
+            
+            try:
+                c.execute("""
+                    INSERT OR IGNORE INTO orders
+                    (order_id, user_id, ticker, status, action, side, type, yes_price, no_price,
+                     initial_count, remaining_count, fill_count, created_time, expiration_time,
+                     last_update_time, client_order_id, order_group_id, queue_position,
+                     self_trade_prevention_type, maker_fees, taker_fees, maker_fill_cost,
+                     taker_fill_cost, raw_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    order_id,
+                    order.get("user_id"),
+                    order.get("ticker"),
+                    order.get("status"),
+                    order.get("action"),
+                    order.get("side"),
+                    order.get("type"),
+                    order.get("yes_price"),
+                    order.get("no_price"),
+                    order.get("initial_count"),
+                    order.get("remaining_count"),
+                    order.get("fill_count"),
+                    order.get("created_time"),
+                    order.get("expiration_time"),
+                    order.get("last_update_time"),
+                    order.get("client_order_id"),
+                    order.get("order_group_id"),
+                    order.get("queue_position"),
+                    order.get("self_trade_prevention_type"),
+                    order.get("maker_fees"),
+                    order.get("taker_fees"),
+                    order.get("maker_fill_cost"),
+                    order.get("taker_fill_cost"),
+                    json.dumps(order)
+                ))
+                new_count += 1
+            except Exception as e:
+                print(f"❌ Failed to insert order {order_id}: {e}")
+        conn.commit()
+        # Save all_orders to orders.json in the same folder
+        orders_json_path = os.path.join(os.path.dirname(ORDERS_DB_PATH), "orders.json")
+        try:
+            with open(orders_json_path, "w") as f:
+                json.dump({"orders": all_orders}, f, indent=2)
+            print(f"💾 orders snapshot written to {orders_json_path}")
+        except Exception as e:
+            print(f"❌ Failed to write orders.json: {e}")
+    print(f"💾 {new_count} new orders written to {ORDERS_DB_PATH}")
+
+
 def main():
     print("🔁 Kalshi Account Supervisor Starting...")
     print("✅ Authenticated account access confirmed via balance endpoint.")
@@ -657,6 +821,7 @@ def main():
         try:
             sync_positions()
             sync_fills()
+            sync_orders()
 
             now = time.time()
             if now - last_settlement_sync > 60:

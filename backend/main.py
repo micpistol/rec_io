@@ -828,11 +828,11 @@ def load_auto_entry_settings():
             with open(AUTO_ENTRY_SETTINGS_PATH, "r") as f:
                 settings = json.load(f)
         else:
-            settings = {"min_probability": 25, "min_differential": 0, "min_ttc_seconds": 60, "min_time": 0, "max_time": 3600}
+            settings = {"min_probability": 25, "min_differential": 0, "min_ttc_seconds": 60, "min_time": 0, "max_time": 3600, "allow_re_entry": False}
         return settings
     except Exception as e:
         print(f"[Auto Entry Settings Load Error] {e}")
-        return {"min_probability": 25, "min_differential": 0, "min_ttc_seconds": 60, "min_time": 0, "max_time": 3600}
+        return {"min_probability": 25, "min_differential": 0, "min_ttc_seconds": 60, "min_time": 0, "max_time": 3600, "allow_re_entry": False}
 
 def save_auto_entry_settings(settings):
     """Save auto entry settings to file"""
@@ -850,6 +850,8 @@ def save_auto_entry_settings(settings):
             settings["min_time"] = 0
         if "max_time" not in settings:
             settings["max_time"] = 3600
+        if "allow_re_entry" not in settings:
+            settings["allow_re_entry"] = False
         with open(AUTO_ENTRY_SETTINGS_PATH, "w") as f:
             json.dump(settings, f)
     except Exception as e:
@@ -873,8 +875,42 @@ async def set_auto_entry_settings(request: Request):
         settings["min_time"] = int(data["min_time"])
     if "max_time" in data:
         settings["max_time"] = int(data["max_time"])
+    if "allow_re_entry" in data:
+        settings["allow_re_entry"] = bool(data["allow_re_entry"])
     save_auto_entry_settings(settings)
-    return {"status": "ok", "min_probability": settings["min_probability"], "min_differential": settings["min_differential"], "min_ttc_seconds": settings["min_ttc_seconds"], "min_time": settings["min_time"], "max_time": settings["max_time"]}
+    return {"status": "ok", "min_probability": settings["min_probability"], "min_differential": settings["min_differential"], "min_ttc_seconds": settings["min_ttc_seconds"], "min_time": settings["min_time"], "max_time": settings["max_time"], "allow_re_entry": settings["allow_re_entry"]}
+
+@app.post("/api/trigger_open_trade")
+async def trigger_open_trade(request: Request):
+    """Trigger the frontend's openTrade function - exactly like a human user clicking a buy button."""
+    try:
+        data = await request.json()
+        strike = data.get("strike")
+        side = data.get("side")
+        ticker = data.get("ticker")
+        buy_price = data.get("buy_price")
+        probability = data.get("probability")
+        
+        print(f"[TRIGGER OPEN TRADE] Received request: strike={strike}, side={side}, ticker={ticker}, buy_price={buy_price}, probability={probability}")
+        
+        # This endpoint will be called by the auto_entry_supervisor
+        # The frontend will handle the actual trade execution via the openTrade function
+        # For now, we'll just log the request and return success
+        # TODO: Implement the actual frontend openTrade function call
+        
+        return {
+            "status": "success",
+            "message": "Trade trigger request received",
+            "strike": strike,
+            "side": side,
+            "ticker": ticker,
+            "buy_price": buy_price,
+            "probability": probability
+        }
+        
+    except Exception as e:
+        print(f"[TRIGGER OPEN TRADE] Error: {e}")
+        return {"status": "error", "message": str(e)}
 
 @app.get("/frontend-changes")
 def frontend_changes():

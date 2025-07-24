@@ -13,7 +13,7 @@ import time
 import threading
 import requests
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from typing import Dict, List, Optional, Any
 from flask import Flask, request, jsonify
@@ -35,8 +35,11 @@ CORS(app)  # Enable CORS for all routes
 monitoring_thread = None
 monitoring_thread_lock = threading.Lock()
 
-# Track triggered strikes to prevent duplicate trades
-triggered_strikes = set()
+# Track triggered strikes to prevent rapid re-triggering (short-term protection)
+triggered_strikes = {}  # strike_key -> timestamp mapping
+
+# Short-term cooldown to prevent rapid re-triggering (in seconds)
+short_term_cooldown = 10  # 10 seconds cooldown
 
 # Global state for auto entry indicator (for frontend display)
 auto_entry_indicator_state = {
@@ -67,35 +70,47 @@ def log(message: str):
 def is_auto_entry_enabled():
     """Check if AUTO ENTRY is enabled in trade_preferences.json"""
     prefs_path = os.path.join(get_data_dir(), "preferences", "trade_preferences.json")
+    log(f"[AUTO ENTRY DEBUG] 📁 Checking preferences file: {prefs_path}")
     if os.path.exists(prefs_path):
         try:
             with open(prefs_path, "r") as f:
                 prefs = json.load(f)
-                return prefs.get("auto_entry", False)
+                enabled = prefs.get("auto_entry", False)
+                log(f"[AUTO ENTRY DEBUG] 📋 Auto entry setting: {enabled}")
+                return enabled
         except Exception as e:
             log(f"[AUTO ENTRY] Error reading preferences: {e}")
+    else:
+        log(f"[AUTO ENTRY DEBUG] ❌ Preferences file not found")
     return False
 
 def get_auto_entry_settings():
     """Get auto entry settings from auto_entry_settings.json"""
     settings_path = os.path.join(get_data_dir(), "preferences", "auto_entry_settings.json")
+    log(f"[AUTO ENTRY DEBUG] 📁 Checking settings file: {settings_path}")
     if os.path.exists(settings_path):
         try:
             with open(settings_path, "r") as f:
                 settings = json.load(f)
-                return {
+                result = {
                     "min_time": settings.get("min_time", 0),
                     "max_time": settings.get("max_time", 3600),
                     "min_probability": settings.get("min_probability", 25),
-                    "min_differential": settings.get("min_differential", 0)
+                    "min_differential": settings.get("min_differential", 0),
+                    "allow_re_entry": settings.get("allow_re_entry", False)
                 }
+                log(f"[AUTO ENTRY DEBUG] ⚙️ Loaded settings: {result}")
+                return result
         except Exception as e:
             log(f"[AUTO ENTRY] Error reading settings: {e}")
+    else:
+        log(f"[AUTO ENTRY DEBUG] ❌ Settings file not found")
     return {
         "min_time": 0,
         "max_time": 3600,
         "min_probability": 25,
-        "min_differential": 0
+        "min_differential": 0,
+        "allow_re_entry": False
     }
 
 def get_current_ttc():
@@ -103,10 +118,15 @@ def get_current_ttc():
     try:
         port = get_port("main_app")
         url = get_service_url(port) + "/api/unified_ttc/btc"
+        log(f"[AUTO ENTRY DEBUG] 🌐 Fetching TTC from: {url}")
         response = requests.get(url, timeout=2)
         if response.ok:
             data = response.json()
-            return data.get("ttc_seconds", 0)
+            ttc = data.get("ttc_seconds", 0)
+            log(f"[AUTO ENTRY DEBUG] ⏰ TTC response: {ttc} seconds")
+            return ttc
+        else:
+            log(f"[AUTO ENTRY DEBUG] ❌ TTC request failed: {response.status_code}")
     except Exception as e:
         log(f"[AUTO ENTRY] Error fetching TTC: {e}")
     return 0
@@ -115,67 +135,51 @@ def get_watchlist_data():
     """Get current watchlist data"""
     try:
         watchlist_path = os.path.join(get_data_dir(), "strike_tables", "btc_watchlist.json")
+        log(f"[AUTO ENTRY DEBUG] 📁 Checking watchlist file: {watchlist_path}")
         if os.path.exists(watchlist_path):
             with open(watchlist_path, "r") as f:
                 data = json.load(f)
+                log(f"[AUTO ENTRY DEBUG] 📋 Watchlist data loaded: {len(data.get('strikes', []))} strikes")
                 return data
+        else:
+            log(f"[AUTO ENTRY DEBUG] ❌ Watchlist file not found")
     except Exception as e:
         log(f"[AUTO ENTRY] Error reading watchlist data: {e}")
     return None
 
 def trigger_auto_entry_trade(strike_data):
-    """Trigger a buy trade for the given strike data using the same payload as manual buy."""
-    import random
+    """Trigger a buy trade by calling the frontend's openTrade function - exactly like a human user clicking a buy button."""
+    import requests
     
-    # Generate unique ticket ID
-    ticket_id = f"TICKET-{{random.getrandbits(32):x}}-{{int(time.time() * 1000)}}"
+    log(f"[AUTO ENTRY] 🟢 Triggered AUTO ENTRY for strike: {strike_data.get('strike')} {strike_data.get('side')}")
     
-    # Get current BTC price for symbol_open
+    # Call the frontend's openTrade function via the main_app endpoint
+    # This mimics exactly what happens when a human user clicks a buy button
     try:
         port = get_port("main_app")
-        url = get_service_url(port) + "/api/btc_price"
-        response = requests.get(url, timeout=2)
-        symbol_open = None
+        url = get_service_url(port) + "/api/trigger_open_trade"
+        
+        # Send the strike data to trigger the openTrade function
+        payload = {
+            "strike": strike_data.get("strike"),
+            "side": strike_data.get("side"),
+            "ticker": strike_data.get("ticker"),
+            "buy_price": strike_data.get("buy_price"),
+            "probability": strike_data.get("probability")
+        }
+        
+        response = requests.post(url, json=payload, timeout=10)
+        
         if response.ok:
-            data = response.json()
-            symbol_open = data.get("price")
-    except Exception as e:
-        log(f"[AUTO ENTRY] Error fetching BTC price: {e}")
-    
-    # Prepare trade payload
-    payload = {
-        'ticket_id': ticket_id,
-        'status': 'pending',
-        'date': datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
-        'time': datetime.now(ZoneInfo("America/New_York")).strftime("%H:%M:%S"),
-        'symbol': 'BTC',
-        'market': 'Kalshi',
-        'trade_strategy': 'Auto Entry',
-        'contract': 'BTC 5pm',
-        'strike': strike_data.get('strike'),
-        'side': strike_data.get('side'),
-        'ticker': strike_data.get('ticker'),
-        'buy_price': strike_data.get('ask_price'),
-        'symbol_open': symbol_open,
-        'symbol_close': None,
-        'momentum': 0,
-        'prob': strike_data.get('prob'),
-        'win_loss': None,
-        'position': 1
-    }
-    
-    try:
-        port = get_port("main_app")
-        url = get_service_url(port) + "/trades"
-        resp = requests.post(url, json=payload, timeout=3)
-        if resp.status_code == 201 or resp.status_code == 200:
-            log(f"[AUTO ENTRY] 🟢 Triggered AUTO ENTRY trade for strike {strike_data.get('strike')} (prob={strike_data.get('prob')})")
+            result = response.json()
+            log(f"[AUTO ENTRY] ✅ Trade triggered successfully via openTrade function: {result}")
             return True
         else:
-            log(f"[AUTO ENTRY] ❌ Failed to trigger trade for strike {strike_data.get('strike')}: {resp.status_code} {resp.text}")
+            log(f"[AUTO ENTRY] ❌ Trade failed: {response.status_code} - {response.text}")
             return False
+            
     except Exception as e:
-        log(f"[AUTO ENTRY] ❌ Exception posting trade for strike {strike_data.get('strike')}: {e}")
+        log(f"[AUTO ENTRY] ❌ Error triggering trade via openTrade: {e}")
         return False
 
 def check_auto_entry_conditions():
@@ -185,6 +189,7 @@ def check_auto_entry_conditions():
     try:
         # Check if AUTO ENTRY is enabled
         auto_entry_enabled = is_auto_entry_enabled()
+        log(f"[AUTO ENTRY DEBUG] 🔍 Auto entry enabled: {auto_entry_enabled}")
         
         if not auto_entry_enabled:
             auto_entry_indicator_state.update({
@@ -193,6 +198,7 @@ def check_auto_entry_conditions():
                 "current_ttc": 0,
                 "last_updated": datetime.now().isoformat()
             })
+            log(f"[AUTO ENTRY DEBUG] ⏸️ Auto entry disabled, skipping checks")
             return
         
         # Get auto entry settings
@@ -201,12 +207,17 @@ def check_auto_entry_conditions():
         max_time = settings["max_time"]
         min_probability = settings["min_probability"]
         min_differential = settings["min_differential"]
+        allow_re_entry = settings["allow_re_entry"]
+        
+        log(f"[AUTO ENTRY DEBUG] ⚙️ Settings - min_time: {min_time}, max_time: {max_time}, min_prob: {min_probability}, min_diff: {min_differential}, allow_re_entry: {allow_re_entry}")
         
         # Get current TTC
         current_ttc = get_current_ttc()
+        log(f"[AUTO ENTRY DEBUG] ⏰ Current TTC: {current_ttc} seconds")
         
         # Check if TTC is within the time window
         ttc_within_window = min_time <= current_ttc <= max_time
+        log(f"[AUTO ENTRY DEBUG] 🪟 TTC within window ({min_time}-{max_time}): {ttc_within_window}")
         
         # Update indicator state for frontend
         auto_entry_indicator_state.update({
@@ -219,41 +230,95 @@ def check_auto_entry_conditions():
         })
         
         if not ttc_within_window:
+            log(f"[AUTO ENTRY DEBUG] ⏸️ TTC not in window, skipping trade checks")
             return
         
         # Get watchlist data
         watchlist_data = get_watchlist_data()
         if not watchlist_data or "strikes" not in watchlist_data:
+            log(f"[AUTO ENTRY DEBUG] ❌ No watchlist data available")
             return
         
+        log(f"[AUTO ENTRY DEBUG] 📋 Found {len(watchlist_data['strikes'])} strikes in watchlist")
+        
         # Check each strike in watchlist
-        for strike in watchlist_data["strikes"]:
+        for i, strike in enumerate(watchlist_data["strikes"]):
             try:
                 strike_key = f"{strike.get('strike')}-{strike.get('side')}"
+                log(f"[AUTO ENTRY DEBUG] 🔍 Checking strike {i+1}/{len(watchlist_data['strikes'])}: {strike_key}")
                 
-                # Skip if already triggered
+                # STEP 1: Check short-term cooldown (prevent rapid re-triggering)
                 if strike_key in triggered_strikes:
+                    last_trigger_time = triggered_strikes[strike_key]
+                    time_since_trigger = time.time() - last_trigger_time
+                    if time_since_trigger < short_term_cooldown:
+                        log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - triggered {time_since_trigger:.1f}s ago (cooldown: {short_term_cooldown}s)")
+                        continue
+                    else:
+                        # Remove old entry from dictionary (cleanup)
+                        del triggered_strikes[strike_key]
+                        log(f"[AUTO ENTRY DEBUG] 🧹 Cleaned up old trigger for {strike_key}")
+                
+                # Clean up old entries from triggered_strikes dictionary
+                cleanup_old_triggered_strikes()
+                
+                # STEP 2: Check if we already have an active trade on this strike (long-term protection)
+                strike_data_for_check = {
+                    'strike': strike.get('strike'),
+                    'side': 'Y' if strike.get('probability', 0) > 50 else 'N'  # Determine side based on probability
+                }
+                
+                if is_strike_already_traded(strike_data_for_check):
+                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - already have active trade on this strike")
                     continue
                 
                 # Check probability threshold
-                prob = strike.get('prob')
+                prob = strike.get('probability')  # Changed from 'prob' to 'probability'
+                log(f"[AUTO ENTRY DEBUG] 📊 Strike probability: {prob} (min required: {min_probability})")
                 if prob is None or prob < min_probability:
+                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - probability {prob} below threshold {min_probability}")
                     continue
                 
                 # Check differential threshold (if applicable)
                 if min_differential > 0:
-                    diff = strike.get('diff')
-                    if diff is None or abs(diff) < min_differential:
+                    diff = strike.get('yes_diff') if strike.get('side') == 'Y' else strike.get('no_diff')
+                    log(f"[AUTO ENTRY DEBUG] 📈 Strike differential: {diff} (min required: {min_differential})")
+                    if diff is None or diff < min_differential:
+                        log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - differential {diff} below threshold {min_differential}")
                         continue
                 
-                # SECURITY CHECK: Verify we don't already have an active trade on this strike
-                if is_strike_already_traded(strike):
-                    continue
+
                 
-                # All conditions met - trigger trade
-                if trigger_auto_entry_trade(strike):
-                    triggered_strikes.add(strike_key)
-                    log(f"[AUTO ENTRY] ✅ Trade triggered for {strike_key} (prob={prob}, ttc={current_ttc}s)")
+                # Determine which side to trade based on probability
+                yes_prob = prob
+                no_prob = 100 - yes_prob
+                
+                if yes_prob > no_prob:
+                    side = 'Y'
+                    buy_price = strike.get('yes_ask', 0) / 100.0  # Convert cents to decimal
+                    log(f"[AUTO ENTRY DEBUG] 🎯 Choosing YES side (prob: {yes_prob}% > {no_prob}%)")
+                else:
+                    side = 'N'
+                    buy_price = strike.get('no_ask', 0) / 100.0  # Convert cents to decimal
+                    log(f"[AUTO ENTRY DEBUG] 🎯 Choosing NO side (prob: {no_prob}% > {yes_prob}%)")
+                
+                # Prepare strike data for trade trigger
+                strike_data = {
+                    'strike': f"${strike.get('strike'):,}",
+                    'side': side,
+                    'ticker': strike.get('ticker'),
+                    'buy_price': buy_price,
+                    'probability': prob
+                }
+                
+                log(f"[AUTO ENTRY DEBUG] 🎯 Strike {strike_key} meets criteria - triggering trade")
+                
+                # Trigger the trade
+                if trigger_auto_entry_trade(strike_data):
+                    triggered_strikes[strike_key] = time.time()
+                    log(f"[AUTO ENTRY DEBUG] ✅ Trade triggered for {strike_key}")
+                else:
+                    log(f"[AUTO ENTRY DEBUG] ❌ Failed to trigger trade for {strike_key}")
                 
             except Exception as e:
                 log(f"[AUTO ENTRY] Error processing strike {strike.get('strike')}: {e}")
@@ -269,11 +334,16 @@ def start_monitoring_loop():
         global monitoring_thread
         log("📊 MONITORING: Starting auto entry monitoring loop")
         
+        check_count = 0
         while True:
             try:
+                check_count += 1
+                log(f"[AUTO ENTRY DEBUG] 🔄 Check #{check_count} - starting condition check")
+                
                 # Check auto entry conditions
                 check_auto_entry_conditions()
                 
+                log(f"[AUTO ENTRY DEBUG] 💤 Check #{check_count} - sleeping for 1 second")
                 # Sleep for 1 second
                 time.sleep(1)
                 
@@ -305,19 +375,55 @@ def get_active_trades():
         log(f"[AUTO ENTRY] Error fetching active trades: {e}")
     return []
 
+def cleanup_old_triggered_strikes():
+    """Clean up old entries from triggered_strikes dictionary"""
+    current_time = time.time()
+    keys_to_remove = []
+    
+    for strike_key, trigger_time in triggered_strikes.items():
+        if current_time - trigger_time > short_term_cooldown:
+            keys_to_remove.append(strike_key)
+    
+    for key in keys_to_remove:
+        del triggered_strikes[key]
+        log(f"[AUTO ENTRY DEBUG] 🧹 Cleaned up old trigger: {key}")
+    
+    if keys_to_remove:
+        log(f"[AUTO ENTRY DEBUG] 🧹 Cleaned up {len(keys_to_remove)} old triggers")
+
 def is_strike_already_traded(strike_data):
     """Check if we already have an active trade on this strike"""
     try:
-        active_trades = get_active_trades()
+        # Get active trades from the active_trade_supervisor
+        port = get_port("active_trade_supervisor")
+        url = get_service_url(port) + "/api/active_trades"
+        response = requests.get(url, timeout=2)
         
-        for trade in active_trades:
-            # Check if this trade is for the same strike and side
-            if (trade.get('strike') == strike_data.get('strike') and 
-                trade.get('side') == strike_data.get('side')):
-                log(f"[AUTO ENTRY] ⚠️ Skipping {strike_data.get('strike')} {strike_data.get('side')} - already have active trade")
-                return True
-        
-        return False
+        if response.ok:
+            active_trades = response.json()
+            
+            for trade in active_trades:
+                # Check if this trade is for the same strike
+                trade_strike = trade.get('strike', '')
+                trade_side = trade.get('side', '')
+                
+                # Extract strike number from trade_strike (e.g., "$117,500" -> "117500")
+                if trade_strike.startswith('$'):
+                    trade_strike_num = trade_strike.replace('$', '').replace(',', '')
+                else:
+                    trade_strike_num = trade_strike
+                
+                # Compare strike numbers and sides
+                if (trade_strike_num == str(strike_data.get('strike')) and 
+                    trade_side == strike_data.get('side')):
+                    log(f"[AUTO ENTRY] ⚠️ Found active trade on {strike_data.get('strike')} {strike_data.get('side')}")
+                    return True
+            
+            return False
+        else:
+            log(f"[AUTO ENTRY] Error fetching active trades: {response.status_code}")
+            return False
+            
     except Exception as e:
         log(f"[AUTO ENTRY] Error checking active trades: {e}")
         return False

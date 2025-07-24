@@ -78,8 +78,24 @@ def get_active_trades():
 # Port information endpoint
 @app.route("/api/ports")
 def get_ports():
-    """Get all port assignments from centralized system."""
-    return get_port_info()
+    """Get port information for this service"""
+    return {
+        "service": "active_trade_supervisor",
+        "port": ACTIVE_TRADE_SUPERVISOR_PORT,
+        "host": get_host()
+    }
+
+@app.route("/api/sync_and_monitor", methods=['POST'])
+def sync_and_monitor():
+    """Manually trigger sync and monitoring for active trades"""
+    try:
+        log("🔄 Manual sync and monitor triggered")
+        sync_on_demand()
+        update_monitoring_on_demand()
+        return {"status": "success", "message": "Sync and monitoring completed"}
+    except Exception as e:
+        log(f"❌ Error in manual sync and monitor: {e}")
+        return {"status": "error", "message": str(e)}, 500
 
 def log(message: str):
     """Log messages with timestamp"""

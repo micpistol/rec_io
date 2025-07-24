@@ -341,7 +341,7 @@
 }
 
 #autoStopToggle:checked {
-  background-color: red;
+  background-color: #007bff;
   box-shadow: none;
 }
 
@@ -358,12 +358,12 @@
 }
 
 #autoStopToggle:focus-visible {
-  outline: 2px solid #f00;
+  outline: 2px solid #007bff;
   outline-offset: 2px;
 }
 
 #autoStopSupervisorToggle {
-  accent-color: red;
+  accent-color: r#007bff;
   background-color: transparent;
   border: none;
   outline: none;
@@ -380,7 +380,7 @@
 }
 
 #autoStopSupervisorToggle:checked {
-  background-color: red;
+  background-color: #007bff;
   box-shadow: none;
 }
 
@@ -403,7 +403,7 @@
 </style>
 <style>
 #recoToggle {
-  accent-color: #00ff00;
+  accent-color: #007bff;
   background-color: transparent;
   border: none;
   outline: none;
@@ -420,7 +420,7 @@
 }
 
 #recoToggle:checked {
-  background-color: #00ff00;
+  background-color: #007bff;
   box-shadow: none;
 }
 
@@ -443,7 +443,7 @@
 </style>
 <style>
 #plusMinusToggle {
-  accent-color: #00ff00;
+  accent-color: #007bff;
   background-color: transparent;
   border: none;
   outline: none;
@@ -1556,6 +1556,12 @@ document.addEventListener('DOMContentLoaded', () => {
             <div style="position:relative; margin-bottom:8px; width:100%;">
               <input type="range" id="autoEntryDifferentialSlider" min="-10" max="10" value="0" style="width:100%; height:6px; z-index:1; position:relative; background:#e0e0e0; border-radius:3px; outline:none;" />
               <div id="autoEntryDifferentialValueDisplay" style="position:absolute; top:-32px; left:0; font-size:12px; color:#222; background:white; padding:4px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0;">0</div>
+            </div>
+            
+            <label for="autoEntryAllowReEntry" style="font-size:14px; color:#333;margin-top:12px; margin-bottom:12px; font-weight:500;">Allow Re-Entry:</label>
+            <div style="position:relative; margin-bottom:24px; width:100%;">
+              <input type="checkbox" id="autoEntryAllowReEntry" style=" width:16px; height:16px; margin-right:8px; accent-color:#007bff;" />
+              <span style="font-size:13px; color:#666;">Allow re-entry on the same strike</span>
             </div>
           </div>
           <div style="display:flex; gap:12px; justify-content:flex-end; align-items:center; margin-top:20px;">
@@ -2707,11 +2713,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const data = await resp.json();
         return {
           min_probability: data.min_probability ?? 25,
-          min_differential: data.min_differential ?? 0
+          min_differential: data.min_differential ?? 0,
+          allow_re_entry: data.allow_re_entry ?? false
         };
       }
     } catch {}
-    return { min_probability: 25, min_differential: 0 };
+    return { min_probability: 25, min_differential: 0, allow_re_entry: false };
   }
 
   function showAutoEntrySettingsModal() {
@@ -2725,6 +2732,13 @@ document.addEventListener('DOMContentLoaded', function() {
         autoEntryDifferentialSlider.value = settings.min_differential;
         updateAutoEntrySliderDisplay(settings.min_probability);
         updateAutoEntryDifferentialDisplay(settings.min_differential);
+        
+        // Set the allow re-entry checkbox
+        const allowReEntryCheckbox = document.getElementById('autoEntryAllowReEntry');
+        if (allowReEntryCheckbox) {
+          allowReEntryCheckbox.checked = settings.allow_re_entry;
+          window.lastSavedAutoEntryAllowReEntry = settings.allow_re_entry;
+        }
       });
       // Fetch all settings
       fetch('/api/get_auto_entry_settings').then(r => r.json()).then(data => {
@@ -2773,6 +2787,12 @@ document.addEventListener('DOMContentLoaded', function() {
         updateTimeWindowSlider();
       }
       
+      // Reset allow re-entry checkbox to last saved value
+      const allowReEntryCheckbox = document.getElementById('autoEntryAllowReEntry');
+      if (allowReEntryCheckbox && window.lastSavedAutoEntryAllowReEntry !== undefined) {
+        allowReEntryCheckbox.checked = window.lastSavedAutoEntryAllowReEntry;
+      }
+      
       autoEntrySettingsModal.style.display = 'none';
       document.body.style.overflow = 'auto';
     });
@@ -2784,6 +2804,9 @@ document.addEventListener('DOMContentLoaded', function() {
       
       if (!isNaN(newProb) && !isNaN(newDifferential)) {
         try {
+          const allowReEntryCheckbox = document.getElementById('autoEntryAllowReEntry');
+          const allowReEntry = allowReEntryCheckbox ? allowReEntryCheckbox.checked : false;
+          
           const response = await fetch('/api/set_auto_entry_settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2792,7 +2815,8 @@ document.addEventListener('DOMContentLoaded', function() {
               min_differential: newDifferential,
               min_ttc_seconds: 60, // Keep default TTC for now
               min_time: minTimeSeconds,
-              max_time: maxTimeSeconds
+              max_time: maxTimeSeconds,
+              allow_re_entry: allowReEntry
             })
           });
           
@@ -2801,6 +2825,7 @@ document.addEventListener('DOMContentLoaded', function() {
             lastSavedAutoEntryDifferential = newDifferential;
             window.lastSavedAutoEntryMinTime = minTimeSeconds;
             window.lastSavedAutoEntryMaxTime = maxTimeSeconds;
+            window.lastSavedAutoEntryAllowReEntry = allowReEntry;
             autoEntrySettingsModal.style.display = 'none';
             document.body.style.overflow = 'auto';
           } else {
