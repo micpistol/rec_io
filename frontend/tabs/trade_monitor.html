@@ -2181,6 +2181,17 @@ function playSound(type) {
   clone.play().catch(err => {});
 }
 
+// Open trade popup function
+function showTradeOpenedPopup() {
+  const popup = document.getElementById('tradeOpenedPopup');
+  if (popup) {
+    popup.style.display = 'block';
+    setTimeout(() => {
+      popup.style.display = 'none';
+    }, 3000);
+  }
+}
+
 async function showPopup(strike, side, price) {
   // showTradeOpenedPopup();   // popup disabled for test
   // --- All other logic temporarily disabled ---
@@ -2406,7 +2417,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 <script>
   function showTradeOpenedPopup() {
-    const popup = document.getElementById('tradePopup');
+    const popup = document.getElementById('tradeOpenedPopup');
     if (!popup) return;
 
     popup.style.transition = 'none';
@@ -2443,7 +2454,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
   <!-- Trade Open/Closed Popups -->
-  <div id="tradePopup" class="trade-popup">Trade Opened</div>
+  <div id="tradeOpenedPopup" class="trade-popup">Trade Opened</div>
   <div id="tradeClosedPopup" class="trade-closed-popup">Trade Closed</div>
 
 

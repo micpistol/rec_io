@@ -140,14 +140,25 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
 // and prepares it for sending to the trade_initiator service
 
 window.prepareTradeData = async function(target) {
-  const btn = target;
+  // 🎧 Sound confirmation - IMMEDIATE
+  if (typeof playSound === 'function') {
+    playSound('open');
+  }
+
+  // ✅ Add UI popup
+  if (typeof showTradeOpenedPopup === 'function') {
+    showTradeOpenedPopup();
+  }
+
+  // Extract trade data from the button element
+  const symbol = target.getAttribute('data-symbol') || 'BTC';
   
-  if (btn?.disabled) {
+  if (target?.disabled) {
     return null;
   }
 
   // Get the actual ask price from data attribute (not the display text)
-  const askPrice = btn?.dataset?.askPrice;
+  const askPrice = target?.dataset?.askPrice;
   
   let buy_price = 0;
   if (askPrice) {
@@ -164,13 +175,12 @@ window.prepareTradeData = async function(target) {
 
   const position = validBase !== null ? validBase * multiplier : null;
 
-  const symbol = typeof getSelectedSymbol === 'function' ? getSelectedSymbol() : 'BTC';
   const contract = typeof getTruncatedMarketTitle === 'function' ? getTruncatedMarketTitle() : 'BTC Market';
 
   // Get strike and side from button context
   let strike = null;
   let side = null;
-  let row = btn.closest('tr');
+  let row = target.closest('tr');
   
   if (row) {
     const strikeCell = row.querySelector('td');
@@ -179,21 +189,21 @@ window.prepareTradeData = async function(target) {
     }
     
     // Side is ONLY the active_side from the watchlist JSON
-    if (btn.dataset.side) {
-      side = btn.dataset.side;
+    if (target.dataset.side) {
+      side = target.dataset.side;
       console.log('🔍 prepareTradeData: Read side', side, 'from btn.dataset.side');
     } else {
       console.error('No data-side attribute found - cannot determine trade side');
-      console.error('btn.dataset.side value:', btn.dataset.side);
-      console.error('btn element:', btn);
+      console.error('btn.dataset.side value:', target.dataset.side);
+      console.error('btn element:', target);
       return null;
     }
   }
 
   // Get ticker
-  let kalshiTicker = btn.dataset.ticker || null;
-  if (!kalshiTicker && btn.parentElement && btn.parentElement.dataset.ticker) {
-    kalshiTicker = btn.parentElement.dataset.ticker;
+  let kalshiTicker = target.dataset.ticker || null;
+  if (!kalshiTicker && target.parentElement && target.parentElement.dataset.ticker) {
+    kalshiTicker = target.parentElement.dataset.ticker;
   }
 
   // Get other data
