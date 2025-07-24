@@ -1056,6 +1056,34 @@ async def get_auto_entry_indicator():
     except Exception as e:
         return {"error": f"Error getting auto entry indicator: {str(e)}"}
 
+@app.post("/api/notify_automated_trade")
+async def notify_automated_trade(request: Request):
+    """Receive automated trade notification and broadcast to frontend via WebSocket"""
+    try:
+        data = await request.json()
+        print(f"[MAIN] 🔔 Received automated trade notification: {data}")
+        
+        # Broadcast to all connected WebSocket clients
+        message = {
+            "type": "automated_trade_triggered",
+            "data": data
+        }
+        
+        # Send to preferences WebSocket clients
+        for websocket in connected_clients.copy():
+            try:
+                await websocket.send_text(json.dumps(message))
+            except Exception as e:
+                print(f"Error sending to WebSocket client: {e}")
+                connected_clients.discard(websocket)
+        
+        print(f"[MAIN] ✅ Automated trade notification broadcasted to {len(connected_clients)} clients")
+        return {"success": True, "message": "Notification broadcasted"}
+        
+    except Exception as e:
+        print(f"[MAIN] ❌ Error handling automated trade notification: {e}")
+        return {"success": False, "error": str(e)}
+
 # Startup and shutdown events
 @app.on_event("startup")
 async def startup_event():

@@ -207,6 +207,31 @@ def trigger_auto_entry_trade(strike_data):
         if response.ok:
             result = response.json()
             log(f"[AUTO ENTRY] ✅ Trade initiated successfully via trade_initiator: {result}")
+            
+            # Notify frontend of automated trade for audio/visual alerts
+            try:
+                notification_data = {
+                    "type": "automated_trade_triggered",
+                    "strike": strike_data.get("strike"),
+                    "side": strike_data.get("side"),
+                    "ticker": strike_data.get("ticker"),
+                    "buy_price": strike_data.get("buy_price"),
+                    "probability": strike_data.get("probability"),
+                    "contract": contract_name,
+                    "position": position_size,
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                # Call our own notification endpoint
+                notification_url = get_service_url(AUTO_ENTRY_SUPERVISOR_PORT) + "/api/notify_automated_trade"
+                notification_response = requests.post(notification_url, json=notification_data, timeout=2)
+                if notification_response.ok:
+                    log(f"[AUTO ENTRY] 🔔 Frontend notification sent for automated trade")
+                else:
+                    log(f"[AUTO ENTRY] ⚠️ Frontend notification failed: {notification_response.status_code}")
+            except Exception as e:
+                log(f"[AUTO ENTRY] ❌ Error sending frontend notification: {e}")
+            
             return True
         else:
             log(f"[AUTO ENTRY] ❌ Trade initiation failed: {response.status_code} - {response.text}")
@@ -526,6 +551,31 @@ def get_auto_entry_status():
 def get_auto_entry_indicator():
     """Get current auto entry indicator state"""
     return jsonify(auto_entry_indicator_state)
+
+# Automated trade notification endpoint
+@app.route("/api/notify_automated_trade", methods=['POST'])
+def notify_automated_trade():
+    """Notify the frontend that an automated trade was triggered"""
+    try:
+        data = request.json
+        log(f"[AUTO ENTRY] 🔔 Notifying frontend of automated trade: {data}")
+        
+        # Forward the notification to the main app for WebSocket broadcast
+        try:
+            port = get_port("main_app")
+            url = get_service_url(port) + "/api/notify_automated_trade"
+            response = requests.post(url, json=data, timeout=2)
+            if response.ok:
+                log(f"[AUTO ENTRY] ✅ Frontend notification sent successfully")
+            else:
+                log(f"[AUTO ENTRY] ⚠️ Frontend notification failed: {response.status_code}")
+        except Exception as e:
+            log(f"[AUTO ENTRY] ❌ Error sending frontend notification: {e}")
+        
+        return jsonify({"success": True, "message": "Automated trade notification sent"})
+    except Exception as e:
+        log(f"[AUTO ENTRY] ❌ Error in notify_automated_trade: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 # Port information endpoint
 @app.route("/api/ports")
