@@ -148,38 +148,51 @@ def get_watchlist_data():
     return None
 
 def trigger_auto_entry_trade(strike_data):
-    """Trigger a buy trade by calling the frontend's openTrade function - exactly like a human user clicking a buy button."""
+    """Trigger a buy trade by calling the trade_initiator service - exactly like a human user clicking a buy button."""
     import requests
     
     log(f"[AUTO ENTRY] 🟢 Triggered AUTO ENTRY for strike: {strike_data.get('strike')} {strike_data.get('side')}")
     
-    # Call the frontend's openTrade function via the main_app endpoint
-    # This mimics exactly what happens when a human user clicks a buy button
+    # TEMPORARILY COMMENTED OUT FOR TESTING - Call the trade_initiator service directly - exactly like manual button clicks
     try:
-        port = get_port("main_app")
-        url = get_service_url(port) + "/api/trigger_open_trade"
+        port = get_port("trade_initiator")
+        url = get_service_url(port) + "/api/initiate_trade"
         
-        # Send the strike data to trigger the openTrade function
-        payload = {
+        # Prepare the trade data exactly like prepareTradeData does
+        trade_payload = {
+            "symbol": "BTC",
             "strike": strike_data.get("strike"),
             "side": strike_data.get("side"),
             "ticker": strike_data.get("ticker"),
             "buy_price": strike_data.get("buy_price"),
-            "probability": strike_data.get("probability")
+            "prob": strike_data.get("probability"),
+            "trade_strategy": "Hourly HTC",
+            "contract": "BTC Market",
+            "position": 1,  # Default position size
+            "symbol_open": None,  # Will be filled by trade_initiator
+            "momentum": None  # Will be filled by trade_initiator
         }
         
-        response = requests.post(url, json=payload, timeout=10)
+        log(f"[AUTO ENTRY] 📤 Sending trade to trade_initiator: {trade_payload}")
         
-        if response.ok:
-            result = response.json()
-            log(f"[AUTO ENTRY] ✅ Trade triggered successfully via openTrade function: {result}")
-            return True
-        else:
-            log(f"[AUTO ENTRY] ❌ Trade failed: {response.status_code} - {response.text}")
-            return False
-            
+        # TEMPORARILY COMMENTED OUT FOR TESTING
+        # response = requests.post(url, json=trade_payload, timeout=10)
+        
+        # TEMPORARILY COMMENTED OUT FOR TESTING
+        # if response.ok:
+        #     result = response.json()
+        #     log(f"[AUTO ENTRY] ✅ Trade initiated successfully via trade_initiator: {result}")
+        #     return True
+        # else:
+        #     log(f"[AUTO ENTRY] ❌ Trade initiation failed: {response.status_code} - {response.text}")
+        #     return False
+        
+        # TEMPORARILY RETURN TRUE FOR TESTING
+        log(f"[AUTO ENTRY] ✅ Trade initiation SIMULATED successfully (commented out for testing)")
+        return True
+        
     except Exception as e:
-        log(f"[AUTO ENTRY] ❌ Error triggering trade via openTrade: {e}")
+        log(f"[AUTO ENTRY] ❌ Error initiating trade via trade_initiator: {e}")
         return False
 
 def check_auto_entry_conditions():
@@ -411,8 +424,13 @@ def is_strike_already_traded(strike_data):
         url = get_service_url(port) + "/api/active_trades"
         response = requests.get(url, timeout=2)
         
-        if response.ok:
-            active_trades = response.json()
+        if not response.ok:
+            log(f"[AUTO ENTRY] ⚠️ Failed to get active trades: {response.status_code}")
+            return False
+            
+        response_data = response.json()
+        active_trades = response_data.get('active_trades', [])
+        log(f"[AUTO ENTRY DEBUG] 🔍 Checking {len(active_trades)} active trades for strike {strike_data.get('strike')} {strike_data.get('side')}")
         
         for trade in active_trades:
             # Check if this trade is for the same strike
@@ -425,12 +443,27 @@ def is_strike_already_traded(strike_data):
             else:
                 trade_strike_num = trade_strike
             
+            # Normalize side comparison (Y = yes, N = no)
+            normalized_trade_side = trade_side.upper()
+            normalized_strike_side = strike_data.get('side', '').upper()
+            
+            # Handle Y/YES and N/NO mapping
+            if normalized_trade_side == 'Y' and normalized_strike_side == 'YES':
+                normalized_trade_side = 'YES'
+            elif normalized_trade_side == 'N' and normalized_strike_side == 'NO':
+                normalized_trade_side = 'NO'
+            
+            # Debug logging to see what we're comparing
+            log(f"[AUTO ENTRY DEBUG] 🔍 Comparing: trade_strike_num='{trade_strike_num}' vs strike_data='{strike_data.get('strike')}'")
+            log(f"[AUTO ENTRY DEBUG] 🔍 Comparing: normalized_trade_side='{normalized_trade_side}' vs normalized_strike_side='{normalized_strike_side}'")
+            
             # Compare strike numbers and sides
             if (trade_strike_num == str(strike_data.get('strike')) and 
-                trade_side == strike_data.get('side')):
+                normalized_trade_side == normalized_strike_side):
                 log(f"[AUTO ENTRY] ⚠️ Found active trade on {strike_data.get('strike')} {strike_data.get('side')}")
                 return True
         
+        log(f"[AUTO ENTRY DEBUG] ✅ No active trades found for {strike_data.get('strike')} {strike_data.get('side')}")
         return False
     except Exception as e:
         log(f"[AUTO ENTRY] Error checking active trades: {e}")
