@@ -1227,6 +1227,33 @@ document.addEventListener('DOMContentLoaded', () => {
         return; // Don't process other WebSocket messages for this type
       }
 
+      // === Automated Trade Close Notification ===
+      if (data.type === 'automated_trade_closed') {
+        console.log('🔔 Automated trade closed:', data.data);
+        
+        // Trigger the same audio/visual alerts as manual trade closes
+        if (typeof playSound === 'function') {
+          playSound('close');
+        }
+        
+        if (typeof showTradeClosedPopup === 'function') {
+          showTradeClosedPopup();
+        }
+        
+        // Show a special automated trade close notification
+        showAutomatedTradeCloseNotification(data.data);
+        
+        // Refresh trade panels to show the closed trade
+        if (typeof fetchAndRenderTrades === 'function') {
+          fetchAndRenderTrades();
+        }
+        if (typeof fetchAndRenderRecentTrades === 'function') {
+          fetchAndRenderRecentTrades();
+        }
+        
+        return; // Don't process other WebSocket messages for this type
+      }
+
       // === Account Mode Sync ===
       if (data.account_mode) {
         const selector = document.getElementById("account-selector");
@@ -2520,6 +2547,62 @@ document.addEventListener('DOMContentLoaded', () => {
       notification.style.opacity = '1';
     }, 100);
     
+    // Hide after 4 seconds
+    setTimeout(() => {
+      notification.style.opacity = '0';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 300);
+    }, 4000);
+  }
+
+  function showAutomatedTradeCloseNotification(tradeData) {
+    // Create a special automated trade close notification popup
+    const notification = document.createElement('div');
+    notification.className = 'automated-trade-close-notification';
+    notification.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 280px;
+      background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+      color: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: bold;
+      text-align: center;
+      box-shadow: 0 5px 15px rgba(255, 107, 107, 0.3);
+      z-index: 10000;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      border: 2px solid #ff6b6b;
+      max-width: 250px;
+    `;
+
+    // Create the notification content
+    const strike = tradeData.strike || 'Unknown';
+    const side = tradeData.side || 'Unknown';
+    const buyPrice = tradeData.buy_price ? `$${tradeData.buy_price.toFixed(2)}` : 'Unknown';
+    const sellPrice = tradeData.sell_price ? `$${tradeData.sell_price.toFixed(2)}` : 'Unknown';
+    const pnl = tradeData.pnl || 'Unknown';
+    
+    notification.innerHTML = `
+      <div style="margin-bottom: 8px; font-size: 12px;">🤖 AUTO CLOSE</div>
+      <div style="font-size: 11px; margin-bottom: 3px;">${strike} ${side.toUpperCase()}</div>
+      <div style="font-size: 11px; margin-bottom: 3px;">Buy: ${buyPrice} | Sell: ${sellPrice}</div>
+      <div style="font-size: 11px;">PnL: ${pnl}</div>
+    `;
+
+    // Add to page
+    document.body.appendChild(notification);
+
+    // Show the notification
+    setTimeout(() => {
+      notification.style.opacity = '1';
+    }, 100);
+
     // Hide after 4 seconds
     setTimeout(() => {
       notification.style.opacity = '0';

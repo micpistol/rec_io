@@ -85,6 +85,31 @@ def get_ports():
         "host": get_host()
     }
 
+# Automated trade close notification endpoint
+@app.route("/api/notify_automated_close", methods=['POST'])
+def notify_automated_close():
+    """Notify the frontend that an automated trade close was triggered"""
+    try:
+        data = request.json
+        log(f"[AUTO STOP] 🔔 Notifying frontend of automated trade close: {data}")
+        
+        # Forward the notification to the main app for WebSocket broadcast
+        try:
+            port = get_port("main_app")
+            url = get_service_url(port) + "/api/notify_automated_close"
+            response = requests.post(url, json=data, timeout=2)
+            if response.ok:
+                log(f"[AUTO STOP] ✅ Frontend notification sent successfully")
+            else:
+                log(f"[AUTO STOP] ⚠️ Frontend notification failed: {response.status_code}")
+        except Exception as e:
+            log(f"[AUTO STOP] ❌ Error sending frontend notification: {e}")
+        
+        return jsonify({"success": True, "message": "Automated trade close notification sent"})
+    except Exception as e:
+        log(f"[AUTO STOP] ❌ Error in notify_automated_close: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route("/api/sync_and_monitor", methods=['POST'])
 def sync_and_monitor():
     """Manually trigger sync and monitoring for active trades"""
@@ -1056,6 +1081,33 @@ def trigger_auto_stop_close(trade):
         resp = requests.post(url, json=payload, timeout=3)
         if resp.status_code == 201 or resp.status_code == 200:
             log(f"[AUTO STOP] Triggered AUTO STOP close for trade {trade['trade_id']} (prob={trade.get('current_probability')})")
+            
+            # Notify frontend of automated trade close for audio/visual alerts
+            try:
+                notification_data = {
+                    "type": "automated_trade_closed",
+                    "trade_id": trade['trade_id'],
+                    "ticker": trade['ticker'],
+                    "strike": trade['strike'],
+                    "side": trade['side'],
+                    "buy_price": trade.get('buy_price'),
+                    "sell_price": sell_price,
+                    "position": trade['position'],
+                    "probability": trade.get('current_probability'),
+                    "pnl": trade.get('current_pnl'),
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                # Call our own notification endpoint
+                notification_url = get_service_url(ACTIVE_TRADE_SUPERVISOR_PORT) + "/api/notify_automated_close"
+                notification_response = requests.post(notification_url, json=notification_data, timeout=2)
+                if notification_response.ok:
+                    log(f"[AUTO STOP] 🔔 Frontend notification sent for automated trade close")
+                else:
+                    log(f"[AUTO STOP] ⚠️ Frontend notification failed: {notification_response.status_code}")
+            except Exception as e:
+                log(f"[AUTO STOP] ❌ Error sending frontend notification: {e}")
+            
         else:
             log(f"[AUTO STOP] Failed to trigger close for trade {trade['trade_id']}: {resp.status_code} {resp.text}")
     except Exception as e:
