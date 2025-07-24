@@ -31,6 +31,35 @@ from backend.strike_table_manager import (
     safe_write_json, get_unified_ttc
 )
 
+def load_auto_entry_settings() -> Dict[str, Any]:
+    """Load auto entry settings from JSON file"""
+    settings_path = os.path.join(get_data_dir(), "preferences", "auto_entry_settings.json")
+    default_settings = {
+        "min_probability": 37,
+        "min_differential": -5,
+        "min_ttc_seconds": 60,
+        "min_time": 120,
+        "max_time": 905,
+        "allow_re_entry": False,
+        "watchlist_min_volume": 1000,
+        "watchlist_max_ask": 98
+    }
+    
+    try:
+        if os.path.exists(settings_path):
+            with open(settings_path, "r") as f:
+                settings = json.load(f)
+                # Ensure all required keys exist
+                for key, default_value in default_settings.items():
+                    if key not in settings:
+                        settings[key] = default_value
+                return settings
+        else:
+            return default_settings
+    except Exception as e:
+        print(f"⚠️ Error loading auto entry settings: {e}")
+        return default_settings
+
 class PipelineStep(Enum):
     BTC_PRICE = "btc_price"
     MARKET_SNAPSHOT = "market_snapshot"
@@ -380,6 +409,13 @@ class UnifiedProductionCoordinator:
             ttc_seconds = strike_table_data["ttc"]
             strikes = strike_table_data["strikes"]
             
+            # Load auto entry settings for filter parameters
+            settings = load_auto_entry_settings()
+            min_volume = settings.get("watchlist_min_volume", 1000)
+            max_ask = settings.get("watchlist_max_ask", 98)
+            min_probability = settings.get("min_probability", 37) - 5  # Subtract 5 as requested
+            min_differential = settings.get("min_differential", -5) - 3  # Subtract 3 as requested
+            
             # Filter strikes for watchlist
             filtered_strikes = []
             for strike in strikes:
@@ -396,7 +432,7 @@ class UnifiedProductionCoordinator:
                     continue
                 
                 # Get the higher of yes_ask and no_ask
-                max_ask = max(yes_ask, no_ask)
+                max_ask_price = max(yes_ask, no_ask)
                 
                 # Determine which side would be the active buy button
                 is_above_money_line = strike.get("strike", 0) > btc_price
@@ -404,8 +440,11 @@ class UnifiedProductionCoordinator:
                 # Get the active button's differential
                 active_diff = no_diff if is_above_money_line else yes_diff
                 
-                # Only include strikes where active buy button differential is -2 or greater
-                if (volume >= 1000 and probability > 90 and max_ask <= 98 and active_diff >= -2):
+                # Apply filter criteria from auto entry settings
+                if (volume >= min_volume and 
+                    probability > min_probability and 
+                    max_ask_price <= max_ask and 
+                    active_diff >= min_differential):
                     filtered_strikes.append(strike)
             
             # Sort by probability (highest to lowest)
