@@ -19,6 +19,11 @@
       "description": "Trade execution service",
       "status": "RUNNING"
     },
+    "trade_initiator": {
+      "port": 8011,
+      "description": "Trade initiation service",
+      "status": "RUNNING"
+    },
     "active_trade_supervisor": {
       "port": 8007,
       "description": "Active trade monitoring",

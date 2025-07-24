@@ -287,14 +287,16 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                         time.sleep(1)  # Wait 1 second before next check
                         continue
                 
-                # Get symbol_close from the trade record
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT symbol_close FROM trades WHERE id = ?", (id,))
-                symbol_close_row = cursor.fetchone()
-                conn.close()
-                
-                symbol_close = symbol_close_row[0] if symbol_close_row else None
+                # Get current symbol price from API for symbol_close
+                symbol_close = None
+                try:
+                    # Get current BTC price from the API
+                    from active_trade_supervisor import get_current_btc_price
+                    symbol_close = get_current_btc_price()
+                    log_event(ticket_id, f"MANAGER: Retrieved current symbol price for close: {symbol_close}")
+                except Exception as e:
+                    log_event(ticket_id, f"MANAGER: Failed to get current symbol price: {e}")
+                    symbol_close = None
                 
                 # Calculate PnL with fees included
                 conn = get_db_connection()
@@ -781,6 +783,27 @@ def fetch_all_trades():
 def insert_trade(trade):
     log(f"[DEBUG] TRADES DB PATH (insert_trade): {DB_TRADES_PATH}")
     print("[DEBUG] Inserting trade data:", trade)
+    
+    # Get current momentum from API and format it correctly for database
+    momentum_for_db = None
+    try:
+        # Get momentum from live_data_analysis API
+        from live_data_analysis import get_momentum_data
+        momentum_data = get_momentum_data()
+        momentum_score = momentum_data.get('weighted_momentum_score', 0)
+        
+        # Format as whole number with +/- sign (e.g., 0.0621 becomes "+6", -0.0501 becomes "-5")
+        if momentum_score != 0:
+            momentum_whole = round(momentum_score * 100)
+            momentum_for_db = f"{'+' if momentum_whole > 0 else ''}{momentum_whole}"
+        else:
+            momentum_for_db = "0"
+            
+        print(f"[MOMENTUM] Raw: {momentum_score}, Formatted for DB: {momentum_for_db}")
+    except Exception as e:
+        print(f"[MOMENTUM] Error getting momentum: {e}")
+        momentum_for_db = "0"
+    
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -793,7 +816,7 @@ def insert_trade(trade):
             trade['date'], trade['time'], trade['strike'], trade['side'], trade['buy_price'],
             trade['position'], trade.get('status', 'open'), trade.get('contract'),
             trade.get('ticker'), trade.get('symbol'), trade.get('market'), trade.get('trade_strategy'),
-            trade.get('symbol_open'), trade.get('momentum'), trade.get('prob'),
+            trade.get('symbol_open'), momentum_for_db, trade.get('prob'),
             trade.get('volatility'), trade.get('ticket_id')
         )
     )

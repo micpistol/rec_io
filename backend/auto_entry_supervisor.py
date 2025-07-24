@@ -244,7 +244,13 @@ def check_auto_entry_conditions():
         # Check each strike in watchlist
         for i, strike in enumerate(watchlist_data["strikes"]):
             try:
-                strike_key = f"{strike.get('strike')}-{strike.get('side')}"
+                # Use active_side for strike_key generation
+                active_side = strike.get('active_side')
+                if not active_side:
+                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping strike {strike.get('strike')} - no active_side in JSON")
+                    continue
+                    
+                strike_key = f"{strike.get('strike')}-{active_side}"
                 log(f"[AUTO ENTRY DEBUG] 🔍 Checking strike {i+1}/{len(watchlist_data['strikes'])}: {strike_key}")
                 
                 # STEP 1: Check short-term cooldown (prevent rapid re-triggering)
@@ -265,7 +271,7 @@ def check_auto_entry_conditions():
                 # STEP 2: Check if we already have an active trade on this strike (long-term protection)
                 strike_data_for_check = {
                     'strike': strike.get('strike'),
-                    'side': 'Y' if strike.get('probability', 0) > 50 else 'N'  # Determine side based on probability
+                    'side': active_side  # Use active_side instead of probability-based logic
                 }
                 
                 if is_strike_already_traded(strike_data_for_check):
@@ -281,7 +287,7 @@ def check_auto_entry_conditions():
                 
                 # Check differential threshold (if applicable)
                 if min_differential > 0:
-                    diff = strike.get('yes_diff') if strike.get('side') == 'Y' else strike.get('no_diff')
+                    diff = strike.get('yes_diff') if active_side == 'yes' else strike.get('no_diff')
                     log(f"[AUTO ENTRY DEBUG] 📈 Strike differential: {diff} (min required: {min_differential})")
                     if diff is None or diff < min_differential:
                         log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - differential {diff} below threshold {min_differential}")
@@ -289,18 +295,24 @@ def check_auto_entry_conditions():
                 
 
                 
-                # Determine which side to trade based on probability
-                yes_prob = prob
-                no_prob = 100 - yes_prob
+                # Use active_side from JSON instead of probability-based logic
+                active_side = strike.get('active_side')
+                if not active_side:
+                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - no active_side in JSON")
+                    continue
                 
-                if yes_prob > no_prob:
-                    side = 'Y'
+                # Determine buy price based on active_side
+                if active_side == 'yes':
+                    side = 'yes'
                     buy_price = strike.get('yes_ask', 0) / 100.0  # Convert cents to decimal
-                    log(f"[AUTO ENTRY DEBUG] 🎯 Choosing YES side (prob: {yes_prob}% > {no_prob}%)")
-                else:
-                    side = 'N'
+                    log(f"[AUTO ENTRY DEBUG] 🎯 Using YES side from active_side parameter")
+                elif active_side == 'no':
+                    side = 'no'
                     buy_price = strike.get('no_ask', 0) / 100.0  # Convert cents to decimal
-                    log(f"[AUTO ENTRY DEBUG] 🎯 Choosing NO side (prob: {no_prob}% > {yes_prob}%)")
+                    log(f"[AUTO ENTRY DEBUG] 🎯 Using NO side from active_side parameter")
+                else:
+                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - invalid active_side: {active_side}")
+                    continue
                 
                 # Prepare strike data for trade trigger
                 strike_data = {
@@ -401,29 +413,25 @@ def is_strike_already_traded(strike_data):
         
         if response.ok:
             active_trades = response.json()
+        
+        for trade in active_trades:
+            # Check if this trade is for the same strike
+            trade_strike = trade.get('strike', '')
+            trade_side = trade.get('side', '')
             
-            for trade in active_trades:
-                # Check if this trade is for the same strike
-                trade_strike = trade.get('strike', '')
-                trade_side = trade.get('side', '')
-                
-                # Extract strike number from trade_strike (e.g., "$117,500" -> "117500")
-                if trade_strike.startswith('$'):
-                    trade_strike_num = trade_strike.replace('$', '').replace(',', '')
-                else:
-                    trade_strike_num = trade_strike
-                
-                # Compare strike numbers and sides
-                if (trade_strike_num == str(strike_data.get('strike')) and 
-                    trade_side == strike_data.get('side')):
-                    log(f"[AUTO ENTRY] ⚠️ Found active trade on {strike_data.get('strike')} {strike_data.get('side')}")
-                    return True
+            # Extract strike number from trade_strike (e.g., "$117,500" -> "117500")
+            if trade_strike.startswith('$'):
+                trade_strike_num = trade_strike.replace('$', '').replace(',', '')
+            else:
+                trade_strike_num = trade_strike
             
-            return False
-        else:
-            log(f"[AUTO ENTRY] Error fetching active trades: {response.status_code}")
-            return False
-            
+            # Compare strike numbers and sides
+            if (trade_strike_num == str(strike_data.get('strike')) and 
+                trade_side == strike_data.get('side')):
+                log(f"[AUTO ENTRY] ⚠️ Found active trade on {strike_data.get('strike')} {strike_data.get('side')}")
+                return True
+        
+        return False
     except Exception as e:
         log(f"[AUTO ENTRY] Error checking active trades: {e}")
         return False

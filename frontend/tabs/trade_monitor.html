@@ -724,6 +724,8 @@ document.head.appendChild(rowFlashStyle);
 
 // === MASTER OPEN TRADE FUNCTION ===
 // This is the single entry point for all trade execution
+// DISABLED - Now using trade_initiator system instead
+/*
 function openTrade(target) {
   const btn = target;
   if (btn?.disabled) return;
@@ -789,6 +791,7 @@ function openTrade(target) {
     }
   }, 0);
 }
+*/
 
 function closeTrade(tradeId, sellPrice, event) {
   // 🎧 Sound confirmation - IMMEDIATE
@@ -855,10 +858,14 @@ function closeTrade(tradeId, sellPrice, event) {
         buy_price:        sellPrice,
         symbol_close:     symbolClose
       };
-      await fetch('/trades', {
+      // Use trade_initiator service for closing trades
+      await fetch('/api/trigger_close_trade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          trade_id: tradeId,
+          sell_price: sellPrice
+        })
       });
       // Refresh panels
       fetchAndRenderTrades();

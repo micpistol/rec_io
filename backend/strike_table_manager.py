@@ -317,6 +317,9 @@ def calculate_strike_data(strike: int, current_price: float, probabilities: Dict
             yes_diff = 100 - prob - yes_ask
             no_diff = prob - no_ask
 
+        # Determine active_side: 'no' if strike above money line, 'yes' otherwise
+        active_side = 'no' if strike > current_price else 'yes'
+
         return {
             "strike": strike,
             "buffer": round(buffer, 2),
@@ -327,7 +330,8 @@ def calculate_strike_data(strike: int, current_price: float, probabilities: Dict
             "yes_diff": round(yes_diff, 2),
             "no_diff": round(no_diff, 2),
             "volume": volume,
-            "ticker": ticker
+            "ticker": ticker,
+            "active_side": active_side
         }
     except Exception as e:
         print(f"Error calculating strike data for strike {strike}: {e}")
@@ -399,7 +403,7 @@ def main():
                 data = calculate_strike_data(strike, btc_price, probabilities, market_snapshot)
                 # Add explicit active_side field to every strike
                 is_above_money_line = data.get("strike", 0) > btc_price
-                data["active_side"] = "N" if is_above_money_line else "Y"
+                data["active_side"] = "no" if is_above_money_line else "yes"
                 strike_data.append(data)
             
             # Create unified JSON output
@@ -425,11 +429,11 @@ def main():
                 volume = strike.get("volume")
                 if volume is None:
                     continue
-                
+                    
                 probability = strike.get("probability")
                 if probability is None:
                     continue
-                
+                    
                 yes_ask = strike.get("yes_ask")
                 no_ask = strike.get("no_ask")
                 yes_diff = strike.get("yes_diff")
@@ -446,7 +450,7 @@ def main():
                 
                 # Add explicit active_side field
                 strike = dict(strike)  # Make a copy to avoid mutating original
-                strike["active_side"] = "N" if is_above_money_line else "Y"
+                strike["active_side"] = "no" if is_above_money_line else "yes"
                 
                 # Only include strikes where active buy button differential is -2 or greater
                 if volume >= 1000 and probability > 90 and max_ask <= 98 and active_diff >= -2:

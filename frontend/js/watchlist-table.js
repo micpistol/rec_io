@@ -110,41 +110,24 @@ async function updateWatchlistTable() {
         const noDiff = strikeData.no_diff;
         const volume = strikeData.volume;
         const ticker = strikeData.ticker;
+        const activeSide = strikeData.active_side; // Use the active_side from JSON
         
         // Get current diff mode state (SAME as main strike table)
         const diffMode = window.diffMode || false;
         
-        // Same button enabling logic as main strike table
-        const volumeNum = parseInt(volume) || 0;
-        const volumeOk = volumeNum >= 1000;
-        const yesPriceOk = yesAsk <= 98;
-        const noPriceOk = noAsk <= 98;
-        const isAboveMoneyLine = strike > data.current_price;
-        
-        // Determine which side should be active and enabled
-        let activeSide = null;
+        // Simplified logic: Use active_side from JSON
         let activeAsk = null;
         let activeDiff = null;
         let activeEnabled = false;
         
-        if (volumeOk) {
-          if (isAboveMoneyLine) {
-            // Above money line: Only enable NO button if price is good
-            if (noPriceOk) {
-              activeSide = "no";
+        if (activeSide === 'yes') {
+          activeAsk = yesAsk;
+          activeDiff = yesDiff;
+          activeEnabled = yesAsk <= 98 && parseInt(volume) >= 1000;
+        } else if (activeSide === 'no') {
               activeAsk = noAsk;
               activeDiff = noDiff;
-              activeEnabled = true;
-            }
-          } else {
-            // Below money line: Only enable YES button if price is good
-            if (yesPriceOk) {
-              activeSide = "yes";
-              activeAsk = yesAsk;
-              activeDiff = yesDiff;
-              activeEnabled = true;
-            }
-          }
+          activeEnabled = noAsk <= 98 && parseInt(volume) >= 1000;
         }
         
         // Update side column
@@ -155,6 +138,7 @@ async function updateWatchlistTable() {
         }
         
         // Update single buy button
+        console.log('🔍 Watchlist: Setting side for strike', strike, 'to', activeSide);
         updateWatchlistBuyButton(buySpan, strike, activeSide, activeAsk, activeEnabled, ticker, false, diffMode, activeDiff);
         
         // Update position indicator for this strike (SAME as main strike table)
@@ -288,7 +272,8 @@ function updateWatchlistBuyButton(spanEl, strike, side, askPrice, isActive, tick
   
   // Set data-strike and data-side for easier retrieval in openTrade
   spanEl.setAttribute('data-strike', strike);
-  spanEl.setAttribute('data-side', side || '');
+  spanEl.setAttribute('data-side', side);
+  console.log('🔍 Watchlist: Set data-side to', side, 'for strike', strike);
   
   // Store the actual ask price for trade execution (not the display value)
   if (askPrice && askPrice !== '—' && askPrice !== 0) {
@@ -298,12 +283,51 @@ function updateWatchlistBuyButton(spanEl, strike, side, askPrice, isActive, tick
   }
 
   if (isActive) {
-    spanEl.onclick = debounce(function(event) {
-      // Use centralized trade execution controller
-      if (typeof openTrade === 'function') {
-        openTrade(spanEl);
-      } else {
-        console.error('openTrade function not available');
+    spanEl.onclick = debounce(async function(event) {
+      // Use centralized trade execution controller via trade_initiator
+      try {
+        const tradeData = await prepareTradeData(spanEl); // Use the centralized function
+        
+        if (!tradeData) {
+          console.error('Missing trade data for watchlist button after prepareTradeData');
+          return;
+        }
+        
+        // Call the new trade_initiator endpoint with complete data
+        const response = await fetch('/api/trigger_open_trade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            strike: tradeData.strike,
+            side: tradeData.side,
+            ticker: tradeData.ticker,
+            buy_price: tradeData.buy_price,
+            prob: tradeData.prob,
+            symbol_open: tradeData.symbol_open,
+            momentum: tradeData.momentum,
+            contract: tradeData.contract,
+            symbol: tradeData.symbol,
+            position: tradeData.position,
+            trade_strategy: tradeData.trade_strategy
+          })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('Watchlist trade initiated successfully:', result);
+          
+          // Refresh panels to show new trade
+          if (typeof fetchAndRenderTrades === 'function') {
+            fetchAndRenderTrades();
+          }
+          if (typeof fetchAndRenderRecentTrades === 'function') {
+            fetchAndRenderRecentTrades();
+          }
+        } else {
+          console.error('Watchlist trade initiation failed:', response.status);
+        }
+      } catch (error) {
+        console.error('Error initiating watchlist trade:', error);
       }
     }, 300);
   } else {

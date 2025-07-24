@@ -567,12 +567,51 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
   }
 
   if (isActive) {
-    spanEl.onclick = debounce(function(event) {
-      // Use centralized trade execution controller
-      if (typeof openTrade === 'function') {
-        openTrade(spanEl);
-      } else {
-        console.error('openTrade function not available');
+    spanEl.onclick = debounce(async function(event) {
+      // Use centralized trade execution controller via trade_initiator
+      try {
+        const tradeData = await prepareTradeData(spanEl); // Use the centralized function
+        
+        if (!tradeData) {
+          console.error('Missing trade data for strike table button after prepareTradeData');
+          return;
+        }
+        
+        // Call the new trade_initiator endpoint with complete data
+        const response = await fetch('/api/trigger_open_trade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            strike: tradeData.strike,
+            side: tradeData.side,
+            ticker: tradeData.ticker,
+            buy_price: tradeData.buy_price,
+            prob: tradeData.prob,
+            symbol_open: tradeData.symbol_open,
+            momentum: tradeData.momentum,
+            contract: tradeData.contract,
+            symbol: tradeData.symbol,
+            position: tradeData.position,
+            trade_strategy: tradeData.trade_strategy
+          })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('Strike table trade initiated successfully:', result);
+          
+          // Refresh panels to show new trade
+          if (typeof fetchAndRenderTrades === 'function') {
+            fetchAndRenderTrades();
+          }
+          if (typeof fetchAndRenderRecentTrades === 'function') {
+            fetchAndRenderRecentTrades();
+          }
+        } else {
+          console.error('Strike table trade initiation failed:', response.status);
+        }
+      } catch (error) {
+        console.error('Error initiating strike table trade:', error);
       }
     }, 300);
   } else {

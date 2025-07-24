@@ -629,63 +629,24 @@ async def get_current_fingerprint():
 async def get_current_momentum():
     """Get current momentum score from the unified API."""
     try:
-        # Get momentum score from the momentum service
-        momentum_service_url = f"http://{get_host()}:{get_port('momentum_service')}/momentum"
-        response = requests.get(momentum_service_url, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            return {
-                "status": "ok",
-                "momentum_score": data.get("momentum_score", 0)
-            }
-    except Exception as e:
-        print(f"Error getting momentum from service: {e}")
-    
-    # Fallback to simple calculation
-    try:
-        # Get latest BTC price from database
-        from backend.util.paths import get_price_history_dir
-        btc_price_history_db = os.path.join(get_price_history_dir(), "btc_price_history.db")
+        # Get momentum data from live_data_analysis (the correct source)
+        from live_data_analysis import get_momentum_data
+        momentum_data = get_momentum_data()
         
-        if os.path.exists(btc_price_history_db):
-            conn = sqlite3.connect(btc_price_history_db)
-            cursor = conn.cursor()
-            cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 31")
-            results = cursor.fetchall()
-            conn.close()
-            
-            if len(results) >= 31:
-                prices = [float(row[0]) for row in results]
-                # Calculate simple momentum score
-                current_price = prices[0]
-                p1m = prices[1] if len(prices) > 1 else current_price
-                p2m = prices[2] if len(prices) > 2 else p1m
-                p3m = prices[3] if len(prices) > 3 else p2m
-                p4m = prices[4] if len(prices) > 4 else p3m
-                p15m = prices[15] if len(prices) > 15 else p4m
-                p30m = prices[30] if len(prices) > 30 else p15m
-                
-                score = (
-                    ((current_price - p1m) / p1m) * 0.30 +
-                    ((current_price - p2m) / p2m) * 0.25 +
-                    ((current_price - p3m) / p3m) * 0.20 +
-                    ((current_price - p4m) / p4m) * 0.15 +
-                    ((current_price - p15m) / p15m) * 0.05 +
-                    ((current_price - p30m) / p30m) * 0.05
-                ) * 10000
-                
-                return {
-                    "status": "ok",
-                    "momentum_score": int(round(score))
-                }
+        # Extract the weighted momentum score
+        momentum_score = momentum_data.get('weighted_momentum_score', 0)
+        
+        return {
+            "status": "ok",
+            "momentum_score": momentum_score
+        }
     except Exception as e:
-        print(f"Error calculating momentum: {e}")
-    
-    return {
-        "status": "error",
-        "momentum_score": 0,
-        "error": "Unable to calculate momentum"
-    }
+        print(f"Error getting momentum from live_data_analysis: {e}")
+        return {
+            "status": "error",
+            "momentum_score": 0,
+            "error": "Unable to get momentum from live_data_analysis"
+        }
 
 # === PREFERENCES API ENDPOINTS ===
 
@@ -882,34 +843,106 @@ async def set_auto_entry_settings(request: Request):
 
 @app.post("/api/trigger_open_trade")
 async def trigger_open_trade(request: Request):
-    """Trigger the frontend's openTrade function - exactly like a human user clicking a buy button."""
+    """Trigger trade initiation via the trade_initiator service - exactly like a human user clicking a buy button."""
     try:
         data = await request.json()
         strike = data.get("strike")
         side = data.get("side")
         ticker = data.get("ticker")
         buy_price = data.get("buy_price")
-        probability = data.get("probability")
+        prob = data.get("prob")
+        symbol_open = data.get("symbol_open")
+        momentum = data.get("momentum")
+        contract = data.get("contract")
+        symbol = data.get("symbol")
+        position = data.get("position")
+        trade_strategy = data.get("trade_strategy")
         
-        print(f"[TRIGGER OPEN TRADE] Received request: strike={strike}, side={side}, ticker={ticker}, buy_price={buy_price}, probability={probability}")
+        print(f"[TRIGGER OPEN TRADE] Received request: strike={strike}, side={side}, ticker={ticker}, buy_price={buy_price}, prob={prob}, symbol_open={symbol_open}, momentum={momentum}")
         
-        # This endpoint will be called by the auto_entry_supervisor
-        # The frontend will handle the actual trade execution via the openTrade function
-        # For now, we'll just log the request and return success
-        # TODO: Implement the actual frontend openTrade function call
+        # Forward the request to the trade_initiator service
+        trade_initiator_port = get_port("trade_initiator")
+        trade_initiator_url = f"http://localhost:{trade_initiator_port}/api/initiate_trade"
         
-        return {
-            "status": "success",
-            "message": "Trade trigger request received",
+        # Prepare the trade data for the trade_initiator
+        trade_data = {
+            "symbol": symbol or "BTC",
             "strike": strike,
             "side": side,
             "ticker": ticker,
             "buy_price": buy_price,
-            "probability": probability
+            "prob": prob,
+            "strategy": trade_strategy or "*** TEST ***",
+            "contract": contract or "BTC 12pm",
+            "symbol_open": symbol_open,
+            "momentum": momentum,
+            "position": position or 1
         }
+        
+        # Send request to trade_initiator
+        response = requests.post(trade_initiator_url, json=trade_data, timeout=10)
+        
+        if response.status_code == 200:
+            result = response.json()
+            print(f"[TRIGGER OPEN TRADE] Trade initiated successfully: {result}")
+            return {
+                "status": "success",
+                "message": "Trade initiated successfully",
+                "trade_data": result
+            }
+        else:
+            print(f"[TRIGGER OPEN TRADE] Trade initiation failed: {response.status_code} - {response.text}")
+            return {
+                "status": "error",
+                "message": f"Trade initiation failed: {response.status_code}",
+                "details": response.text
+            }
         
     except Exception as e:
         print(f"[TRIGGER OPEN TRADE] Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/trigger_close_trade")
+async def trigger_close_trade(request: Request):
+    """Trigger trade closure via the trade_initiator service."""
+    try:
+        data = await request.json()
+        trade_id = data.get("trade_id")
+        sell_price = data.get("sell_price")
+        
+        print(f"[TRIGGER CLOSE TRADE] Received request: trade_id={trade_id}, sell_price={sell_price}")
+        
+        # Forward the request to the trade_initiator service
+        trade_initiator_port = get_port("trade_initiator")
+        trade_initiator_url = f"http://localhost:{trade_initiator_port}/api/close_trade"
+        
+        # Prepare the close trade data
+        close_data = {
+            "trade_id": trade_id,
+            "sell_price": sell_price
+        }
+        
+        # Send request to trade_initiator
+        response = requests.post(trade_initiator_url, json=close_data, timeout=10)
+        
+        if response.status_code == 200:
+            result = response.json()
+            print(f"[TRIGGER CLOSE TRADE] Trade closed successfully: {result}")
+            return {
+                "status": "success",
+                "message": "Trade closed successfully",
+                "close_data": result
+            }
+        else:
+            print(f"[TRIGGER CLOSE TRADE] Trade closure failed: {response.status_code} - {response.text}")
+            return {
+                "status": "error",
+                "message": f"Trade closure failed: {response.status_code}",
+                "details": response.text
+            }
+        
+    except Exception as e:
+        print(f"[TRIGGER CLOSE TRADE] Error: {e}")
         return {"status": "error", "message": str(e)}
 
 @app.get("/frontend-changes")

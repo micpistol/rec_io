@@ -19,124 +19,6 @@ window.TRADE_STATE = {
   executedTrades: new Set()
 };
 
-// === CENTRALIZED TRADE EXECUTION FUNCTION ===
-// This is the ONLY function that should execute trades
-window.executeTrade = async function(tradeData) {
-  // Prevent multiple simultaneous executions
-  if (window.TRADE_STATE.isExecuting) {
-    return { success: false, error: 'Trade already executing' };
-  }
-
-  // Validate trade data
-  if (!tradeData || !tradeData.symbol || !tradeData.side || !tradeData.buy_price) {
-    return { success: false, error: 'Invalid trade data' };
-  }
-
-  // Check position size limits
-  if (tradeData.position && tradeData.position > window.TRADE_CONFIG.MAX_POSITION_SIZE) {
-    return { success: false, error: 'Position size too large' };
-  }
-
-  // Generate unique ticket ID
-  const ticket_id = 'TICKET-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
-  
-  // Add to pending trades
-  window.TRADE_STATE.pendingTrades.add(ticket_id);
-  window.TRADE_STATE.isExecuting = true;
-
-  try {
-    // Create the trade payload
-    // Force Eastern Time Zone for all dates and times
-    const now = new Date();
-    const easternTime = new Date(now.toLocaleString("en-US", {timeZone: "America/New_York"}));
-    const easternDate = easternTime.toLocaleDateString('en-CA'); // YYYY-MM-DD format
-    const easternTimeString = easternTime.toLocaleTimeString('en-US', { hour12: false });
-    
-    // Patch: Format momentum as integer (e.g., 0.04 -> 4)
-    let rawMomentum = tradeData.momentum;
-    let momentum = 0;
-    if (rawMomentum !== undefined && rawMomentum !== null && rawMomentum !== "") {
-      momentum = Math.round(parseFloat(rawMomentum) * 100);
-    }
-
-    const payload = {
-      ticket_id: ticket_id,
-      status: "pending",
-      date: easternDate,
-      time: easternTimeString,
-      symbol: tradeData.symbol,
-      market: "Kalshi",
-      trade_strategy: tradeData.trade_strategy || "Hourly HTC",
-      contract: tradeData.contract,
-      strike: tradeData.strike,
-      side: tradeData.side,
-      ticker: tradeData.ticker,
-      buy_price: tradeData.buy_price,
-      symbol_open: tradeData.symbol_open,
-      symbol_close: null,
-      momentum: momentum, // PATCHED: send formatted integer
-      prob: tradeData.prob,
-      
-      
-      win_loss: null
-    };
-
-    if (tradeData.position !== null) {
-      payload.position = tradeData.position;
-    }
-
-    // === DEMO MODE CHECK ===
-    if (window.TRADE_CONFIG.DEMO_MODE) {
-      // Audio alert already played in trade_monitor.html when button was clicked
-      window.TRADE_STATE.executedTrades.add(ticket_id);
-      window.TRADE_STATE.lastTradeId = ticket_id;
-      return { 
-        success: true, 
-        ticket_id: ticket_id, 
-        demo: true,
-        message: 'Demo trade created successfully'
-      };
-    }
-
-    // Execute the actual trade
-    const response = await fetch('/trades', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      throw new Error(`Trade execution failed: ${response.status}`);
-    }
-
-    const result = await response.json();
-    
-    // Add to executed trades
-    window.TRADE_STATE.executedTrades.add(ticket_id);
-    window.TRADE_STATE.lastTradeId = ticket_id;
-
-    // Audio alert already played in trade_monitor.html when button was clicked
-
-    return { 
-      success: true, 
-      ticket_id: ticket_id, 
-      demo: false,
-      result: result
-    };
-
-  } catch (error) {
-    return { 
-      success: false, 
-      error: error.message,
-      ticket_id: ticket_id
-    };
-  } finally {
-    // Remove from pending trades
-    window.TRADE_STATE.pendingTrades.delete(ticket_id);
-    window.TRADE_STATE.isExecuting = false;
-  }
-};
-
 // === CENTRALIZED CLOSE TRADE FUNCTION ===
 // This is the ONLY function that should close trades
 window.closeTrade = async function(tradeId, sellPrice, event) {
@@ -253,10 +135,11 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
   }
 };
 
-// === TRADE EXECUTION HELPER FUNCTIONS ===
+// === CENTRALIZED TRADE DATA PREPARATION ===
+// This function extracts all necessary trade data from a button element
+// and prepares it for sending to the trade_initiator service
 
-// Function to prepare trade data from button click
-window.prepareTradeData = function(target) {
+window.prepareTradeData = async function(target) {
   const btn = target;
   
   if (btn?.disabled) {
@@ -295,18 +178,17 @@ window.prepareTradeData = function(target) {
       strike = parseFloat(strikeCell.textContent.replace(/\$|,/g, ''));
     }
     
-    const tds = Array.from(row.children);
-    for (let i = 0; i < tds.length; ++i) {
-      if (tds[i].contains(btn)) {
-        if (i === 4) side = 'Y';
-        if (i === 5) side = 'N';
-      }
+    // Side is ONLY the active_side from the watchlist JSON
+    if (btn.dataset.side) {
+      side = btn.dataset.side;
+      console.log('🔍 prepareTradeData: Read side', side, 'from btn.dataset.side');
+    } else {
+      console.error('No data-side attribute found - cannot determine trade side');
+      console.error('btn.dataset.side value:', btn.dataset.side);
+      console.error('btn element:', btn);
+      return null;
     }
   }
-
-  // Fallback to dataset attributes
-  if (!strike && btn.dataset.strike) strike = parseFloat(btn.dataset.strike);
-  if (!side && btn.dataset.side) side = btn.dataset.side;
 
   // Get ticker
   let kalshiTicker = btn.dataset.ticker || null;
@@ -316,8 +198,18 @@ window.prepareTradeData = function(target) {
 
   // Get other data
   const symbol_open = typeof getCurrentBTCTickerPrice === 'function' ? getCurrentBTCTickerPrice() : null;
-  const momentum = typeof getCurrentMomentumScore === 'function' ? getCurrentMomentumScore() : null;
   
+  // Get momentum from API instead of DOM element
+  let momentum = null;
+  try {
+    const momentumResponse = await fetch('/api/momentum');
+    if (momentumResponse.ok) {
+      const momentumData = await momentumResponse.json();
+      momentum = momentumData.momentum_score;
+    }
+  } catch (error) {
+    console.error('Failed to fetch momentum from API:', error);
+  }
 
   // Get the PROB value from the strike table for this specific strike
   let prob = null;
@@ -354,7 +246,7 @@ window.prepareTradeData = function(target) {
   const tradeStrategyPicker = document.getElementById('trade-strategy-picker');
   const tradeStrategy = tradeStrategyPicker ? tradeStrategyPicker.value : "Hourly HTC";
 
-  return {
+  const tradeData = {
     symbol: symbol,
     contract: contract,
     strike: `$${Number(strike).toLocaleString()}`,
@@ -368,6 +260,8 @@ window.prepareTradeData = function(target) {
     prob: prob,
     trade_strategy: tradeStrategy
   };
+
+  return tradeData;
 };
 
 // === SAFETY CONTROLS ===
