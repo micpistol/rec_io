@@ -197,7 +197,8 @@ def trigger_auto_entry_trade(strike_data):
             "prob": strike_data.get("probability"),
             "contract": contract_name,
             "position": position_size,
-            "momentum": None  # Will be filled by trade_initiator
+            "momentum": None,  # Will be filled by trade_initiator
+            "entry_method": "auto"
         }
         
         log(f"[AUTO ENTRY] 📤 Sending trade to trade_initiator: {trade_payload}")

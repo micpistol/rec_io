@@ -316,21 +316,16 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                     # Determine win/loss
                     win_loss = "W" if pnl > 0 else "L" if pnl < 0 else "D"
                     
-                    # Update trade status to closed with correct PnL calculation
+                    # Get the close_method from the trade record
                     conn = get_db_connection()
                     cursor = conn.cursor()
-                    cursor.execute("""
-                        UPDATE trades 
-                        SET status = 'closed',
-                            closed_at = ?,
-                            sell_price = ?,
-                            symbol_close = ?,
-                            win_loss = ?,
-                            pnl = ?
-                        WHERE id = ?
-                    """, (closed_at, sell_price, symbol_close, win_loss, pnl, id))
-                    conn.commit()
+                    cursor.execute("SELECT close_method FROM trades WHERE id = ?", (id,))
+                    close_method_row = cursor.fetchone()
+                    close_method = close_method_row[0] if close_method_row else "manual"
                     conn.close()
+                    
+                    # Update trade status to closed with correct PnL calculation
+                    update_trade_status(id, "closed", closed_at, sell_price, symbol_close, win_loss, pnl, close_method)
                     
                     # Update the FEES column in trades.db with total_fees_paid
                     conn = get_db_connection()
@@ -740,7 +735,9 @@ def init_trades_db():
         symbol_close REAL DEFAULT NULL,
         win_loss TEXT DEFAULT NULL,
         ticker TEXT DEFAULT NULL,
-        fees REAL DEFAULT NULL
+        fees REAL DEFAULT NULL,
+        entry_method TEXT DEFAULT 'manual',
+        close_method TEXT DEFAULT NULL
     )
     """)
     conn.commit()
@@ -860,14 +857,14 @@ def insert_trade(trade):
         """INSERT INTO trades (
             date, time, strike, side, buy_price, position, status,
             contract, ticker, symbol, market, trade_strategy, symbol_open,
-            momentum, prob, volatility, ticket_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            momentum, prob, volatility, ticket_id, entry_method
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             trade['date'], trade['time'], trade['strike'], trade['side'], trade['buy_price'],
             trade['position'], trade.get('status', 'open'), contract_name,
             trade.get('ticker'), trade.get('symbol'), trade.get('market'), trade.get('trade_strategy'),
             symbol_open, momentum_for_db, trade.get('prob'),
-            trade.get('volatility'), trade.get('ticket_id')
+            trade.get('volatility'), trade.get('ticket_id'), trade.get('entry_method', 'manual')
         )
     )
     conn.commit()
@@ -875,7 +872,7 @@ def insert_trade(trade):
     conn.close()
     return last_id
 
-def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbol_close=None, win_loss=None, pnl=None):
+def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbol_close=None, win_loss=None, pnl=None, close_method=None):
     conn = get_db_connection()
     cursor = conn.cursor()
     if status == 'closed':
@@ -910,8 +907,8 @@ def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbo
                 calculated_pnl = round(sell_value - buy_value - fees, 2)
 
         cursor.execute(
-            "UPDATE trades SET status = ?, closed_at = ?, sell_price = ?, symbol_close = ?, win_loss = ?, pnl = ? WHERE id = ?",
-            (status, closed_at, sell_price, symbol_close, win_loss, calculated_pnl, trade_id)
+            "UPDATE trades SET status = ?, closed_at = ?, sell_price = ?, symbol_close = ?, win_loss = ?, pnl = ?, close_method = ? WHERE id = ?",
+            (status, closed_at, sell_price, symbol_close, win_loss, calculated_pnl, close_method, trade_id)
         )
     else:
         cursor.execute("UPDATE trades SET status = ? WHERE id = ?", (status, trade_id))
@@ -976,7 +973,8 @@ async def add_trade(request: Request):
             cursor = conn.cursor()
             sell_price = data.get("buy_price")
             symbol_close = data.get("symbol_close")
-            cursor.execute("UPDATE trades SET status = 'closing', symbol_close = ? WHERE ticker = ?", (symbol_close, ticker))
+            close_method = data.get("close_method", "manual")
+            cursor.execute("UPDATE trades SET status = 'closing', symbol_close = ?, close_method = ? WHERE ticker = ?", (symbol_close, close_method, ticker))
             conn.commit()
             conn.close()
             log(f"[DEBUG] Trade status set to 'closing' for ticker: {ticker}")
@@ -1283,7 +1281,8 @@ def check_expired_trades():
             UPDATE trades 
             SET status = 'expired', 
                 closed_at = ?, 
-                symbol_close = ?
+                symbol_close = ?,
+                close_method = 'expired'
             WHERE status = 'open'
         """, (closed_at, symbol_close))
         conn.commit()

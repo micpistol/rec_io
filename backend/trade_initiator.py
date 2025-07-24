@@ -147,7 +147,8 @@ def create_open_trade_ticket(trade_data: Dict[str, Any]) -> Dict[str, Any]:
         "symbol_close": None,
         "momentum": momentum,
         "prob": trade_data["prob"],
-        "win_loss": None
+        "win_loss": None,
+        "entry_method": trade_data.get("entry_method", "manual")
     }
     
     return payload

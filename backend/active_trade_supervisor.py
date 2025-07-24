@@ -1073,7 +1073,8 @@ def trigger_auto_stop_close(trade):
         'type': 'market',
         'time_in_force': 'IOC',
         'buy_price': sell_price,
-        'symbol_close': symbol_close
+        'symbol_close': symbol_close,
+        'close_method': 'auto'
     }
     try:
         port = get_port('main_app')

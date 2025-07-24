@@ -80,7 +80,8 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
       type:             'market',
       time_in_force:    'IOC',
       buy_price:        sellPrice,
-      symbol_close:     symbolClose
+      symbol_close:     symbolClose,
+      close_method:     'manual'
     };
 
     // === DEMO MODE CHECK ===
@@ -268,7 +269,8 @@ window.prepareTradeData = async function(target) {
     momentum: momentum,
     
     prob: prob,
-    trade_strategy: tradeStrategy
+    trade_strategy: tradeStrategy,
+    entry_method: "manual"
   };
 
   return tradeData;
