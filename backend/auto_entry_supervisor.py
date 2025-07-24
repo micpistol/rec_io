@@ -208,6 +208,10 @@ def trigger_auto_entry_trade(strike_data):
             result = response.json()
             log(f"[AUTO ENTRY] ✅ Trade initiated successfully via trade_initiator: {result}")
             
+            # Log to master autotrade log
+            with open(os.path.join(get_data_dir(), "trade_history", "autotrade_log.txt"), "a") as f:
+                f.write(f'{datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")} | ENTRY | {contract_name} | {strike_data.get("strike")} | {strike_data.get("side")} | {position_size} | {strike_data.get("buy_price")} | {strike_data.get("probability")} | {strike.get("yes_diff") if strike_data.get("side") == "yes" else strike.get("no_diff")}\n')
+            
             # Notify frontend of automated trade for audio/visual alerts
             try:
                 notification_data = {

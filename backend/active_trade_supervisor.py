@@ -1082,6 +1082,10 @@ def trigger_auto_stop_close(trade):
         if resp.status_code == 201 or resp.status_code == 200:
             log(f"[AUTO STOP] Triggered AUTO STOP close for trade {trade['trade_id']} (prob={trade.get('current_probability')})")
             
+            # Log to master autotrade log
+            with open(os.path.join(get_data_dir(), "trade_history", "autotrade_log.txt"), "a") as f:
+                f.write(f'{datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")} | CLOSE | {trade.get("ticker", "Unknown")} | {trade.get("strike")} | {trade.get("side")} | {trade.get("position")} | {sell_price} | {trade.get("current_probability")} | {trade.get("current_pnl", "Unknown")}\n')
+            
             # Notify frontend of automated trade close for audio/visual alerts
             try:
                 notification_data = {
