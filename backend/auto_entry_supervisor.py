@@ -211,6 +211,28 @@ def trigger_auto_entry_trade(strike_data):
             with open(os.path.join(get_data_dir(), "trade_history", "autotrade_log.txt"), "a") as f:
                 f.write(f'{datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")} | ENTRY | {contract_name} | {strike_data.get("strike")} | {strike_data.get("side")} | {position_size} | {strike_data.get("buy_price")} | {strike_data.get("probability")}\n')
             
+            # Send WebSocket notification to frontend for audio/popup alerts
+            try:
+                main_port = get_port("main_app")
+                main_url = get_service_url(main_port) + "/api/notify_automated_trade"
+                notification_data = {
+                    "strike": strike_data.get("strike"),
+                    "side": strike_data.get("side"),
+                    "ticker": strike_data.get("ticker"),
+                    "buy_price": strike_data.get("buy_price"),
+                    "probability": strike_data.get("probability"),
+                    "contract": contract_name,
+                    "position": position_size,
+                    "entry_method": "auto"
+                }
+                notification_response = requests.post(main_url, json=notification_data, timeout=2)
+                if notification_response.ok:
+                    log(f"[AUTO ENTRY] ✅ WebSocket notification sent successfully")
+                else:
+                    log(f"[AUTO ENTRY] ⚠️ WebSocket notification failed: {notification_response.status_code}")
+            except Exception as e:
+                log(f"[AUTO ENTRY] ❌ Error sending WebSocket notification: {e}")
+            
             return True
         else:
             log(f"[AUTO ENTRY] ❌ Trade initiation failed: {response.status_code} - {response.text}")
@@ -385,10 +407,10 @@ def check_auto_entry_conditions():
                     continue
                 
                 # STEP 4: Check differential threshold (if applicable)
-                if min_differential > 0:
+                if min_differential is not None:
                     diff = strike.get('yes_diff') if active_side == 'yes' else strike.get('no_diff')
                     log(f"[AUTO ENTRY DEBUG] 📈 Strike differential: {diff} (min required: {min_differential})")
-                    if diff is None or diff < min_differential:
+                    if diff is None or diff < (min_differential - 0.5):
                         log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - differential {diff} below threshold {min_differential}")
                         continue
                 
