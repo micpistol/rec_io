@@ -1056,6 +1056,42 @@ async def get_auto_entry_indicator():
     except Exception as e:
         return {"error": f"Error getting auto entry indicator: {str(e)}"}
 
+# Log event endpoint
+@app.post("/api/log_event")
+async def log_event(request: Request):
+    """Log trade events to ticket-specific log files"""
+    try:
+        data = await request.json()
+        ticket_id = data.get("ticket_id", "UNKNOWN")
+        message = data.get("message", "No message provided")
+        timestamp = datetime.now(pytz.timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S")
+
+        log_line = f"[{timestamp}] Ticket {ticket_id}: {message}\n"
+        # Directory for trade flow logs
+        log_dir = os.path.join(get_data_dir(), "trade_history", "tickets")
+        # Use last 5 characters of ticket_id for log file name, fallback to full ticket_id if too short
+        log_path = os.path.join(log_dir, f"trade_flow_{ticket_id[-5:] if len(ticket_id) >= 5 else ticket_id}.log")
+
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+            with open(log_path, "a") as f:
+                f.write(log_line)
+
+            # Prune older log files, keep only latest 100
+            log_files = sorted(
+                [f for f in os.listdir(log_dir) if f.startswith("trade_flow_") and f.endswith(".log")],
+                key=lambda name: os.path.getmtime(os.path.join(log_dir, name)),
+                reverse=True
+            )
+            for old_log in log_files[100:]:
+                os.remove(os.path.join(log_dir, old_log))
+
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.post("/api/notify_automated_trade")
 async def notify_automated_trade(request: Request):
     """Receive automated trade notification and broadcast to frontend via WebSocket"""

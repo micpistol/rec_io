@@ -89,11 +89,9 @@ async function fetchBTCPriceChanges() {
 // Fetch auto entry indicator state from auto_entry_supervisor
 async function fetchAutoEntryIndicator() {
   try {
-    console.log('Fetching auto entry indicator...');
     const response = await fetch('/api/auto_entry_indicator');
     if (!response.ok) throw new Error('Failed to fetch auto entry indicator');
     const data = await response.json();
-    console.log('Auto entry indicator data:', data);
     
     // Update the indicator display
     updateAutoEntryIndicator(data);
@@ -105,21 +103,16 @@ async function fetchAutoEntryIndicator() {
 // Update the auto entry indicator display
 function updateAutoEntryIndicator(data) {
   const indicator = document.getElementById('autoEntryIndicator');
-  console.log('Auto entry indicator element:', indicator);
   if (!indicator) {
     console.error('Auto entry indicator element not found');
     return;
   }
   
-  console.log('Auto entry conditions:', { enabled: data.enabled, ttc_within_window: data.ttc_within_window });
-  
   if (data.enabled && data.ttc_within_window) {
     // Show the indicator when AUTO ENTRY is ON and TTC is within window
-    console.log('Showing auto entry indicator');
     indicator.style.display = 'flex';
   } else {
     // Hide the indicator when conditions are not met
-    console.log('Hiding auto entry indicator');
     indicator.style.display = 'none';
   }
 }

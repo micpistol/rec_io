@@ -28,7 +28,7 @@ function initializeWatchlistTable() {
     return;
   }
   
-  console.log('🔍 Initializing watchlist table...');
+  // Initialize watchlist table
   
   // Clear any existing state to prevent conflicts
   if (window.watchlistRowsMap) {
@@ -57,18 +57,16 @@ async function updateWatchlistTable() {
     
     // Initialize watchlist table if needed - FIXED LOGIC
     if (!window.watchlistRowsMap || window.watchlistRowsMap.size === 0) {
-      console.log('🔍 Watchlist table not initialized, creating rows...');
       initializeWatchlistTableRows(data.strikes);
     }
     
-    // Debug: Log update frequency
+    // Track update frequency (no logging)
     if (!window.lastWatchlistUpdate) {
       window.lastWatchlistUpdate = Date.now();
     } else {
       const now = Date.now();
       const timeSinceLastUpdate = now - window.lastWatchlistUpdate;
-      if (timeSinceLastUpdate > 5000) { // Log every 5 seconds
-        console.log('🔍 Watchlist table updating with', data.strikes.length, 'strikes');
+      if (timeSinceLastUpdate > 5000) { // Update timestamp every 5 seconds
         window.lastWatchlistUpdate = now;
       }
     }
@@ -138,7 +136,6 @@ async function updateWatchlistTable() {
         }
         
         // Update single buy button
-        console.log('🔍 Watchlist: Setting side for strike', strike, 'to', activeSide);
         updateWatchlistBuyButton(buySpan, strike, activeSide, activeAsk, activeEnabled, ticker, false, diffMode, activeDiff);
         
         // Update position indicator for this strike (SAME as main strike table)
@@ -163,7 +160,7 @@ function initializeWatchlistTableRows(strikes) {
     return;
   }
   
-  console.log('🔍 Creating watchlist table rows for', strikes.length, 'strikes');
+  // Create watchlist table rows
   
   // Clear existing content
   watchlistTableBody.innerHTML = '';
@@ -217,7 +214,7 @@ function initializeWatchlistTableRows(strikes) {
     });
   });
   
-  console.log('🔍 Watchlist table rows created:', window.watchlistRowsMap.size, 'rows');
+  // Watchlist table rows created
 }
 
 // === WATCHLIST BUY BUTTON FUNCTION ===
@@ -273,7 +270,7 @@ function updateWatchlistBuyButton(spanEl, strike, side, askPrice, isActive, tick
   // Set data-strike and data-side for easier retrieval in openTrade
   spanEl.setAttribute('data-strike', strike);
   spanEl.setAttribute('data-side', side);
-  console.log('🔍 Watchlist: Set data-side to', side, 'for strike', strike);
+  // Set data-side attribute
   
   // Store the actual ask price for trade execution (not the display value)
   if (askPrice && askPrice !== '—' && askPrice !== 0) {
@@ -392,7 +389,6 @@ function debounce(func, wait) {
 document.addEventListener('DOMContentLoaded', function() {
   // Wait longer for the main strike table to initialize first and avoid conflicts
   setTimeout(() => {
-    console.log('🔍 Starting watchlist table initialization...');
     initializeWatchlistTable();
   }, 500); // Increased from 100ms to 500ms to avoid race conditions
 });
