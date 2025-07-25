@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-Auto Entry Supervisor
+Auto Entry Supervisor - SIMPLIFIED VERSION
 
 Monitors watchlist data and triggers automated trades when criteria are met.
-Modeled after active_trade_supervisor's auto-stop feature but for automated buying.
-Only monitors essential data: TTC, watchlist JSON, and auto entry settings JSON.
+Uses atomic operations to prevent rapid-fire trades.
 """
 
 import os
@@ -35,11 +34,11 @@ CORS(app)  # Enable CORS for all routes
 monitoring_thread = None
 monitoring_thread_lock = threading.Lock()
 
-# Track triggered strikes to prevent rapid re-triggering (short-term protection)
-triggered_strikes = {}  # strike_key -> timestamp mapping
+# SIMPLIFIED: Track last trade time per strike (atomic)
+last_trade_times = {}  # strike_key -> timestamp
 
-# Short-term cooldown to prevent rapid re-triggering (in seconds)
-short_term_cooldown = 10  # 10 seconds cooldown
+# Cooldown period (seconds)
+TRADE_COOLDOWN = 10
 
 # Global state for auto entry indicator (for frontend display)
 auto_entry_indicator_state = {
@@ -167,12 +166,11 @@ def get_position_size():
         return None
 
 def trigger_auto_entry_trade(strike_data):
-    """Trigger a buy trade by calling the trade_initiator service - exactly like a human user clicking a buy button."""
+    """Trigger a buy trade by calling the trade_initiator service"""
     import requests
     
     log(f"[AUTO ENTRY] 🟢 Triggered AUTO ENTRY for strike: {strike_data.get('strike')} {strike_data.get('side')}")
     
-    # TEMPORARILY COMMENTED OUT FOR TESTING - Call the trade_initiator service directly - exactly like manual button clicks
     try:
         port = get_port("trade_initiator")
         url = get_service_url(port) + "/api/initiate_trade"
@@ -211,31 +209,7 @@ def trigger_auto_entry_trade(strike_data):
             
             # Log to master autotrade log
             with open(os.path.join(get_data_dir(), "trade_history", "autotrade_log.txt"), "a") as f:
-                f.write(f'{datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")} | ENTRY | {contract_name} | {strike_data.get("strike")} | {strike_data.get("side")} | {position_size} | {strike_data.get("buy_price")} | {strike_data.get("probability")} | {strike.get("yes_diff") if strike_data.get("side") == "yes" else strike.get("no_diff")}\n')
-            
-            # Notify frontend of automated trade for audio/visual alerts
-            try:
-                notification_data = {
-                    "type": "automated_trade_triggered",
-                    "strike": strike_data.get("strike"),
-                    "side": strike_data.get("side"),
-                    "ticker": strike_data.get("ticker"),
-                    "buy_price": strike_data.get("buy_price"),
-                    "probability": strike_data.get("probability"),
-                    "contract": contract_name,
-                    "position": position_size,
-                    "timestamp": datetime.now().isoformat()
-                }
-                
-                # Call our own notification endpoint
-                notification_url = get_service_url(AUTO_ENTRY_SUPERVISOR_PORT) + "/api/notify_automated_trade"
-                notification_response = requests.post(notification_url, json=notification_data, timeout=2)
-                if notification_response.ok:
-                    log(f"[AUTO ENTRY] 🔔 Frontend notification sent for automated trade")
-                else:
-                    log(f"[AUTO ENTRY] ⚠️ Frontend notification failed: {notification_response.status_code}")
-            except Exception as e:
-                log(f"[AUTO ENTRY] ❌ Error sending frontend notification: {e}")
+                f.write(f'{datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")} | ENTRY | {contract_name} | {strike_data.get("strike")} | {strike_data.get("side")} | {position_size} | {strike_data.get("buy_price")} | {strike_data.get("probability")}\n')
             
             return True
         else:
@@ -246,226 +220,20 @@ def trigger_auto_entry_trade(strike_data):
         log(f"[AUTO ENTRY] ❌ Error initiating trade via trade_initiator: {e}")
         return False
 
-def check_auto_entry_conditions():
-    """Check if auto entry conditions are met and trigger trades"""
-    global triggered_strikes, auto_entry_indicator_state
-    
-    try:
-        # Check if AUTO ENTRY is enabled
-        auto_entry_enabled = is_auto_entry_enabled()
-        log(f"[AUTO ENTRY DEBUG] 🔍 Auto entry enabled: {auto_entry_enabled}")
-        
-        if not auto_entry_enabled:
-            auto_entry_indicator_state.update({
-                "enabled": False,
-                "ttc_within_window": False,
-                "current_ttc": 0,
-                "last_updated": datetime.now().isoformat()
-            })
-            log(f"[AUTO ENTRY DEBUG] ⏸️ Auto entry disabled, skipping checks")
-            return
-        
-        # Get auto entry settings
-        settings = get_auto_entry_settings()
-        min_time = settings["min_time"]
-        max_time = settings["max_time"]
-        min_probability = settings["min_probability"]
-        min_differential = settings["min_differential"]
-        allow_re_entry = settings["allow_re_entry"]
-        
-        log(f"[AUTO ENTRY DEBUG] ⚙️ Settings - min_time: {min_time}, max_time: {max_time}, min_prob: {min_probability}, min_diff: {min_differential}, allow_re_entry: {allow_re_entry}")
-        
-        # Get current TTC
-        current_ttc = get_current_ttc()
-        log(f"[AUTO ENTRY DEBUG] ⏰ Current TTC: {current_ttc} seconds")
-        
-        # Check if TTC is within the time window
-        ttc_within_window = min_time <= current_ttc <= max_time
-        log(f"[AUTO ENTRY DEBUG] 🪟 TTC within window ({min_time}-{max_time}): {ttc_within_window}")
-        
-        # Update indicator state for frontend
-        auto_entry_indicator_state.update({
-            "enabled": True,
-            "ttc_within_window": ttc_within_window,
-            "current_ttc": current_ttc,
-            "min_time": min_time,
-            "max_time": max_time,
-            "last_updated": datetime.now().isoformat()
-        })
-        
-        if not ttc_within_window:
-            log(f"[AUTO ENTRY DEBUG] ⏸️ TTC not in window, skipping trade checks")
-            return
-        
-        # Get watchlist data
-        watchlist_data = get_watchlist_data()
-        if not watchlist_data or "strikes" not in watchlist_data:
-            log(f"[AUTO ENTRY DEBUG] ❌ No watchlist data available")
-            return
-        
-        log(f"[AUTO ENTRY DEBUG] 📋 Found {len(watchlist_data['strikes'])} strikes in watchlist")
-        
-        # Check each strike in watchlist
-        for i, strike in enumerate(watchlist_data["strikes"]):
-            try:
-                # Use active_side for strike_key generation
-                active_side = strike.get('active_side')
-                if not active_side:
-                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping strike {strike.get('strike')} - no active_side in JSON")
-                    continue
-                    
-                strike_key = f"{strike.get('strike')}-{active_side}"
-                log(f"[AUTO ENTRY DEBUG] 🔍 Checking strike {i+1}/{len(watchlist_data['strikes'])}: {strike_key}")
-                
-                # STEP 1: Check short-term cooldown (prevent rapid re-triggering)
-                if strike_key in triggered_strikes:
-                    last_trigger_time = triggered_strikes[strike_key]
-                    time_since_trigger = time.time() - last_trigger_time
-                    if time_since_trigger < short_term_cooldown:
-                        log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - triggered {time_since_trigger:.1f}s ago (cooldown: {short_term_cooldown}s)")
-                        continue
-                    else:
-                        # Remove old entry from dictionary (cleanup)
-                        del triggered_strikes[strike_key]
-                        log(f"[AUTO ENTRY DEBUG] 🧹 Cleaned up old trigger for {strike_key}")
-                
-                # Clean up old entries from triggered_strikes dictionary
-                cleanup_old_triggered_strikes()
-                
-                # STEP 2: Check if we already have an active trade on this strike (long-term protection)
-                strike_data_for_check = {
-                    'strike': strike.get('strike'),
-                    'side': active_side  # Use active_side instead of probability-based logic
-                }
-                
-                if is_strike_already_traded(strike_data_for_check):
-                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - already have active trade on this strike")
-                    continue
-                
-                # Check probability threshold
-                prob = strike.get('probability')  # Changed from 'prob' to 'probability'
-                log(f"[AUTO ENTRY DEBUG] 📊 Strike probability: {prob} (min required: {min_probability})")
-                if prob is None or prob < min_probability:
-                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - probability {prob} below threshold {min_probability}")
-                    continue
-                
-                # Check differential threshold (if applicable)
-                if min_differential > 0:
-                    diff = strike.get('yes_diff') if active_side == 'yes' else strike.get('no_diff')
-                    log(f"[AUTO ENTRY DEBUG] 📈 Strike differential: {diff} (min required: {min_differential})")
-                    if diff is None or diff < min_differential:
-                        log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - differential {diff} below threshold {min_differential}")
-                        continue
-                
-
-                
-                # Use active_side from JSON instead of probability-based logic
-                active_side = strike.get('active_side')
-                if not active_side:
-                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - no active_side in JSON")
-                    continue
-                
-                # Determine buy price based on active_side
-                if active_side == 'yes':
-                    side = 'yes'
-                    buy_price = strike.get('yes_ask', 0) / 100.0  # Convert cents to decimal
-                    log(f"[AUTO ENTRY DEBUG] 🎯 Using YES side from active_side parameter")
-                elif active_side == 'no':
-                    side = 'no'
-                    buy_price = strike.get('no_ask', 0) / 100.0  # Convert cents to decimal
-                    log(f"[AUTO ENTRY DEBUG] 🎯 Using NO side from active_side parameter")
-                else:
-                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - invalid active_side: {active_side}")
-                    continue
-                
-                # Prepare strike data for trade trigger
-                strike_data = {
-                    'strike': f"${strike.get('strike'):,}",
-                    'side': side,
-                    'ticker': strike.get('ticker'),
-                    'buy_price': buy_price,
-                    'probability': prob
-                }
-                
-                log(f"[AUTO ENTRY DEBUG] 🎯 Strike {strike_key} meets criteria - triggering trade")
-                
-                # Trigger the trade
-                if trigger_auto_entry_trade(strike_data):
-                    triggered_strikes[strike_key] = time.time()
-                    log(f"[AUTO ENTRY DEBUG] ✅ Trade triggered for {strike_key}")
-                else:
-                    log(f"[AUTO ENTRY DEBUG] ❌ Failed to trigger trade for {strike_key}")
-                
-            except Exception as e:
-                log(f"[AUTO ENTRY] Error processing strike {strike.get('strike')}: {e}")
-                
-    except Exception as e:
-        log(f"[AUTO ENTRY] Error checking auto entry conditions: {e}")
-
-def start_monitoring_loop():
-    """Start the monitoring loop for auto entry conditions"""
-    global monitoring_thread
-    
-    def monitoring_worker():
-        global monitoring_thread
-        log("📊 MONITORING: Starting auto entry monitoring loop")
-        
-        check_count = 0
-        while True:
-            try:
-                check_count += 1
-                log(f"[AUTO ENTRY DEBUG] 🔄 Check #{check_count} - starting condition check")
-                
-                # Check auto entry conditions
-                check_auto_entry_conditions()
-                
-                log(f"[AUTO ENTRY DEBUG] 💤 Check #{check_count} - sleeping for 1 second")
-                # Sleep for 1 second
-                time.sleep(1)
-                
-            except Exception as e:
-                log(f"❌ Error in monitoring worker: {e}")
-                time.sleep(5)  # Wait longer on error
-        
-        # Clear the global monitoring thread reference when done
-        with monitoring_thread_lock:
-            monitoring_thread = None
-        log("📊 MONITORING: Auto entry monitoring thread finished")
-    
-    # Start monitoring in a separate thread
-    with monitoring_thread_lock:
-        monitoring_thread = threading.Thread(target=monitoring_worker, daemon=True)
-        monitoring_thread.start()
-        log("📊 MONITORING: Auto entry monitoring thread started")
-
-def get_active_trades():
-    """Get current active trades to check for duplicates"""
-    try:
-        port = get_port("active_trade_supervisor")
-        url = get_service_url(port) + "/api/active_trades"
-        response = requests.get(url, timeout=2)
-        if response.ok:
-            data = response.json()
-            return data.get("active_trades", [])
-    except Exception as e:
-        log(f"[AUTO ENTRY] Error fetching active trades: {e}")
-    return []
-
-def cleanup_old_triggered_strikes():
-    """Clean up old entries from triggered_strikes dictionary"""
+def can_trade_strike(strike_key):
+    """ATOMIC: Check if we can trade this strike (cooldown check)"""
     current_time = time.time()
-    keys_to_remove = []
     
-    for strike_key, trigger_time in triggered_strikes.items():
-        if current_time - trigger_time > short_term_cooldown:
-            keys_to_remove.append(strike_key)
+    if strike_key in last_trade_times:
+        time_since_last_trade = current_time - last_trade_times[strike_key]
+        if time_since_last_trade < TRADE_COOLDOWN:
+            log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - traded {time_since_last_trade:.1f}s ago (cooldown: {TRADE_COOLDOWN}s)")
+            return False
     
-    for key in keys_to_remove:
-        del triggered_strikes[key]
-        log(f"[AUTO ENTRY DEBUG] 🧹 Cleaned up old trigger: {key}")
-    
-    if keys_to_remove:
-        log(f"[AUTO ENTRY DEBUG] 🧹 Cleaned up {len(keys_to_remove)} old triggers")
+    # ATOMIC: Add to cooldown immediately
+    last_trade_times[strike_key] = current_time
+    log(f"[AUTO ENTRY DEBUG] ✅ {strike_key} passed cooldown check - added to cooldown")
+    return True
 
 def is_strike_already_traded(strike_data):
     """Check if we already have an active trade on this strike"""
@@ -504,10 +272,6 @@ def is_strike_already_traded(strike_data):
             elif normalized_trade_side == 'N' and normalized_strike_side == 'NO':
                 normalized_trade_side = 'NO'
             
-            # Debug logging to see what we're comparing
-            log(f"[AUTO ENTRY DEBUG] 🔍 Comparing: trade_strike_num='{trade_strike_num}' vs strike_data='{strike_data.get('strike')}'")
-            log(f"[AUTO ENTRY DEBUG] 🔍 Comparing: normalized_trade_side='{normalized_trade_side}' vs normalized_strike_side='{normalized_strike_side}'")
-            
             # Compare strike numbers and sides
             if (trade_strike_num == str(strike_data.get('strike')) and 
                 normalized_trade_side == normalized_strike_side):
@@ -519,6 +283,208 @@ def is_strike_already_traded(strike_data):
     except Exception as e:
         log(f"[AUTO ENTRY] Error checking active trades: {e}")
         return False
+
+def check_auto_entry_conditions():
+    """SIMPLIFIED: Check if auto entry conditions are met and trigger trades"""
+    global auto_entry_indicator_state
+    
+    try:
+        # Check if AUTO ENTRY is enabled
+        auto_entry_enabled = is_auto_entry_enabled()
+        log(f"[AUTO ENTRY DEBUG] 🔍 Auto entry enabled: {auto_entry_enabled}")
+        
+        if not auto_entry_enabled:
+            auto_entry_indicator_state.update({
+                "enabled": False,
+                "ttc_within_window": False,
+                "current_ttc": 0,
+                "last_updated": datetime.now().isoformat()
+            })
+            log(f"[AUTO ENTRY DEBUG] ⏸️ Auto entry disabled, skipping checks")
+            return
+        
+        # Get auto entry settings
+        settings = get_auto_entry_settings()
+        min_time = settings["min_time"]
+        max_time = settings["max_time"]
+        min_probability = settings["min_probability"]
+        min_differential = settings["min_differential"]
+        
+        log(f"[AUTO ENTRY DEBUG] ⚙️ Settings - min_time: {min_time}, max_time: {max_time}, min_prob: {min_probability}, min_diff: {min_differential}")
+        
+        # Get current TTC
+        current_ttc = get_current_ttc()
+        log(f"[AUTO ENTRY DEBUG] ⏰ Current TTC: {current_ttc} seconds")
+        
+        # Check if TTC is within the time window
+        ttc_within_window = min_time <= current_ttc <= max_time
+        log(f"[AUTO ENTRY DEBUG] 🪟 TTC within window ({min_time}-{max_time}): {ttc_within_window}")
+        
+        # Update indicator state for frontend
+        auto_entry_indicator_state.update({
+            "enabled": True,
+            "ttc_within_window": ttc_within_window,
+            "current_ttc": current_ttc,
+            "min_time": min_time,
+            "max_time": max_time,
+            "last_updated": datetime.now().isoformat()
+        })
+        
+        if not ttc_within_window:
+            log(f"[AUTO ENTRY DEBUG] ⏸️ TTC not in window, skipping trade checks")
+            return
+        
+        # Get watchlist data
+        watchlist_data = get_watchlist_data()
+        if not watchlist_data or "strikes" not in watchlist_data:
+            log(f"[AUTO ENTRY DEBUG] ❌ No watchlist data available")
+            return
+        
+        log(f"[AUTO ENTRY DEBUG] 📋 Found {len(watchlist_data['strikes'])} strikes in watchlist")
+        
+        # Process each strike ONCE
+        processed_strikes = set()  # Prevent duplicate processing
+        
+        for i, strike in enumerate(watchlist_data["strikes"]):
+            try:
+                # Use active_side for strike_key generation
+                active_side = strike.get('active_side')
+                if not active_side:
+                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping strike {strike.get('strike')} - no active_side in JSON")
+                    continue
+                    
+                strike_key = f"{strike.get('strike')}-{active_side}"
+                
+                # Prevent duplicate processing
+                if strike_key in processed_strikes:
+                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - already processed this cycle")
+                    continue
+                
+                processed_strikes.add(strike_key)
+                log(f"[AUTO ENTRY DEBUG] 🔍 Checking strike {i+1}/{len(watchlist_data['strikes'])}: {strike_key}")
+                
+                # STEP 1: ATOMIC cooldown check
+                if not can_trade_strike(strike_key):
+                    continue
+                
+                # STEP 2: Check if we already have an active trade on this strike
+                strike_data_for_check = {
+                    'strike': strike.get('strike'),
+                    'side': active_side
+                }
+                
+                if is_strike_already_traded(strike_data_for_check):
+                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - already have active trade on this strike")
+                    continue
+                
+                # STEP 3: Check probability threshold
+                prob = strike.get('probability')
+                log(f"[AUTO ENTRY DEBUG] 📊 Strike probability: {prob} (min required: {min_probability})")
+                if prob is None or prob < min_probability:
+                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - probability {prob} below threshold {min_probability}")
+                    continue
+                
+                # STEP 4: Check differential threshold (if applicable)
+                if min_differential > 0:
+                    diff = strike.get('yes_diff') if active_side == 'yes' else strike.get('no_diff')
+                    log(f"[AUTO ENTRY DEBUG] 📈 Strike differential: {diff} (min required: {min_differential})")
+                    if diff is None or diff < min_differential:
+                        log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - differential {diff} below threshold {min_differential}")
+                        continue
+                
+                # STEP 5: Determine buy price based on active_side
+                if active_side == 'yes':
+                    side = 'yes'
+                    buy_price = strike.get('yes_ask', 0) / 100.0  # Convert cents to decimal
+                    log(f"[AUTO ENTRY DEBUG] 🎯 Using YES side from active_side parameter")
+                elif active_side == 'no':
+                    side = 'no'
+                    buy_price = strike.get('no_ask', 0) / 100.0  # Convert cents to decimal
+                    log(f"[AUTO ENTRY DEBUG] 🎯 Using NO side from active_side parameter")
+                else:
+                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - invalid active_side: {active_side}")
+                    continue
+                
+                # STEP 6: Prepare strike data for trade trigger
+                strike_data = {
+                    'strike': f"${strike.get('strike'):,}",
+                    'side': side,
+                    'ticker': strike.get('ticker'),
+                    'buy_price': buy_price,
+                    'probability': prob
+                }
+                
+                log(f"[AUTO ENTRY DEBUG] 🎯 Strike {strike_key} meets criteria - triggering trade")
+                
+                # STEP 7: Trigger the trade
+                if trigger_auto_entry_trade(strike_data):
+                    log(f"[AUTO ENTRY DEBUG] ✅ Trade triggered for {strike_key}")
+                else:
+                    log(f"[AUTO ENTRY DEBUG] ❌ Failed to trigger trade for {strike_key}")
+                    # Remove from cooldown if trade failed
+                    if strike_key in last_trade_times:
+                        del last_trade_times[strike_key]
+                
+            except Exception as e:
+                log(f"[AUTO ENTRY] Error processing strike {strike.get('strike')}: {e}")
+                
+    except Exception as e:
+        log(f"[AUTO ENTRY] Error checking auto entry conditions: {e}")
+
+def cleanup_old_cooldowns():
+    """Clean up old cooldown entries"""
+    current_time = time.time()
+    keys_to_remove = []
+    
+    for strike_key, last_trade_time in last_trade_times.items():
+        if current_time - last_trade_time >= TRADE_COOLDOWN:
+            keys_to_remove.append(strike_key)
+    
+    for key in keys_to_remove:
+        del last_trade_times[key]
+        log(f"[AUTO ENTRY DEBUG] 🧹 Cleaned up old cooldown: {key}")
+    
+    if keys_to_remove:
+        log(f"[AUTO ENTRY DEBUG] 🧹 Cleaned up {len(keys_to_remove)} old cooldowns")
+
+def start_monitoring_loop():
+    """Start the monitoring loop for auto entry conditions"""
+    global monitoring_thread
+    
+    def monitoring_worker():
+        global monitoring_thread
+        log("📊 MONITORING: Starting auto entry monitoring loop")
+        
+        check_count = 0
+        while True:
+            try:
+                check_count += 1
+                log(f"[AUTO ENTRY DEBUG] 🔄 Check #{check_count} - starting condition check")
+                
+                # Clean up old cooldowns first
+                cleanup_old_cooldowns()
+                
+                # Check auto entry conditions
+                check_auto_entry_conditions()
+                
+                log(f"[AUTO ENTRY DEBUG] 💤 Check #{check_count} - sleeping for 1 second")
+                # Sleep for 1 second
+                time.sleep(1)
+                
+            except Exception as e:
+                log(f"❌ Error in monitoring worker: {e}")
+                time.sleep(5)  # Wait longer on error
+        
+        # Clear the global monitoring thread reference when done
+        with monitoring_thread_lock:
+            monitoring_thread = None
+        log("📊 MONITORING: Auto entry monitoring thread finished")
+    
+    # Start monitoring in a separate thread
+    with monitoring_thread_lock:
+        monitoring_thread = threading.Thread(target=monitoring_worker, daemon=True)
+        monitoring_thread.start()
+        log("📊 MONITORING: Auto entry monitoring thread started")
 
 # Health check endpoint
 @app.route("/health")
@@ -545,7 +511,7 @@ def get_auto_entry_status():
             "enabled": enabled,
             "settings": settings,
             "current_ttc": current_ttc,
-            "triggered_strikes_count": len(triggered_strikes),
+            "cooldown_entries_count": len(last_trade_times),
             "timestamp": datetime.now().isoformat()
         })
     except Exception as e:
@@ -591,7 +557,7 @@ def get_ports():
 
 def start_event_driven_supervisor():
     """Start the event-driven auto entry supervisor"""
-    log("🚀 Starting Auto Entry Supervisor")
+    log("🚀 Starting Auto Entry Supervisor (SIMPLIFIED)")
     
     # Start monitoring loop
     start_monitoring_loop()
