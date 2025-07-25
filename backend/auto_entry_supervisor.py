@@ -69,24 +69,19 @@ def log(message: str):
 def is_auto_entry_enabled():
     """Check if AUTO ENTRY is enabled in trade_preferences.json"""
     prefs_path = os.path.join(get_data_dir(), "preferences", "trade_preferences.json")
-    log(f"[AUTO ENTRY DEBUG] 📁 Checking preferences file: {prefs_path}")
     if os.path.exists(prefs_path):
         try:
             with open(prefs_path, "r") as f:
                 prefs = json.load(f)
                 enabled = prefs.get("auto_entry", False)
-                log(f"[AUTO ENTRY DEBUG] 📋 Auto entry setting: {enabled}")
                 return enabled
         except Exception as e:
             log(f"[AUTO ENTRY] Error reading preferences: {e}")
-    else:
-        log(f"[AUTO ENTRY DEBUG] ❌ Preferences file not found")
     return False
 
 def get_auto_entry_settings():
     """Get auto entry settings from auto_entry_settings.json"""
     settings_path = os.path.join(get_data_dir(), "preferences", "auto_entry_settings.json")
-    log(f"[AUTO ENTRY DEBUG] 📁 Checking settings file: {settings_path}")
     if os.path.exists(settings_path):
         try:
             with open(settings_path, "r") as f:
@@ -98,12 +93,9 @@ def get_auto_entry_settings():
                     "min_differential": settings.get("min_differential", 0),
                     "allow_re_entry": settings.get("allow_re_entry", False)
                 }
-                log(f"[AUTO ENTRY DEBUG] ⚙️ Loaded settings: {result}")
                 return result
         except Exception as e:
             log(f"[AUTO ENTRY] Error reading settings: {e}")
-    else:
-        log(f"[AUTO ENTRY DEBUG] ❌ Settings file not found")
     return {
         "min_time": 0,
         "max_time": 3600,
@@ -117,15 +109,13 @@ def get_current_ttc():
     try:
         port = get_port("main_app")
         url = get_service_url(port) + "/api/unified_ttc/btc"
-        log(f"[AUTO ENTRY DEBUG] 🌐 Fetching TTC from: {url}")
         response = requests.get(url, timeout=2)
         if response.ok:
             data = response.json()
             ttc = data.get("ttc_seconds", 0)
-            log(f"[AUTO ENTRY DEBUG] ⏰ TTC response: {ttc} seconds")
             return ttc
         else:
-            log(f"[AUTO ENTRY DEBUG] ❌ TTC request failed: {response.status_code}")
+            log(f"[AUTO ENTRY] TTC request failed: {response.status_code}")
     except Exception as e:
         log(f"[AUTO ENTRY] Error fetching TTC: {e}")
     return 0
@@ -134,14 +124,12 @@ def get_watchlist_data():
     """Get current watchlist data"""
     try:
         watchlist_path = os.path.join(get_data_dir(), "strike_tables", "btc_watchlist.json")
-        log(f"[AUTO ENTRY DEBUG] 📁 Checking watchlist file: {watchlist_path}")
         if os.path.exists(watchlist_path):
             with open(watchlist_path, "r") as f:
                 data = json.load(f)
-                log(f"[AUTO ENTRY DEBUG] 📋 Watchlist data loaded: {len(data.get('strikes', []))} strikes")
                 return data
         else:
-            log(f"[AUTO ENTRY DEBUG] ❌ Watchlist file not found")
+            log(f"[AUTO ENTRY] Watchlist file not found")
     except Exception as e:
         log(f"[AUTO ENTRY] Error reading watchlist data: {e}")
     return None
@@ -156,13 +144,12 @@ def get_position_size():
                 position_size = data.get("position_size", 1)
                 multiplier = data.get("multiplier", 1)
                 total_position = position_size * multiplier
-                log(f"[AUTO ENTRY DEBUG] 📊 Position size: {position_size}, Multiplier: {multiplier}, Total: {total_position}")
                 return total_position
         else:
-            log(f"[AUTO ENTRY DEBUG] ❌ Trade preferences file not found: {preferences_file}")
+            log(f"[AUTO ENTRY] Trade preferences file not found")
             return None
     except Exception as e:
-        log(f"[AUTO ENTRY DEBUG] ❌ Error loading position size: {e}")
+        log(f"[AUTO ENTRY] Error loading position size: {e}")
         return None
 
 def trigger_auto_entry_trade(strike_data):
@@ -313,7 +300,6 @@ def check_auto_entry_conditions():
     try:
         # Check if AUTO ENTRY is enabled
         auto_entry_enabled = is_auto_entry_enabled()
-        log(f"[AUTO ENTRY DEBUG] 🔍 Auto entry enabled: {auto_entry_enabled}")
         
         if not auto_entry_enabled:
             auto_entry_indicator_state.update({
@@ -322,7 +308,6 @@ def check_auto_entry_conditions():
                 "current_ttc": 0,
                 "last_updated": datetime.now().isoformat()
             })
-            log(f"[AUTO ENTRY DEBUG] ⏸️ Auto entry disabled, skipping checks")
             return
         
         # Get auto entry settings
@@ -332,15 +317,11 @@ def check_auto_entry_conditions():
         min_probability = settings["min_probability"]
         min_differential = settings["min_differential"]
         
-        log(f"[AUTO ENTRY DEBUG] ⚙️ Settings - min_time: {min_time}, max_time: {max_time}, min_prob: {min_probability}, min_diff: {min_differential}")
-        
         # Get current TTC
         current_ttc = get_current_ttc()
-        log(f"[AUTO ENTRY DEBUG] ⏰ Current TTC: {current_ttc} seconds")
         
         # Check if TTC is within the time window
         ttc_within_window = min_time <= current_ttc <= max_time
-        log(f"[AUTO ENTRY DEBUG] 🪟 TTC within window ({min_time}-{max_time}): {ttc_within_window}")
         
         # Update indicator state for frontend
         auto_entry_indicator_state.update({
@@ -353,16 +334,12 @@ def check_auto_entry_conditions():
         })
         
         if not ttc_within_window:
-            log(f"[AUTO ENTRY DEBUG] ⏸️ TTC not in window, skipping trade checks")
             return
         
         # Get watchlist data
         watchlist_data = get_watchlist_data()
         if not watchlist_data or "strikes" not in watchlist_data:
-            log(f"[AUTO ENTRY DEBUG] ❌ No watchlist data available")
             return
-        
-        log(f"[AUTO ENTRY DEBUG] 📋 Found {len(watchlist_data['strikes'])} strikes in watchlist")
         
         # Process each strike ONCE
         processed_strikes = set()  # Prevent duplicate processing
@@ -372,18 +349,15 @@ def check_auto_entry_conditions():
                 # Use active_side for strike_key generation
                 active_side = strike.get('active_side')
                 if not active_side:
-                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping strike {strike.get('strike')} - no active_side in JSON")
                     continue
                     
                 strike_key = f"{strike.get('strike')}-{active_side}"
                 
                 # Prevent duplicate processing
                 if strike_key in processed_strikes:
-                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - already processed this cycle")
                     continue
                 
                 processed_strikes.add(strike_key)
-                log(f"[AUTO ENTRY DEBUG] 🔍 Checking strike {i+1}/{len(watchlist_data['strikes'])}: {strike_key}")
                 
                 # STEP 1: ATOMIC cooldown check
                 if not can_trade_strike(strike_key):
@@ -396,14 +370,11 @@ def check_auto_entry_conditions():
                 }
                 
                 if is_strike_already_traded(strike_data_for_check):
-                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - already have active trade on this strike")
                     continue
                 
                 # STEP 3: Check probability threshold
                 prob = strike.get('probability')
-                log(f"[AUTO ENTRY DEBUG] 📊 Strike probability: {prob} (min required: {min_probability})")
                 if prob is None or prob < min_probability:
-                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - probability {prob} below threshold {min_probability}")
                     continue
                 
                 # STEP 4: Check differential threshold (if applicable)
@@ -418,13 +389,10 @@ def check_auto_entry_conditions():
                 if active_side == 'yes':
                     side = 'yes'
                     buy_price = strike.get('yes_ask', 0) / 100.0  # Convert cents to decimal
-                    log(f"[AUTO ENTRY DEBUG] 🎯 Using YES side from active_side parameter")
                 elif active_side == 'no':
                     side = 'no'
                     buy_price = strike.get('no_ask', 0) / 100.0  # Convert cents to decimal
-                    log(f"[AUTO ENTRY DEBUG] 🎯 Using NO side from active_side parameter")
                 else:
-                    log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - invalid active_side: {active_side}")
                     continue
                 
                 # STEP 6: Prepare strike data for trade trigger
@@ -436,13 +404,10 @@ def check_auto_entry_conditions():
                     'probability': prob
                 }
                 
-                log(f"[AUTO ENTRY DEBUG] 🎯 Strike {strike_key} meets criteria - triggering trade")
-                
                 # STEP 7: Trigger the trade
                 if trigger_auto_entry_trade(strike_data):
-                    log(f"[AUTO ENTRY DEBUG] ✅ Trade triggered for {strike_key}")
+                    log(f"[AUTO ENTRY] ✅ Trade triggered for {strike_key}")
                 else:
-                    log(f"[AUTO ENTRY DEBUG] ❌ Failed to trigger trade for {strike_key}")
                     # Remove from cooldown if trade failed
                     if strike_key in last_trade_times:
                         del last_trade_times[strike_key]
@@ -464,10 +429,10 @@ def cleanup_old_cooldowns():
     
     for key in keys_to_remove:
         del last_trade_times[key]
-        log(f"[AUTO ENTRY DEBUG] 🧹 Cleaned up old cooldown: {key}")
     
+    # Only log if we actually cleaned up something
     if keys_to_remove:
-        log(f"[AUTO ENTRY DEBUG] 🧹 Cleaned up {len(keys_to_remove)} old cooldowns")
+        log(f"[AUTO ENTRY] Cleaned up {len(keys_to_remove)} old cooldowns")
 
 def start_monitoring_loop():
     """Start the monitoring loop for auto entry conditions"""
@@ -481,7 +446,10 @@ def start_monitoring_loop():
         while True:
             try:
                 check_count += 1
-                log(f"[AUTO ENTRY DEBUG] 🔄 Check #{check_count} - starting condition check")
+                
+                # Only log every 100 checks (reduces logging by 99%)
+                if check_count % 100 == 0:
+                    log(f"[AUTO ENTRY] Check #{check_count} - continuing monitoring...")
                 
                 # Clean up old cooldowns first
                 cleanup_old_cooldowns()
@@ -489,7 +457,6 @@ def start_monitoring_loop():
                 # Check auto entry conditions
                 check_auto_entry_conditions()
                 
-                log(f"[AUTO ENTRY DEBUG] 💤 Check #{check_count} - sleeping for 1 second")
                 # Sleep for 1 second
                 time.sleep(1)
                 

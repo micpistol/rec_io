@@ -1,8 +1,0 @@
-active_trade_supervisor          RUNNING   pid 49581, uptime 0:20:11
-btc_price_watchdog               RUNNING   pid 49582, uptime 0:20:11
-db_poller                        RUNNING   pid 49583, uptime 0:20:11
-kalshi_account_sync              RUNNING   pid 49584, uptime 0:20:11
-kalshi_api_watchdog              RUNNING   pid 49585, uptime 0:20:11
-kalshi_trade_executor            RUNNING   pid 49586, uptime 0:20:11
-main_app                         RUNNING   pid 55524, uptime 0:07:42
-trade_manager                    RUNNING   pid 49588, uptime 0:20:11

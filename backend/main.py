@@ -1034,9 +1034,9 @@ async def get_watchlist(symbol: str):
 
 @app.get("/api/unified_ttc/{symbol}")
 async def get_unified_ttc(symbol: str):
-    """Get unified TTC data for a specific symbol from strike table manager"""
+    """Get unified TTC data for a specific symbol from unified production coordinator"""
     try:
-        from strike_table_manager import get_unified_ttc
+        from unified_production_coordinator import get_unified_ttc
         return get_unified_ttc(symbol)
     except Exception as e:
         return {"error": f"Error getting unified TTC: {str(e)}"}

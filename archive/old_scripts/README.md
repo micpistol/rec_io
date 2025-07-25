@@ -5,7 +5,7 @@ This directory contains the old independent scripts that were replaced by the un
 ## Archived Files
 
 - `probability_writer.py` - Old script that generated live probabilities
-- `strike_table_manager.py` - Old script that generated strike table and watchlist JSON files
+
 
 ## Replacement
 

@@ -156,8 +156,8 @@ environment=PATH="venv/bin",PYTHONPATH=".",TRADING_SYSTEM_HOST="localhost"
 
 ### Step 1: Stop Old Scripts
 ```bash
-supervisorctl stop probability_writer
-supervisorctl stop strike_table_manager
+# Note: probability_writer has been replaced by unified_production_coordinator
+
 ```
 
 ### Step 2: Start Unified Coordinator
