@@ -550,6 +550,63 @@
     border-right: none;
     border-bottom: 1px solid #222c3c;
   }
+  #recentTradesTable tbody tr:nth-child(even) {
+    background-color: #323c4e;
+  }
+  #recentTradesTable tbody tr:hover {
+    background-color: #4d586f !important;
+    cursor: pointer;
+  }
+  #recentTradesTable tbody td {
+    padding: 4px 6px;
+    text-align: center;
+    font-size: 12px;
+  }
+  #openPositionsTable thead th {
+    font-size: 13px;
+    font-weight: bold;
+    background-color: #222c3c;
+    padding: 4px 6px;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    border-bottom: 1px solid #222c3c;
+  }
+  #openPositionsTable tbody tr:nth-child(even) {
+    background-color: #323c4e;
+  }
+  #openPositionsTable tbody tr:hover {
+    background-color: #4d586f !important;
+    cursor: pointer;
+  }
+  #openPositionsTable tbody td {
+    padding: 4px 6px;
+    text-align: center;
+    font-size: 12px;
+  }
+  #settlementsTable thead th {
+    font-size: 13px;
+    font-weight: bold;
+    background-color: #222c3c;
+    padding: 4px 6px;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    border-bottom: 1px solid #222c3c;
+  }
+  #settlementsTable tbody tr:nth-child(even) {
+    background-color: #323c4e;
+  }
+  #settlementsTable tbody tr:hover {
+    background-color: #4d586f !important;
+    cursor: pointer;
+  }
+  #settlementsTable tbody td {
+    padding: 4px 6px;
+    text-align: center;
+    font-size: 12px;
+  }
+
 </style>
 
 </style>
@@ -1638,21 +1695,63 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
       <!-- Recent Fills Panel -->
       <div class="panel-container" style="min-height: 100px;" id="recentTradesPanel">
-        <div class="panel-header">Recent Fills</div>
-        <table id="recentTradesTable" class="panel-table" style="width: 100%; border-collapse: collapse;">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Time</th>
-              <th>Contract</th>
-              <th>Strike</th>
-              <th>Side</th>
-              <th>Count</th>
-              <th>Price</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; gap: 20px;">
+            <span id="open-positions-tab" class="panel-tab active" style="cursor: pointer; opacity: 1; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="if(!this.classList.contains('active')) this.style.opacity='0.5'">Open Positions</span>
+            <span id="recent-fills-tab" class="panel-tab" style="cursor: pointer; opacity: 0.5; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="if(!this.classList.contains('active')) this.style.opacity='0.5'">Recent Fills</span>
+            <span id="settlements-tab" class="panel-tab" style="cursor: pointer; opacity: 0.5; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="if(!this.classList.contains('active')) this.style.opacity='0.5'">Settlements</span>
+          </div>
+        </div>
+        <div id="recent-fills-content" class="tab-content" style="display: none;">
+          <div style="height: 200px; overflow-y: auto;">
+            <table id="recentTradesTable" class="panel-table" style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Contract</th>
+                  <th>Strike</th>
+                  <th>Side</th>
+                  <th>Count</th>
+                  <th>Price</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="settlements-content" class="tab-content" style="display: none;">
+          <div style="height: 200px; overflow-y: auto;">
+            <table id="settlementsTable" class="panel-table" style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr>
+                  <th>Ticker</th>
+                  <th>Result</th>
+                  <th>Yes</th>
+                  <th>No</th>
+                  <th>Revenue</th>
+                  <th>Settled At</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="open-positions-content" class="tab-content active">
+          <table id="openPositionsTable" class="panel-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Buy</th>
+                <th>Position</th>
+                <th>Fees</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
     </div>
    
@@ -2343,12 +2442,23 @@ async function fetchAndRenderRecentTrades() {
     if (!res.ok) throw new Error("Failed to fetch recent fills");
     const data = await res.json();
     const fills = data.fills || [];
-    // Show the 5 most recent fills
-    const recentFive = fills.slice(0, 5);
+    
+    // Limit to previous 30 fills (same logic as settlements)
+    const recentFills = fills.slice(0, 30);
+    
     const recentTradesTableBody = document.querySelector('#recentTradesTable tbody');
     if (!recentTradesTableBody) return;
     recentTradesTableBody.innerHTML = '';
-    recentFive.forEach(fill => {
+    
+    if (recentFills.length === 0) {
+      // Show "No Fills" message
+      const noFillsRow = document.createElement('tr');
+      noFillsRow.innerHTML = '<td colspan="7" style="text-align: center; color: #ccc; padding: 20px;">No Fills</td>';
+      recentTradesTableBody.appendChild(noFillsRow);
+      return;
+    }
+    
+    recentFills.forEach(fill => {
       // Parse the created_time to extract date and time
       const createdTime = new Date(fill.created_time);
       const dateCell = createdTime.toLocaleDateString();
@@ -2467,10 +2577,224 @@ async function closeExpiredTrades() {
   }
 }
 
+// === Tab Switching Functionality ===
+function initializeTabSwitching() {
+  const recentFillsTab = document.getElementById('recent-fills-tab');
+  const openPositionsTab = document.getElementById('open-positions-tab');
+  const recentFillsContent = document.getElementById('recent-fills-content');
+  const openPositionsContent = document.getElementById('open-positions-content');
+
+  function switchToTab(activeTab, activeContent, inactiveTab, inactiveContent) {
+    // Update tab styles
+    activeTab.classList.add('active');
+    activeTab.style.opacity = '1';
+    inactiveTab.classList.remove('active');
+    inactiveTab.style.opacity = '0.5';
+    
+    // Update content visibility
+    activeContent.classList.add('active');
+    activeContent.style.display = 'block';
+    inactiveContent.classList.remove('active');
+    inactiveContent.style.display = 'none';
+  }
+
+  // Recent Fills tab click handler
+  recentFillsTab.addEventListener('click', () => {
+    // Hide all tabs and show only recent fills
+    openPositionsTab.classList.remove('active');
+    openPositionsTab.style.opacity = '0.5';
+    settlementsTab.classList.remove('active');
+    settlementsTab.style.opacity = '0.5';
+    recentFillsTab.classList.add('active');
+    recentFillsTab.style.opacity = '1';
+    
+    // Hide all content and show only recent fills
+    openPositionsContent.classList.remove('active');
+    openPositionsContent.style.display = 'none';
+    settlementsContent.classList.remove('active');
+    settlementsContent.style.display = 'none';
+    recentFillsContent.classList.add('active');
+    recentFillsContent.style.display = 'block';
+    
+    // Refresh recent fills data
+    fetchAndRenderRecentTrades();
+  });
+
+  // Open Positions tab click handler
+  openPositionsTab.addEventListener('click', () => {
+    // Hide all tabs and show only positions
+    recentFillsTab.classList.remove('active');
+    recentFillsTab.style.opacity = '0.5';
+    settlementsTab.classList.remove('active');
+    settlementsTab.style.opacity = '0.5';
+    openPositionsTab.classList.add('active');
+    openPositionsTab.style.opacity = '1';
+    
+    // Hide all content and show only positions
+    recentFillsContent.classList.remove('active');
+    recentFillsContent.style.display = 'none';
+    settlementsContent.classList.remove('active');
+    settlementsContent.style.display = 'none';
+    openPositionsContent.classList.add('active');
+    openPositionsContent.style.display = 'block';
+    
+    // Fetch and render positions data
+    fetchAndRenderPositions();
+  });
+
+  // Settlements tab click handler
+  const settlementsTab = document.getElementById('settlements-tab');
+  const settlementsContent = document.getElementById('settlements-content');
+  
+  settlementsTab.addEventListener('click', () => {
+    // Hide all tabs and show only settlements
+    recentFillsTab.classList.remove('active');
+    recentFillsTab.style.opacity = '0.5';
+    openPositionsTab.classList.remove('active');
+    openPositionsTab.style.opacity = '0.5';
+    settlementsTab.classList.add('active');
+    settlementsTab.style.opacity = '1';
+    
+    // Hide all content and show only settlements
+    recentFillsContent.classList.remove('active');
+    recentFillsContent.style.display = 'none';
+    openPositionsContent.classList.remove('active');
+    openPositionsContent.style.display = 'none';
+    settlementsContent.classList.add('active');
+    settlementsContent.style.display = 'block';
+    
+    // Fetch and render settlements data
+    fetchAndRenderSettlements();
+  });
+
+
+}
+
+// === Positions Data Fetching and Rendering ===
+async function fetchAndRenderPositions() {
+  try {
+    const response = await fetch('/api/db/positions', { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error('Failed to fetch positions data');
+    }
+    
+    const data = await response.json();
+    const positions = data.positions || [];
+    
+    const openPositionsTableBody = document.querySelector('#openPositionsTable tbody');
+    if (!openPositionsTableBody) return;
+    
+    // Clear existing content
+    openPositionsTableBody.innerHTML = '';
+    
+    if (positions.length === 0) {
+      // Show "No Open Positions" message
+      const noPositionsRow = document.createElement('tr');
+      noPositionsRow.innerHTML = '<td colspan="5" style="text-align: center; color: #ccc; padding: 20px;">No Open Positions</td>';
+      openPositionsTableBody.appendChild(noPositionsRow);
+      return;
+    }
+    
+    // Render positions data using the same logic as account_manager.html
+    openPositionsTableBody.innerHTML = positions
+      .filter(p => p.position !== 0)
+      .map(p => `
+        <tr>
+          <td>${p.ticker}</td>
+          <td>${p.market_exposure && p.position !== 0 ? (p.market_exposure / p.position / 100).toFixed(2) : "0.00"}</td>
+          <td>${p.position}</td>
+          <td>${(p.fees_paid / 100).toFixed(2)}</td>
+          <td>${new Date(p.last_updated_ts).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
+        </tr>
+      `).join("");
+    
+  } catch (error) {
+    console.error('Error fetching positions:', error);
+    const openPositionsTableBody = document.querySelector('#openPositionsTable tbody');
+    if (openPositionsTableBody) {
+      openPositionsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #dc3545; padding: 20px;">Error loading positions</td></tr>';
+    }
+  }
+}
+
+
+
+// === Settlements Data Fetching and Rendering ===
+async function fetchAndRenderSettlements() {
+  try {
+    const response = await fetch('/api/db/settlements', { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error('Failed to fetch settlements data');
+    }
+    
+    const data = await response.json();
+    const allSettlements = data.settlements || [];
+    
+    // Limit to previous 30 settlements
+    const recentSettlements = allSettlements.slice(0, 30);
+    
+    const settlementsTableBody = document.querySelector('#settlementsTable tbody');
+    if (!settlementsTableBody) return;
+    
+    // Clear existing content
+    settlementsTableBody.innerHTML = '';
+    
+    if (recentSettlements.length === 0) {
+      // Show "No Settlements" message
+      const noSettlementsRow = document.createElement('tr');
+      noSettlementsRow.innerHTML = '<td colspan="6" style="text-align: center; color: #ccc; padding: 20px;">No Settlements</td>';
+      settlementsTableBody.appendChild(noSettlementsRow);
+      return;
+    }
+    
+    // Render settlements data using the same logic as account_manager.html
+    settlementsTableBody.innerHTML = recentSettlements.map(s => {
+      // Convert revenue from cents to dollars
+      const revenueInDollars = s.revenue / 100;
+      const formattedRevenue = revenueInDollars.toLocaleString(undefined, { 
+        minimumFractionDigits: 0, 
+        maximumFractionDigits: 0 
+      });
+      
+      return `
+        <tr>
+          <td>${s.ticker}</td>
+          <td>${s.market_result === "yes" ? "Y" : "N"}</td>
+          <td>${s.yes_count}</td>
+          <td>${s.no_count}</td>
+          <td>$${formattedRevenue}</td>
+          <td>${new Date(s.settled_time).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
+        </tr>
+      `;
+    }).join("");
+    
+  } catch (error) {
+    console.error('Error fetching settlements:', error);
+    const settlementsTableBody = document.querySelector('#settlementsTable tbody');
+    if (settlementsTableBody) {
+      settlementsTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #dc3545; padding: 20px;">Error loading settlements</td></tr>';
+    }
+  }
+}
+
+// === Open Positions Data Fetching (placeholder for future implementation) ===
+async function fetchAndRenderOpenPositions() {
+  try {
+    // This is a placeholder function for future implementation
+    // For now, it will show an empty table
+    const openPositionsTableBody = document.querySelector('#openPositionsTable tbody');
+    if (!openPositionsTableBody) return;
+    
+    openPositionsTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #ccc;">No open positions</td></tr>';
+  } catch (err) {
+    console.error('Error fetching open positions:', err);
+  }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   fetchAndRenderRecentTrades();
-  // setInterval(fetchAndRenderRecentTrades, 1000); // Replaced by staggered polling below
+  fetchAndRenderPositions(); // Load positions data since it's the default tab
+  initializeTabSwitching();
 });
 
 </script>
