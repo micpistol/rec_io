@@ -402,7 +402,7 @@
 }
 </style>
 <style>
-#recoToggle {
+#autoEntryToggle {
   accent-color: #007bff;
   background-color: transparent;
   border: none;
@@ -419,12 +419,12 @@
   transition: outline 0.2s ease;
 }
 
-#recoToggle:checked {
+#autoEntryToggle:checked {
   background-color: #007bff;
   box-shadow: none;
 }
 
-#recoToggle:checked::after {
+#autoEntryToggle:checked::after {
   content: "";
   position: absolute;
   left: 4px;
@@ -436,7 +436,7 @@
   transform: rotate(45deg);
 }
 
-#recoToggle:focus-visible {
+#autoEntryToggle:focus-visible {
   outline: 2px solid #00ff00;
   outline-offset: 2px;
 }
@@ -527,7 +527,7 @@
   }
 </style>
 <style>
-  /* === RECENT TRADES TABLE STYLES (match Active Trades) === */
+  /* === Profile Data TABLE STYLES (match Active Trades) === */
   #recentTradesTable {
     width: 100%;
     border-collapse: collapse;
@@ -731,7 +731,7 @@
             />
             <label style="font-size: 12px; user-select: none; color: white; display: flex; align-items: center; gap: 6px; margin: 0;">
               AUTO ENTRY
-              <input type="checkbox" id="recoToggle" />
+              <input type="checkbox" id="autoEntryToggle" />
             </label>
           </div>
         </div>
@@ -1177,14 +1177,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const autoStopSupervisorToggle = document.getElementById('autoStopSupervisorToggle');
   const positionInput = document.getElementById('position-size');
   const multiplierButtons = document.querySelectorAll('.multiplier-btn');
-  const recoToggle = document.getElementById('recoToggle');
+  const autoEntryToggle = document.getElementById('autoEntryToggle');
   const plusMinusToggle = document.getElementById('plusMinusToggle');
   
   console.log('Elements found:', {
     autoStopToggle: !!autoStopToggle,
     positionInput: !!positionInput,
     multiplierButtons: multiplierButtons.length,
-    recoToggle: !!recoToggle,
+    autoEntryToggle: !!autoEntryToggle,
     plusMinusToggle: !!plusMinusToggle
   });
   
@@ -1217,8 +1217,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (autoStopSupervisorToggle && data.auto_stop !== undefined) {
         autoStopSupervisorToggle.checked = data.auto_stop;
       }
-      if (recoToggle && data.auto_entry !== undefined) {
-        recoToggle.checked = data.auto_entry;
+      if (autoEntryToggle && data.auto_entry !== undefined) {
+        autoEntryToggle.checked = data.auto_entry;
         window.recoEnabled = data.auto_entry;
         
         // If AUTO ENTRY is enabled on initial load, apply filtering
@@ -1342,10 +1342,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ignoreWsUpdates = false;
       }
 
-      if (recoToggle && data.auto_entry !== undefined && document.activeElement !== recoToggle) {
+      if (autoEntryToggle && data.auto_entry !== undefined && document.activeElement !== autoEntryToggle) {
         ignoreWsUpdates = true;
         console.log('Received AUTO ENTRY update via WebSocket:', data.auto_entry);
-        recoToggle.checked = data.auto_entry;
+        autoEntryToggle.checked = data.auto_entry;
         window.recoEnabled = data.auto_entry;
         
         // If AUTO ENTRY is being turned ON, apply filtering immediately
@@ -1453,15 +1453,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  if (recoToggle) {
+  if (autoEntryToggle) {
     console.log('Adding AUTO ENTRY event listener');
-    recoToggle.addEventListener('change', () => {
+    autoEntryToggle.addEventListener('change', () => {
       console.log('AUTO ENTRY event handler triggered, ignoreWsUpdates:', ignoreWsUpdates);
       if (ignoreWsUpdates) {
         console.log('Ignoring AUTO ENTRY change due to WebSocket update');
         return;
       }
-      const value = recoToggle.checked;
+      const value = autoEntryToggle.checked;
       console.log('AUTO ENTRY toggle changed to:', value);
       window.recoEnabled = value;
       
@@ -1693,13 +1693,13 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
       </div>
-      <!-- Recent Fills Panel -->
-      <div class="panel-container" style="min-height: 100px;" id="recentTradesPanel">
+      <!-- Profile Data Panel -->
+      <div class="panel-container" style="min-height: 100px;" id="profileDataPanel">
         <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
           <div style="display: flex; gap: 20px;">
-            <span id="open-positions-tab" class="panel-tab active" style="cursor: pointer; opacity: 1; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="if(!this.classList.contains('active')) this.style.opacity='0.5'">Open Positions</span>
-            <span id="recent-fills-tab" class="panel-tab" style="cursor: pointer; opacity: 0.5; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="if(!this.classList.contains('active')) this.style.opacity='0.5'">Recent Fills</span>
-            <span id="settlements-tab" class="panel-tab" style="cursor: pointer; opacity: 0.5; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="if(!this.classList.contains('active')) this.style.opacity='0.5'">Settlements</span>
+            <span id="open-positions-tab" class="panel-tab active" style="cursor: pointer; opacity: 1; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="if(!this.classList.contains('active')) this.style.opacity='0.3'">Open Positions</span>
+            <span id="recent-fills-tab" class="panel-tab" style="cursor: pointer; opacity: 0.3; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="if(!this.classList.contains('active')) this.style.opacity='0.3'">Recent Fills</span>
+            <span id="settlements-tab" class="panel-tab" style="cursor: pointer; opacity: 0.3; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="if(!this.classList.contains('active')) this.style.opacity='0.3'">Settlements</span>
           </div>
         </div>
         <div id="recent-fills-content" class="tab-content" style="display: none;">
@@ -2589,7 +2589,7 @@ function initializeTabSwitching() {
     activeTab.classList.add('active');
     activeTab.style.opacity = '1';
     inactiveTab.classList.remove('active');
-    inactiveTab.style.opacity = '0.5';
+    inactiveTab.style.opacity = '0.3';
     
     // Update content visibility
     activeContent.classList.add('active');
@@ -2602,9 +2602,9 @@ function initializeTabSwitching() {
   recentFillsTab.addEventListener('click', () => {
     // Hide all tabs and show only recent fills
     openPositionsTab.classList.remove('active');
-    openPositionsTab.style.opacity = '0.5';
+    openPositionsTab.style.opacity = '0.3';
     settlementsTab.classList.remove('active');
-    settlementsTab.style.opacity = '0.5';
+    settlementsTab.style.opacity = '0.3';
     recentFillsTab.classList.add('active');
     recentFillsTab.style.opacity = '1';
     
@@ -2624,9 +2624,9 @@ function initializeTabSwitching() {
   openPositionsTab.addEventListener('click', () => {
     // Hide all tabs and show only positions
     recentFillsTab.classList.remove('active');
-    recentFillsTab.style.opacity = '0.5';
+    recentFillsTab.style.opacity = '0.3';
     settlementsTab.classList.remove('active');
-    settlementsTab.style.opacity = '0.5';
+    settlementsTab.style.opacity = '0.3';
     openPositionsTab.classList.add('active');
     openPositionsTab.style.opacity = '1';
     
