@@ -683,6 +683,46 @@ def notify_active_trade_supervisor(trade_id: int, ticket_id: str, status: str) -
     except Exception as e:
         log(f"❌ Error notifying active trade supervisor: {e}")
 
+def notify_frontend_trade_change() -> None:
+    """
+    Send notification to frontend when trades.db is updated.
+    This triggers the trade history page to refresh.
+    """
+    try:
+        import aiohttp
+        import asyncio
+        
+        async def send_notification():
+            async with aiohttp.ClientSession() as session:
+                notification_url = f"http://localhost:{config.get('main_app_port', 3000)}/api/notify_db_change"
+                payload = {
+                    "db_name": "trades",
+                    "timestamp": time.time(),
+                    "change_data": {"trades": 1}
+                }
+                
+                try:
+                    async with session.post(notification_url, json=payload, timeout=2) as response:
+                        if response.status == 200:
+                            log("✅ Notified frontend about trade database change")
+                        else:
+                            log(f"⚠️ Failed to notify frontend about trade change: {response.status}")
+                except Exception as e:
+                    log(f"❌ Error sending trade change notification: {e}")
+        
+        # Run the async notification in a new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(send_notification())
+        finally:
+            loop.close()
+            
+    except ImportError:
+        log("⚠️ aiohttp not available - skipping frontend notification")
+    except Exception as e:
+        log(f"❌ Error in trade change notification: {e}")
+
 def is_trade_expired(trade):
     contract = trade.get('contract', '')
     if not contract:
@@ -870,6 +910,10 @@ def insert_trade(trade):
     conn.commit()
     last_id = cursor.lastrowid
     conn.close()
+    
+    # Notify frontend about trade database change
+    notify_frontend_trade_change()
+    
     return last_id
 
 def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbol_close=None, win_loss=None, pnl=None, close_method=None):
@@ -914,6 +958,9 @@ def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbo
         cursor.execute("UPDATE trades SET status = ? WHERE id = ?", (status, trade_id))
     conn.commit()
     conn.close()
+    
+    # Notify frontend about trade database change
+    notify_frontend_trade_change()
 
 def delete_trade(trade_id):
     conn = get_db_connection()
@@ -921,6 +968,9 @@ def delete_trade(trade_id):
     cursor.execute("DELETE FROM trades WHERE id = ?", (trade_id,))
     conn.commit()
     conn.close()
+    
+    # Notify frontend about trade database change
+    notify_frontend_trade_change()
 
 def fetch_recent_closed_trades(hours=24):
     conn = get_db_connection()

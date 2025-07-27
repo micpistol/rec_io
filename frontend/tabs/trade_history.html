@@ -711,12 +711,51 @@
       display.textContent = rangeText;
     }
 
+    // WebSocket connection for database change notifications
+    function setupDatabaseChangeListener() {
+      const ws = new WebSocket(`ws://${window.location.host}/ws/db_changes`);
+      
+      ws.onopen = function() {
+        console.log('🔗 Connected to database change notifications (trade history)');
+      };
+      
+      ws.onmessage = function(event) {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('📡 Received database change notification (trade history):', data);
+          
+          // Handle trade database changes and refresh immediately
+          if (data.database === 'trades') {
+            console.log('🔄 Refreshing trade history due to database change');
+            fetchAllTrades();
+          }
+        } catch (error) {
+          console.error('❌ Error parsing database change notification (trade history):', error);
+        }
+      };
+      
+      ws.onerror = function(error) {
+        console.error('❌ WebSocket error (trade history):', error);
+      };
+      
+      ws.onclose = function() {
+        console.log('🔌 Database change WebSocket connection closed (trade history)');
+        // Attempt to reconnect after a delay
+        setTimeout(() => {
+          console.log('🔄 Attempting to reconnect to database change notifications (trade history)...');
+          setupDatabaseChangeListener();
+        }, 5000);
+      };
+    }
+
     // On initial load, show filtered trades
     window.addEventListener('DOMContentLoaded', async () => {
       // updateDayNames(); // Update day names
       await updateDateRangeDisplay(); // Update date range display
       fetchAllTrades();
-      setInterval(fetchAllTrades, 1000);
+      
+      // Set up WebSocket connection for database change notifications
+      setupDatabaseChangeListener();
 
       // Add event listener for dropdown changes
       const filterPicker = document.getElementById('date-filter-picker');
