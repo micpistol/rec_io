@@ -1232,15 +1232,51 @@
                         yesSpan.textContent = yesPrice;
                         noSpan.textContent = noPrice;
                         
+                        // Set data attributes (SAME AS DESKTOP)
+                        const ticker = strikeData.ticker || 'BTC-USD'; // Get ticker from strike data
+                        
+                        // Set data-ticker on the YES/NO cell's parent td (for reference, if needed)
+                        if (yesSpan.parentElement && ticker) {
+                            yesSpan.parentElement.setAttribute('data-ticker', ticker);
+                        }
+                        if (noSpan.parentElement && ticker) {
+                            noSpan.parentElement.setAttribute('data-ticker', ticker);
+                        }
+                        
+                        // Also set data-ticker directly on spanEl for easier access in openTrade
+                        if (ticker) {
+                            yesSpan.setAttribute('data-ticker', ticker);
+                            noSpan.setAttribute('data-ticker', ticker);
+                        }
+                        
+                        // Set data-strike and data-side for easier retrieval in openTrade
+                        yesSpan.setAttribute('data-strike', strike);
+                        noSpan.setAttribute('data-strike', strike);
+                        yesSpan.setAttribute('data-side', 'Y');
+                        noSpan.setAttribute('data-side', 'N');
+                        
+                        // Store the actual ask price for trade execution (not the display value)
+                        if (yesAsk && yesAsk !== '—' && yesAsk !== 0) {
+                            yesSpan.setAttribute('data-ask-price', yesAsk);
+                        } else {
+                            yesSpan.removeAttribute('data-ask-price');
+                        }
+                        
+                        if (noAsk && noAsk !== '—' && noAsk !== 0) {
+                            noSpan.setAttribute('data-ask-price', noAsk);
+                        } else {
+                            noSpan.removeAttribute('data-ask-price');
+                        }
+                        
                         // Add click handlers
                         if (yesEnabled) {
-                            yesSpan.onclick = () => openTrade(yesSpan, strike.toString(), 'Y', yesAsk);
+                            yesSpan.onclick = () => handleStrikeTableButtonClick(yesSpan);
                         } else {
                             yesSpan.onclick = null;
                         }
                         
                         if (noEnabled) {
-                            noSpan.onclick = () => openTrade(noSpan, strike.toString(), 'N', noAsk);
+                            noSpan.onclick = () => handleStrikeTableButtonClick(noSpan);
                         } else {
                             noSpan.onclick = null;
                         }
@@ -1362,23 +1398,264 @@
             }).catch(console.error);
         }
 
-        function closeTrade(tradeId, event) {
-            const btn = event.target;
-            if (btn.disabled) return;
+        // === EXACT SAME TRADE EXECUTION AS DESKTOP ===
+        // This replicates the desktop strike table button behavior exactly
+        
+        async function prepareTradeData(target) {
+            // 🎧 Sound confirmation - IMMEDIATE
+            if (typeof playSound === 'function') {
+                playSound('open');
+            }
             
-            btn.disabled = true;
-            btn.textContent = 'Closing...';
+            // ✅ Add UI popup
+            if (typeof showTradeOpenedPopup === 'function') {
+                showTradeOpenedPopup();
+            }
             
-            fetch('/api/trigger_close_trade', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    trade_id: tradeId
-                })
-            }).catch(console.error).finally(() => {
-                btn.disabled = false;
-                btn.textContent = 'Close';
-            });
+            if (target?.disabled) {
+                return null;
+            }
+            
+            // Get the actual ask price from data attribute (not the display text)
+            const askPrice = target?.dataset?.askPrice;
+            
+            let buy_price = 0;
+            if (askPrice) {
+                // Convert from cents to dollars (e.g., "96" becomes 0.96)
+                buy_price = parseFloat(askPrice) / 100;
+            }
+            
+            // Get position size from mobile controls
+            const posInput = document.getElementById('position-size');
+            const rawBasePos = posInput ? parseInt(posInput.value, 10) : NaN;
+            const validBase = Number.isFinite(rawBasePos) && rawBasePos > 0 ? rawBasePos : null;
+            
+            const multiplierBtn = document.querySelector('.multiplier-btn.active');
+            const multiplier = multiplierBtn ? parseInt(multiplierBtn.dataset.multiplier, 10) : 1;
+            
+            const position = validBase !== null ? validBase * multiplier : null;
+            
+            const contract = 'BTC Market'; // Mobile uses simplified market title
+            
+            // Get strike and side from button context
+            let strike = null;
+            let side = null;
+            let row = target.closest('tr');
+            
+            if (row) {
+                const strikeCell = row.querySelector('td');
+                if (strikeCell) {
+                    strike = parseFloat(strikeCell.textContent.replace(/\$|,/g, ''));
+                }
+                
+                // Determine side based on which button was clicked
+                if (target.classList.contains('yes-button') || target.textContent.includes('YES')) {
+                    side = 'Y';
+                } else if (target.classList.contains('no-button') || target.textContent.includes('NO')) {
+                    side = 'N';
+                } else {
+                    // Fallback: determine from button position in row
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 6) {
+                        const yesCell = cells[4]; // YES column
+                        const noCell = cells[5];  // NO column
+                        if (target.closest('td') === yesCell) {
+                            side = 'Y';
+                        } else if (target.closest('td') === noCell) {
+                            side = 'N';
+                        }
+                    }
+                }
+            }
+            
+            if (!strike || !side) {
+                console.error('Could not determine strike or side from button context');
+                return null;
+            }
+            
+            // Get ticker from strike table data (SAME AS DESKTOP)
+            let kalshiTicker = null;
+            if (strike) {
+                // Get ticker from the strike table data for this specific strike
+                const strikeFormatted = '$' + Number(strike).toLocaleString();
+                const strikeTableRows = document.querySelectorAll('#strike-table tbody tr');
+                
+                for (const row of strikeTableRows) {
+                    const firstTd = row.querySelector('td');
+                    if (!firstTd) continue;
+                    const firstTdText = firstTd.textContent.trim();
+                    
+                    if (firstTdText === strikeFormatted) {
+                        // Get ticker from the button's data attribute
+                        const yesButton = row.querySelector('.price-box-mobile:not(.disabled)');
+                        if (yesButton && yesButton.dataset.ticker) {
+                            kalshiTicker = yesButton.dataset.ticker;
+                        } else {
+                            const noButton = row.querySelector('.price-box-mobile:not(.disabled)');
+                            if (noButton && noButton.dataset.ticker) {
+                                kalshiTicker = noButton.dataset.ticker;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            // Fallback to default if no ticker found
+            if (!kalshiTicker) {
+                kalshiTicker = 'BTC-USD';
+            }
+            
+            // Get current BTC price
+            const symbol_open = typeof getCurrentBTCTickerPrice === 'function' ? getCurrentBTCTickerPrice() : null;
+            
+            // Get momentum from API
+            let momentum = null;
+            try {
+                const momentumResponse = await fetch('/api/momentum');
+                if (momentumResponse.ok) {
+                    const momentumData = await momentumResponse.json();
+                    momentum = momentumData.momentum_score;
+                }
+            } catch (error) {
+                console.error('Failed to fetch momentum from API:', error);
+            }
+            
+            // Get probability from the strike table
+            let prob = null;
+            if (strike) {
+                const strikeFormatted = '$' + Number(strike).toLocaleString();
+                const strikeTableRows = document.querySelectorAll('#strike-table tbody tr');
+                
+                for (const row of strikeTableRows) {
+                    const firstTd = row.querySelector('td');
+                    if (!firstTd) continue;
+                    const firstTdText = firstTd.textContent.trim();
+                    
+                    if (firstTdText === strikeFormatted) {
+                        const tds = row.querySelectorAll('td');
+                        if (tds.length > 3) {
+                            const probText = tds[3].textContent.trim(); // Prob column
+                            if (probText && probText !== '—') {
+                                prob = probText;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            if (!prob) {
+                console.error('Could not determine probability for strike:', strike);
+                return null;
+            }
+            
+            const tradeData = {
+                symbol: 'BTC',
+                contract: contract,
+                strike: `$${Number(strike).toLocaleString()}`,
+                side: side,
+                ticker: kalshiTicker,
+                buy_price: buy_price,
+                position: position,
+                symbol_open: symbol_open,
+                momentum: momentum,
+                prob: prob,
+                trade_strategy: "Hourly HTC",
+                entry_method: "manual"
+            };
+            
+            return tradeData;
+        }
+        
+        // === EXACT SAME BUTTON CLICK HANDLER AS DESKTOP ===
+        async function handleStrikeTableButtonClick(spanEl) {
+            try {
+                const tradeData = await prepareTradeData(spanEl); // Use the same function as desktop
+                
+                if (!tradeData) {
+                    console.error('Missing trade data for strike table button after prepareTradeData');
+                    return;
+                }
+                
+                // Call the EXACT SAME endpoint as desktop
+                const response = await fetch('/api/trigger_open_trade', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        strike: tradeData.strike,
+                        side: tradeData.side,
+                        ticker: tradeData.ticker,
+                        buy_price: tradeData.buy_price,
+                        prob: tradeData.prob,
+                        symbol_open: tradeData.symbol_open,
+                        momentum: tradeData.momentum,
+                        contract: tradeData.contract,
+                        symbol: tradeData.symbol,
+                        position: tradeData.position,
+                        trade_strategy: tradeData.trade_strategy
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Strike table trade initiated successfully:', result);
+                    
+                    // Refresh panels to show new trade (same as desktop)
+                    if (typeof fetchAndRenderActiveTradeSupervisorTrades === 'function') {
+                        fetchAndRenderActiveTradeSupervisorTrades();
+                    }
+                } else {
+                    console.error('Strike table trade initiation failed:', response.status);
+                }
+            } catch (error) {
+                console.error('Error initiating strike table trade:', error);
+            }
+        }
+
+        // === UPDATED CLOSE TRADE FUNCTION FOR MOBILE ===
+        async function closeActiveTrade(tradeId, ticketId) {
+            try {
+                console.log('[ACTIVE TRADE SUPERVISOR] Attempting to close trade:', tradeId);
+                
+                // 🎧 Sound confirmation - IMMEDIATE (same as desktop)
+                if (typeof playSound === 'function') {
+                    playSound('close');
+                }
+                
+                // ✅ Add UI popup (same as desktop)
+                if (typeof showTradeClosedPopup === 'function') {
+                    showTradeClosedPopup();
+                }
+                
+                // Get current BTC price for sell price (same as desktop)
+                const currentPrice = typeof getCurrentBTCTickerPrice === 'function' ? getCurrentBTCTickerPrice() : 0.5;
+                console.log('[ACTIVE TRADE SUPERVISOR] Current price for close:', currentPrice);
+                
+                // Use the EXACT SAME endpoint as desktop
+                const response = await fetch('/api/trigger_close_trade', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        trade_id: tradeId,
+                        sell_price: currentPrice
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('[ACTIVE TRADE SUPERVISOR] Close trade completed successfully:', result);
+                    
+                    // Refresh panels (same as desktop)
+                    if (typeof fetchAndRenderActiveTradeSupervisorTrades === 'function') {
+                        fetchAndRenderActiveTradeSupervisorTrades();
+                    }
+                } else {
+                    console.error('[ACTIVE TRADE SUPERVISOR] Close trade failed:', response.status);
+                }
+            } catch (error) {
+                console.error(`[ACTIVE TRADE SUPERVISOR] Error closing trade ${tradeId}:`, error);
+            }
         }
 
         // Active Trade Supervisor functionality
@@ -1779,35 +2056,6 @@
             }
         }
 
-        async function closeActiveTrade(tradeId, ticketId) {
-            try {
-                console.log('[ACTIVE TRADE SUPERVISOR] Attempting to close trade:', tradeId);
-                
-                // Use the centralized closeTrade function from the trade execution controller
-                if (typeof window.closeTrade === 'function') {
-                    // Get current BTC price for sell price
-                    const currentPrice = typeof getCurrentBTCTickerPrice === 'function' ? getCurrentBTCTickerPrice() : 0.5;
-                    console.log('[ACTIVE TRADE SUPERVISOR] Current price for close:', currentPrice);
-                    
-                    // Create a mock event object since we don't have the actual event
-                    const mockEvent = {
-                        target: document.createElement('button'),
-                        preventDefault: () => {},
-                        stopPropagation: () => {}
-                    };
-                    
-                    // Call the centralized close trade function - let it handle all notifications
-                    console.log('[ACTIVE TRADE SUPERVISOR] Calling window.closeTrade with:', { tradeId, currentPrice });
-                    await window.closeTrade(tradeId, currentPrice, mockEvent);
-                    console.log('[ACTIVE TRADE SUPERVISOR] Close trade call completed');
-                } else {
-                    console.error('[ACTIVE TRADE SUPERVISOR] Centralized closeTrade function not available');
-                }
-            } catch (error) {
-                console.error(`[ACTIVE TRADE SUPERVISOR] Error closing trade ${tradeId}:`, error);
-            }
-        }
-
         function startActiveTradeSupervisorPolling() {
             // Initial load
             fetchAndRenderActiveTradeSupervisorTrades();
@@ -1855,6 +2103,88 @@
             spannerTd.innerHTML = `<span style="margin:0 12px;display:inline-block;">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style="margin:0 12px;display:inline-block;">${arrowBlock}</span>`;
             spannerRow.appendChild(spannerTd);
             return spannerRow;
+        }
+
+        // === HELPER FUNCTIONS (SAME AS DESKTOP) ===
+        
+        // Get current BTC price for trade execution
+        function getCurrentBTCTickerPrice() {
+            const priceEl = document.getElementById('btc-price-value');
+            if (priceEl && priceEl.textContent) {
+                const priceText = priceEl.textContent.replace(/[\$,]/g, '');
+                const price = parseFloat(priceText);
+                return isNaN(price) ? 0.5 : price;
+            }
+            return 0.5; // Fallback price
+        }
+        
+        // Play sound for trade confirmation
+        function playSound(type) {
+            if (type === 'open') {
+                // Play open trade sound
+                const audio = new Audio('../audio/sfx/open_trade_confirmation.wav');
+                audio.play().catch(console.error);
+            } else if (type === 'close') {
+                // Play close trade sound
+                const audio = new Audio('../audio/sfx/close_trade_confirmation.wav');
+                audio.play().catch(console.error);
+            }
+        }
+        
+        // Show trade opened popup (same as desktop)
+        function showTradeOpenedPopup() {
+            // Create a simple popup notification
+            const popup = document.createElement('div');
+            popup.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background-color: #28a745;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 6px;
+                font-size: 14px;
+                font-weight: bold;
+                z-index: 10000;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            `;
+            popup.textContent = 'Trade Opened!';
+            document.body.appendChild(popup);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                if (popup.parentNode) {
+                    popup.parentNode.removeChild(popup);
+                }
+            }, 3000);
+        }
+        
+        // Show trade closed popup (same as desktop)
+        function showTradeClosedPopup() {
+            // Create a simple popup notification
+            const popup = document.createElement('div');
+            popup.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background-color: #dc3545;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 6px;
+                font-size: 14px;
+                font-weight: bold;
+                z-index: 10000;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            `;
+            popup.textContent = 'Trade Closed!';
+            document.body.appendChild(popup);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                if (popup.parentNode) {
+                    popup.parentNode.removeChild(popup);
+                }
+            }, 3000);
         }
     </script>
 </body>
