@@ -7,10 +7,11 @@
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../styles/global.css">
     <script src="../js/live-data.js"></script>
-    <script src="../js/strike-table.js"></script>
     <script src="../js/globals.js"></script>
-    <script src="../js/active-trade-supervisor_panel.js"></script>
+
     <script src="../js/trade-execution-controller.js"></script>
+    
+
     
     <style>
         /* Mobile-specific styles */
@@ -51,7 +52,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 16px 0;
+            padding: 0px 0;
         }
 
         .price-info {
@@ -189,17 +190,15 @@
             border: 1px solid #444;
         }
 
-        /* Spanner row styling (same as main trade monitor) */
-        .spanner-row {
-            background-color: #2c3e50 !important;
-        }
-
-        .spanner-row td {
+        /* Spanner row styling (exact match from desktop trade monitor) */
+        tr.spanner-row td {
+            background-color: #535668 !important;
+            color: #c0c0c0 !important;
             text-align: center !important;
-            background-color: #2c3e50 !important;
-            color: #ecf0f1 !important;
-            font-weight: bold !important;
-            padding: 8px !important;
+            font-size: 12px !important;
+            font-style: italic !important;
+            height: 25px !important;
+            padding: 2px 4px !important;
         }
 
         /* Risk-based color formatting (same as main trade monitor) */
@@ -227,6 +226,28 @@
         .price-box-mobile.disabled {
             opacity: 0.1;
             pointer-events: none;
+        }
+
+        /* Multiplier Button Styles */
+        .multiplier-btn {
+            background-color: transparent;
+            border: 1px solid #ccc;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            font-size: 10px;
+        }
+        .multiplier-btn.active {
+            background-color: #007bff;
+            border-color: #0056b3;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 0 6px rgba(0, 123, 255, 0.7);
+        }
+        .multiplier-btn:hover:not(.active) {
+            background-color: rgba(255, 255, 255, 0.1);
         }
 
         /* Risk colors */
@@ -330,7 +351,7 @@
             
             .price-change {
                 font-size: 9px;
-                padding-top: 20px;
+                padding-top: 10px;
             }
             
             .momentum-score {
@@ -391,31 +412,23 @@
                     <div class="mobile-toggle" id="autoStopToggle"></div>
                     <span class="toggle-label">Auto Stop</span>
                 </div>
+                <div class="toggle-group">
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <input type="number" id="position-size" min="1" style="width: 45px; padding: 3px; text-align: right; font-size: 11px; border-radius: 3px; border: 1px solid #ccc; background-color: #323c4e; color: white;" />
+                            <div style="display: flex; gap: 2px;">
+                                <button class="multiplier-btn" data-multiplier="1">1x</button>
+                                <button class="multiplier-btn" data-multiplier="2">2x</button>
+                                <button class="multiplier-btn" data-multiplier="3">3x</button>
+                            </div>
+                        </div>
+                        <div id="position-display" style="font-size: 10px; color: #ccc;">100 contracts</div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Active Trades -->
-        <div class="mobile-panel">
-            <div class="mobile-panel-header">
-                <span>Active Trades</span>
-            </div>
-            <table id="activeTradeSupervisorTable" class="active-trades-table">
-                <thead>
-                    <tr>
-                        <th>Strike</th>
-                        <th>Side</th>
-                        <th>Buy</th>
-                        <th>Pos</th>
-                        <th>Close</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td colspan="5" class="empty-state">No active trades</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+
 
         <!-- Strike Table -->
         <div class="mobile-panel">
@@ -453,6 +466,9 @@
             
             // Initialize toggle controls
             initializeMobileToggles();
+            
+            // Initialize position controls
+            initializePositionControls();
             
             // Start TTC clock
             startTTCClock();
@@ -714,9 +730,99 @@
                         plusMinusToggle.classList.add('active');
                     }
                 }
+                
+                // Set Position Size and Multiplier
+                const positionInput = document.getElementById('position-size');
+                const multiplierButtons = document.querySelectorAll('.multiplier-btn');
+                
+                if (positionInput && data.position_size !== undefined) {
+                    positionInput.value = data.position_size;
+                }
+                
+                if (multiplierButtons.length && data.multiplier !== undefined) {
+                    multiplierButtons.forEach(btn => {
+                        if (parseInt(btn.dataset.multiplier, 10) === data.multiplier) {
+                            btn.classList.add('active');
+                        } else {
+                            btn.classList.remove('active');
+                        }
+                    });
+                }
+                
+                updatePositionDisplay();
             } catch (error) {
                 console.error('Error loading toggle states:', error);
             }
+        }
+
+        function updatePositionDisplay() {
+            const positionInput = document.getElementById('position-size');
+            const multiplierButtons = document.querySelectorAll('.multiplier-btn');
+            const positionDisplay = document.getElementById('position-display');
+            
+            if (positionInput && positionDisplay) {
+                const baseValue = parseInt(positionInput.value, 10) || 0;
+                const activeMultiplier = Array.from(multiplierButtons).find(btn => btn.classList.contains('active'));
+                const multiplier = activeMultiplier ? parseInt(activeMultiplier.dataset.multiplier, 10) : 1;
+                const total = baseValue * multiplier;
+                positionDisplay.textContent = `${total} contracts`;
+            }
+        }
+
+        function initializePositionControls() {
+            const positionInput = document.getElementById('position-size');
+            const multiplierButtons = document.querySelectorAll('.multiplier-btn');
+            
+            // Position size input handler
+            if (positionInput) {
+                positionInput.addEventListener('change', async function() {
+                    const value = parseInt(this.value, 10) || 100;
+                    console.log('Position size changed to:', value);
+                    
+                    try {
+                        const response = await fetch('/api/set_position_size', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ position_size: value })
+                        });
+                        
+                        if (response.ok) {
+                            updatePositionDisplay();
+                        } else {
+                            console.error('Failed to update position size');
+                        }
+                    } catch (error) {
+                        console.error('Error updating position size:', error);
+                    }
+                });
+            }
+            
+            // Multiplier button handlers
+            multiplierButtons.forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const multiplier = parseInt(this.dataset.multiplier, 10);
+                    console.log('Multiplier button clicked:', multiplier);
+                    
+                    // Update UI
+                    multiplierButtons.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    updatePositionDisplay();
+                    
+                    try {
+                        const response = await fetch('/api/set_multiplier', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ multiplier })
+                        });
+                        
+                        if (!response.ok) {
+                            console.error('Failed to update multiplier');
+                        }
+                    } catch (error) {
+                        console.error('Error updating multiplier:', error);
+                    }
+                });
+            });
         }
 
         function startMobileDataPolling() {
@@ -774,8 +880,7 @@
                         }
                     }
 
-                    // Update active trades
-                    await updateMobileActiveTrades();
+
                     
                     // Update strike table
                     await updateMobileStrikeTable();
@@ -854,46 +959,7 @@
             }, 5000); // Poll every 5 seconds
         }
 
-        async function updateMobileActiveTrades() {
-            try {
-                // Use the same endpoint as the main trade monitor for active trades
-                const response = await fetch('/api/active_trades');
-                if (!response.ok) return;
-                
-                const trades = await response.json();
-                const tbody = document.querySelector('#activeTradeSupervisorTable tbody');
-                
-                if (!tbody) return;
-                
-                if (!Array.isArray(trades) || trades.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No active trades</td></tr>';
-                    return;
-                }
-                
-                tbody.innerHTML = '';
-                
-                trades.forEach(trade => {
-                    const row = document.createElement('tr');
-                    const buyPrice = trade.buy_price ? (trade.buy_price / 100).toFixed(2) : '—';
-                    const position = trade.position || '—';
-                    const strike = trade.strike ? `$${parseFloat(trade.strike).toLocaleString()}` : '—';
-                    const side = trade.side || '—';
-                    
-                    row.innerHTML = `
-                        <td>${strike}</td>
-                        <td>${side}</td>
-                        <td>${buyPrice}</td>
-                        <td>${position}</td>
-                        <td><button class="close-btn" onclick="closeTrade(${trade.id}, event)">Close</button></td>
-                    `;
-                    
-                    tbody.appendChild(row);
-                });
-                
-            } catch (error) {
-                console.error('Error updating mobile active trades:', error);
-            }
-        }
+
 
         async function updateMobileStrikeTable() {
             try {
@@ -940,16 +1006,72 @@
                     const buffer = strike.buffer ? Math.round(strike.buffer).toLocaleString() : '—';
                     const bufferPct = strike.buffer_pct ? strike.buffer_pct.toFixed(2) : '—';
                     const probability = strike.probability ? strike.probability.toFixed(1) : '—';
-                    const yesPrice = strike.yes_ask ? strike.yes_ask.toString() : '—';
-                    const noPrice = strike.no_ask ? strike.no_ask.toString() : '—';
+                    // Check if DIFF MODE is enabled
+                    const plusMinusToggle = document.getElementById('plusMinusToggle');
+                    const isDiffMode = plusMinusToggle && plusMinusToggle.classList.contains('active');
+                    
+                    // Determine display values based on mode (same logic as desktop)
+                    let yesPrice = '—';
+                    let noPrice = '—';
+                    
+                    if (strike.yes_ask && strike.yes_ask !== '—' && strike.yes_ask !== 0) {
+                        if (isDiffMode && strike.yes_diff !== null && strike.yes_diff !== undefined) {
+                            // DIFF MODE: Show pre-calculated diff value (no decimals)
+                            yesPrice = strike.yes_diff > 0 ? `+${Math.round(strike.yes_diff)}` : `${Math.round(strike.yes_diff)}`;
+                        } else {
+                            // PRICE MODE: Show actual ask price
+                            yesPrice = strike.yes_ask.toString();
+                        }
+                    }
+                    
+                    if (strike.no_ask && strike.no_ask !== '—' && strike.no_ask !== 0) {
+                        if (isDiffMode && strike.no_diff !== null && strike.no_diff !== undefined) {
+                            // DIFF MODE: Show pre-calculated diff value (no decimals)
+                            noPrice = strike.no_diff > 0 ? `+${Math.round(strike.no_diff)}` : `${Math.round(strike.no_diff)}`;
+                        } else {
+                            // PRICE MODE: Show actual ask price
+                            noPrice = strike.no_ask.toString();
+                        }
+                    }
+                    
+                    // Apply same enable/disable rules as desktop
+                    const volumeNum = parseInt(strike.volume) || 0;
+                    const volumeOk = volumeNum >= 1000;
+                    const yesPriceOk = strike.yes_ask && strike.yes_ask <= 98;
+                    const noPriceOk = strike.no_ask && strike.no_ask <= 98;
+                    const currentPriceFloat = parseFloat(currentPrice);
+                    const strikeFloat = parseFloat(strike.strike);
+                    const isAboveMoneyLine = strikeFloat > currentPriceFloat;
+                    
+                    // Determine which button should be enabled (same logic as desktop)
+                    let yesEnabled = false;
+                    let noEnabled = false;
+                    
+                    if (volumeOk) {
+                        if (isAboveMoneyLine) {
+                            // Above money line: Only enable NO button if price is good
+                            noEnabled = noPriceOk;
+                            yesEnabled = false; // Never enable YES above money line
+                        } else {
+                            // Below money line: Only enable YES button if price is good
+                            yesEnabled = yesPriceOk;
+                            noEnabled = false; // Never enable NO below money line
+                        }
+                    }
+                    
+                    // Create buttons with proper enable/disable state
+                    const yesButtonClass = yesEnabled ? 'price-box-mobile' : 'price-box-mobile disabled';
+                    const noButtonClass = noEnabled ? 'price-box-mobile' : 'price-box-mobile disabled';
+                    const yesOnClick = yesEnabled ? `onclick="openTrade(this, '${strike.strike}', 'Y', ${strike.yes_ask})"` : '';
+                    const noOnClick = noEnabled ? `onclick="openTrade(this, '${strike.strike}', 'N', ${strike.no_ask})"` : '';
                     
                     row.innerHTML = `
                         <td>${strikePrice}</td>
                         <td>${buffer}</td>
                         <td>${bufferPct}</td>
                         <td>${probability}</td>
-                        <td><span class="price-box-mobile" onclick="openTrade(this, '${strike.strike}', 'Y', ${strike.yes_ask})">${yesPrice}</span></td>
-                        <td><span class="price-box-mobile" onclick="openTrade(this, '${strike.strike}', 'N', ${strike.no_ask})">${noPrice}</span></td>
+                        <td><span class="${yesButtonClass}" ${yesOnClick}>${yesPrice}</span></td>
+                        <td><span class="${noButtonClass}" ${noOnClick}>${noPrice}</span></td>
                     `;
                     
                     // Add risk-based color formatting (same as main trade monitor)
@@ -973,8 +1095,8 @@
                 const spannerTd = document.createElement('td');
                 spannerTd.colSpan = 6;
                 
-                // Get momentum score for arrows
-                const momentumEl = document.getElementById('momentum-score-value');
+                // Get momentum score for arrows (CORRECT ELEMENT ID)
+                const momentumEl = document.getElementById('momentum-score-display');
                 let momentumScore = 0;
                 if (momentumEl && momentumEl.textContent) {
                     const val = parseFloat(momentumEl.textContent.replace(/[^\d\.\-]/g, ''));
@@ -1080,8 +1202,6 @@
                 body: JSON.stringify({
                     trade_id: tradeId
                 })
-            }).then(() => {
-                updateMobileActiveTrades();
             }).catch(console.error).finally(() => {
                 btn.disabled = false;
                 btn.textContent = 'Close';

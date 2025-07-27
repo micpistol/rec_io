@@ -39,6 +39,11 @@ struct WebView: UIViewRepresentable {
 
 struct ContentView: View {
     var body: some View {
+        WebView(url: resolvedURL)
+            .ignoresSafeArea()
+    }
+
+    private var resolvedURL: URL {
         let urlString: String
         switch UIDevice.current.userInterfaceIdiom {
         case .pad:
@@ -48,7 +53,6 @@ struct ContentView: View {
         default:
             urlString = "http://192.168.86.42:3000"
         }
-        WebView(url: URL(string: urlString)!)
-            .ignoresSafeArea()
+        return URL(string: urlString)!
     }
 }
