@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>REC.IO Mobile</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../styles/global.css">
+    <style>
+        /* Mobile-specific styles */
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            -webkit-text-size-adjust: 100%;
+            font-family: 'IBM Plex Sans', sans-serif;
+        }
+
+        .mobile-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .content-area {
+            flex: 1;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        .page-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: none;
+        }
+
+        .page-frame.active {
+            display: block;
+        }
+
+        /* Bottom Tab Navigation */
+        .bottom-tabs {
+            display: flex;
+            border-top: 1px solid #444;
+            height: 60px;
+            min-height: 60px;
+        }
+
+        .tab-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            color: #c4c4c4;
+            font-size: 10px;
+            font-weight: bold;
+            transition: color 0.2s ease;
+            padding: 4px 2px;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            opacity: 0.5;
+        }
+
+        .tab-item:hover {
+            opacity: 1;
+        }
+
+        .tab-item.active {
+            color: white;
+            opacity: 1;
+            position: relative;
+            z-index: 1;
+        }
+
+        .tab-item.active::before {
+            content: '';
+            position: absolute;
+            top: 4px;
+            left: 2px;
+            right: 2px;
+            bottom: 4px;
+            background: #2a3a4a;
+            border-radius: 6px;
+            z-index: -1;
+        }
+
+        .tab-icon {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+            margin-bottom: 2px;
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+        }
+
+        .tab-item.active .tab-icon {
+            opacity: 1;
+        }
+
+        .tab-label {
+            font-size: 10px;
+            line-height: 1;
+            text-align: center;
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+        }
+
+        .tab-item.active .tab-label {
+            opacity: 1;
+        }
+
+        /* Loading indicator */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #c4c4c4;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-container">
+        <!-- Content Area -->
+        <div class="content-area">
+            <!-- Monitor Page -->
+            <iframe id="monitor-frame" class="page-frame active" src="trade_monitor_mobile.html"></iframe>
+            
+            <!-- History Page -->
+            <iframe id="history-frame" class="page-frame" src="about:blank"></iframe>
+            
+            <!-- Account Page -->
+            <iframe id="account-frame" class="page-frame" src="about:blank"></iframe>
+            
+            <!-- User Page -->
+            <iframe id="user-frame" class="page-frame" src="about:blank"></iframe>
+        </div>
+
+        <!-- Bottom Tab Navigation -->
+        <div class="bottom-tabs">
+            <a href="#" class="tab-item active" data-tab="monitor">
+                <img src="../images/icons/trade_monitor_icon.png" alt="Monitor" class="tab-icon">
+                <span class="tab-label">Monitor</span>
+            </a>
+            <a href="#" class="tab-item" data-tab="history">
+                <img src="../images/icons/trade_history.png" alt="History" class="tab-icon">
+                <span class="tab-label">History</span>
+            </a>
+            <a href="#" class="tab-item" data-tab="account">
+                <img src="../images/icons/account_manager_icon.png" alt="Account" class="tab-icon">
+                <span class="tab-label">Account</span>
+            </a>
+            <a href="#" class="tab-item" data-tab="user">
+                <img src="../images/icons/user_icon.png" alt="User" class="tab-icon">
+                <span class="tab-label">User</span>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const tabItems = document.querySelectorAll('.tab-item');
+            const pageFrames = document.querySelectorAll('.page-frame');
+
+            function switchTab(tabName) {
+                // Remove active class from all tabs and frames
+                tabItems.forEach(tab => tab.classList.remove('active'));
+                pageFrames.forEach(frame => frame.classList.remove('active'));
+
+                // Add active class to selected tab and frame
+                const activeTab = document.querySelector(`[data-tab="${tabName}"]`);
+                const activeFrame = document.getElementById(`${tabName}-frame`);
+                
+                if (activeTab && activeFrame) {
+                    activeTab.classList.add('active');
+                    activeFrame.classList.add('active');
+                }
+            }
+
+            // Add click handlers to tabs
+            tabItems.forEach(tab => {
+                tab.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const tabName = this.getAttribute('data-tab');
+                    switchTab(tabName);
+                });
+            });
+
+            // Initialize with monitor tab active
+            switchTab('monitor');
+        });
+    </script>
+</body>
+</html> 
