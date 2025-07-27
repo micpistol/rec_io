@@ -287,6 +287,12 @@
             color: #ffffff !important;
         }
 
+        /* Active Trade Indicator for Strike Table */
+        .strike-table-mobile td.has-active-trade {
+            background-color: #1a2a1a !important; /* Very subtle green tint */
+            border-left: 3px solid #45d34a !important; /* Green left border */
+        }
+
         /* Multiplier Button Styles */
         .multiplier-btn {
             background-color: transparent;
@@ -623,6 +629,11 @@
             
             // Start Active Trade Supervisor polling
             startActiveTradeSupervisorPolling();
+            
+            // Start position indicator updates (separate from table redraws)
+            setInterval(() => {
+                updatePositionIndicatorsOnly();
+            }, 2000); // Update every 2 seconds to reduce flashing
         });
 
         function initializeMobileToggles() {
@@ -1037,202 +1048,288 @@
 
 
 
+        // Mobile Strike Table - Using same efficient logic as desktop
+        let mobileStrikeRowsMap = new Map(); // Track row elements like desktop version
+        
+        // Initialize mobile strike table once (like desktop)
+        function initializeMobileStrikeTable(basePrice) {
+            const strikeTableBody = document.querySelector('#strike-table tbody');
+            if (!strikeTableBody) return;
+            
+            // Clear existing table
+            strikeTableBody.innerHTML = '';
+            mobileStrikeRowsMap.clear();
+            
+            // Build strikes around current price (5 above, 5 below)
+            const strikes = [];
+            for (let i = -5; i <= 5; i++) {
+                strikes.push(basePrice + (i * 250));
+            }
+            
+            strikes.forEach((strike, idx) => {
+                const row = document.createElement('tr');
+                
+                // Strike cell
+                const strikeTd = document.createElement('td');
+                strikeTd.textContent = '$' + strike.toLocaleString();
+                row.appendChild(strikeTd);
+                
+                // Buffer cell
+                const bufferTd = document.createElement('td');
+                row.appendChild(bufferTd);
+                
+                // Buffer % cell
+                const bufferPctTd = document.createElement('td');
+                row.appendChild(bufferPctTd);
+                
+                // Probability cell
+                const probTd = document.createElement('td');
+                row.appendChild(probTd);
+                
+                // Yes button cell and span
+                const yesTd = document.createElement('td');
+                const yesSpan = document.createElement('span');
+                yesTd.appendChild(yesSpan);
+                row.appendChild(yesTd);
+                
+                // No button cell and span
+                const noTd = document.createElement('td');
+                const noSpan = document.createElement('span');
+                noTd.appendChild(noSpan);
+                row.appendChild(noTd);
+                
+                strikeTableBody.appendChild(row);
+                
+                // Store row references (like desktop version)
+                mobileStrikeRowsMap.set(strike, {
+                    row,
+                    bufferTd,
+                    bufferPctTd,
+                    probTd,
+                    yesSpan,
+                    noSpan
+                });
+            });
+            
+            // Add spanner row
+            const spannerRow = createMobileSpannerRow();
+            strikeTableBody.appendChild(spannerRow);
+        }
+        
+        // Create spanner row for mobile
+        function createMobileSpannerRow() {
+            const spannerRow = document.createElement('tr');
+            spannerRow.className = 'spanner-row';
+            const spannerTd = document.createElement('td');
+            spannerTd.colSpan = 6;
+            spannerTd.textContent = 'Loading...';
+            spannerRow.appendChild(spannerTd);
+            return spannerRow;
+        }
+        
+        // Update mobile strike table efficiently (like desktop)
         async function updateMobileStrikeTable() {
             try {
-                // Use same endpoint as main trade monitor
                 const response = await fetch('/api/strike_tables/btc');
                 if (!response.ok) return;
                 
                 const data = await response.json();
-                const tbody = document.querySelector('#strike-table tbody');
+                if (!data.strikes) return;
                 
-                if (!tbody || !data.strikes) return;
-                
-                tbody.innerHTML = '';
-                
-                // Sort strikes by value (lowest to highest)
-                const sortedStrikes = data.strikes.sort((a, b) => parseFloat(a.strike) - parseFloat(b.strike));
-                
-                // Get current price
                 const currentPrice = data.current_price || 0;
                 const currentPriceFloat = parseFloat(currentPrice);
                 
-                // Filter strikes to show only 5 above and 5 below current price
-                const filteredStrikes = [];
+                // Initialize table if needed
+                if (mobileStrikeRowsMap.size === 0) {
+                    const base = Math.round(currentPriceFloat / 250) * 250;
+                    initializeMobileStrikeTable(base);
+                }
                 
-                // Find strikes below current price (up to 5)
-                const strikesBelow = sortedStrikes
-                    .filter(strike => parseFloat(strike.strike) < currentPriceFloat)
-                    .slice(-5); // Take last 5 (closest to current price)
-                
-                // Find strikes above current price (up to 5)
-                const strikesAbove = sortedStrikes
-                    .filter(strike => parseFloat(strike.strike) > currentPriceFloat)
-                    .slice(0, 5); // Take first 5 (closest to current price)
-                
-                // Combine and sort
-                filteredStrikes.push(...strikesBelow, ...strikesAbove);
-                filteredStrikes.sort((a, b) => parseFloat(a.strike) - parseFloat(b.strike));
-                
-                // Create data rows first
-                const dataRows = [];
-                filteredStrikes.forEach(strike => {
-                    const row = document.createElement('tr');
-                    const strikePrice = `$${parseFloat(strike.strike).toLocaleString()}`;
-                    const buffer = strike.buffer ? Math.round(strike.buffer).toLocaleString() : '—';
-                    const bufferPct = strike.buffer_pct ? strike.buffer_pct.toFixed(2) : '—';
-                    const probability = strike.probability ? strike.probability.toFixed(1) : '—';
-                    // Check if DIFF MODE is enabled
-                    const plusMinusToggle = document.getElementById('plusMinusToggle');
-                    const isDiffMode = plusMinusToggle && plusMinusToggle.classList.contains('active');
+                // Update each strike row with data (like desktop)
+                mobileStrikeRowsMap.forEach((cells, strike) => {
+                    const { row, bufferTd, bufferPctTd, probTd, yesSpan, noSpan } = cells;
                     
-                    // Determine display values based on mode (same logic as desktop)
-                    let yesPrice = '—';
-                    let noPrice = '—';
+                    // Find matching strike data
+                    const strikeData = data.strikes.find(s => parseFloat(s.strike) === strike);
                     
-                    if (strike.yes_ask && strike.yes_ask !== '—' && strike.yes_ask !== 0) {
-                        if (isDiffMode && strike.yes_diff !== null && strike.yes_diff !== undefined) {
-                            // DIFF MODE: Show pre-calculated diff value (no decimals)
-                            yesPrice = strike.yes_diff > 0 ? `+${Math.round(strike.yes_diff)}` : `${Math.round(strike.yes_diff)}`;
-                        } else {
-                            // PRICE MODE: Show actual ask price
-                            yesPrice = strike.yes_ask.toString();
+                    if (strikeData) {
+                        // Update buffer
+                        const buffer = strikeData.buffer ? Math.round(strikeData.buffer).toLocaleString() : '—';
+                        bufferTd.textContent = buffer;
+                        
+                        // Update buffer %
+                        const bufferPct = strikeData.buffer_pct ? strikeData.buffer_pct.toFixed(2) : '—';
+                        bufferPctTd.textContent = bufferPct;
+                        
+                        // Update probability
+                        const probability = strikeData.probability ? strikeData.probability.toFixed(1) : '—';
+                        probTd.textContent = probability;
+                        
+                        // Risk-based color formatting
+                        const prob = strikeData.probability;
+                        if (prob) {
+                            row.classList.remove('ultra-safe', 'safe', 'caution', 'high-risk', 'danger-stop');
+                            let riskClass = '';
+                            if (prob >= 98) riskClass = 'ultra-safe';
+                            else if (prob >= 95) riskClass = 'safe';
+                            else if (prob >= 80) riskClass = 'caution';
+                            else riskClass = 'high-risk';
+                            row.classList.add(riskClass);
                         }
-                    }
-                    
-                    if (strike.no_ask && strike.no_ask !== '—' && strike.no_ask !== 0) {
-                        if (isDiffMode && strike.no_diff !== null && strike.no_diff !== undefined) {
-                            // DIFF MODE: Show pre-calculated diff value (no decimals)
-                            noPrice = strike.no_diff > 0 ? `+${Math.round(strike.no_diff)}` : `${Math.round(strike.no_diff)}`;
-                        } else {
-                            // PRICE MODE: Show actual ask price
-                            noPrice = strike.no_ask.toString();
+                        
+                        // Update Yes/No buttons
+                        const yesAsk = strikeData.yes_ask;
+                        const noAsk = strikeData.no_ask;
+                        const volume = strikeData.volume;
+                        
+                        // Check if DIFF MODE is enabled
+                        const plusMinusToggle = document.getElementById('plusMinusToggle');
+                        const isDiffMode = plusMinusToggle && plusMinusToggle.classList.contains('active');
+                        
+                        // Determine display values
+                        let yesPrice = '—';
+                        let noPrice = '—';
+                        
+                        if (yesAsk && yesAsk !== '—' && yesAsk !== 0) {
+                            if (isDiffMode && strikeData.yes_diff !== null && strikeData.yes_diff !== undefined) {
+                                yesPrice = strikeData.yes_diff > 0 ? `+${Math.round(strikeData.yes_diff)}` : `${Math.round(strikeData.yes_diff)}`;
+                            } else {
+                                yesPrice = yesAsk.toString();
+                            }
                         }
-                    }
-                    
-                    // Apply same enable/disable rules as desktop
-                    const volumeNum = parseInt(strike.volume) || 0;
-                    const volumeOk = volumeNum >= 1000;
-                    const yesPriceOk = strike.yes_ask && strike.yes_ask <= 98;
-                    const noPriceOk = strike.no_ask && strike.no_ask <= 98;
-                    const currentPriceFloat = parseFloat(currentPrice);
-                    const strikeFloat = parseFloat(strike.strike);
-                    const isAboveMoneyLine = strikeFloat > currentPriceFloat;
-                    
-                    // Determine which button should be enabled (same logic as desktop)
-                    let yesEnabled = false;
-                    let noEnabled = false;
-                    
-                    if (volumeOk) {
-                        if (isAboveMoneyLine) {
-                            // Above money line: Only enable NO button if price is good
-                            noEnabled = noPriceOk;
-                            yesEnabled = false; // Never enable YES above money line
-                        } else {
-                            // Below money line: Only enable YES button if price is good
-                            yesEnabled = yesPriceOk;
-                            noEnabled = false; // Never enable NO below money line
+                        
+                        if (noAsk && noAsk !== '—' && noAsk !== 0) {
+                            if (isDiffMode && strikeData.no_diff !== null && strikeData.no_diff !== undefined) {
+                                noPrice = strikeData.no_diff > 0 ? `+${Math.round(strikeData.no_diff)}` : `${Math.round(strikeData.no_diff)}`;
+                            } else {
+                                noPrice = noAsk.toString();
+                            }
                         }
+                        
+                        // Apply enable/disable logic
+                        const volumeNum = parseInt(volume) || 0;
+                        const volumeOk = volumeNum >= 1000;
+                        const yesPriceOk = yesAsk && yesAsk <= 98;
+                        const noPriceOk = noAsk && noAsk <= 98;
+                        const isAboveMoneyLine = strike > currentPriceFloat;
+                        
+                        let yesEnabled = false;
+                        let noEnabled = false;
+                        
+                        if (volumeOk) {
+                            if (isAboveMoneyLine) {
+                                noEnabled = noPriceOk;
+                                yesEnabled = false;
+                            } else {
+                                yesEnabled = yesPriceOk;
+                                noEnabled = false;
+                            }
+                        }
+                        
+                        // Update button classes and content
+                        yesSpan.className = yesEnabled ? 'price-box-mobile' : 'price-box-mobile disabled';
+                        noSpan.className = noEnabled ? 'price-box-mobile' : 'price-box-mobile disabled';
+                        yesSpan.textContent = yesPrice;
+                        noSpan.textContent = noPrice;
+                        
+                        // Add click handlers
+                        if (yesEnabled) {
+                            yesSpan.onclick = () => openTrade(yesSpan, strike.toString(), 'Y', yesAsk);
+                        } else {
+                            yesSpan.onclick = null;
+                        }
+                        
+                        if (noEnabled) {
+                            noSpan.onclick = () => openTrade(noSpan, strike.toString(), 'N', noAsk);
+                        } else {
+                            noSpan.onclick = null;
+                        }
+                        
+                        // Update position indicator
+                        const strikeCell = row.querySelector('td:first-child');
+                        if (strikeCell) {
+                            updatePositionIndicator(strikeCell, strike);
+                        }
+                    } else {
+                        // No data for this strike, show placeholders
+                        bufferTd.textContent = '—';
+                        bufferPctTd.textContent = '—';
+                        probTd.textContent = '—';
+                        yesSpan.textContent = '—';
+                        noSpan.textContent = '—';
+                        yesSpan.className = 'price-box-mobile disabled';
+                        noSpan.className = 'price-box-mobile disabled';
                     }
-                    
-                    // Create buttons with proper enable/disable state
-                    const yesButtonClass = yesEnabled ? 'price-box-mobile' : 'price-box-mobile disabled';
-                    const noButtonClass = noEnabled ? 'price-box-mobile' : 'price-box-mobile disabled';
-                    const yesOnClick = yesEnabled ? `onclick="openTrade(this, '${strike.strike}', 'Y', ${strike.yes_ask})"` : '';
-                    const noOnClick = noEnabled ? `onclick="openTrade(this, '${strike.strike}', 'N', ${strike.no_ask})"` : '';
-                    
-                    row.innerHTML = `
-                        <td>${strikePrice}</td>
-                        <td>${buffer}</td>
-                        <td>${bufferPct}</td>
-                        <td>${probability}</td>
-                        <td><span class="${yesButtonClass}" ${yesOnClick}>${yesPrice}</span></td>
-                        <td><span class="${noButtonClass}" ${noOnClick}>${noPrice}</span></td>
-                    `;
-                    
-                    // Add risk-based color formatting (same as main trade monitor)
-                    const prob = strike.probability;
-                    if (prob) {
-                        row.classList.remove('ultra-safe', 'safe', 'caution', 'high-risk', 'danger-stop');
-                        let riskClass = '';
-                        if (prob >= 98) riskClass = 'ultra-safe';
-                        else if (prob >= 95) riskClass = 'safe';
-                        else if (prob >= 80) riskClass = 'caution';
-                        else riskClass = 'high-risk';
-                        row.classList.add(riskClass);
-                    }
-                    
-                    dataRows.push(row);
                 });
                 
-                // Create spanner row with momentum arrows (same as main trade monitor)
-                const spannerRow = document.createElement('tr');
-                spannerRow.className = 'spanner-row';
-                const spannerTd = document.createElement('td');
-                spannerTd.colSpan = 6;
-                
-                // Get momentum score for arrows (CORRECT ELEMENT ID)
-                const momentumEl = document.getElementById('momentum-score-display');
-                let momentumScore = 0;
-                if (momentumEl && momentumEl.textContent) {
-                    const val = parseFloat(momentumEl.textContent.replace(/[^\d\.\-]/g, ''));
-                    momentumScore = isNaN(val) ? 0 : val;
-                }
-                
-                // Create momentum arrows (same as main trade monitor)
-                const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-                const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-                
-                let arrowBlock = '';
-                const absMomentum = Math.abs(momentumScore);
-                if (absMomentum < 5) {
-                    arrowBlock = '-';
-                } else if (absMomentum < 10) {
-                    arrowBlock = momentumScore > 0 ? svgDown : svgUp;
-                } else if (absMomentum < 20) {
-                    arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(2);
-                } else {
-                    arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(3);
-                }
-                
-                spannerTd.innerHTML = `<span style="margin:0 12px;display:inline-block;">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style="margin:0 12px;display:inline-block;">${arrowBlock}</span>`;
-                spannerRow.appendChild(spannerTd);
-                
-                // Add data rows first
-                dataRows.forEach(row => {
-                    tbody.appendChild(row);
-                });
-                
-                // Position spanner row correctly (same logic as main trade monitor)
-                const allRows = Array.from(tbody.children).filter(row => !row.classList.contains('spanner-row'));
-                let insertIndex = allRows.length; // default to end
-                
-                for (let i = 0; i < allRows.length; i++) {
-                    const row = allRows[i];
-                    const strikeCell = row.querySelector('td');
-                    if (strikeCell && strikeCell.textContent) {
-                        const strikeText = strikeCell.textContent.replace(/[\$,]/g, '');
-                        const strike = parseFloat(strikeText);
-                        if (!isNaN(strike) && currentPrice < strike) {
-                            insertIndex = i;
-                            break;
-                        }
-                    }
-                }
-                
-                // Remove spanner row from current position and insert at correct position
-                if (spannerRow.parentNode) {
-                    spannerRow.remove();
-                }
-                
-                if (insertIndex < allRows.length) {
-                    tbody.insertBefore(spannerRow, allRows[insertIndex]);
-                } else {
-                    tbody.appendChild(spannerRow);
-                }
+                // Update spanner row with current price and momentum
+                updateMobileSpannerRow(currentPriceFloat);
                 
             } catch (error) {
                 console.error('Error updating mobile strike table:', error);
+            }
+        }
+        
+        // Update spanner row with current price and momentum
+        function updateMobileSpannerRow(currentPrice) {
+            const spannerRow = document.querySelector('#strike-table tbody .spanner-row');
+            if (!spannerRow) return;
+            
+            const spannerTd = spannerRow.querySelector('td');
+            if (!spannerTd) return;
+            
+            // Get momentum score for arrows
+            const momentumEl = document.getElementById('momentum-score-display');
+            let momentumScore = 0;
+            if (momentumEl && momentumEl.textContent) {
+                const val = parseFloat(momentumEl.textContent.replace(/[^\d\.\-]/g, ''));
+                momentumScore = isNaN(val) ? 0 : val;
+            }
+            
+            // Create momentum arrows
+            const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+            const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+            
+            let arrowBlock = '';
+            const absMomentum = Math.abs(momentumScore);
+            if (absMomentum < 5) {
+                arrowBlock = '-';
+            } else if (absMomentum < 10) {
+                arrowBlock = momentumScore > 0 ? svgDown : svgUp;
+            } else if (absMomentum < 20) {
+                arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(2);
+            } else {
+                arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(3);
+            }
+            
+            spannerTd.innerHTML = `<span style="margin:0 12px;display:inline-block;">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style="margin:0 12px;display:inline-block;">${arrowBlock}</span>`;
+            
+            // Position spanner row correctly
+            const allRows = Array.from(document.querySelector('#strike-table tbody').children).filter(row => !row.classList.contains('spanner-row'));
+            let insertIndex = allRows.length;
+            
+            for (let i = 0; i < allRows.length; i++) {
+                const row = allRows[i];
+                const strikeCell = row.querySelector('td');
+                if (strikeCell && strikeCell.textContent) {
+                    const strikeText = strikeCell.textContent.replace(/[\$,]/g, '');
+                    const strike = parseFloat(strikeText);
+                    if (!isNaN(strike) && currentPrice < strike) {
+                        insertIndex = i;
+                        break;
+                    }
+                }
+            }
+            
+            // Remove spanner row from current position and insert at correct position
+            if (spannerRow.parentNode) {
+                spannerRow.remove();
+            }
+            
+            if (insertIndex < allRows.length) {
+                document.querySelector('#strike-table tbody').insertBefore(spannerRow, allRows[insertIndex]);
+            } else {
+                document.querySelector('#strike-table tbody').appendChild(spannerRow);
             }
         }
 
@@ -1287,6 +1384,107 @@
         // Active Trade Supervisor functionality
         let activeTradeSupervisorRowsMap = new Map();
 
+        // Active Trade Indicator for Strike Table
+        let lastActiveTrades = new Set(); // Track last known active trades to avoid unnecessary updates
+        
+        // Separate function to update only position indicators without redrawing table
+        async function updatePositionIndicatorsOnly() {
+            try {
+                // Fetch active trades to check for positions
+                const tradesRes = await fetch('/trades', { cache: 'no-store' });
+                if (!tradesRes.ok) return;
+                
+                const trades = await tradesRes.json();
+                const activeTrades = trades.filter(trade => 
+                    trade.status !== "closed" && 
+                    trade.status !== "expired"
+                );
+                
+                // Create a set of current active trade strikes
+                const currentActiveStrikes = new Set();
+                activeTrades.forEach(trade => {
+                    const tradeStrike = parseFloat(trade.strike.replace(/[^\d.-]/g, ''));
+                    currentActiveStrikes.add(tradeStrike);
+                });
+                
+                // Check if active trades have changed
+                const tradesChanged = !setsAreEqual(lastActiveTrades, currentActiveStrikes);
+                if (!tradesChanged) return; // No change, skip update
+                
+                // Update all strike cells
+                const strikeCells = document.querySelectorAll('#strike-table tbody tr td:first-child');
+                strikeCells.forEach(cell => {
+                    const strikeText = cell.textContent.replace(/[\$,]/g, '');
+                    const strike = parseFloat(strikeText);
+                    if (!isNaN(strike)) {
+                        const hasPosition = currentActiveStrikes.has(strike);
+                        const currentlyHasIndicator = cell.classList.contains('has-active-trade');
+                        
+                        if (hasPosition !== currentlyHasIndicator) {
+                            if (hasPosition) {
+                                cell.classList.add('has-active-trade');
+                            } else {
+                                cell.classList.remove('has-active-trade');
+                            }
+                        }
+                    }
+                });
+                
+                // Update last known state
+                lastActiveTrades = currentActiveStrikes;
+            } catch (e) {
+                console.error('Error updating position indicators:', e);
+            }
+        }
+        
+        // Helper function to compare sets
+        function setsAreEqual(set1, set2) {
+            if (set1.size !== set2.size) return false;
+            for (const item of set1) {
+                if (!set2.has(item)) return false;
+            }
+            return true;
+        }
+        
+        async function updatePositionIndicator(strikeCell, strike) {
+            try {
+                // Fetch active trades to check for positions at this strike
+                const tradesRes = await fetch('/trades', { cache: 'no-store' });
+                if (!tradesRes.ok) return;
+                
+                const trades = await tradesRes.json();
+                const activeTrades = trades.filter(trade => 
+                    trade.status !== "closed" && 
+                    trade.status !== "expired"
+                );
+                
+                // Create a set of current active trade strikes for comparison
+                const currentActiveStrikes = new Set();
+                activeTrades.forEach(trade => {
+                    const tradeStrike = parseFloat(trade.strike.replace(/[^\d.-]/g, ''));
+                    currentActiveStrikes.add(tradeStrike);
+                });
+                
+                // Check if any active trade has this strike
+                const hasPosition = currentActiveStrikes.has(strike);
+                
+                // Only update if the state has actually changed
+                const currentlyHasIndicator = strikeCell.classList.contains('has-active-trade');
+                if (hasPosition !== currentlyHasIndicator) {
+                    if (hasPosition) {
+                        strikeCell.classList.add('has-active-trade');
+                    } else {
+                        strikeCell.classList.remove('has-active-trade');
+                    }
+                }
+                
+                // Update last known state
+                lastActiveTrades = currentActiveStrikes;
+            } catch (e) {
+                strikeCell.classList.remove('has-active-trade');
+            }
+        }
+
         async function fetchAndRenderActiveTradeSupervisorTrades() {
             try {
                 // Get the active trade supervisor service URL
@@ -1334,6 +1532,15 @@
                 console.error('[ACTIVE TRADE SUPERVISOR] Table body not found!');
                 return;
             }
+            
+            // Clear any existing "Loading..." or empty state rows first
+            const loadingRows = tableBody.querySelectorAll('tr');
+            loadingRows.forEach(row => {
+                const firstCell = row.querySelector('td');
+                if (firstCell && (firstCell.textContent === 'Loading...' || firstCell.textContent === 'No active trades')) {
+                    row.remove();
+                }
+            });
             
             // Sort trades by strike price in ascending order
             activeTrades.sort((a, b) => {
@@ -1520,6 +1727,55 @@
                 spannerCell.textContent = "No active trades";
                 spannerRow.appendChild(spannerCell);
                 tableBody.appendChild(spannerRow);
+            } else {
+                // There are active trades - add current price spanner row
+                // Try to get current BTC price, with fallback
+                let currentBTCPrice = null;
+                
+                // Try to get current price from the market strike table's spanner row
+                const marketSpannerRow = document.querySelector('#strike-table .spanner-row');
+                if (marketSpannerRow) {
+                    const spannerText = marketSpannerRow.textContent;
+                    const priceMatch = spannerText.match(/Current Price: \$([\d,]+)/);
+                    if (priceMatch) {
+                        currentBTCPrice = parseFloat(priceMatch[1].replace(/,/g, ''));
+                    }
+                }
+                
+                // If we don't have a current price, try to get it from the first trade's strike as a fallback
+                if (currentBTCPrice === null || currentBTCPrice === "" || isNaN(currentBTCPrice)) {
+                    if (activeTrades.length > 0 && activeTrades[0].strike) {
+                        // Use the first trade's strike as a rough estimate
+                        currentBTCPrice = parseFloat(activeTrades[0].strike.toString().replace(/[\$,]/g, ''));
+                    }
+                }
+                
+                if (currentBTCPrice !== null && currentBTCPrice !== "" && !isNaN(currentBTCPrice)) {
+                    const spannerRow = createActiveTradeSupervisorSpannerRow(currentBTCPrice);
+                    
+                    // Find the correct position to insert the spanner row
+                    const allRows = Array.from(tableBody.children);
+                    let insertIndex = allRows.length; // default to end
+                    
+                    for (let i = 0; i < allRows.length; i++) {
+                        const row = allRows[i];
+                        if (row.classList.contains('spanner-row')) continue;
+                        const strikeCell = row.querySelector('td');
+                        if (strikeCell) {
+                            const strike = parseFloat(strikeCell.textContent.replace(/[\$,]/g, ''));
+                            if (currentBTCPrice < strike) {
+                                insertIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (insertIndex < allRows.length) {
+                        tableBody.insertBefore(spannerRow, allRows[insertIndex]);
+                    } else {
+                        tableBody.appendChild(spannerRow);
+                    }
+                }
             }
         }
 
@@ -1560,6 +1816,45 @@
             setInterval(() => {
                 fetchAndRenderActiveTradeSupervisorTrades();
             }, 1000);
+        }
+
+        // Spanner Row Helper for Active Trade Supervisor
+        function createActiveTradeSupervisorSpannerRow(currentPrice) {
+            const spannerRow = document.createElement("tr");
+            spannerRow.className = "spanner-row";
+            const spannerTd = document.createElement("td");
+            spannerTd.colSpan = 7; // Match the number of columns in active trade supervisor table
+            
+            // SVGs for straight arrows (no margin)
+            const svgDown = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M8 14l4-4M8 14l-4-4" stroke="#45d34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+            const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+            
+            // Helper to get current momentum score from DOM
+            function getCurrentMomentumScoreForArrow() {
+                const el = document.getElementById('momentum-score-display');
+                if (el && el.textContent) {
+                    const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
+                    return isNaN(val) ? 0 : val;
+                }
+                return 0;
+            }
+            
+            let momentumScore = getCurrentMomentumScoreForArrow();
+            let arrowBlock = '';
+            const absMomentum = Math.abs(momentumScore);
+            if (absMomentum < 5) {
+                arrowBlock = '-';
+            } else if (absMomentum < 10) {
+                arrowBlock = momentumScore > 0 ? svgDown : svgUp;
+            } else if (absMomentum < 20) {
+                arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(2);
+            } else {
+                arrowBlock = (momentumScore > 0 ? svgDown : svgUp).repeat(3);
+            }
+            
+            spannerTd.innerHTML = `<span style="margin:0 12px;display:inline-block;">${arrowBlock}</span>Current Price: $${Math.round(currentPrice).toLocaleString()}<span style="margin:0 12px;display:inline-block;">${arrowBlock}</span>`;
+            spannerRow.appendChild(spannerTd);
+            return spannerRow;
         }
     </script>
 </body>
