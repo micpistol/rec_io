@@ -190,6 +190,76 @@
             border: 1px solid #444;
         }
 
+        /* Active Trade Supervisor Table */
+        .active-trade-supervisor-table-mobile {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .active-trade-supervisor-table-mobile th {
+            background-color: #1e2733;
+            padding: 6px 2px;
+            text-align: center;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .active-trade-supervisor-table-mobile td {
+            padding: 4px 2px;
+            text-align: center;
+            border: 1px solid #444;
+        }
+
+        /* Unified price button styling for both market and active trade supervisor */
+        .price-box-mobile {
+            display: inline-block;
+            padding: 4px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            min-width: 40px;
+            text-align: center;
+            background-color: transparent;
+            transition: background-color 0.2s ease;
+        }
+
+        .price-box-mobile:hover {
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+
+        .price-box-mobile.disabled {
+            opacity: 0.1;
+            pointer-events: none;
+        }
+
+        /* Close button styling - identical to price buttons */
+        .close-btn-mobile {
+            display: inline-block;
+            padding: 4px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            min-width: 40px;
+            text-align: center;
+            background-color: transparent;
+            transition: background-color 0.2s ease;
+            color: white;
+        }
+
+        .close-btn-mobile:hover {
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+
+        .close-btn-mobile.disabled {
+            opacity: 0.1;
+            pointer-events: none;
+        }
+
         /* Spanner row styling (exact match from desktop trade monitor) */
         tr.spanner-row td {
             background-color: #535668 !important;
@@ -206,26 +276,15 @@
         .safe { background-color: #7ec27e !important; }
         .caution { background-color: #c5ab50 !important; }
         .high-risk { background-color: #a07777 !important; }
+        .danger-stop { background-color: #ec3434 !important; }
 
-        .price-box-mobile {
-            display: inline-block;
-            padding: 4px 6px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: bold;
-            cursor: pointer;
-            border: 1px solid #ccc;
-            min-width: 40px;
-            text-align: center;
+        /* Blue background for closing trades */
+        .active-trade-supervisor-table-mobile tr.closing-trade {
+            background-color: #1e3a8a !important;
         }
-
-        .price-box-mobile:hover {
-            background-color: rgba(0, 0, 0, 0.1);
-        }
-
-        .price-box-mobile.disabled {
-            opacity: 0.1;
-            pointer-events: none;
+        .active-trade-supervisor-table-mobile tr.closing-trade td {
+            background-color: #1e3a8a !important;
+            color: #ffffff !important;
         }
 
         /* Multiplier Button Styles */
@@ -249,15 +308,6 @@
         .multiplier-btn:hover:not(.active) {
             background-color: rgba(255, 255, 255, 0.1);
         }
-
-        /* Risk colors */
-        .ultra-safe { background-color: #58b558 !important; }
-        .safe { background-color: #7ec27e !important; }
-        .caution { background-color: #c5ab50 !important; }
-        .high-risk { background-color: #a07777 !important; }
-        .danger-stop { background-color: #ec3434 !important; }
-
-
 
         /* Empty state */
         .empty-state {
@@ -428,7 +478,30 @@
             </div>
         </div>
 
-
+        <!-- Active Trade Supervisor Panel -->
+        <div class="mobile-panel">
+            <div class="mobile-panel-header">
+                <span>Active Trade Supervisor</span>
+            </div>
+            <table id="active-trade-supervisor-table" class="active-trade-supervisor-table-mobile">
+                <thead>
+                    <tr>
+                        <th>Strike</th>
+                        <th>Side</th>
+                        <th>Buy</th>
+                        <th>Pos</th>
+                        <th>Buffer</th>
+                        <th>Prob</th>
+                        <th>Close</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="7" class="empty-state">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
         <!-- Strike Table -->
         <div class="mobile-panel">
@@ -547,6 +620,9 @@
             
             // Start data polling
             startMobileDataPolling();
+            
+            // Start Active Trade Supervisor polling
+            startActiveTradeSupervisorPolling();
         });
 
         function initializeMobileToggles() {
@@ -1206,6 +1282,284 @@
                 btn.disabled = false;
                 btn.textContent = 'Close';
             });
+        }
+
+        // Active Trade Supervisor functionality
+        let activeTradeSupervisorRowsMap = new Map();
+
+        async function fetchAndRenderActiveTradeSupervisorTrades() {
+            try {
+                // Get the active trade supervisor service URL
+                let activeTradeSupervisorUrl;
+                try {
+                    // Try to use the same port configuration as desktop
+                    if (typeof getActiveTradeSupervisorUrl === 'function') {
+                        activeTradeSupervisorUrl = getActiveTradeSupervisorUrl('/api/active_trades');
+                    } else {
+                        // Fallback to hardcoded URL
+                        activeTradeSupervisorUrl = `http://${window.location.hostname}:6000/api/active_trades`;
+                    }
+                } catch (error) {
+                    console.error('[ACTIVE TRADE SUPERVISOR] Port configuration error:', error);
+                    // Fallback to hardcoded URL
+                    activeTradeSupervisorUrl = `http://${window.location.hostname}:6000/api/active_trades`;
+                }
+                
+                // Fetch active trades from the supervisor service
+                const response = await fetch(activeTradeSupervisorUrl, { cache: 'no-store' });
+                
+                if (!response.ok) {
+                    console.error('[ACTIVE TRADE SUPERVISOR] Failed to fetch active trades:', response.status);
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                if (!data.active_trades || !Array.isArray(data.active_trades)) {
+                    console.error('[ACTIVE TRADE SUPERVISOR] Invalid data format:', data);
+                    return;
+                }
+                
+                // Render the trades
+                renderActiveTradeSupervisorTrades(data.active_trades);
+                
+            } catch (error) {
+                console.error('[ACTIVE TRADE SUPERVISOR] Error fetching trades:', error);
+            }
+        }
+
+        function renderActiveTradeSupervisorTrades(activeTrades) {
+            const tableBody = document.querySelector('#active-trade-supervisor-table tbody');
+            if (!tableBody) {
+                console.error('[ACTIVE TRADE SUPERVISOR] Table body not found!');
+                return;
+            }
+            
+            // Sort trades by strike price in ascending order
+            activeTrades.sort((a, b) => {
+                const strikeA = parseFloat(a.strike.toString().replace(/[\$,]/g, ''));
+                const strikeB = parseFloat(b.strike.toString().replace(/[\$,]/g, ''));
+                return strikeA - strikeB;
+            });
+            
+            // Remove rows for trades that no longer exist
+            const activeTradeIds = new Set(activeTrades.map(trade => trade.trade_id));
+            
+            for (const [tradeId, rowObj] of activeTradeSupervisorRowsMap.entries()) {
+                if (!activeTradeIds.has(tradeId)) {
+                    if (rowObj.tr && rowObj.tr.parentNode === tableBody) {
+                        tableBody.removeChild(rowObj.tr);
+                    }
+                    activeTradeSupervisorRowsMap.delete(tradeId);
+                }
+            }
+
+            // Remove all existing spanner rows before rendering trade rows
+            tableBody.querySelectorAll('.spanner-row').forEach(row => row.remove());
+
+            // Render each active trade
+            activeTrades.forEach((trade, idx) => {
+                const tradeId = trade.trade_id;
+                
+                // Check if we already have a row for this trade
+                let rowObj = activeTradeSupervisorRowsMap.get(tradeId);
+                
+                if (!rowObj) {
+                    const row = document.createElement("tr");
+                    
+                    // Strike
+                    const strikeCell = document.createElement("td");
+                    strikeCell.textContent = trade.strike;
+                    row.appendChild(strikeCell);
+                    
+                    // Side
+                    const sideCell = document.createElement("td");
+                    sideCell.textContent = trade.side;
+                    row.appendChild(sideCell);
+                    
+                    // Buy (price)
+                    const priceCell = document.createElement("td");
+                    priceCell.textContent = (typeof trade.buy_price === "number")
+                        ? trade.buy_price.toFixed(2)
+                        : trade.buy_price;
+                    row.appendChild(priceCell);
+                    
+                    // Position
+                    const posCell = document.createElement("td");
+                    posCell.textContent = trade.position ?? "";
+                    row.appendChild(posCell);
+                    
+                    // Buffer (from active_trades.db)
+                    const bufferCell = document.createElement("td");
+                    if (trade.buffer_from_entry !== null) {
+                        const buffer = trade.buffer_from_entry;
+                        bufferCell.textContent = buffer.toLocaleString(undefined, {maximumFractionDigits: 0});
+                        
+                        // Apply risk color classes based on probability
+                        if (trade.current_probability !== null && trade.current_probability !== undefined) {
+                            const prob = trade.current_probability;
+                            if (prob >= 95) row.classList.add('ultra-safe');
+                            else if (prob >= 80) row.classList.add('safe');
+                            else if (prob >= 50) row.classList.add('caution');
+                            else if (prob >= 25) row.classList.add('high-risk');
+                            else row.classList.add('danger-stop');
+                        }
+                    } else {
+                        bufferCell.textContent = "N/A";
+                    }
+                    row.appendChild(bufferCell);
+                    
+                    // Probability (from active_trades.db)
+                    const probCell = document.createElement("td");
+                    if (trade.current_probability !== null) {
+                        probCell.textContent = trade.current_probability.toFixed(1);
+                    } else {
+                        probCell.textContent = "N/A";
+                    }
+                    row.appendChild(probCell);
+                    
+                    // Close button with PnL display - using same styling as price buttons
+                    const closeCell = document.createElement("td");
+                    closeCell.style.textAlign = "center";
+                    const closeSpan = document.createElement("span");
+                    closeSpan.className = "close-btn-mobile";
+                    closeSpan.dataset.tradeId = trade.trade_id;
+                    closeSpan.dataset.action = "close";
+                    closeSpan.style.cursor = "pointer";
+                    closeSpan.onclick = () => closeActiveTrade(trade.trade_id, trade.ticket_id);
+                    
+                    // Display PnL if available, otherwise show "Close"
+                    if (trade.current_pnl !== null && trade.current_pnl !== undefined) {
+                        const pnl = parseFloat(trade.current_pnl);
+                        if (!isNaN(pnl)) {
+                            // Format PnL with white text
+                            const pnlText = pnl >= 0 ? `+${pnl.toFixed(2)}` : pnl.toFixed(2);
+                            closeSpan.textContent = pnlText;
+                            closeSpan.style.color = "white";
+                        } else {
+                            closeSpan.textContent = "Close";
+                            closeSpan.style.color = "white";
+                        }
+                    } else {
+                        closeSpan.textContent = "Close";
+                        closeSpan.style.color = "white";
+                    }
+                    
+                    closeCell.appendChild(closeSpan);
+                    row.appendChild(closeCell);
+                    
+                    // Store the row object
+                    rowObj = { tr: row };
+                    activeTradeSupervisorRowsMap.set(tradeId, rowObj);
+                    
+                    // Apply status-based styling
+                    if (trade.status === 'closing') {
+                        row.classList.add('closing-trade');
+                    }
+                    
+                    // Add the row to the table
+                    tableBody.appendChild(row);
+                } else {
+                    // Update existing row with new data
+                    const row = rowObj.tr;
+                    const cells = row.querySelectorAll('td');
+                    
+                    // Update buffer
+                    if (cells.length > 4 && trade.buffer_from_entry !== null) {
+                        const buffer = trade.buffer_from_entry;
+                        cells[4].textContent = buffer.toLocaleString(undefined, {maximumFractionDigits: 0});
+                        
+                        // Update risk color classes based on probability
+                        row.classList.remove('ultra-safe', 'safe', 'caution', 'high-risk', 'danger-stop');
+                        if (trade.current_probability !== null && trade.current_probability !== undefined) {
+                            const prob = trade.current_probability;
+                            if (prob >= 95) row.classList.add('ultra-safe');
+                            else if (prob >= 80) row.classList.add('safe');
+                            else if (prob >= 50) row.classList.add('caution');
+                            else if (prob >= 25) row.classList.add('high-risk');
+                            else row.classList.add('danger-stop');
+                        }
+                    }
+                    
+                    // Update probability
+                    if (cells.length > 5 && trade.current_probability !== null) {
+                        cells[5].textContent = trade.current_probability.toFixed(1);
+                    }
+                    
+                    // Update status-based styling
+                    row.classList.remove('closing-trade');
+                    if (trade.status === 'closing') {
+                        row.classList.add('closing-trade');
+                    }
+                    
+                    // Update PnL on close button
+                    if (cells.length > 6 && trade.current_pnl !== null && trade.current_pnl !== undefined) {
+                        const closeButton = cells[6].querySelector('.close-btn-mobile');
+                        if (closeButton) {
+                            const pnl = parseFloat(trade.current_pnl);
+                            if (!isNaN(pnl)) {
+                                const pnlText = pnl >= 0 ? `+${pnl.toFixed(2)}` : pnl.toFixed(2);
+                                closeButton.textContent = pnlText;
+                                closeButton.style.color = "white";
+                            } else {
+                                closeButton.textContent = "Close";
+                                closeButton.style.color = "white";
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Add spanner row logic
+            if (activeTrades.length === 0) {
+                // No active trades - show "No active trades" message
+                const spannerRow = document.createElement("tr");
+                spannerRow.className = "spanner-row";
+                const spannerCell = document.createElement("td");
+                spannerCell.colSpan = 7;
+                spannerCell.textContent = "No active trades";
+                spannerRow.appendChild(spannerCell);
+                tableBody.appendChild(spannerRow);
+            }
+        }
+
+        async function closeActiveTrade(tradeId, ticketId) {
+            try {
+                console.log('[ACTIVE TRADE SUPERVISOR] Attempting to close trade:', tradeId);
+                
+                // Use the centralized closeTrade function from the trade execution controller
+                if (typeof window.closeTrade === 'function') {
+                    // Get current BTC price for sell price
+                    const currentPrice = typeof getCurrentBTCTickerPrice === 'function' ? getCurrentBTCTickerPrice() : 0.5;
+                    console.log('[ACTIVE TRADE SUPERVISOR] Current price for close:', currentPrice);
+                    
+                    // Create a mock event object since we don't have the actual event
+                    const mockEvent = {
+                        target: document.createElement('button'),
+                        preventDefault: () => {},
+                        stopPropagation: () => {}
+                    };
+                    
+                    // Call the centralized close trade function - let it handle all notifications
+                    console.log('[ACTIVE TRADE SUPERVISOR] Calling window.closeTrade with:', { tradeId, currentPrice });
+                    await window.closeTrade(tradeId, currentPrice, mockEvent);
+                    console.log('[ACTIVE TRADE SUPERVISOR] Close trade call completed');
+                } else {
+                    console.error('[ACTIVE TRADE SUPERVISOR] Centralized closeTrade function not available');
+                }
+            } catch (error) {
+                console.error(`[ACTIVE TRADE SUPERVISOR] Error closing trade ${tradeId}:`, error);
+            }
+        }
+
+        function startActiveTradeSupervisorPolling() {
+            // Initial load
+            fetchAndRenderActiveTradeSupervisorTrades();
+            
+            // Set up periodic refresh (every 1 second - same as desktop)
+            setInterval(() => {
+                fetchAndRenderActiveTradeSupervisorTrades();
+            }, 1000);
         }
     </script>
 </body>
