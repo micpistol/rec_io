@@ -6,6 +6,7 @@
 // Global data holders
 window.momentumData = {
   weightedScore: null,
+  deltas: {}, // New: to store individual minute deltas
 };
 
 // === UTILITY FUNCTIONS ===
@@ -43,6 +44,14 @@ function fetchCore() {
     .then(data => {
       // Update weighted momentum score
       window.momentumData.weightedScore = data.weighted_momentum_score;
+
+      // Update individual momentum deltas
+      if (data.delta_1m !== undefined) window.momentumData.deltas['1m'] = data.delta_1m;
+      if (data.delta_2m !== undefined) window.momentumData.deltas['2m'] = data.delta_2m;
+      if (data.delta_3m !== undefined) window.momentumData.deltas['3m'] = data.delta_3m;
+      if (data.delta_4m !== undefined) window.momentumData.deltas['4m'] = data.delta_4m;
+      if (data.delta_15m !== undefined) window.momentumData.deltas['15m'] = data.delta_15m;
+      if (data.delta_30m !== undefined) window.momentumData.deltas['30m'] = data.delta_30m;
 
       // Update BTC price display
       if ('btc_price' in data) {

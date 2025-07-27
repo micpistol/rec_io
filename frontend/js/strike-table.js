@@ -162,7 +162,7 @@ function buildStrikeTableRows(basePrice) {
   const step = 250;
   const rows = [];
   // Generate two extra rows: one above, one below
-  for (let i = basePrice - 7 * step; i <= basePrice + 7 * step; i += step) {
+  for (let i = basePrice - 6 * step; i <= basePrice + 7 * step; i += step) {
     rows.push(i);
   }
   return rows;
