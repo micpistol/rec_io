@@ -1148,6 +1148,28 @@ async def notify_automated_close(request: Request):
         print(f"[MAIN] ❌ Error handling automated trade close notification: {e}")
         return {"success": False, "error": str(e)}
 
+@app.post("/api/notify_db_change")
+async def notify_db_change(request: Request):
+    """Handle database change notifications from kalshi_account_sync"""
+    try:
+        data = await request.json()
+        db_name = data.get("db_name")
+        timestamp = data.get("timestamp")
+        change_data = data.get("change_data", {})
+        
+        print(f"📡 Received DB change notification: {db_name} at {timestamp}")
+        
+        # Broadcast to all connected WebSocket clients
+        await broadcast_db_change(db_name, {
+            "timestamp": timestamp,
+            "change_data": change_data
+        })
+        
+        return {"status": "ok", "message": f"Notification sent for {db_name}"}
+    except Exception as e:
+        print(f"❌ Error handling DB change notification: {e}")
+        return {"status": "error", "message": str(e)}
+
 # Startup and shutdown events
 @app.on_event("startup")
 async def startup_event():

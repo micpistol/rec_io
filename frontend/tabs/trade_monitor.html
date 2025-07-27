@@ -2795,7 +2795,55 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchAndRenderRecentTrades();
   fetchAndRenderPositions(); // Load positions data since it's the default tab
   initializeTabSwitching();
+  
+  // Set up WebSocket connection for database change notifications
+  setupDatabaseChangeListener();
 });
+
+// WebSocket connection for database change notifications
+function setupDatabaseChangeListener() {
+  const ws = new WebSocket(`ws://${window.location.host}/ws/db_changes`);
+  
+  ws.onopen = function() {
+    console.log('🔗 Connected to database change notifications');
+  };
+  
+  ws.onmessage = function(event) {
+    try {
+      const data = JSON.parse(event.data);
+      console.log('📡 Received database change notification:', data);
+      
+      // Handle different database change types and refresh immediately
+      if (data.database === 'fills') {
+        console.log('🔄 Refreshing fills table due to database change');
+        fetchAndRenderRecentTrades();
+      } else if (data.database === 'positions') {
+        console.log('🔄 Refreshing positions table due to database change');
+        fetchAndRenderPositions();
+      } else if (data.database === 'settlements') {
+        console.log('🔄 Refreshing settlements table due to database change');
+        fetchAndRenderSettlements();
+      }
+    } catch (error) {
+      console.error('❌ Error parsing database change notification:', error);
+    }
+  };
+  
+  ws.onerror = function(error) {
+    console.error('❌ WebSocket error:', error);
+  };
+  
+  ws.onclose = function() {
+    console.log('🔌 Database change WebSocket connection closed');
+    // Attempt to reconnect after a delay
+    setTimeout(() => {
+      console.log('🔄 Attempting to reconnect to database change notifications...');
+      setupDatabaseChangeListener();
+    }, 5000);
+  };
+}
+
+
 
 </script>
 <script>
