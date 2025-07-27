@@ -1031,6 +1031,9 @@ async def add_trade(request: Request):
             conn.close()
             log(f"[DEBUG] Trade status set to 'closing' for ticker: {ticker}")
             
+            # Notify frontend about trade database change
+            notify_frontend_trade_change()
+            
             # Notify active trade supervisor about the closing status
             conn = get_db_connection()
             cursor = conn.cursor()
@@ -1342,6 +1345,9 @@ def check_expired_trades():
         
         print(f"[EXPIRATION] Marked {len(open_trades)} trades as expired")
         
+        # Notify frontend about trade database change
+        notify_frontend_trade_change()
+        
         # Notify active_trade_supervisor for each expired trade
         for id, ticker in open_trades:
             notify_active_trade_supervisor(id, str(ticker), "expired")
@@ -1436,6 +1442,9 @@ def poll_settlements_for_matches(expired_tickers):
                     """, (sell_price, 'W' if sell_price > 0 else 'L', pnl, ticker))
                     conn_trades.commit()
                     conn_trades.close()
+                    
+                    # Notify frontend about trade database change
+                    notify_frontend_trade_change()
                     
                     found_tickers.add(ticker)
                     print(f"[SETTLEMENTS] Closed trade for {ticker} with sell_price={sell_price}")

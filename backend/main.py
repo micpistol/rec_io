@@ -138,6 +138,7 @@ app.mount("/images", StaticFiles(directory="frontend/images"), name="images")
 app.mount("/js", StaticFiles(directory="frontend/js"), name="js")
 app.mount("/tabs", StaticFiles(directory="frontend/tabs"), name="tabs")
 app.mount("/audio", StaticFiles(directory="frontend/audio"), name="audio")
+app.mount("/mobile", StaticFiles(directory="frontend/mobile"), name="mobile")
 
 # Health check endpoint
 @app.get("/health")
@@ -647,6 +648,40 @@ async def get_current_momentum():
             "momentum_score": 0,
             "error": "Unable to get momentum from live_data_analysis"
         }
+
+@app.get("/api/btc_price")
+async def get_btc_price():
+    """Get current BTC price."""
+    try:
+        from live_data_analysis import get_btc_price
+        price = get_btc_price()
+        return {"price": price}
+    except Exception as e:
+        print(f"Error getting BTC price: {e}")
+        return {"price": None, "error": str(e)}
+
+@app.get("/api/momentum_score")
+async def get_momentum_score():
+    """Get current momentum score for mobile."""
+    try:
+        from live_data_analysis import get_momentum_data
+        momentum_data = get_momentum_data()
+        weighted_score = momentum_data.get('weighted_momentum_score', 0)
+        return {"weighted_score": weighted_score}
+    except Exception as e:
+        print(f"Error getting momentum score: {e}")
+        return {"weighted_score": 0, "error": str(e)}
+
+@app.get("/api/strike_table")
+async def get_strike_table_mobile():
+    """Get strike table data for mobile."""
+    try:
+        from live_data_analysis import get_strike_table_data
+        strike_data = get_strike_table_data()
+        return {"strikes": strike_data}
+    except Exception as e:
+        print(f"Error getting strike table: {e}")
+        return {"strikes": [], "error": str(e)}
 
 # === PREFERENCES API ENDPOINTS ===
 
