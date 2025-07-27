@@ -544,13 +544,32 @@
     async function fetchAllTrades() {
       console.log('Fetching trades at', new Date().toLocaleTimeString());
       try {
-        // Use the centralized port system
+        // Wait for port configuration to be loaded
+        let retries = 0;
+        const maxRetries = 10;
+        while (retries < maxRetries) {
+          try {
+                    // Use the centralized port system
         const apiBaseUrl = getMainAppUrl();
         
         const res = await fetch(`${apiBaseUrl}/trades`, { cache: 'no-store' });
-        if (!res.ok) throw new Error('Network response was not ok');
-        trades = await res.json();
-        applyFilters();
+            if (!res.ok) throw new Error('Network response was not ok');
+            trades = await res.json();
+            applyFilters();
+            return; // Success, exit the function
+          } catch (portError) {
+            if (portError.message.includes('Port configuration not loaded')) {
+              console.log(`Waiting for port configuration... (attempt ${retries + 1}/${maxRetries})`);
+              retries++;
+              if (retries < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
+                continue;
+              }
+            }
+            throw portError; // Re-throw if it's not a port config error or we've exhausted retries
+          }
+        }
+        throw new Error('Port configuration failed to load after multiple attempts');
       } catch (error) {
         const tbody = document.querySelector('#trade-log-table tbody');
         tbody.innerHTML = `<tr><td colspan="22" style="color:red;">Failed to load trades: ${error.message}</td></tr>`;
@@ -619,17 +638,39 @@
       switch (selectedValue) {
         case 'ALL':
           try {
-            const apiBaseUrl = getMainAppUrl();
-            const response = await fetch(`${apiBaseUrl}/api/earliest_trade_date`);
-            if (response.ok) {
-              const data = await response.json();
-              if (data.earliest_date) {
-                const todayStr = formatDate(now);
-                rangeText = `${data.earliest_date} to ${todayStr}`;
-              } else {
-                rangeText = '';
+            // Wait for port configuration to be loaded
+            let retries = 0;
+            const maxRetries = 5;
+            while (retries < maxRetries) {
+              try {
+                const apiBaseUrl = getMainAppUrl();
+                const response = await fetch(`${apiBaseUrl}/api/earliest_trade_date`);
+                if (response.ok) {
+                  const data = await response.json();
+                  if (data.earliest_date) {
+                    const todayStr = formatDate(now);
+                    rangeText = `${data.earliest_date} to ${todayStr}`;
+                  } else {
+                    rangeText = '';
+                  }
+                } else {
+                  rangeText = '';
+                }
+                break; // Success, exit the loop
+              } catch (portError) {
+                if (portError.message.includes('Port configuration not loaded')) {
+                  console.log(`Waiting for port configuration in date range... (attempt ${retries + 1}/${maxRetries})`);
+                  retries++;
+                  if (retries < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 300)); // Wait 300ms before retry
+                    continue;
+                  }
+                }
+                throw portError; // Re-throw if it's not a port config error or we've exhausted retries
               }
-            } else {
+            }
+            if (retries >= maxRetries) {
+              console.error('Port configuration failed to load for date range');
               rangeText = '';
             }
           } catch (error) {
@@ -725,7 +766,7 @@
           console.log('📡 Received database change notification (trade history):', data);
           
           // Handle trade database changes and refresh immediately
-          if (data.database === 'trades') {
+          if (data.database === 'trades' || data.data?.trades) {
             console.log('🔄 Refreshing trade history due to database change');
             fetchAllTrades();
           }

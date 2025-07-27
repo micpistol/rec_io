@@ -169,6 +169,9 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
                     # Notify active trade supervisor about new open trade
                     notify_active_trade_supervisor(id, ticket_id, "open")
                     
+                    # Notify frontend about trade database change
+                    notify_frontend_trade_change()
+                    
                     break
                     
         except Exception as e:
@@ -691,9 +694,12 @@ def notify_frontend_trade_change() -> None:
     try:
         import aiohttp
         import asyncio
+        import threading
         
-        async def send_notification():
-            async with aiohttp.ClientSession() as session:
+        def send_notification_sync():
+            """Send notification in a separate thread to avoid event loop conflicts"""
+            try:
+                import requests
                 notification_url = f"http://localhost:{config.get('main_app_port', 3000)}/api/notify_db_change"
                 payload = {
                     "db_name": "trades",
@@ -701,25 +707,21 @@ def notify_frontend_trade_change() -> None:
                     "change_data": {"trades": 1}
                 }
                 
-                try:
-                    async with session.post(notification_url, json=payload, timeout=2) as response:
-                        if response.status == 200:
-                            log("✅ Notified frontend about trade database change")
-                        else:
-                            log(f"⚠️ Failed to notify frontend about trade change: {response.status}")
-                except Exception as e:
-                    log(f"❌ Error sending trade change notification: {e}")
+                response = requests.post(notification_url, json=payload, timeout=2)
+                if response.status_code == 200:
+                    log("✅ Notified frontend about trade database change")
+                else:
+                    log(f"⚠️ Failed to notify frontend about trade change: {response.status_code}")
+            except Exception as e:
+                log(f"❌ Error sending trade change notification: {e}")
         
-        # Run the async notification in a new event loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(send_notification())
-        finally:
-            loop.close()
+        # Run the notification in a separate thread to avoid event loop conflicts
+        thread = threading.Thread(target=send_notification_sync)
+        thread.daemon = True
+        thread.start()
             
     except ImportError:
-        log("⚠️ aiohttp not available - skipping frontend notification")
+        log("⚠️ requests not available - skipping frontend notification")
     except Exception as e:
         log(f"❌ Error in trade change notification: {e}")
 
