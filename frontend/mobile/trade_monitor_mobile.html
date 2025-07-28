@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Trade Monitor Mobile</title>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="../styles/global.css">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../styles/global.css?v=1.0.1">
     <script src="../js/live-data.js"></script>
     <script src="../js/globals.js?v=1"></script>
 
@@ -473,6 +473,27 @@
                 padding: 3px 1px;
             }
         }
+
+        /* Mobile Settings Modal Toggle Styles */
+        .mobile-toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background-color: white;
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+
+        .mobile-toggle.active {
+            background-color: #007bff;
+        }
+
+        .mobile-toggle.active::after {
+            transform: translateX(20px);
+        }
     </style>
 </head>
 <body>
@@ -508,6 +529,17 @@
         <div class="mobile-panel">
             <div class="mobile-panel-header">
                 <span>Trading Controls</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <img 
+                        id="mobileSettingsIcon"
+                        src="../images/icons/panel_settings.png" 
+                        alt="Trading Settings" 
+                        title="Trading Settings" 
+                        style="width: 14px; height: 14px; opacity: 0.7; transition: opacity 0.2s; cursor: pointer; align-self: center;"
+                        onmouseover="this.style.opacity='1'" 
+                        onmouseout="this.style.opacity='0.7'"
+                    />
+                </div>
             </div>
             <div class="control-toggles">
                 <div class="toggle-group">
@@ -585,6 +617,93 @@
                     </tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Mobile Settings Modal -->
+    <div id="mobileSettingsModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:1000;">
+        <div id="mobileSettingsDim" style="position:absolute; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.6);"></div>
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; border-radius:12px; width:90vw; max-width:400px; max-height:80vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.3); padding:20px; display:flex; flex-direction:column;">
+            <div style="font-size:18px; font-weight:600; margin-bottom:20px; color:#222; text-align:center;">Trading Settings</div>
+            
+            <!-- Auto Entry Settings Section -->
+            <div style="margin-bottom:24px;">
+                <div style="font-size:16px; font-weight:600; color:#333; margin-bottom:16px; border-bottom:1px solid #eee; padding-bottom:8px;">Auto Entry Settings</div>
+                
+                <!-- Time Window -->
+                <div style="margin-bottom:16px;">
+                    <label style="font-size:14px; color:#333; margin-bottom:8px; display:block; font-weight:500;">Time Window:</label>
+                    <div style="position:relative; width:100%;">
+                        <div id="mobileTimeWindowSliderContainer" style="position:relative; width:100%; height:8px; background:#e0e0e0; border-radius:4px; margin-top:8px;">
+                            <div id="mobileMinTimeHandle" style="position:absolute; top:-6px; width:20px; height:20px; background:#007bff; border-radius:50%; cursor:pointer; z-index:10; transform:translateX(-50%); box-shadow:0 2px 4px rgba(0,0,0,0.2);"></div>
+                            <div id="mobileMaxTimeHandle" style="position:absolute; top:-6px; width:20px; height:20px; background:#007bff; border-radius:50%; cursor:pointer; z-index:10; transform:translateX(-50%); box-shadow:0 2px 4px rgba(0,0,0,0.2);"></div>
+                            <div id="mobileTimeWindowRange" style="position:absolute; top:0; height:8px; background:#007bff; border-radius:4px; z-index:5;"></div>
+                            <div id="mobileTimeWindowMinDisplay" style="position:absolute; top:-40px; left:0; font-size:12px; color:#222; background:white; padding:6px 10px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0; font-weight:500;">00:00</div>
+                            <div id="mobileTimeWindowMaxDisplay" style="position:absolute; top:-40px; left:0; font-size:12px; color:#222; background:white; padding:6px 10px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0; font-weight:500;">60:00</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Minimum Win Probability -->
+                <div style="margin-bottom:16px;">
+                    <label style="font-size:14px; color:#333; margin-bottom:8px; display:block; font-weight:500;">Minimum Win Probability:</label>
+                    <div style="position:relative; width:100%;">
+                        <input type="range" id="mobileAutoEntryProbabilitySlider" min="0" max="100" value="25" style="width:100%; height:8px; background:#e0e0e0; border-radius:4px; outline:none;" />
+                        <div id="mobileAutoEntrySliderValueDisplay" style="position:absolute; top:-40px; left:0; font-size:12px; color:#222; background:white; padding:6px 10px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0; font-weight:500;">25%</div>
+                    </div>
+                </div>
+                
+                <!-- Minimum Differential -->
+                <div style="margin-bottom:16px;">
+                    <label style="font-size:14px; color:#333; margin-bottom:8px; display:block; font-weight:500;">Minimum Differential:</label>
+                    <div style="position:relative; width:100%;">
+                        <input type="range" id="mobileAutoEntryDifferentialSlider" min="-10" max="10" value="0" style="width:100%; height:8px; background:#e0e0e0; border-radius:4px; outline:none;" />
+                        <div id="mobileAutoEntryDifferentialValueDisplay" style="position:absolute; top:-40px; left:0; font-size:12px; color:#222; background:white; padding:6px 10px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0; font-weight:500;">0</div>
+                    </div>
+                </div>
+                
+                <!-- Allow Re-Entry -->
+                <div style="margin-bottom:16px;">
+                    <label style="font-size:14px; color:#333; margin-bottom:8px; display:block; font-weight:500;">Allow Re-Entry:</label>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <input type="checkbox" id="mobileAutoEntryAllowReEntry" style="width:18px; height:18px; accent-color:#007bff;" />
+                        <span style="font-size:13px; color:#666;">Allow re-entry on the same strike</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Auto Stop Settings Section -->
+            <div style="margin-bottom:24px;">
+                <div style="font-size:16px; font-weight:600; color:#333; margin-bottom:16px; border-bottom:1px solid #eee; padding-bottom:8px;">Auto Stop Settings</div>
+                
+                <!-- Current Win Probability -->
+                <div style="margin-bottom:16px;">
+                    <label style="font-size:14px; color:#333; margin-bottom:8px; display:block; font-weight:500;">Current Win Probability:</label>
+                    <div style="position:relative; width:100%;">
+                        <input type="range" id="mobileAutoStopProbabilitySlider" min="0" max="100" value="25" style="width:100%; height:8px; background:#e0e0e0; border-radius:4px; outline:none;" />
+                        <div id="mobileAutoStopSliderValueDisplay" style="position:absolute; top:-40px; left:0; font-size:12px; color:#222; background:white; padding:6px 10px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0; font-weight:500;">25%</div>
+                    </div>
+                </div>
+                
+                <!-- Minimum Time to Close -->
+                <div style="margin-bottom:16px;">
+                    <label style="font-size:14px; color:#333; margin-bottom:8px; display:block; font-weight:500;">Minimum Time to Close:</label>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="display:flex; align-items:center; border:1px solid #ddd; border-radius:6px; background:white;">
+                            <button id="mobileAutoStopMinTTCDown" style="padding:10px 14px; border:none; background:#f8f9fa; cursor:pointer; border-right:1px solid #ddd; border-radius:6px 0 0 6px; font-size:14px;">▼</button>
+                            <span id="mobileAutoStopMinTTCDisplay" style="padding:10px 18px; font-size:14px; color:#333; min-width:70px; text-align:center; font-weight:500;">01:00</span>
+                            <button id="mobileAutoStopMinTTCUp" style="padding:10px 14px; border:none; background:#f8f9fa; cursor:pointer; border-left:1px solid #ddd; border-radius:0 6px 6px 0; font-size:14px;">▲</button>
+                        </div>
+                        <input type="hidden" id="mobileAutoStopMinTTCInput" value="60" />
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div style="display:flex; gap:12px; justify-content:center; align-items:center; margin-top:20px;">
+                <button id="mobileSettingsCancel" style="padding:12px 24px; border-radius:6px; border:1px solid #ddd; background:#f8f9fa; color:#333; font-size:14px; cursor:pointer; font-weight:500; flex:1;">Cancel</button>
+                <button id="mobileSettingsSave" style="padding:12px 24px; border-radius:6px; border:none; background:#007bff; color:white; font-size:14px; cursor:pointer; font-weight:500; flex:1;">Save</button>
+            </div>
         </div>
     </div>
 
@@ -2404,6 +2523,409 @@
             }
         }
 
+        // Set up WebSocket connection for database change notifications
+        setupDatabaseChangeListener();
+    </script>
+
+    <!-- Mobile Settings Modal JavaScript -->
+    <script>
+        // Mobile Settings Modal Variables
+        let mobileMinTimeSeconds = 0;
+        let mobileMaxTimeSeconds = 3600;
+        let mobileSliderWidth = 0;
+        let mobileIsDragging = false;
+        let mobileCurrentHandle = null;
+        let mobileLastSavedAutoEntryProbability = 25;
+        let mobileLastSavedAutoEntryDifferential = 0;
+        let mobileLastSavedAutoStopProbability = 25;
+        let mobileLastSavedAutoStopMinTTC = 60;
+        let mobileLastSavedAutoEntryMinTime = 0;
+        let mobileLastSavedAutoEntryMaxTime = 3600;
+        let mobileLastSavedAutoEntryAllowReEntry = false;
+
+        // Initialize mobile settings functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const mobileSettingsIcon = document.getElementById('mobileSettingsIcon');
+            const mobileSettingsModal = document.getElementById('mobileSettingsModal');
+            const mobileSettingsDim = document.getElementById('mobileSettingsDim');
+            const mobileSettingsCancel = document.getElementById('mobileSettingsCancel');
+            const mobileSettingsSave = document.getElementById('mobileSettingsSave');
+
+            // Mobile Settings Icon Click Handler
+            if (mobileSettingsIcon) {
+                mobileSettingsIcon.addEventListener('click', showMobileSettingsModal);
+            }
+
+            // Mobile Settings Modal Event Handlers
+            if (mobileSettingsCancel) {
+                mobileSettingsCancel.addEventListener('click', hideMobileSettingsModal);
+            }
+
+            if (mobileSettingsSave) {
+                mobileSettingsSave.addEventListener('click', saveMobileSettings);
+            }
+
+            if (mobileSettingsDim) {
+                mobileSettingsDim.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                });
+            }
+
+            // Initialize slider event listeners
+            initializeMobileSliderEventListeners();
+        });
+
+        // Show Mobile Settings Modal
+        function showMobileSettingsModal() {
+            const modal = document.getElementById('mobileSettingsModal');
+            if (modal) {
+                modal.style.display = 'block';
+                document.body.style.overflow = 'hidden';
+                
+                // Load current settings
+                loadMobileSettings();
+                
+                // Initialize time window slider
+                setTimeout(() => {
+                    initMobileTimeWindowSlider();
+                }, 100);
+            }
+        }
+
+        // Hide Mobile Settings Modal
+        function hideMobileSettingsModal() {
+            const modal = document.getElementById('mobileSettingsModal');
+            if (modal) {
+                modal.style.display = 'none';
+                document.body.style.overflow = '';
+            }
+        }
+
+        // Load Mobile Settings from API
+        async function loadMobileSettings() {
+            try {
+                // Load main preferences (auto_entry, auto_stop, etc.)
+                const preferencesResponse = await fetch('/api/get_preferences');
+                if (preferencesResponse.ok) {
+                    const preferences = await preferencesResponse.json();
+                    
+                    // Update main toggle states (only the ones on the main page)
+                    const autoEntryToggle = document.getElementById('autoEntryToggle');
+                    const autoStopToggle = document.getElementById('autoStopToggle');
+                    
+                    if (autoEntryToggle) {
+                        autoEntryToggle.classList.toggle('active', preferences.auto_entry === true);
+                    }
+                    if (autoStopToggle) {
+                        autoStopToggle.classList.toggle('active', preferences.auto_stop === true);
+                    }
+                }
+                
+                // Load Auto Entry Settings
+                const autoEntryResponse = await fetch('/api/get_auto_entry_settings');
+                if (autoEntryResponse.ok) {
+                    const autoEntryData = await autoEntryResponse.json();
+                    
+                    mobileLastSavedAutoEntryProbability = autoEntryData.min_probability ?? 25;
+                    mobileLastSavedAutoEntryDifferential = autoEntryData.min_differential ?? 0;
+                    mobileLastSavedAutoEntryMinTime = autoEntryData.min_time ?? 0;
+                    mobileLastSavedAutoEntryMaxTime = autoEntryData.max_time ?? 3600;
+                    mobileLastSavedAutoEntryAllowReEntry = autoEntryData.allow_re_entry ?? false;
+                    
+                    // Set slider values
+                    const probSlider = document.getElementById('mobileAutoEntryProbabilitySlider');
+                    const diffSlider = document.getElementById('mobileAutoEntryDifferentialSlider');
+                    const allowReEntryCheckbox = document.getElementById('mobileAutoEntryAllowReEntry');
+                    
+                    if (probSlider) {
+                        probSlider.value = mobileLastSavedAutoEntryProbability;
+                        updateMobileAutoEntrySliderDisplay(mobileLastSavedAutoEntryProbability);
+                    }
+                    
+                    if (diffSlider) {
+                        diffSlider.value = mobileLastSavedAutoEntryDifferential;
+                        updateMobileAutoEntryDifferentialDisplay(mobileLastSavedAutoEntryDifferential);
+                    }
+                    
+                    if (allowReEntryCheckbox) {
+                        allowReEntryCheckbox.checked = mobileLastSavedAutoEntryAllowReEntry;
+                    }
+                    
+                    // Set time window values
+                    mobileMinTimeSeconds = mobileLastSavedAutoEntryMinTime;
+                    mobileMaxTimeSeconds = mobileLastSavedAutoEntryMaxTime;
+                }
+                
+                // Load Auto Stop Settings
+                const autoStopResponse = await fetch('/api/get_auto_stop_settings');
+                if (autoStopResponse.ok) {
+                    const autoStopData = await autoStopResponse.json();
+                    
+                    mobileLastSavedAutoStopProbability = autoStopData.current_probability ?? 25;
+                    mobileLastSavedAutoStopMinTTC = autoStopData.min_ttc_seconds ?? 60;
+                    
+                    // Set slider values
+                    const stopProbSlider = document.getElementById('mobileAutoStopProbabilitySlider');
+                    const minTTCInput = document.getElementById('mobileAutoStopMinTTCInput');
+                    const minTTCDisplay = document.getElementById('mobileAutoStopMinTTCDisplay');
+                    
+                    if (stopProbSlider) {
+                        stopProbSlider.value = mobileLastSavedAutoStopProbability;
+                        updateMobileAutoStopSliderDisplay(mobileLastSavedAutoStopProbability);
+                    }
+                    
+                    if (minTTCInput && minTTCDisplay) {
+                        minTTCInput.value = mobileLastSavedAutoStopMinTTC;
+                        minTTCDisplay.textContent = formatSecondsToMMSS(mobileLastSavedAutoStopMinTTC);
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading mobile settings:', error);
+            }
+        }
+
+        // Save Mobile Settings
+        async function saveMobileSettings() {
+            try {
+                const probSlider = document.getElementById('mobileAutoEntryProbabilitySlider');
+                const diffSlider = document.getElementById('mobileAutoEntryDifferentialSlider');
+                const allowReEntryCheckbox = document.getElementById('mobileAutoEntryAllowReEntry');
+                const stopProbSlider = document.getElementById('mobileAutoStopProbabilitySlider');
+                const minTTCInput = document.getElementById('mobileAutoStopMinTTCInput');
+                
+                const newProb = parseInt(probSlider.value, 10);
+                const newDifferential = parseInt(diffSlider.value, 10);
+                const allowReEntry = allowReEntryCheckbox ? allowReEntryCheckbox.checked : false;
+                const newStopProb = parseInt(stopProbSlider.value, 10);
+                const newMinTTC = parseInt(minTTCInput.value, 10);
+                
+                if (!isNaN(newProb) && !isNaN(newDifferential) && !isNaN(newStopProb) && !isNaN(newMinTTC)) {
+                    // Save Auto Entry Settings
+                    const autoEntryResponse = await fetch('/api/set_auto_entry_settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            min_probability: newProb,
+                            min_differential: newDifferential,
+                            min_ttc_seconds: 60,
+                            min_time: mobileMinTimeSeconds,
+                            max_time: mobileMaxTimeSeconds,
+                            allow_re_entry: allowReEntry
+                        })
+                    });
+                    
+                    // Save Auto Stop Settings
+                    const autoStopResponse = await fetch('/api/set_auto_stop_settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            current_probability: newStopProb,
+                            min_ttc_seconds: newMinTTC
+                        })
+                    });
+                    
+                    if (autoEntryResponse.ok && autoStopResponse.ok) {
+                        // Update last saved values
+                        mobileLastSavedAutoEntryProbability = newProb;
+                        mobileLastSavedAutoEntryDifferential = newDifferential;
+                        mobileLastSavedAutoStopProbability = newStopProb;
+                        mobileLastSavedAutoStopMinTTC = newMinTTC;
+                        mobileLastSavedAutoEntryMinTime = mobileMinTimeSeconds;
+                        mobileLastSavedAutoEntryMaxTime = mobileMaxTimeSeconds;
+                        mobileLastSavedAutoEntryAllowReEntry = allowReEntry;
+                        
+                        hideMobileSettingsModal();
+                    } else {
+                        console.error('Failed to save mobile settings');
+                    }
+                }
+            } catch (error) {
+                console.error('Error saving mobile settings:', error);
+            }
+        }
+
+        // Mobile Slider Display Functions
+        function updateMobileAutoEntrySliderDisplay(value) {
+            const display = document.getElementById('mobileAutoEntrySliderValueDisplay');
+            if (display) {
+                display.textContent = value + '%';
+                updateSliderDisplayPosition(display, value, 0, 100);
+            }
+        }
+
+        function updateMobileAutoEntryDifferentialDisplay(value) {
+            const display = document.getElementById('mobileAutoEntryDifferentialValueDisplay');
+            if (display) {
+                const displayValue = parseInt(value) >= 0 ? `+${value}` : value;
+                display.textContent = displayValue;
+                updateSliderDisplayPosition(display, value, -10, 10);
+            }
+        }
+
+        function updateMobileAutoStopSliderDisplay(value) {
+            const display = document.getElementById('mobileAutoStopSliderValueDisplay');
+            if (display) {
+                display.textContent = value + '%';
+                updateSliderDisplayPosition(display, value, 0, 100);
+            }
+        }
+
+        function updateSliderDisplayPosition(displayElement, value, min, max) {
+            const percent = (value - min) / (max - min);
+            const slider = displayElement.previousElementSibling;
+            if (slider) {
+                const sliderWidth = slider.offsetWidth;
+                const thumbWidth = 20; // Approximate thumb width
+                const offset = percent * (sliderWidth - thumbWidth) + thumbWidth / 2;
+                displayElement.style.left = `${offset}px`;
+            }
+        }
+
+        // Mobile Time Window Slider Functions
+        function initMobileTimeWindowSlider() {
+            const container = document.getElementById('mobileTimeWindowSliderContainer');
+            if (!container) return;
+            
+            mobileSliderWidth = container.offsetWidth;
+            updateMobileTimeWindowSlider();
+        }
+
+        function updateMobileTimeWindowSlider() {
+            if (!mobileSliderWidth) return;
+            
+            const minPercent = (mobileMinTimeSeconds / 3600) * 100;
+            const maxPercent = (mobileMaxTimeSeconds / 3600) * 100;
+            
+            const minHandle = document.getElementById('mobileMinTimeHandle');
+            const maxHandle = document.getElementById('mobileMaxTimeHandle');
+            const range = document.getElementById('mobileTimeWindowRange');
+            const minDisplay = document.getElementById('mobileTimeWindowMinDisplay');
+            const maxDisplay = document.getElementById('mobileTimeWindowMaxDisplay');
+            
+            if (minHandle) minHandle.style.left = `${minPercent}%`;
+            if (maxHandle) maxHandle.style.left = `${maxPercent}%`;
+            if (range) {
+                range.style.left = `${minPercent}%`;
+                range.style.width = `${maxPercent - minPercent}%`;
+            }
+            if (minDisplay) {
+                minDisplay.textContent = formatSecondsToMMSS(mobileMinTimeSeconds);
+                minDisplay.style.left = `${minPercent}%`;
+            }
+            if (maxDisplay) {
+                maxDisplay.textContent = formatSecondsToMMSS(mobileMaxTimeSeconds);
+                maxDisplay.style.left = `${maxPercent}%`;
+            }
+        }
+
+        // Mobile Touch Event Handlers for Time Window Slider
+        function handleMobileTouchStart(e) {
+            mobileIsDragging = true;
+            mobileCurrentHandle = e.target;
+            document.addEventListener('touchmove', handleMobileTouchMove, { passive: false });
+            document.addEventListener('touchend', handleMobileTouchEnd);
+            e.preventDefault();
+        }
+
+        function handleMobileTouchMove(e) {
+            if (!mobileIsDragging || !mobileCurrentHandle) return;
+            
+            const container = document.getElementById('mobileTimeWindowSliderContainer');
+            const rect = container.getBoundingClientRect();
+            const touch = e.touches[0];
+            const x = touch.clientX - rect.left;
+            const percent = Math.max(0, Math.min(100, (x / rect.width) * 100));
+            
+            // Map percentage to 15-second intervals
+            const intervalIndex = Math.round((percent / 100) * 240);
+            const snappedSeconds = Math.max(0, Math.min(3600, intervalIndex * 15));
+            
+            if (mobileCurrentHandle.id === 'mobileMinTimeHandle') {
+                if (snappedSeconds >= mobileMaxTimeSeconds) return;
+                mobileMinTimeSeconds = snappedSeconds;
+            } else if (mobileCurrentHandle.id === 'mobileMaxTimeHandle') {
+                if (snappedSeconds <= mobileMinTimeSeconds) return;
+                mobileMaxTimeSeconds = snappedSeconds;
+            }
+            
+            updateMobileTimeWindowSlider();
+        }
+
+        function handleMobileTouchEnd() {
+            mobileIsDragging = false;
+            mobileCurrentHandle = null;
+            document.removeEventListener('touchmove', handleMobileTouchMove);
+            document.removeEventListener('touchend', handleMobileTouchEnd);
+        }
+
+        // Initialize Mobile Slider Event Listeners
+        function initializeMobileSliderEventListeners() {
+            // Auto Entry Probability Slider
+            const probSlider = document.getElementById('mobileAutoEntryProbabilitySlider');
+            if (probSlider) {
+                probSlider.addEventListener('input', function() {
+                    updateMobileAutoEntrySliderDisplay(this.value);
+                });
+            }
+
+            // Auto Entry Differential Slider
+            const diffSlider = document.getElementById('mobileAutoEntryDifferentialSlider');
+            if (diffSlider) {
+                diffSlider.addEventListener('input', function() {
+                    updateMobileAutoEntryDifferentialDisplay(this.value);
+                });
+            }
+
+            // Auto Stop Probability Slider
+            const stopProbSlider = document.getElementById('mobileAutoStopProbabilitySlider');
+            if (stopProbSlider) {
+                stopProbSlider.addEventListener('input', function() {
+                    updateMobileAutoStopSliderDisplay(this.value);
+                });
+            }
+
+            // Auto Stop Min TTC Controls
+            const minTTCUp = document.getElementById('mobileAutoStopMinTTCUp');
+            const minTTCDown = document.getElementById('mobileAutoStopMinTTCDown');
+            const minTTCInput = document.getElementById('mobileAutoStopMinTTCInput');
+            const minTTCDisplay = document.getElementById('mobileAutoStopMinTTCDisplay');
+
+            if (minTTCUp) {
+                minTTCUp.addEventListener('click', function() {
+                    const currentVal = parseInt(minTTCInput.value, 10) || 0;
+                    const newVal = currentVal + 15;
+                    minTTCInput.value = newVal;
+                    minTTCDisplay.textContent = formatSecondsToMMSS(newVal);
+                });
+            }
+
+            if (minTTCDown) {
+                minTTCDown.addEventListener('click', function() {
+                    const currentVal = parseInt(minTTCInput.value, 10) || 0;
+                    const newVal = Math.max(0, currentVal - 30);
+                    minTTCInput.value = newVal;
+                    minTTCDisplay.textContent = formatSecondsToMMSS(newVal);
+                });
+            }
+
+            // Time Window Slider Touch Events
+            const minHandle = document.getElementById('mobileMinTimeHandle');
+            const maxHandle = document.getElementById('mobileMaxTimeHandle');
+
+            if (minHandle) {
+                minHandle.addEventListener('touchstart', handleMobileTouchStart);
+            }
+            if (maxHandle) {
+                maxHandle.addEventListener('touchstart', handleMobileTouchStart);
+            }
+        }
+
+        // Utility function for formatting seconds to MM:SS
+        function formatSecondsToMMSS(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
     </script>
 </body>
 </html> 

@@ -192,13 +192,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files with cache busting
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
+
+# Custom static file handler with cache busting
+class CacheBustingStaticFiles(StaticFiles):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    async def __call__(self, scope, receive, send):
+        # Add cache-busting headers to all static files
+        async def send_with_cache_busting(message):
+            if message["type"] == "http.response.start":
+                message["headers"].extend([
+                    (b"cache-control", b"no-cache, no-store, must-revalidate"),
+                    (b"pragma", b"no-cache"),
+                    (b"expires", b"0")
+                ])
+            await send(message)
+        
+        await super().__call__(scope, receive, send_with_cache_busting)
+
 # Mount static files
-app.mount("/styles", StaticFiles(directory="frontend/styles"), name="styles")
-app.mount("/images", StaticFiles(directory="frontend/images"), name="images")
-app.mount("/js", StaticFiles(directory="frontend/js"), name="js")
-app.mount("/tabs", StaticFiles(directory="frontend/tabs"), name="tabs")
-app.mount("/audio", StaticFiles(directory="frontend/audio"), name="audio")
-app.mount("/mobile", StaticFiles(directory="frontend/mobile"), name="mobile")
+app.mount("/tabs", CacheBustingStaticFiles(directory="frontend/tabs"), name="tabs")
+app.mount("/audio", CacheBustingStaticFiles(directory="frontend/audio"), name="audio")
+app.mount("/js", CacheBustingStaticFiles(directory="frontend/js"), name="js")
+app.mount("/images", CacheBustingStaticFiles(directory="frontend/images"), name="images")
+app.mount("/styles", CacheBustingStaticFiles(directory="frontend/styles"), name="styles")
+app.mount("/mobile", CacheBustingStaticFiles(directory="frontend/mobile"), name="mobile")
 
 # Health check endpoint
 @app.get("/health")
@@ -281,7 +304,15 @@ async def websocket_db_changes(websocket: WebSocket):
 @app.get("/", response_class=HTMLResponse)
 async def read_root():
     with open("index.html", "r") as f:
-        return HTMLResponse(content=f.read())
+        content = f.read()
+        return HTMLResponse(
+            content=content,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
 
 # Serve favicon
 @app.get("/favicon.ico")
@@ -294,6 +325,115 @@ async def serve_favicon():
         return FileResponse(file_path)
     else:
         return {"error": "Favicon not found"}, 404
+
+# Serve CSS files with cache busting
+@app.get("/styles/{filename:path}")
+async def serve_css(filename: str):
+    """Serve CSS files with cache busting headers."""
+    file_path = f"frontend/styles/{filename}"
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            content = f.read()
+            return HTMLResponse(
+                content=content,
+                headers={
+                    "Content-Type": "text/css",
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+            )
+    else:
+        return HTMLResponse(content="CSS file not found", status_code=404)
+
+# Serve JS files with cache busting
+@app.get("/js/{filename:path}")
+async def serve_js(filename: str):
+    """Serve JS files with cache busting headers."""
+    file_path = f"frontend/js/{filename}"
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            content = f.read()
+            return HTMLResponse(
+                content=content,
+                headers={
+                    "Content-Type": "application/javascript",
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+            )
+    else:
+        return HTMLResponse(content="JS file not found", status_code=404)
+
+# Serve mobile trade monitor with cache busting
+@app.get("/mobile/trade_monitor", response_class=HTMLResponse)
+async def serve_mobile_trade_monitor():
+    """Serve mobile trade monitor with cache busting headers."""
+    file_path = "frontend/mobile/trade_monitor_mobile.html"
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            content = f.read()
+            return HTMLResponse(
+                content=content,
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+            )
+    else:
+        return HTMLResponse(content="Mobile trade monitor not found", status_code=404)
+
+# Serve mobile account manager with cache busting
+@app.get("/mobile/account_manager", response_class=HTMLResponse)
+async def serve_mobile_account_manager():
+    """Serve mobile account manager with cache busting headers."""
+    file_path = "frontend/mobile/account_manager_mobile.html"
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            content = f.read()
+            return HTMLResponse(
+                content=content,
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+            )
+    else:
+        return HTMLResponse(content="Mobile account manager not found", status_code=404)
+
+# Serve mobile index with cache busting
+@app.get("/mobile", response_class=HTMLResponse)
+async def serve_mobile_index():
+    """Serve mobile index with cache busting headers."""
+    file_path = "frontend/mobile/index.html"
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            content = f.read()
+            return HTMLResponse(
+                content=content,
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+            )
+    else:
+        return HTMLResponse(content="Mobile index not found", status_code=404)
+
+# Test route for debugging
+@app.get("/test-mobile")
+async def test_mobile():
+    """Test route for debugging mobile routes."""
+    return {"message": "Mobile test route works!"}
+
+# Test route for debugging mobile path
+@app.get("/mobile/test")
+async def test_mobile_path():
+    """Test route for debugging mobile path."""
+    return {"message": "Mobile path test route works!"}
 
 @app.get("/api/ttc")
 async def get_ttc_data():
