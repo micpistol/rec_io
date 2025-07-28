@@ -13,7 +13,6 @@
             font-family: 'IBM Plex Sans', sans-serif;
             background-color: #101018;
             color: white;
-            overflow-x: hidden;
         }
 
         .mobile-container {
@@ -42,25 +41,82 @@
             padding: 15px;
         }
 
-        .data-table {
+        /* Tab Styles */
+        .tab-container {
+            margin-bottom: 15px;
+            height: calc(93vh - 120px); /* Account for header and padding */
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tab-buttons {
+            display: flex;
+            background-color: #1f2530;
+            border: 1px solid #787878;
+            border-radius: 4px 4px 0 0;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .tab-button {
+            flex: 1;
+            background-color: #2a3441;
+            border: none;
+            color: white;
+            padding: 12px 8px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .tab-button:hover {
+            background-color: #394559;
+        }
+
+        .tab-button.active {
+            background-color: #4d586f;
+        }
+
+        .tab-content {
+            display: none;
+            background-color: #1f2530;
+            border: 1px solid #787878;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .tab-content.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tab-panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.8rem;
         }
 
-        .data-table th,
-        .data-table td {
+        th, td {
             border: 1px solid #787878;
             padding: 6px 10px;
             text-align: center;
         }
 
-        .data-table th {
+        th {
             background-color: #1f2530;
             font-weight: bold;
         }
 
-        .data-table tbody tr:hover {
+        tbody tr:hover {
             background-color: #4d586f !important;
             cursor: pointer;
         }
@@ -94,13 +150,17 @@
 
         /* Mobile optimizations */
         @media (max-width: 768px) {
-            .data-table {
+            table {
                 font-size: 0.7rem;
             }
             
-            .data-table th,
-            .data-table td {
+            th, td {
                 padding: 4px 6px;
+            }
+
+            .tab-button {
+                font-size: 0.7rem;
+                padding: 10px 6px;
             }
         }
     </style>
@@ -118,12 +178,18 @@
             </div>
         </div>
 
-        <!-- Open Positions -->
-        <div class="panel-container">
-            <div class="panel">
-                <div class="panel-header">Open Positions</div>
-                <div class="panel-body" style="height: 200px; overflow-y: auto;">
-                    <table class="data-table">
+        <!-- Tab Container -->
+        <div class="tab-container">
+            <div class="tab-buttons">
+                <button class="tab-button active" onclick="showTab('positions')">Open Positions</button>
+                <button class="tab-button" onclick="showTab('fills')">Fills</button>
+                <button class="tab-button" onclick="showTab('settlements')">Settlements</button>
+            </div>
+
+            <!-- Open Positions Tab -->
+            <div id="positions-tab" class="tab-content active">
+                <div class="tab-panel-body">
+                    <table class="data-table" style="width: 100%; text-align: center;">
                         <thead>
                             <tr>
                                 <th>Ticker</th>
@@ -139,14 +205,11 @@
                     </table>
                 </div>
             </div>
-        </div>
 
-        <!-- Fills -->
-        <div class="panel-container">
-            <div class="panel">
-                <div class="panel-header">Fills</div>
-                <div class="panel-body" style="height: 200px; overflow-y: auto;">
-                    <table class="data-table">
+            <!-- Fills Tab -->
+            <div id="fills-tab" class="tab-content">
+                <div class="tab-panel-body">
+                    <table class="data-table" style="width: 100%; text-align: center;">
                         <thead>
                             <tr>
                                 <th>Ticker</th>
@@ -163,14 +226,11 @@
                     </table>
                 </div>
             </div>
-        </div>
 
-        <!-- Settlements -->
-        <div class="panel-container">
-            <div class="panel">
-                <div class="panel-header">Settlements</div>
-                <div class="panel-body" style="height: 200px; overflow-y: auto;">
-                    <table class="data-table">
+            <!-- Settlements Tab -->
+            <div id="settlements-tab" class="tab-content">
+                <div class="tab-panel-body">
+                    <table class="data-table" style="width: 100%; text-align: center;">
                         <thead>
                             <tr>
                                 <th>Ticker</th>
@@ -192,6 +252,23 @@
 
     <script>
         let GLOBAL_ACCOUNT_MODE = "prod";  // Will be updated by backend
+
+        // Tab switching function
+        function showTab(tabName) {
+            // Hide all tab contents
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(content => content.classList.remove('active'));
+            
+            // Remove active class from all buttons
+            const tabButtons = document.querySelectorAll('.tab-button');
+            tabButtons.forEach(button => button.classList.remove('active'));
+            
+            // Show selected tab content
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // Add active class to clicked button
+            event.target.classList.add('active');
+        }
 
         fetch('/api/get_account_mode')
             .then(res => res.json())
@@ -251,51 +328,95 @@
                         <td>${s.yes_count}</td>
                         <td>${s.no_count}</td>
                         <td>$${formattedRevenue}</td>
-                        <td>${new Date(s.settled_time).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
+                        <td>${new Date(s.settled_time).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour12: false })}</td>
                     </tr>
                 `;
             }).join("");
 
             const fillsBody = document.getElementById("fills-body");
             fillsBody.innerHTML = fills.map(f => {
-                const actionClass = f.action?.toLowerCase() === 'buy' ? 'buy' : 'sell';
-                const actionText = f.action?.toUpperCase() || 'N/A';
+                // Convert price from cents to dollars
+                const price = f.side === "yes" ? f.yes_price : f.no_price;
+                const priceInDollars = price / 100;
+                const formattedPrice = priceInDollars.toLocaleString(undefined, { 
+                    minimumFractionDigits: 2, 
+                    maximumFractionDigits: 2 
+                });
                 
                 return `
                     <tr>
                         <td>${f.ticker}</td>
-                        <td>${f.side?.toUpperCase() || 'N/A'}</td>
-                        <td>${actionText}</td>
+                        <td>${f.side === "yes" ? "Y" : "N"}</td>
+                        <td>${f.action.toUpperCase()}</td>
                         <td>${f.count}</td>
-                        <td>$${Number(f.price).toFixed(2)}</td>
+                        <td>${formattedPrice}</td>
                         <td>${new Date(f.created_time).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
                     </tr>
                 `;
             }).join("");
 
             const positionsBody = document.getElementById("positions-body");
-            if (!positions || positions.length === 0) {
-                positionsBody.innerHTML = '<tr><td colspan="5" class="no-data">No open positions</td></tr>';
-            } else {
-                positionsBody.innerHTML = positions.map(p => {
-                    const sideClass = p.side?.toLowerCase() === 'yes' ? 'yes' : 'no';
-                    const sideText = p.side?.toUpperCase() || 'N/A';
-                    
-                    return `
-                        <tr>
-                            <td>${p.ticker}</td>
-                            <td>$${Number(p.buy_price).toFixed(2)}</td>
-                            <td>${p.position}</td>
-                            <td>$${Number(p.fees).toFixed(2)}</td>
-                            <td>${new Date(p.created_time).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
-                        </tr>
-                    `;
-                }).join("");
-            }
+            positionsBody.innerHTML = positions
+                .filter(p => p.position !== 0)
+                .map(p => `
+                    <tr>
+                        <td>${p.ticker}</td>
+                        <td>${p.market_exposure && p.position !== 0 ? (p.market_exposure / p.position / 100).toFixed(2) : "0.00"}</td>
+                        <td>${p.position}</td>
+                        <td>${(p.fees_paid / 100).toFixed(2)}</td>
+                        <td>${new Date(p.last_updated_ts).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
+                    </tr>
+                `).join("");
         }
 
-        // Auto-refresh every 30 seconds
-        setInterval(loadAccountData, 30000);
+        // Respect backend-set mode only
+        loadAccountData();
+        
+        // WebSocket connection for database change notifications
+        function setupDatabaseChangeListener() {
+            const ws = new WebSocket(`ws://${window.location.host}/ws/db_changes`);
+            
+            ws.onopen = function() {
+                console.log('🔗 Connected to database change notifications (account manager mobile)');
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log('📡 Received database change notification (account manager mobile):', data);
+                    
+                    // Handle different database change types and refresh immediately
+                    if (data.database === 'fills') {
+                        console.log('🔄 Refreshing fills table due to database change (account manager mobile)');
+                        loadAccountData();
+                    } else if (data.database === 'positions') {
+                        console.log('🔄 Refreshing positions table due to database change (account manager mobile)');
+                        loadAccountData();
+                    } else if (data.database === 'settlements') {
+                        console.log('🔄 Refreshing settlements table due to database change (account manager mobile)');
+                        loadAccountData();
+                    }
+                } catch (error) {
+                    console.error('❌ Error parsing database change notification (account manager mobile):', error);
+                }
+            };
+            
+            ws.onerror = function(error) {
+                console.error('❌ WebSocket error (account manager mobile):', error);
+            };
+            
+            ws.onclose = function() {
+                console.log('🔌 Database change WebSocket connection closed (account manager mobile)');
+                // Attempt to reconnect after a delay
+                setTimeout(() => {
+                    console.log('🔄 Attempting to reconnect to database change notifications (account manager mobile)...');
+                    setupDatabaseChangeListener();
+                }, 5000);
+            };
+        }
+        
+        // Set up WebSocket connection for database change notifications
+        setupDatabaseChangeListener();
     </script>
 </body>
 </html> 
