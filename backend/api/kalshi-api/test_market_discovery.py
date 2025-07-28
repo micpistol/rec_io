@@ -88,7 +88,8 @@ def main():
         
         # Get current BTC price
         try:
-            btc_response = requests.get("http://localhost:3000/api/btc_price", timeout=5)
+            from backend.util.paths import get_host
+            btc_response = requests.get(f"http://{get_host()}:3000/api/btc_price", timeout=5)
             if btc_response.ok:
                 btc_data = btc_response.json()
                 current_btc_price = btc_data.get("price", 118000)

@@ -439,9 +439,13 @@
 </head>
 <body>
     <div class="mobile-container">
-        <!-- Top Row: Market Title and TTC Clock -->
+        <!-- Top Row: Market Title, Automated Trading Indicator, and TTC Clock -->
         <div class="top-row">
             <div class="market-title">BTC Price Today</div>
+            <div id="autoEntryIndicator" style="display: none; align-items: center; gap: 4px; padding: 4px 8px; color: white; border-radius: 4px; font-size: 10px; font-weight: 500; background-color: #323c4e;">
+                <div style="width: 8px; height: 8px; background: #00ff2f; border-radius: 50%;"></div>
+                <span>AUTO ON</span>
+            </div>
             <div class="ttc-clock" id="ttc-clock">--:--</div>
         </div>
 
@@ -612,6 +616,9 @@
                     }
                 }
             }).catch(console.error);
+            
+            // Initial auto entry indicator fetch
+            fetchAutoEntryIndicator();
             
             // Initial BTC price changes fetch
             fetch('/btc_price_changes').then(response => response.json()).then(data => {
@@ -1194,6 +1201,15 @@
                     console.error('Error refreshing toggle states:', error);
                 }
             }, 5000); // Poll every 5 seconds
+
+            // Poll for auto entry indicator every second (same as main trade monitor)
+            setInterval(async () => {
+                try {
+                    await fetchAutoEntryIndicator();
+                } catch (error) {
+                    console.error('Error fetching auto entry indicator:', error);
+                }
+            }, 1000); // Poll every second
         }
 
 
@@ -2316,7 +2332,39 @@
                 }
             }, 3000);
         }
+
+        // === AUTO ENTRY INDICATOR FUNCTIONS (SAME AS DESKTOP) ===
         
+        // Fetch auto entry indicator state from auto_entry_supervisor
+        async function fetchAutoEntryIndicator() {
+            try {
+                const response = await fetch('/api/auto_entry_indicator');
+                if (!response.ok) throw new Error('Failed to fetch auto entry indicator');
+                const data = await response.json();
+                
+                // Update the indicator display
+                updateAutoEntryIndicator(data);
+            } catch (error) {
+                console.error('Error fetching auto entry indicator:', error);
+            }
+        }
+
+        // Update the auto entry indicator display
+        function updateAutoEntryIndicator(data) {
+            const indicator = document.getElementById('autoEntryIndicator');
+            if (!indicator) {
+                console.error('Auto entry indicator element not found');
+                return;
+            }
+            
+            if (data.enabled && data.ttc_within_window) {
+                // Show the indicator when AUTO ENTRY is ON and TTC is within window
+                indicator.style.display = 'flex';
+            } else {
+                // Hide the indicator when conditions are not met
+                indicator.style.display = 'none';
+            }
+        }
 
     </script>
 </body>

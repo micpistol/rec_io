@@ -118,7 +118,8 @@ def notify_frontend_db_change(db_name: str, change_data: dict = None):
         # Use aiohttp to send HTTP request to the main server's notification endpoint
         async def send_notification():
             async with aiohttp.ClientSession() as session:
-                notification_url = f"http://localhost:{config.get('main_app_port', 3000)}/api/notify_db_change"
+                from backend.util.paths import get_host
+                notification_url = f"http://{get_host()}:{config.get('main_app_port', 3000)}/api/notify_db_change"
                 payload = {
                     "db_name": db_name,
                     "timestamp": time.time(),

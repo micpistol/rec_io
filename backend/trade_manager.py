@@ -700,7 +700,8 @@ def notify_frontend_trade_change() -> None:
             """Send notification in a separate thread to avoid event loop conflicts"""
             try:
                 import requests
-                notification_url = f"http://localhost:{config.get('main_app_port', 3000)}/api/notify_db_change"
+                from backend.util.paths import get_host
+                notification_url = f"http://{get_host()}:{config.get('main_app_port', 3000)}/api/notify_db_change"
                 payload = {
                     "db_name": "trades",
                     "timestamp": time.time(),

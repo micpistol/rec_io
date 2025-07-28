@@ -998,7 +998,9 @@ async def trigger_open_trade(request: Request):
         
         # Forward the request to the trade_initiator service
         trade_initiator_port = get_port("trade_initiator")
-        trade_initiator_url = f"http://localhost:{trade_initiator_port}/api/initiate_trade"
+        from backend.util.paths import get_host
+        trade_initiator_host = get_host()
+        trade_initiator_url = f"http://{trade_initiator_host}:{trade_initiator_port}/api/initiate_trade"
         
         # Prepare the trade data for the trade_initiator
         trade_data = {
@@ -1050,7 +1052,9 @@ async def trigger_close_trade(request: Request):
         
         # Forward the request to the trade_initiator service
         trade_initiator_port = get_port("trade_initiator")
-        trade_initiator_url = f"http://localhost:{trade_initiator_port}/api/close_trade"
+        from backend.util.paths import get_host
+        trade_initiator_host = get_host()
+        trade_initiator_url = f"http://{trade_initiator_host}:{trade_initiator_port}/api/close_trade"
         
         # Prepare the close trade data
         close_data = {
@@ -1182,8 +1186,10 @@ async def get_auto_entry_indicator():
     """Proxy endpoint to get auto entry indicator state from auto_entry_supervisor"""
     try:
         from backend.core.port_config import get_port
+        from backend.util.paths import get_host
         port = get_port("auto_entry_supervisor")
-        url = f"http://localhost:{port}/api/auto_entry_indicator"
+        host = get_host()
+        url = f"http://{host}:{port}/api/auto_entry_indicator"
         response = requests.get(url, timeout=2)
         if response.ok:
             return response.json()

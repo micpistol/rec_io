@@ -3557,6 +3557,53 @@ if (minTimeHandle && maxTimeHandle) {
 function initTimeWindowSliderOnShow() {
   setTimeout(initTimeWindowSlider, 100);
 }
+
+// === AUTO ENTRY INDICATOR FUNCTIONS ===
+
+// Fetch auto entry indicator state from auto_entry_supervisor
+async function fetchAutoEntryIndicator() {
+    try {
+        const response = await fetch('/api/auto_entry_indicator');
+        if (!response.ok) throw new Error('Failed to fetch auto entry indicator');
+        const data = await response.json();
+        
+        // Update the indicator display
+        updateAutoEntryIndicator(data);
+    } catch (error) {
+        console.error('Error fetching auto entry indicator:', error);
+    }
+}
+
+// Update the auto entry indicator display
+function updateAutoEntryIndicator(data) {
+    const indicator = document.getElementById('autoEntryIndicator');
+    if (!indicator) {
+        console.error('Auto entry indicator element not found');
+        return;
+    }
+    
+    if (data.enabled && data.ttc_within_window) {
+        // Show the indicator when AUTO ENTRY is ON and TTC is within window
+        indicator.style.display = 'flex';
+    } else {
+        // Hide the indicator when conditions are not met
+        indicator.style.display = 'none';
+    }
+}
+
+// Start polling for auto entry indicator updates
+function startAutoEntryIndicatorPolling() {
+    // Initial fetch
+    fetchAutoEntryIndicator();
+    
+    // Poll every 5 seconds
+    setInterval(fetchAutoEntryIndicator, 5000);
+}
+
+// Start polling when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    startAutoEntryIndicatorPolling();
+});
 </script>
 
 </html>
