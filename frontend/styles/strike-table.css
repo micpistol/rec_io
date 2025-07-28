@@ -1,0 +1,110 @@
+/* === STRIKE TABLE STYLES === */
+.strike-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+  table-layout: fixed;
+}
+
+.strike-table th {
+  font-size: 11px;
+  font-weight: bold;
+  text-align: center;
+  background-color: #222c3c;
+  padding: 4px 6px;
+}
+
+.strike-table td {
+  font-size: 14px;
+  text-align: right;
+  border: 1px solid #888;
+  padding: 4px 6px;
+}
+
+.strike-table td.center {
+  text-align: center;
+}
+
+.strike-table td:nth-child(4) {
+  text-align: center;
+}
+
+.strike-table td:nth-child(5),
+.strike-table td:nth-child(6) {
+  text-align: center;
+}
+
+.price-box {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 5px 9.6px;
+  border-radius: 8px;
+  background-color: transparent;
+  font-weight: bold;
+  min-width: 48px;
+  user-select: none;
+  border: 1px solid #ccc;
+  transition: background-color 0.2s ease;
+  cursor: pointer !important;
+}
+
+.price-box:not(.disabled) {
+  cursor: pointer !important;
+}
+
+.price-box:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.price-box.disabled {
+  opacity: 0.1;
+  pointer-events: none;
+  cursor: default !important;
+}
+
+/* Risk color classes */
+.ultra-safe { background-color: #58b558 !important; }
+.safe { background-color: #7ec27e !important; }
+.caution { background-color: #c5ab50 !important; }
+.high-risk { background-color: #a07777 !important; }
+.danger-stop { background-color: #ec3434 !important; }
+
+/* Column width classes */
+.col-strike { width: 60px; }
+.col-side { width: 40px; }
+.col-buffer { width: 50px; }
+.col-bm { width: 50px; }
+.col-risk { width: 50px; }
+.col-yes { width: 60px; }
+.col-no { width: 60px; }
+.col-buy { width: 60px; }
+
+/* Spanner row styling */
+.spanner-row {
+  background-color: #2a3a4a !important;
+}
+
+.spanner-row td {
+  text-align: center !important;
+  font-weight: bold;
+  color: white !important;
+  padding: 8px 6px !important;
+  font-size: 16px !important;
+}
+
+.strike-row-buffer {
+  display: none;
+}
+
+/* Unified spanner row styling for ALL tables */
+tr.spanner-row td {
+  background-color: #535668 !important;
+  color: #c0c0c0 !important;
+  text-align: center !important;
+  font-size: 12px !important;
+  font-style: italic !important;
+  height: 25px !important;
+  padding: 2px 4px !important;
+} 

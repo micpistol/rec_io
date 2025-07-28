@@ -157,9 +157,41 @@ async function updateMiddleColumnData() {
 }
 
 // === STRIKE TABLE INITIALIZATION ===
+// Uses dynamic strike_tier from market data - no hardcoded values
 
-function buildStrikeTableRows(basePrice) {
-  const step = 250;
+// Generate the complete strike table HTML structure
+function generateStrikeTableHTML() {
+  return `
+    <div style="display: flex; align-items: flex-start;">
+      <table id="strike-table" class="strike-table" style="width: 100%; table-layout: fixed;">
+        <colgroup>
+          <col class="col-strike">
+          <col class="col-buffer">
+          <col class="col-bm">
+          <col class="col-risk">
+          <col class="col-yes">
+          <col class="col-no">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>STRIKE</th>
+            <th>BUFFER</th>
+            <th>%</th>
+            <th>Prob</th>
+            <th>YES</th>
+            <th>NO</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function buildStrikeTableRows(basePrice) {
+  const strikeTableData = await fetchStrikeTableData();
+  const strikeTier = strikeTableData.strike_tier;
+  const step = strikeTier;
   const rows = [];
   // Generate two extra rows: one above, one below
   for (let i = basePrice - 7 * step; i <= basePrice + 7 * step; i += step) {
@@ -202,9 +234,9 @@ function createSpannerRow(currentPrice) {
   return spannerRow;
 }
 
-function initializeStrikeTable(basePrice) {
+async function initializeStrikeTable(basePrice) {
   const strikeTableBody = document.querySelector('#strike-table tbody');
-  const strikes = buildStrikeTableRows(basePrice);
+  const strikes = await buildStrikeTableRows(basePrice);
   strikeTableBody.innerHTML = '';
   window.strikeRowsMap.clear();
 
@@ -280,8 +312,9 @@ async function updateStrikeTable() {
 
     // Initialize strike table if needed
     if (!window.strikeRowsMap || window.strikeRowsMap.size === 0) {
-      const base = Math.round(currentPrice / 250) * 250;
-      initializeStrikeTable(base);
+      const strikeTier = strikeTableData.strike_tier;
+      const base = Math.round(currentPrice / strikeTier) * strikeTier;
+      await initializeStrikeTable(base);
     }
 
     // Update each strike row with pre-calculated data
@@ -660,6 +693,76 @@ function showTradeOpenedPopup() {
   }, 2000);
 }
 
+// === STRIKE TABLE CONTAINER INITIALIZATION ===
+
+function initializeStrikeTableContainer() {
+  const container = document.getElementById('strikePanelContainer');
+  if (!container) {
+    console.error('Strike table container not found');
+    return;
+  }
+  
+  // Find the panel content area (after the header)
+  const panelContent = container.querySelector('.panel-content') || container;
+  
+  // Generate and insert the strike table HTML
+  const strikeTableHTML = generateStrikeTableHTML();
+  panelContent.innerHTML = strikeTableHTML;
+}
+
+// === CLEAN STRIKE TABLE API ===
+// Expose a clean API for other modules to use
+window.StrikeTable = {
+  // Initialize the strike table container and structure
+  initialize: function() {
+    initializeStrikeTableContainer();
+  },
+  
+  // Update the strike table with new data
+  update: function() {
+    return updateStrikeTable();
+  },
+  
+  // Set diff mode (affects price display)
+  setDiffMode: function(enabled) {
+    window.diffMode = enabled;
+    window.diffModeChanged = true;
+    // Force immediate update
+    if (typeof window.updateStrikeTable === 'function') {
+      window.updateStrikeTable();
+    }
+  },
+  
+  // Set auto entry mode (affects button enabling)
+  setAutoEntry: function(enabled) {
+    window.recoEnabled = enabled;
+    // Update click handlers for auto entry mode
+    if (typeof window.updateClickHandlersForReco === 'function') {
+      window.updateClickHandlersForReco();
+    }
+  },
+  
+  // Get current strike table data
+  getData: function() {
+    return fetchStrikeTableData();
+  },
+  
+  // Get current strike tier from strike table data
+  getStrikeTier: function() {
+    return fetchStrikeTableData().then(data => data?.strike_tier);
+  },
+  
+  // Update TTC display
+  updateTTC: function() {
+    return updateTTCDisplay();
+  },
+  
+  // Update market title
+  updateMarketTitle: function() {
+    return updateMiddleColumnData();
+  }
+};
+
 // === EXPORT FUNCTIONS TO WINDOW ===
 // Make functions available globally for other modules to use
 window.initializeStrikeTable = initializeStrikeTable;
@@ -670,6 +773,7 @@ window.addStrikeTableRowClickHandlers = addStrikeTableRowClickHandlers;
 window.updateMiddleColumnData = updateMiddleColumnData;
 window.fetchUnifiedTTC = fetchUnifiedTTC;
 window.fetchStrikeTableData = fetchStrikeTableData;
+window.initializeStrikeTableContainer = initializeStrikeTableContainer;
 
 // === STRIKE TABLE ROW CLICK HANDLERS ===
 function addStrikeTableRowClickHandlers() {
@@ -703,6 +807,9 @@ async function loadDiffModeFromPreferences() {
 if (typeof window !== 'undefined') {
   document.addEventListener('DOMContentLoaded', async () => {
     await loadDiffModeFromPreferences();
+    
+    // Initialize strike table container first
+    initializeStrikeTableContainer();
     
     // Initialize middle column data immediately
     await updateMiddleColumnData();
