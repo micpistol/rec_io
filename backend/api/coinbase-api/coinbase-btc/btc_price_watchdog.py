@@ -1,7 +1,7 @@
 import asyncio
 import websockets
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from datetime import timezone
 from zoneinfo import ZoneInfo
 import sqlite3
@@ -33,6 +33,10 @@ last_logged_second = None
 BTC_PRICE_CHANGE_PATH = os.path.join(get_coinbase_data_dir(), "btc_price_change.json")
 
 def insert_tick(timestamp: str, price: float):
+    """
+    Insert BTC price tick with 30-day rolling window cleanup.
+    Maintains only the last 30 days of price data to prevent unlimited database growth.
+    """
     conn = sqlite3.connect(BTC_PRICE_HISTORY_DB)
     cursor = conn.cursor()
     cursor.execute('''
@@ -46,6 +50,12 @@ def insert_tick(timestamp: str, price: float):
     cursor.execute('''
         INSERT OR REPLACE INTO price_log (timestamp, price) VALUES (?, ?)
     ''', (rounded_timestamp, price))
+    
+    # ROLLING WINDOW: Clean up data older than 30 days
+    cutoff_time = dt - timedelta(days=30)
+    cutoff_iso = cutoff_time.strftime("%Y-%m-%dT%H:%M:%S")
+    cursor.execute("DELETE FROM price_log WHERE timestamp < ?", (cutoff_iso,))
+    
     conn.commit()
     conn.close()
 

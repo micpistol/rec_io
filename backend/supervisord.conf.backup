@@ -17,6 +17,9 @@ command=python backend/main.py
 directory=.
 autostart=true
 autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
 stderr_logfile=logs/main_app.err.log
 stdout_logfile=logs/main_app.out.log
 environment=PATH="venv/bin",PYTHONPATH="."
@@ -26,6 +29,9 @@ command=python backend/trade_manager.py
 directory=.
 autostart=true
 autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
 stderr_logfile=logs/trade_manager.err.log
 stdout_logfile=logs/trade_manager.out.log
 environment=PATH="venv/bin",PYTHONPATH="."
@@ -35,6 +41,9 @@ command=python backend/trade_executor.py
 directory=.
 autostart=true
 autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
 stderr_logfile=logs/trade_executor.err.log
 stdout_logfile=logs/trade_executor.out.log
 environment=PATH="venv/bin",PYTHONPATH="."
@@ -44,6 +53,9 @@ command=python backend/trade_initiator.py
 directory=.
 autostart=true
 autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
 stderr_logfile=logs/trade_initiator.err.log
 stdout_logfile=logs/trade_initiator.out.log
 environment=PATH="venv/bin",PYTHONPATH="."
@@ -53,6 +65,9 @@ command=python backend/active_trade_supervisor.py
 directory=.
 autostart=true
 autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
 stderr_logfile=logs/active_trade_supervisor.err.log
 stdout_logfile=logs/active_trade_supervisor.out.log
 environment=PATH="venv/bin",PYTHONPATH="."
@@ -62,6 +77,9 @@ command=python backend/auto_entry_supervisor.py
 directory=.
 autostart=true
 autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
 stderr_logfile=logs/auto_entry_supervisor.err.log
 stdout_logfile=logs/auto_entry_supervisor.out.log
 environment=PATH="venv/bin",PYTHONPATH="."
@@ -71,6 +89,9 @@ command=python backend/api/coinbase-api/coinbase-btc/btc_price_watchdog.py
 directory=.
 autostart=true
 autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
 stderr_logfile=logs/btc_price_watchdog.err.log
 stdout_logfile=logs/btc_price_watchdog.out.log
 environment=PATH="venv/bin",PYTHONPATH="."
@@ -80,6 +101,9 @@ command=python backend/db_poller.py
 directory=.
 autostart=true
 autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
 stderr_logfile=logs/db_poller.err.log
 stdout_logfile=logs/db_poller.out.log
 environment=PATH="venv/bin",PYTHONPATH="."
@@ -89,6 +113,9 @@ command=python backend/api/kalshi-api/kalshi_account_sync.py
 directory=.
 autostart=true
 autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
 stderr_logfile=logs/kalshi_account_sync.err.log
 stdout_logfile=logs/kalshi_account_sync.out.log
 environment=PATH="venv/bin",PYTHONPATH="."
@@ -98,6 +125,9 @@ command=python backend/api/kalshi-api/kalshi_api_watchdog.py
 directory=.
 autostart=true
 autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
 stderr_logfile=logs/kalshi_api_watchdog.err.log
 stdout_logfile=logs/kalshi_api_watchdog.out.log
 environment=PATH="venv/bin",PYTHONPATH="."
@@ -110,6 +140,9 @@ command=python backend/unified_production_coordinator_api.py
 directory=.
 autostart=true
 autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
 stderr_logfile=logs/unified_production_coordinator.err.log
 stdout_logfile=logs/unified_production_coordinator.out.log
 environment=PATH="venv/bin",PYTHONPATH=".",TRADING_SYSTEM_HOST="localhost"
@@ -119,6 +152,9 @@ command=python backend/cascading_failure_detector.py
 directory=.
 autostart=true
 autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
 stderr_logfile=logs/cascading_failure_detector.err.log
 stdout_logfile=logs/cascading_failure_detector.out.log
 environment=PATH="venv/bin",PYTHONPATH="."
