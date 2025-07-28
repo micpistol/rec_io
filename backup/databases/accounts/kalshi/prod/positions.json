@@ -1,0 +1,24 @@
+{
+  "market_positions": [
+    {
+      "ticker": "KXMAYORNYCPARTY-25-R",
+      "total_traded": 101,
+      "position": 0,
+      "market_exposure": 0,
+      "realized_pnl": -1,
+      "resting_orders_count": 0,
+      "fees_paid": 2,
+      "last_updated_ts": "2025-07-18T17:56:00.174079Z"
+    }
+  ],
+  "event_positions": [
+    {
+      "event_ticker": "KXMAYORNYCPARTY-25",
+      "total_cost": 101,
+      "event_exposure": 0,
+      "realized_pnl": -1,
+      "resting_order_count": 0,
+      "fees_paid": 2
+    }
+  ]
+}

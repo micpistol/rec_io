@@ -1,0 +1,38 @@
+TRADING SYSTEM STATE CAPTURE MANIFEST
+=====================================
+
+CAPTURE TIMESTAMP: Mon Jul 28 11:04:06 PDT 2025
+
+FILES CAPTURED:
+- Current directory: /Users/ericwais1/rec_io_20
+- Current ports: backup/current_ports.txt
+- Current processes: backup/current_processes.txt
+- Supervisor status: backup/supervisor_status.txt
+- Supervisor version: backup/supervisor_version.txt
+- Python version: backup/python_version.txt
+- Environment variables: backup/trading_environment_vars.txt
+- Configuration: backup/config.json.original
+- Supervisor config: backup/supervisord.conf.original
+- Main app: backup/main.py.original
+- Trade manager: backup/trade_manager.py.original
+- Trade executor: backup/trade_executor.py.original
+- Port registry: backup/port_registry.json.original
+- Databases: backup/databases/
+- Service tests: backup/*_test.txt
+
+ENVIRONMENT VARIABLES:
+VSCODE_GIT_ASKPASS_MAIN=/Applications/Cursor.app/Contents/Resources/app/extensions/git/dist/askpass-main.js
+
+CURRENT PORTS:
+
+
+SERVICE STATUS:
+Supervisor not running
+
+RESTORATION COMMANDS:
+1. Stop supervisor: supervisorctl stop all
+2. Restore files: cp backup/*.original ./
+3. Restore databases: cp backup/databases/*.backup backend/data/
+4. Restart supervisor: supervisord -c backend/supervisord.conf
+5. Test: curl http://localhost:$(python -c "from backend.core.port_manager import get_port; print(get_port('main_app'))")/health
+
