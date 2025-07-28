@@ -1181,6 +1181,16 @@ async def get_unified_ttc(symbol: str):
     except Exception as e:
         return {"error": f"Error getting unified TTC: {str(e)}"}
 
+@app.get("/api/failure_detector_status")
+async def get_failure_detector_status():
+    """Get the current status of the cascading failure detector."""
+    try:
+        from backend.cascading_failure_detector import CascadingFailureDetector
+        detector = CascadingFailureDetector()
+        return detector.generate_status_report()
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.get("/api/auto_entry_indicator")
 async def get_auto_entry_indicator():
     """Proxy endpoint to get auto entry indicator state from auto_entry_supervisor"""
