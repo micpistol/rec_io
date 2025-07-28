@@ -132,6 +132,12 @@ setup_directories() {
     mkdir -p "$INSTALL_DIR/config"
     mkdir -p "$INSTALL_DIR/scripts"
     
+    # Create user data directory structure
+    mkdir -p "$INSTALL_DIR/user_data"/{credentials,databases,preferences,state}
+    mkdir -p "$INSTALL_DIR/user_data/credentials/kalshi"/{demo,prod}
+    mkdir -p "$INSTALL_DIR/user_data/databases"/{accounts,trade_history,price_history}
+    mkdir -p "$INSTALL_DIR/user_data/preferences"/{trading,system,ui}
+    
     # Copy project files
     cp -r "$PROJECT_DIR/backend" "$INSTALL_DIR/"
     cp -r "$PROJECT_DIR/frontend" "$INSTALL_DIR/"
@@ -144,6 +150,10 @@ setup_directories() {
     chown -R root:root "$INSTALL_DIR"
     chmod -R 755 "$INSTALL_DIR"
     chmod +x "$INSTALL_DIR/scripts"/*.sh
+    
+    # Set user data permissions
+    chmod 700 "$INSTALL_DIR/user_data"
+    chown -R trading_user:trading_user "$INSTALL_DIR/user_data" 2>/dev/null || chown -R root:root "$INSTALL_DIR/user_data"
     
     log "Directory structure setup complete"
 }
