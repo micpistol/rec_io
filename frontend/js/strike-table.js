@@ -28,16 +28,6 @@ if (!window._rowFlashStyleInjected) {
 // Global strike table state
 window.strikeRowsMap = new Map();
 
-// Auto-centering configuration
-window.strikeTableConfig = {
-  visibleRows: 13, // 6 above + spanner + 6 below
-  spannerPosition: 6, // 0-indexed position of spanner row
-  bufferRows: 4, // Extra rows to pre-render on each side
-  step: 250, // Strike price increment
-  lastBasePrice: null,
-  lastCurrentPrice: null
-};
-
 // === UNIFIED DATA FETCHING ===
 
 // Fetch unified TTC data
@@ -108,7 +98,12 @@ async function updateTTCDisplay() {
       ttcEl.style.borderRadius = '6px';
       ttcEl.style.padding = '0 10px';
     } else if (ttcSeconds <= 720) {
-      ttcEl.style.backgroundColor = '#28a745';
+      ttcEl.style.backgroundColor = '#45d34a';
+      ttcEl.style.color = '#fff';
+      ttcEl.style.borderRadius = '6px';
+      ttcEl.style.padding = '0 10px';
+    } else if (ttcSeconds <= 900) {
+      ttcEl.style.backgroundColor = '#45d34a';
       ttcEl.style.color = '#fff';
       ttcEl.style.borderRadius = '6px';
       ttcEl.style.padding = '0 10px';
@@ -161,66 +156,18 @@ async function updateMiddleColumnData() {
   }
 }
 
-// === AUTO-CENTERING STRIKE TABLE FUNCTIONS ===
+// === STRIKE TABLE INITIALIZATION ===
 
-// Calculate the base price for auto-centering
-function calculateBasePrice(currentPrice) {
-  const { step } = window.strikeTableConfig;
-  return Math.round(currentPrice / step) * step;
-}
-
-// Build strike table rows with auto-centering
-function buildStrikeTableRows(basePrice, currentPrice) {
-  const { visibleRows, bufferRows, step, spannerPosition } = window.strikeTableConfig;
-  const totalRows = visibleRows + (bufferRows * 2);
+function buildStrikeTableRows(basePrice) {
+  const step = 250;
   const rows = [];
-  
-  // Calculate the range of strikes to display
-  // We want the spanner row to be at position 6, so we need strikes around the current price
-  const strikesBelowSpanner = spannerPosition;
-  const strikesAboveSpanner = visibleRows - spannerPosition - 1;
-  
-  // Calculate the lowest strike we need to display
-  const lowestStrike = basePrice - (strikesBelowSpanner + bufferRows) * step;
-  const highestStrike = basePrice + (strikesAboveSpanner + bufferRows) * step;
-  
-  for (let strike = lowestStrike; strike <= highestStrike; strike += step) {
-    rows.push(strike);
+  // Generate two extra rows: one above, one below
+  for (let i = basePrice - 7 * step; i <= basePrice + 7 * step; i += step) {
+    rows.push(i);
   }
-  
   return rows;
 }
 
-// Check if we need to roll the table based on current price
-function shouldRollTable(currentPrice, basePrice) {
-  const { step, spannerPosition } = window.strikeTableConfig;
-  
-  // Calculate the strikes that should be visible around the spanner
-  const strikesBelowSpanner = spannerPosition;
-  const strikesAboveSpanner = window.strikeTableConfig.visibleRows - spannerPosition - 1;
-  
-  const lowestVisibleStrike = basePrice - strikesBelowSpanner * step;
-  const highestVisibleStrike = basePrice + strikesAboveSpanner * step;
-  
-  // Check if current price is outside the visible range
-  return currentPrice < lowestVisibleStrike || currentPrice > highestVisibleStrike;
-}
-
-// Roll the table to keep the spanner centered
-function rollStrikeTable(currentPrice) {
-  const { step } = window.strikeTableConfig;
-  const newBasePrice = calculateBasePrice(currentPrice);
-  
-  // Only roll if the base price has changed significantly
-  if (Math.abs(newBasePrice - window.strikeTableConfig.lastBasePrice) >= step) {
-    window.strikeTableConfig.lastBasePrice = newBasePrice;
-    return true;
-  }
-  
-  return false;
-}
-
-// Create spanner row
 function createSpannerRow(currentPrice) {
   const spannerRow = document.createElement("tr");
   spannerRow.className = "spanner-row";
@@ -255,10 +202,9 @@ function createSpannerRow(currentPrice) {
   return spannerRow;
 }
 
-// Initialize strike table with auto-centering
-function initializeStrikeTable(basePrice, currentPrice) {
+function initializeStrikeTable(basePrice) {
   const strikeTableBody = document.querySelector('#strike-table tbody');
-  const strikes = buildStrikeTableRows(basePrice, currentPrice);
+  const strikes = buildStrikeTableRows(basePrice);
   strikeTableBody.innerHTML = '';
   window.strikeRowsMap.clear();
 
@@ -298,13 +244,11 @@ function initializeStrikeTable(basePrice, currentPrice) {
     noTd.appendChild(noSpan);
     row.appendChild(noTd);
 
-    // Hide buffer rows (first and last few rows)
-    const { bufferRows } = window.strikeTableConfig;
-    if (idx < bufferRows || idx >= strikes.length - bufferRows) {
+    // Hide the first and last row (buffer rows)
+    if (idx === 0 || idx === strikes.length - 1) {
       row.classList.add('strike-row-buffer');
       row.style.display = 'none';
     }
-    
     strikeTableBody.appendChild(row);
 
     window.strikeRowsMap.set(strike, {
@@ -316,18 +260,6 @@ function initializeStrikeTable(basePrice, currentPrice) {
       noSpan
     });
   });
-
-  // Add spanner row at the correct position
-  const spannerRow = createSpannerRow(currentPrice);
-  const { spannerPosition, bufferRows } = window.strikeTableConfig;
-  const visibleRows = Array.from(strikeTableBody.children).filter(row => !row.classList.contains('strike-row-buffer'));
-  const insertIndex = bufferRows + spannerPosition;
-  
-  if (insertIndex < strikeTableBody.children.length) {
-    strikeTableBody.insertBefore(spannerRow, strikeTableBody.children[insertIndex]);
-  } else {
-    strikeTableBody.appendChild(spannerRow);
-  }
 }
 
 // === STRIKE TABLE UPDATE LOGIC ===
@@ -346,15 +278,10 @@ async function updateStrikeTable() {
     const currentPrice = strikeTableData.current_price;
     const symbol = strikeTableData.symbol || 'BTC';
 
-    // Check if we need to roll the table
-    const basePrice = calculateBasePrice(currentPrice);
-    const shouldRoll = rollStrikeTable(currentPrice);
-    
-    // Initialize or reinitialize strike table if needed
-    if (!window.strikeRowsMap || window.strikeRowsMap.size === 0 || shouldRoll) {
-      initializeStrikeTable(basePrice, currentPrice);
-      window.strikeTableConfig.lastBasePrice = basePrice;
-      window.strikeTableConfig.lastCurrentPrice = currentPrice;
+    // Initialize strike table if needed
+    if (!window.strikeRowsMap || window.strikeRowsMap.size === 0) {
+      const base = Math.round(currentPrice / 250) * 250;
+      initializeStrikeTable(base);
     }
 
     // Update each strike row with pre-calculated data
@@ -444,16 +371,8 @@ async function updateStrikeTable() {
     // Create spanner row if it doesn't exist
     if (!spannerRow) {
       spannerRow = createSpannerRow(currentPrice);
-      // Position spanner row at the center (position 6)
-      const { spannerPosition, bufferRows } = window.strikeTableConfig;
-      const visibleRows = Array.from(strikeTableBody.children).filter(row => !row.classList.contains('strike-row-buffer'));
-      const insertIndex = bufferRows + spannerPosition;
-      
-      if (insertIndex < strikeTableBody.children.length) {
-        strikeTableBody.insertBefore(spannerRow, strikeTableBody.children[insertIndex]);
-      } else {
-        strikeTableBody.appendChild(spannerRow);
-      }
+      // Ensure the spanner row is added to the table
+      strikeTableBody.appendChild(spannerRow);
     } else {
       // Update existing spanner row with current price and momentum arrows
       const spannerTd = spannerRow.querySelector('td');
@@ -489,19 +408,30 @@ async function updateStrikeTable() {
       }
     }
 
-    // Ensure spanner row is always at the center position
-    const { spannerPosition, bufferRows } = window.strikeTableConfig;
+    // Position spanner row correctly
     const allRows = Array.from(strikeTableBody.children).filter(row => !row.classList.contains('spanner-row'));
-    const targetIndex = bufferRows + spannerPosition;
+    let insertIndex = allRows.length; // default to end
     
-    // Remove spanner row from current position
+    for (let i = 0; i < allRows.length; i++) {
+      const row = allRows[i];
+      const strikeCell = row.querySelector('td');
+      if (strikeCell && strikeCell.textContent) {
+        const strikeText = strikeCell.textContent.replace(/[\$,]/g, '');
+        const strike = parseFloat(strikeText);
+        if (!isNaN(strike) && currentPrice < strike) {
+          insertIndex = i;
+          break;
+        }
+      }
+    }
+
+    // Remove spanner row from current position and insert at correct position
     if (spannerRow.parentNode) {
       spannerRow.remove();
     }
     
-    // Insert spanner row at the correct center position
-    if (targetIndex < strikeTableBody.children.length) {
-      strikeTableBody.insertBefore(spannerRow, strikeTableBody.children[targetIndex]);
+    if (insertIndex < allRows.length) {
+      strikeTableBody.insertBefore(spannerRow, allRows[insertIndex]);
     } else {
       strikeTableBody.appendChild(spannerRow);
     }
@@ -519,12 +449,12 @@ async function updateStrikeTable() {
         if (strikeTable && heatBand) {
           heatBand.style.height = strikeTable.offsetHeight + 'px';
         }
-      }, 100);
+        updateMomentumHeatBandSegmented();
+      }, 0);
     }
 
-    // Update last current price
-    window.strikeTableConfig.lastCurrentPrice = currentPrice;
-
+    // Reset diff mode change flag after update is complete
+    window.diffModeChanged = false;
   } catch (error) {
     console.error('Error updating strike table:', error);
   }
@@ -796,74 +726,69 @@ function connectDbChangeWebSocket() {
     return; // Already connected
   }
 
-  console.log("[WEBSOCKET] Connecting to database change notifications...");
-  
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}/ws/db_changes`;
+  console.log("[WEBSOCKET] Connecting to:", wsUrl);
   
   dbChangeWebSocket = new WebSocket(wsUrl);
   
-  dbChangeWebSocket.onopen = function(event) {
-    console.log("[WEBSOCKET] Connected to database change notifications");
+  dbChangeWebSocket.onopen = function() {
+    console.log("[WEBSOCKET] ✅ Connection opened successfully");
   };
   
   dbChangeWebSocket.onmessage = function(event) {
     try {
+      console.log("[WEBSOCKET] Received message:", event.data);
       const data = JSON.parse(event.data);
-      console.log("[WEBSOCKET] Received database change:", data);
-      
-      // Handle different types of database changes
-      if (data.type === 'trade_update') {
-        // Refresh trade-related displays
-        if (typeof updateStrikeTable === 'function') {
-          updateStrikeTable();
-        }
-        if (typeof fetchAndRenderTrades === 'function') {
-          fetchAndRenderTrades();
-        }
-        if (typeof fetchAndRenderRecentTrades === 'function') {
-          fetchAndRenderRecentTrades();
-        }
-      } else if (data.type === 'strike_table_update') {
-        // Refresh strike table specifically
-        if (typeof updateStrikeTable === 'function') {
-          updateStrikeTable();
+      if (data.type === 'db_change' && data.database === 'trades') {
+        console.log("[WEBSOCKET] ✅ Trades DB change detected, updating UI");
+        fetchAndRenderStrikeTable();
+        // Also update active trades when trades.db changes
+        if (typeof window.fetchAndRenderTrades === 'function') {
+          window.fetchAndRenderTrades();
         }
       }
     } catch (error) {
-      console.error("[WEBSOCKET] Error parsing message:", error);
+      console.error("[WEBSOCKET] Error processing message:", error);
     }
   };
   
   dbChangeWebSocket.onclose = function(event) {
-    console.log("[WEBSOCKET] Connection closed, attempting to reconnect...");
-    setTimeout(connectDbChangeWebSocket, 5000);
+    console.log("[WEBSOCKET] ❌ Connection closed:", event.code, event.reason);
+    // Try to reconnect after 5 seconds
+    setTimeout(() => {
+      console.log("[WEBSOCKET] Attempting to reconnect...");
+      connectDbChangeWebSocket();
+    }, 5000);
   };
   
   dbChangeWebSocket.onerror = function(error) {
-    console.error("[WEBSOCKET] WebSocket error:", error);
+    console.error("[WEBSOCKET] ❌ Connection error:", error);
   };
 }
 
-// Initialize WebSocket connection when page loads
-if (typeof window !== 'undefined') {
-  document.addEventListener('DOMContentLoaded', () => {
-    connectDbChangeWebSocket();
-  });
-}
-
-// === STRIKE TABLE INITIALIZATION ===
-
-// Main function to fetch and render strike table
-async function fetchAndRenderStrikeTable() {
-  try {
-    await updateStrikeTable();
-  } catch (error) {
-    console.error('Error fetching and rendering strike table:', error);
+// Function to fetch and render strike table (called by WebSocket)
+function fetchAndRenderStrikeTable() {
+  if (typeof window.fetchAndUpdate === 'function') {
+    window.fetchAndUpdate();
   }
 }
 
-// Export the main function
-window.fetchAndRenderStrikeTable = fetchAndRenderStrikeTable;
+// Initialize WebSocket connection
+if (typeof window !== 'undefined') {
+  connectDbChangeWebSocket();
+  
+  // Add a test function to manually trigger a database change notification
+  window.testWebSocketConnection = function() {
+    console.log("[WEBSOCKET] Testing connection...");
+    if (dbChangeWebSocket && dbChangeWebSocket.readyState === WebSocket.OPEN) {
+      console.log("[WEBSOCKET] ✅ Connection is open");
+      // Send a test message to the server
+      dbChangeWebSocket.send("ping");
+    } else {
+      console.log("[WEBSOCKET] ❌ Connection is not open, state:", dbChangeWebSocket ? dbChangeWebSocket.readyState : 'null');
+    }
+  };
+} 
 
  
