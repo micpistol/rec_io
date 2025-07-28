@@ -178,6 +178,10 @@ from backend.util.paths import get_host
 host = get_host()
 origins = [
     f"http://{host}:{MAIN_APP_PORT}",
+    f"http://localhost:{MAIN_APP_PORT}",
+    f"http://127.0.0.1:{MAIN_APP_PORT}",
+    # Allow access from any device on the local network (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+    "*"  # Allow all origins for local network access
 ]
 
 app.add_middleware(

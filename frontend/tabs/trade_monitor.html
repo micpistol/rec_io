@@ -1962,7 +1962,7 @@ function getCurrentBTCTickerPrice() {
 
 // Utility function to get current momentum score from the panel
 function getCurrentMomentumScore() {
-  const el = document.getElementById('momentum-score-value');
+  const el = document.getElementById('momentum-score-display');
   if (el && el.textContent) {
     // Parse the display value (e.g., "+1", "-2", "0") and convert to decimal
     const displayText = el.textContent.trim();
@@ -2663,7 +2663,7 @@ function setupDatabaseChangeListener() {
   <!-- --- Add a MutationObserver to update arrows when momentum score changes --- -->
   <script>
   (function setupMomentumArrowObserver() {
-    const momentumEl = document.getElementById('momentum-score-value');
+    const momentumEl = document.getElementById('momentum-score-display');
     if (!momentumEl) {
       setTimeout(setupMomentumArrowObserver, 1000);
       return;

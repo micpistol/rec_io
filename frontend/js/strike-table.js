@@ -210,7 +210,7 @@ function createSpannerRow(currentPrice) {
   const svgUp = `<svg width="16" height="16" style="vertical-align:middle;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14V2M8 2l4 4M8 2l-4 4" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   // Helper to get current momentum score from DOM
   function getCurrentMomentumScoreForArrow() {
-    const el = document.getElementById('momentum-score-value');
+    const el = document.getElementById('momentum-score-display');
     if (el && el.textContent) {
       const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
       return isNaN(val) ? 0 : val;
@@ -416,7 +416,7 @@ async function updateStrikeTable() {
         
         // Helper to get current momentum score from DOM
         function getCurrentMomentumScoreForArrow() {
-          const el = document.getElementById('momentum-score-value');
+          const el = document.getElementById('momentum-score-display');
           if (el && el.textContent) {
             const val = parseFloat(el.textContent.replace(/[^\d\.\-]/g, ''));
             return isNaN(val) ? 0 : val;

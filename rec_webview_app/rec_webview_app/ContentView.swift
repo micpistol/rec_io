@@ -47,11 +47,11 @@ struct ContentView: View {
         let urlString: String
         switch UIDevice.current.userInterfaceIdiom {
         case .pad:
-            urlString = "http://localhost:3000/"
+            urlString = "http://192.168.86.42:3000/"
         case .phone:
-            urlString = "http://localhost:3000/mobile/index.html"
+            urlString = "http://192.168.86.42:3000/mobile/index.html#"
         default:
-            urlString = "http://localhost:3000"
+            urlString = "http://192.168.86.42:3000/"
         }
         return URL(string: urlString)!
     }
