@@ -187,6 +187,46 @@ verify_deployment() {
         echo "=== FIREWALL STATUS ==="
         ufw status | head -5
         
+        echo "=== DEPLOYING FIREWALL ==="
+        if command -v ufw >/dev/null 2>&1; then
+            # Enable UFW if not already enabled
+            if ! ufw status | grep -q "Status: active"; then
+                echo "Enabling UFW..."
+                ufw --force enable
+            fi
+            
+            # Apply trading system firewall rules
+            echo "Applying trading system firewall rules..."
+            ufw default deny incoming
+            ufw default allow outgoing
+            
+            # Allow SSH
+            ufw allow ssh
+            
+            # Allow HTTP/HTTPS
+            ufw allow 80/tcp
+            ufw allow 443/tcp
+            
+            # Allow trading system ports (restrict to localhost)
+            ufw allow from 127.0.0.1 to any port 3000
+            ufw allow from 127.0.0.1 to any port 4000
+            ufw allow from 127.0.0.1 to any port 8001
+            ufw allow from 127.0.0.1 to any port 8002
+            ufw allow from 127.0.0.1 to any port 8003
+            ufw allow from 127.0.0.1 to any port 8004
+            ufw allow from 127.0.0.1 to any port 8005
+            ufw allow from 127.0.0.1 to any port 8008
+            
+            # Allow internal network communication
+            ufw allow from 10.0.0.0/8
+            ufw allow from 172.16.0.0/12
+            ufw allow from 192.168.0.0/16
+            
+            echo "Firewall rules applied successfully"
+        else
+            echo "UFW not available, skipping firewall configuration"
+        fi
+        
         echo "=== DISK USAGE ==="
         df -h /opt/trading_system
         

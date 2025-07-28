@@ -6,6 +6,13 @@ struct WebView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let webView = WKWebView()
+        let dataStore = WKWebsiteDataStore.default()
+        let types = WKWebsiteDataStore.allWebsiteDataTypes()
+        dataStore.fetchDataRecords(ofTypes: types) { records in
+            dataStore.removeData(ofTypes: types, for: records) {
+                print("✅ Cleared web cache")
+            }
+        }
         webView.navigationDelegate = context.coordinator
         webView.scrollView.bounces = false
         webView.scrollView.isScrollEnabled = false
@@ -14,7 +21,8 @@ struct WebView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        let request = URLRequest(url: url)
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         uiView.load(request)
     }
 
@@ -49,7 +57,7 @@ struct ContentView: View {
         case .pad:
             urlString = "http://192.168.86.42:3000/"
         case .phone:
-            urlString = "http://192.168.86.42:3000/mobile/index.html#"
+            urlString = "http://192.168.86.42:3000/mobile/index.html"
         default:
             urlString = "http://192.168.86.42:3000/"
         }

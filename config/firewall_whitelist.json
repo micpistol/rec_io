@@ -1,7 +1,7 @@
 {
   "firewall_config": {
-    "description": "Trading System Firewall IP Whitelist Configuration",
-    "version": "1.0",
+    "description": "Trading System Firewall IP Whitelist Configuration - Minimally Intrusive",
+    "version": "2.0",
     "last_updated": "2025-07-28",
     "notes": "Configure allowed IP addresses for SSH and admin access in production mode"
   },
@@ -12,47 +12,6 @@
     "127.0.0.1",
     "::1"
   ],
-  "admin_allowed_ips": [
-    "10.0.0.0/8",
-    "172.16.0.0/12",
-    "192.168.0.0/16"
-  ],
-  "api_endpoints": {
-    "kalshi": [
-      "api.kalshi.com",
-      "api.kalshi.com:443",
-      "api.kalshi.com:80"
-    ],
-    "coinbase": [
-      "api.coinbase.com",
-      "api.pro.coinbase.com",
-      "api.coinbase.com:443",
-      "api.pro.coinbase.com:443"
-    ],
-    "tradingview": [
-      "api.tradingview.com",
-      "www.tradingview.com"
-    ],
-    "general": [
-      "www.google.com",
-      "www.cloudflare.com",
-      "8.8.8.8",
-      "1.1.1.1"
-    ]
-  },
-  "trading_system_ports": {
-    "main_app": 3000,
-    "trade_manager": 4000,
-    "active_trade_supervisor": 6000,
-    "trade_executor": 8001,
-    "btc_price_watchdog": 8002,
-    "db_poller": 8003,
-    "kalshi_account_sync": 8004,
-    "kalshi_api_watchdog": 8005,
-    "auto_entry_supervisor": 8009,
-    "unified_production_coordinator": 8010,
-    "trade_initiator": 8011
-  },
   "production_settings": {
     "ssh_rate_limit": true,
     "restrict_trading_ports_to_localhost": true,
@@ -63,5 +22,32 @@
     "permissive_mode": true,
     "allow_all_internal": true,
     "unrestricted_ssh": true
+  },
+  "trading_system_ports": {
+    "main_app": 3000,
+    "trade_manager": 4000,
+    "trade_executor": 8001,
+    "btc_price_watchdog": 8002,
+    "db_poller": 8003,
+    "kalshi_account_sync": 8004,
+    "kalshi_api_watchdog": 8005,
+    "active_trade_supervisor": 8007,
+    "auto_entry_supervisor": 8009,
+    "unified_production_coordinator": 8010,
+    "trade_initiator": 8011
+  },
+  "notes": {
+    "principles": [
+      "Does NOT interfere with local development",
+      "Does NOT block internal service communication",
+      "Does NOT restrict outbound API calls",
+      "ONLY blocks unwanted incoming connections",
+      "ALLOWS all localhost traffic"
+    ],
+    "usage": {
+      "local": "sudo ./scripts/setup_firewall.sh --mode local",
+      "production": "sudo ./scripts/setup_firewall.sh --mode production",
+      "dry_run": "sudo ./scripts/setup_firewall.sh --mode production --dry-run"
+    }
   }
 } 

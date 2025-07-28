@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 
 """
-Trading System Firewall Setup Script
-====================================
+Trading System Firewall Setup Script - MINIMALLY INTRUSIVE
+==========================================================
 
 This script configures ufw (Uncomplicated Firewall) for the trading system
-with different rules for local development vs production deployment.
+with minimal intrusion while providing standard protection for production.
+
+PRINCIPLES:
+- DOES NOT interfere with local development
+- DOES NOT block internal service-to-service communication  
+- DOES NOT restrict outbound traffic (API calls to Kalshi, Coinbase, etc.)
+- ONLY blocks unwanted incoming connections from unknown public IPs
+- ALLOWS all localhost traffic (127.0.0.1, ::1)
+- ALLOWS specified inbound ports for SSH, HTTP/HTTPS, and system APIs
 
 Features:
 - Non-intrusive: Preserves all localhost and internal communication
@@ -16,9 +24,9 @@ Features:
 - SSH protection: Restricts SSH to whitelisted IPs in production
 
 Usage:
-    python scripts/firewall_setup.py --mode local
-    python scripts/firewall_setup.py --mode production
-    python scripts/firewall_setup.py --mode production --dry-run
+    sudo python scripts/firewall_setup.py --mode local
+    sudo python scripts/firewall_setup.py --mode production
+    sudo python scripts/firewall_setup.py --mode production --dry-run
 """
 
 import argparse
@@ -40,25 +48,22 @@ LOG_FILE = PROJECT_DIR / "logs" / "firewall_setup.log"
 TRADING_PORTS = [
     3000,  # main_app
     4000,  # trade_manager
-    6000,  # active_trade_supervisor
     8001,  # trade_executor
     8002,  # btc_price_watchdog
     8003,  # db_poller
     8004,  # kalshi_account_sync
     8005,  # kalshi_api_watchdog
+    8007,  # active_trade_supervisor
     8009,  # auto_entry_supervisor
     8010,  # unified_production_coordinator
     8011,  # trade_initiator
 ]
 
-# API endpoints that need outbound access
-API_ENDPOINTS = [
-    "api.kalshi.com",
-    "api.coinbase.com",
-    "api.pro.coinbase.com",
-    "api.tradingview.com",
-    "www.google.com",
-    "www.cloudflare.com",
+# Standard web ports
+WEB_PORTS = [
+    80,   # HTTP
+    443,  # HTTPS
+    22,   # SSH
 ]
 
 def setup_logging():
@@ -98,6 +103,7 @@ def check_root():
     """Check if running as root"""
     if os.geteuid() != 0:
         logging.error("This script must be run as root (use sudo)")
+        logging.error(f"Usage: sudo python {sys.argv[0]} --mode local|production")
         sys.exit(1)
 
 def check_ufw():
@@ -138,47 +144,45 @@ def load_whitelist():
     return ssh_allowed_ips
 
 def setup_local_mode():
-    """Setup firewall rules for local development"""
-    logging.info("Setting up LOCAL development firewall mode")
+    """Setup firewall rules for local development (minimally intrusive)"""
+    logging.info("Setting up LOCAL development firewall mode (minimally intrusive)")
     
     # Reset to default state
     run_command("ufw --force reset")
     
-    # Default policies
+    # Default policies - allow all outgoing, deny incoming
     run_command("ufw default deny incoming")
     run_command("ufw default allow outgoing")
     
-    # Allow all localhost traffic
+    # CRITICAL: Allow all localhost traffic (preserves internal communication)
     run_command("ufw allow from 127.0.0.1 to any")
     run_command("ufw allow from ::1 to any")
+    logging.info("  ✓ Allowed all localhost traffic (127.0.0.1, ::1)")
     
-    # Allow all internal communication
+    # Allow all internal network communication
     run_command("ufw allow from 10.0.0.0/8")
     run_command("ufw allow from 172.16.0.0/12")
     run_command("ufw allow from 192.168.0.0/16")
+    logging.info("  ✓ Allowed all internal network communication")
     
-    # Allow trading system ports
+    # Allow trading system ports (unrestricted in local mode)
     for port in TRADING_PORTS:
         run_command(f"ufw allow {port}")
-        logging.info(f"  Allowed port {port} for trading system")
+        logging.info(f"  ✓ Allowed port {port} for trading system")
     
-    # Allow SSH (unrestricted in local mode)
-    run_command("ufw allow ssh")
+    # Allow standard web ports
+    for port in WEB_PORTS:
+        run_command(f"ufw allow {port}")
+        logging.info(f"  ✓ Allowed port {port} for web services")
     
-    # Allow HTTP/HTTPS
-    run_command("ufw allow 80")
-    run_command("ufw allow 443")
-    
-    # Allow outbound API access
-    for endpoint in API_ENDPOINTS:
-        run_command("ufw allow out to any port 80,443,8080,8443")
-        logging.info(f"  Allowed outbound API access to {endpoint}")
+    # CRITICAL: Allow all outbound traffic (preserves API calls)
+    logging.info("  ✓ All outbound traffic allowed (API calls preserved)")
     
     logging.info("LOCAL mode configured - permissive for development")
 
 def setup_production_mode(ssh_allowed_ips):
-    """Setup firewall rules for production"""
-    logging.info("Setting up PRODUCTION firewall mode")
+    """Setup firewall rules for production (standard protection)"""
+    logging.info("Setting up PRODUCTION firewall mode (standard protection)")
     
     # Reset to default state
     run_command("ufw --force reset")
@@ -187,44 +191,46 @@ def setup_production_mode(ssh_allowed_ips):
     run_command("ufw default deny incoming")
     run_command("ufw default allow outgoing")
     
-    # Allow all localhost traffic (critical for internal services)
+    # CRITICAL: Allow all localhost traffic (preserves internal services)
     run_command("ufw allow from 127.0.0.1 to any")
     run_command("ufw allow from ::1 to any")
+    logging.info("  ✓ Allowed all localhost traffic (127.0.0.1, ::1)")
     
     # Allow internal communication (for supervisor services)
     run_command("ufw allow from 10.0.0.0/8")
     run_command("ufw allow from 172.16.0.0/12")
     run_command("ufw allow from 192.168.0.0/16")
+    logging.info("  ✓ Allowed internal network communication")
     
     # Allow trading system ports (restrict to localhost in production)
     for port in TRADING_PORTS:
         run_command(f"ufw allow from 127.0.0.1 to any port {port}")
-        logging.info(f"  Allowed localhost access to port {port}")
+        logging.info(f"  ✓ Allowed localhost access to port {port}")
     
     # SSH access - restrict to whitelisted IPs
     if ssh_allowed_ips:
         for ip in ssh_allowed_ips:
             run_command(f"ufw allow from {ip} to any port 22")
-            logging.info(f"  Allowed SSH from {ip}")
+            logging.info(f"  ✓ Allowed SSH from {ip}")
     else:
-        # Fallback: allow SSH from common ranges
+        # Fallback: allow SSH from private networks
         for network in ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]:
             run_command(f"ufw allow from {network} to any port 22")
-        logging.info("  Allowed SSH from private networks (no whitelist configured)")
+        logging.info("  ✓ Allowed SSH from private networks (no whitelist configured)")
     
-    # Allow HTTP/HTTPS (for web interface)
+    # Allow standard web ports
     run_command("ufw allow 80")
     run_command("ufw allow 443")
+    logging.info("  ✓ Allowed HTTP/HTTPS (ports 80, 443)")
     
-    # Allow outbound API access (critical for trading)
-    for endpoint in API_ENDPOINTS:
-        run_command("ufw allow out to any port 80,443,8080,8443")
-        logging.info(f"  Allowed outbound API access to {endpoint}")
+    # CRITICAL: Allow all outbound traffic (preserves API calls)
+    logging.info("  ✓ All outbound traffic allowed (API calls preserved)")
     
-    # Additional security: rate limiting
+    # Additional security: rate limiting for SSH
     run_command("ufw limit ssh")
+    logging.info("  ✓ Enabled SSH rate limiting")
     
-    logging.info("PRODUCTION mode configured - restrictive with API access preserved")
+    logging.info("PRODUCTION mode configured - standard protection with API access preserved")
 
 def show_status():
     """Show current ufw status"""
@@ -236,9 +242,9 @@ def show_status():
 
 def main():
     """Main execution function"""
-    parser = argparse.ArgumentParser(description="Trading System Firewall Setup")
+    parser = argparse.ArgumentParser(description="Trading System Firewall Setup - Minimally Intrusive")
     parser.add_argument("--mode", choices=["local", "production"], default="local",
-                       help="Firewall mode: local (permissive) or production (restrictive)")
+                       help="Firewall mode: local (permissive) or production (standard protection)")
     parser.add_argument("--dry-run", action="store_true",
                        help="Show rules without applying")
     parser.add_argument("--verbose", action="store_true",
@@ -251,9 +257,17 @@ def main():
     if args.verbose:
         logger.setLevel(logging.DEBUG)
     
-    logger.info("=== TRADING SYSTEM FIREWALL SETUP ===")
+    logger.info("=== TRADING SYSTEM FIREWALL SETUP (MINIMALLY INTRUSIVE) ===")
     logger.info(f"Mode: {args.mode}")
     logger.info(f"Dry run: {args.dry_run}")
+    logger.info("")
+    logger.info("PRINCIPLES:")
+    logger.info("  - Does NOT interfere with local development")
+    logger.info("  - Does NOT block internal service communication")
+    logger.info("  - Does NOT restrict outbound API calls")
+    logger.info("  - ONLY blocks unwanted incoming connections")
+    logger.info("  - ALLOWS all localhost traffic")
+    logger.info("")
     
     # Check prerequisites
     check_root()
@@ -270,15 +284,15 @@ def main():
             logger.info("  - Allow all localhost traffic")
             logger.info("  - Allow all internal networks")
             logger.info("  - Allow all trading system ports")
-            logger.info("  - Allow unrestricted SSH")
-            logger.info("  - Allow outbound API access")
+            logger.info("  - Allow all outbound traffic")
+            logger.info("  - No restrictions on incoming connections")
         elif args.mode == "production":
             logger.info("DRY RUN: Would configure PRODUCTION mode")
             logger.info("  - Allow localhost traffic only")
             logger.info("  - Restrict trading ports to localhost")
             logger.info("  - Restrict SSH to whitelisted IPs")
-            logger.info("  - Allow outbound API access")
-            logger.info("  - Enable rate limiting")
+            logger.info("  - Allow all outbound traffic")
+            logger.info("  - Enable SSH rate limiting")
     else:
         if args.mode == "local":
             setup_local_mode()
@@ -296,6 +310,12 @@ def main():
         
         logger.info("Firewall setup complete!")
         logger.info(f"Log file: {LOG_FILE}")
+        logger.info("")
+        logger.info("VERIFICATION:")
+        logger.info("  - All localhost traffic should work normally")
+        logger.info("  - Internal service communication should be preserved")
+        logger.info("  - Outbound API calls should work normally")
+        logger.info("  - Only unwanted incoming connections are blocked")
     else:
         logger.info("DRY RUN: Would enable ufw firewall")
 
