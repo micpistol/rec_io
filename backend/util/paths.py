@@ -35,8 +35,26 @@ def get_logs_dir():
 
 def get_host():
     """Get the host configuration for the current environment."""
-    # Default to localhost, but can be overridden by environment variable
-    return os.getenv("TRADING_SYSTEM_HOST", "localhost")
+    # Check for environment variable first
+    env_host = os.getenv("TRADING_SYSTEM_HOST")
+    if env_host:
+        print(f"[HOST] Using environment variable: {env_host}")
+        return env_host
+    
+    # Try to detect the actual IP address for network access
+    try:
+        import socket
+        # Get the local IP address that other devices can reach
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+        print(f"[HOST] Detected IP address: {local_ip}")
+        return local_ip
+    except Exception as e:
+        print(f"[HOST] IP detection failed: {e}, falling back to localhost")
+        # Fallback to localhost if detection fails
+        return "localhost"
 
 def get_service_url(port: int) -> str:
     """Get a service URL with the configured host."""

@@ -47,7 +47,20 @@ db_change_clients = set()
 # Global auto_stop state
 PREFERENCES_PATH = os.path.join(get_data_dir(), "preferences", "trade_preferences.json")
 
+# Global preferences cache
+_preferences_cache = None
+_cache_timestamp = 0
+CACHE_TTL = 1.0  # 1 second cache TTL
+
 def load_preferences():
+    global _preferences_cache, _cache_timestamp
+    current_time = time.time()
+    
+    # Return cached version if still valid
+    if _preferences_cache is not None and (current_time - _cache_timestamp) < CACHE_TTL:
+        return _preferences_cache.copy()
+    
+    # Load from file
     if os.path.exists(PREFERENCES_PATH):
         try:
             with open(PREFERENCES_PATH, "r") as f:
@@ -56,34 +69,77 @@ def load_preferences():
                 if "plus_minus_mode" in prefs and "diff_mode" not in prefs:
                     prefs["diff_mode"] = prefs.pop("plus_minus_mode")
                     # Save the migrated preferences
-                    save_preferences(prefs)
+                    asyncio.create_task(save_preferences(prefs))
                 # Migrate old reco to auto_entry if needed
                 if "reco" in prefs and "auto_entry" not in prefs:
                     prefs["auto_entry"] = prefs.pop("reco")
                     # Save the migrated preferences
-                    save_preferences(prefs)
+                    asyncio.create_task(save_preferences(prefs))
+                
+                # Update cache
+                _preferences_cache = prefs
+                _cache_timestamp = current_time
                 return prefs
         except Exception:
             pass
-    return {"auto_stop": True, "auto_entry": False, "diff_mode": False, "position_size": 1, "multiplier": 1}
+    
+    # Default preferences
+    default_prefs = {"auto_stop": True, "auto_entry": False, "diff_mode": False, "position_size": 1, "multiplier": 1}
+    _preferences_cache = default_prefs
+    _cache_timestamp = current_time
+    return default_prefs
 
-def save_preferences(prefs):
+async def save_preferences(prefs):
+    global _preferences_cache, _cache_timestamp
     try:
-        with open(PREFERENCES_PATH, "w") as f:
-            json.dump(prefs, f)
+        import aiofiles
+        async with aiofiles.open(PREFERENCES_PATH, "w") as f:
+            await f.write(json.dumps(prefs))
+        
+        # Update cache
+        _preferences_cache = prefs.copy()
+        _cache_timestamp = time.time()
+    except ImportError:
+        # Fallback to synchronous if aiofiles not available
+        try:
+            with open(PREFERENCES_PATH, "w") as f:
+                json.dump(prefs, f)
+            
+            # Update cache
+            _preferences_cache = prefs.copy()
+            _cache_timestamp = time.time()
+        except Exception as e:
+            print(f"[Preferences Save Error] {e}")
     except Exception as e:
         print(f"[Preferences Save Error] {e}")
 
 # Broadcast helper function for preferences updates
 async def broadcast_preferences_update():
-    data = json.dumps(load_preferences())
-    to_remove = set()
-    for client in connected_clients:
-        try:
-            await client.send_text(data)
-        except Exception:
-            to_remove.add(client)
-    connected_clients.difference_update(to_remove)
+    try:
+        data = json.dumps(load_preferences())
+        to_remove = set()
+        
+        # Send to all connected clients concurrently
+        tasks = []
+        for client in connected_clients:
+            task = asyncio.create_task(send_to_client(client, data))
+            tasks.append(task)
+        
+        # Wait for all sends to complete with timeout
+        if tasks:
+            await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=1.0)
+        
+        # Clean up disconnected clients
+        connected_clients.difference_update(to_remove)
+    except Exception as e:
+        print(f"[Broadcast Preferences Error] {e}")
+
+async def send_to_client(client, data):
+    try:
+        await client.send_text(data)
+    except Exception:
+        # Client will be removed in the main function
+        pass
 
 # Broadcast helper function for account mode updates
 async def broadcast_account_mode(mode: str):
@@ -688,29 +744,74 @@ async def get_strike_table_mobile():
 @app.post("/api/set_auto_stop")
 async def set_auto_stop(request: Request):
     data = await request.json()
-    prefs = load_preferences()
-    prefs["auto_stop"] = bool(data.get("enabled", False))
-    save_preferences(prefs)
-    await broadcast_preferences_update()
-    return {"status": "ok"}
+    enabled = bool(data.get("enabled", False))
+    
+    # Return immediate response
+    response_data = {"status": "ok", "enabled": enabled}
+    
+    # Handle file operations asynchronously
+    async def update_preferences():
+        try:
+            prefs = load_preferences()
+            prefs["auto_stop"] = enabled
+            await save_preferences(prefs)
+            await broadcast_preferences_update()
+        except Exception as e:
+            print(f"[Auto Stop Update Error] {e}")
+    
+    # Start async task without waiting
+    import asyncio
+    asyncio.create_task(update_preferences())
+    
+    return response_data
 
 @app.post("/api/set_auto_entry")
 async def set_auto_entry(request: Request):
     data = await request.json()
-    prefs = load_preferences()
-    prefs["auto_entry"] = bool(data.get("enabled", False))
-    save_preferences(prefs)
-    await broadcast_preferences_update()
-    return {"status": "ok"}
+    enabled = bool(data.get("enabled", False))
+    
+    # Return immediate response
+    response_data = {"status": "ok", "enabled": enabled}
+    
+    # Handle file operations asynchronously
+    async def update_preferences():
+        try:
+            prefs = load_preferences()
+            prefs["auto_entry"] = enabled
+            await save_preferences(prefs)
+            await broadcast_preferences_update()
+        except Exception as e:
+            print(f"[Auto Entry Update Error] {e}")
+    
+    # Start async task without waiting
+    import asyncio
+    asyncio.create_task(update_preferences())
+    
+    return response_data
 
 @app.post("/api/set_diff_mode")
 async def set_diff_mode(request: Request):
     data = await request.json()
-    prefs = load_preferences()
-    prefs["diff_mode"] = bool(data.get("enabled", False))
-    save_preferences(prefs)
-    await broadcast_preferences_update()
-    return {"status": "ok"}
+    enabled = bool(data.get("enabled", False))
+    
+    # Return immediate response
+    response_data = {"status": "ok", "enabled": enabled}
+    
+    # Handle file operations asynchronously
+    async def update_preferences():
+        try:
+            prefs = load_preferences()
+            prefs["diff_mode"] = enabled
+            await save_preferences(prefs)
+            await broadcast_preferences_update()
+        except Exception as e:
+            print(f"[Diff Mode Update Error] {e}")
+    
+    # Start async task without waiting
+    import asyncio
+    asyncio.create_task(update_preferences())
+    
+    return response_data
 
 @app.post("/api/set_position_size")
 async def set_position_size(request: Request):
@@ -718,7 +819,7 @@ async def set_position_size(request: Request):
     prefs = load_preferences()
     try:
         prefs["position_size"] = int(data.get("position_size", 100))
-        save_preferences(prefs)
+        await save_preferences(prefs)
         await broadcast_preferences_update()
     except Exception as e:
         print(f"[Set Position Size Error] {e}")
@@ -730,7 +831,7 @@ async def set_multiplier(request: Request):
     prefs = load_preferences()
     try:
         prefs["multiplier"] = int(data.get("multiplier", 1))
-        save_preferences(prefs)
+        await save_preferences(prefs)
         await broadcast_preferences_update()
     except Exception as e:
         print(f"[Set Multiplier Error] {e}")
@@ -757,7 +858,7 @@ async def update_preferences(request: Request):
             print(f"[Invalid Multiplier] {e}")
 
     if updated:
-        save_preferences(prefs)
+        await save_preferences(prefs)
         await broadcast_preferences_update()
     return {"status": "ok"}
 

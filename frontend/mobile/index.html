@@ -132,10 +132,10 @@
             <iframe id="monitor-frame" class="page-frame active" src="trade_monitor_mobile.html"></iframe>
             
             <!-- History Page -->
-            <iframe id="history-frame" class="page-frame" src="about:blank"></iframe>
+            <iframe id="history-frame" class="page-frame" src="trade_history_mobile.html"></iframe>
             
             <!-- Account Page -->
-            <iframe id="account-frame" class="page-frame" src="about:blank"></iframe>
+            <iframe id="account-frame" class="page-frame" src="account_manager_mobile.html"></iframe>
             
             <!-- User Page -->
             <iframe id="user-frame" class="page-frame" src="about:blank"></iframe>
@@ -195,6 +195,20 @@
             // Initialize with monitor tab active
             switchTab('monitor');
         });
+
+        // Auto-refresh functionality for frontend changes
+        let lastFrontendChange = null;
+        async function checkFrontendChanges() {
+            try {
+                const res = await fetch('/frontend-changes');
+                const data = await res.json();
+                if (lastFrontendChange && data.last_modified > lastFrontendChange) {
+                    location.reload();
+                }
+                lastFrontendChange = data.last_modified;
+            } catch (e) {}
+        }
+        setInterval(checkFrontendChanges, 10000);
     </script>
 </body>
 </html> 

@@ -7,7 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../styles/global.css">
     <script src="../js/live-data.js"></script>
-    <script src="../js/globals.js"></script>
+    <script src="../js/globals.js?v=1"></script>
 
     <script src="../js/trade-execution-controller.js"></script>
     
@@ -135,6 +135,15 @@
 
         .mobile-toggle.active::after {
             transform: translateX(20px);
+        }
+
+        .mobile-toggle.loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .mobile-toggle.loading::after {
+            background-color: #ccc;
         }
 
         /* Active Trades */
@@ -538,15 +547,46 @@
     </div>
 
     <script>
+        // Wait for port configuration to be ready (same as desktop version)
+        async function waitForPortConfig() {
+            let attempts = 0;
+            const maxAttempts = 50; // 5 seconds with 100ms intervals
+            
+            while (attempts < maxAttempts) {
+                try {
+                    // Check if port configuration is loaded
+                    if (typeof getActiveTradeSupervisorUrl === 'function') {
+                        // Test if the function works
+                        getActiveTradeSupervisorUrl('/test');
+                        console.log('[MOBILE] Port configuration loaded successfully');
+                        return true;
+                    }
+                } catch (error) {
+                    // Port config not ready yet
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+            
+            throw new Error('Port configuration not loaded after 5 seconds - system cannot function without universal port management');
+        }
+
         // Mobile-specific initialization
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             console.log('Mobile trade monitor initialized');
+            
+            // Wait for port configuration to be ready
+            await waitForPortConfig();
             
             // Initialize toggle controls
             initializeMobileToggles();
             
             // Initialize position controls
             initializePositionControls();
+            
+            // Initialize WebSocket for real-time updates
+            initializeWebSocket();
             
             // Start TTC clock
             startTTCClock();
@@ -642,6 +682,15 @@
                 autoEntryToggle.addEventListener('click', async function() {
                     const enabled = !this.classList.contains('active');
                     
+                    // Prevent multiple clicks during request
+                    if (this.classList.contains('loading')) return;
+                    
+                    // Add loading state
+                    this.classList.add('loading');
+                    
+                    // Immediate visual feedback
+                    this.classList.toggle('active');
+                    
                     try {
                         const response = await fetch('/api/set_auto_entry', {
                             method: 'POST',
@@ -649,13 +698,18 @@
                             body: JSON.stringify({ enabled })
                         });
                         
-                        if (response.ok) {
+                        if (!response.ok) {
+                            // Revert if failed
                             this.classList.toggle('active');
-                        } else {
                             console.error('Failed to update auto entry setting');
                         }
                     } catch (error) {
+                        // Revert if failed
+                        this.classList.toggle('active');
                         console.error('Error updating auto entry:', error);
+                    } finally {
+                        // Remove loading state
+                        this.classList.remove('loading');
                     }
                 });
             }
@@ -666,6 +720,15 @@
                 autoStopToggle.addEventListener('click', async function() {
                     const enabled = !this.classList.contains('active');
                     
+                    // Prevent multiple clicks during request
+                    if (this.classList.contains('loading')) return;
+                    
+                    // Add loading state
+                    this.classList.add('loading');
+                    
+                    // Immediate visual feedback
+                    this.classList.toggle('active');
+                    
                     try {
                         const response = await fetch('/api/set_auto_stop', {
                             method: 'POST',
@@ -673,13 +736,18 @@
                             body: JSON.stringify({ enabled })
                         });
                         
-                        if (response.ok) {
+                        if (!response.ok) {
+                            // Revert if failed
                             this.classList.toggle('active');
-                        } else {
                             console.error('Failed to update auto stop setting');
                         }
                     } catch (error) {
+                        // Revert if failed
+                        this.classList.toggle('active');
                         console.error('Error updating auto stop:', error);
+                    } finally {
+                        // Remove loading state
+                        this.classList.remove('loading');
                     }
                 });
             }
@@ -688,20 +756,103 @@
             const plusMinusToggle = document.getElementById('plusMinusToggle');
             if (plusMinusToggle) {
                 plusMinusToggle.addEventListener('click', function() {
+                    const enabled = !this.classList.contains('active');
+                    
+                    // Prevent multiple clicks during request
+                    if (this.classList.contains('loading')) return;
+                    
+                    // Add loading state
+                    this.classList.add('loading');
+                    
+                    // Immediate visual feedback
                     this.classList.toggle('active');
-                    const enabled = this.classList.contains('active');
                     
                     // Update backend
                     fetch('/api/set_diff_mode', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ enabled })
-                    }).catch(console.error);
+                    }).then(() => {
+                        // Remove loading state on success
+                        this.classList.remove('loading');
+                    }).catch(error => {
+                        // Revert if failed
+                        this.classList.toggle('active');
+                        this.classList.remove('loading');
+                        console.error('Error updating diff mode:', error);
+                    });
                 });
             }
 
             // Load initial toggle states
             loadToggleStates();
+        }
+
+        // WebSocket connection for real-time updates
+        function initializeWebSocket() {
+            const ws = new WebSocket(`ws://${window.location.host}/ws/preferences`);
+            
+            ws.onopen = function() {
+                console.log('WebSocket connected for preferences');
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    updateTogglesFromWebSocket(data);
+                } catch (error) {
+                    console.error('Error parsing WebSocket message:', error);
+                }
+            };
+            
+            ws.onclose = function() {
+                console.log('WebSocket disconnected, attempting to reconnect...');
+                setTimeout(initializeWebSocket, 1000);
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        function updateTogglesFromWebSocket(data) {
+            // Update Auto Entry toggle
+            const autoEntryToggle = document.getElementById('autoEntryToggle');
+            if (autoEntryToggle && data.auto_entry !== undefined) {
+                autoEntryToggle.classList.toggle('active', data.auto_entry);
+            }
+            
+            // Update Auto Stop toggle
+            const autoStopToggle = document.getElementById('autoStopToggle');
+            if (autoStopToggle && data.auto_stop !== undefined) {
+                autoStopToggle.classList.toggle('active', data.auto_stop);
+            }
+            
+            // Update Plus/Minus toggle
+            const plusMinusToggle = document.getElementById('plusMinusToggle');
+            if (plusMinusToggle && data.diff_mode !== undefined) {
+                plusMinusToggle.classList.toggle('active', data.diff_mode);
+            }
+            
+            // Update position size and multiplier
+            const positionInput = document.getElementById('position-size');
+            const multiplierButtons = document.querySelectorAll('.multiplier-btn');
+            
+            if (positionInput && data.position_size !== undefined) {
+                positionInput.value = data.position_size;
+            }
+            
+            if (multiplierButtons.length && data.multiplier !== undefined) {
+                multiplierButtons.forEach(btn => {
+                    if (parseInt(btn.dataset.multiplier, 10) === data.multiplier) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+            }
+            
+            updatePositionDisplay();
         }
 
         function startTTCClock() {
@@ -1401,10 +1552,6 @@
         // This replicates the desktop strike table button behavior exactly
         
         async function prepareTradeData(target) {
-            // 🎧 Sound confirmation - IMMEDIATE
-            if (typeof playSound === 'function') {
-                playSound('open');
-            }
             
             // ✅ Add UI popup
             if (typeof showTradeOpenedPopup === 'function') {
@@ -1433,8 +1580,6 @@
             const multiplier = multiplierBtn ? parseInt(multiplierBtn.dataset.multiplier, 10) : 1;
             
             const position = validBase !== null ? validBase * multiplier : null;
-            
-            const contract = 'BTC Market'; // Mobile uses simplified market title
             
             // Get strike and side from button context
             let strike = null;
@@ -1503,6 +1648,21 @@
             // Fallback to default if no ticker found
             if (!kalshiTicker) {
                 kalshiTicker = 'BTC-USD';
+            }
+            
+            // Get contract name from ticker (SAME AS DESKTOP)
+            let contract = '';
+            if (kalshiTicker) {
+                const tickerMain = kalshiTicker.split('-T')[0];
+                const hourMatch = tickerMain.match(/(\d{2})$/);
+                if (hourMatch) {
+                    const hour = parseInt(hourMatch[1], 10);
+                    const ampm = hour >= 12 ? 'pm' : 'am';
+                    const displayHour = hour === 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+                    contract = `BTC ${displayHour}${ampm}`;
+                } else {
+                    contract = kalshiTicker;
+                }
             }
             
             // Get current BTC price
@@ -1616,11 +1776,6 @@
         async function closeActiveTrade(tradeId, ticketId) {
             try {
                 console.log('[ACTIVE TRADE SUPERVISOR] Attempting to close trade:', tradeId);
-                
-                // 🎧 Sound confirmation - IMMEDIATE (same as desktop)
-                if (typeof playSound === 'function') {
-                    playSound('close');
-                }
                 
                 // ✅ Add UI popup (same as desktop)
                 if (typeof showTradeClosedPopup === 'function') {
@@ -1763,21 +1918,8 @@
 
         async function fetchAndRenderActiveTradeSupervisorTrades() {
             try {
-                // Get the active trade supervisor service URL
-                let activeTradeSupervisorUrl;
-                try {
-                    // Try to use the same port configuration as desktop
-                    if (typeof getActiveTradeSupervisorUrl === 'function') {
-                        activeTradeSupervisorUrl = getActiveTradeSupervisorUrl('/api/active_trades');
-                    } else {
-                        // Fallback to hardcoded URL
-                        activeTradeSupervisorUrl = `http://${window.location.hostname}:6000/api/active_trades`;
-                    }
-                } catch (error) {
-                    console.error('[ACTIVE TRADE SUPERVISOR] Port configuration error:', error);
-                    // Fallback to hardcoded URL
-                    activeTradeSupervisorUrl = `http://${window.location.hostname}:6000/api/active_trades`;
-                }
+                // Get the active trade supervisor service URL using universal port management
+                const activeTradeSupervisorUrl = getActiveTradeSupervisorUrl('/api/active_trades');
                 
                 // Fetch active trades from the supervisor service
                 const response = await fetch(activeTradeSupervisorUrl, { cache: 'no-store' });
@@ -2117,18 +2259,7 @@
             return 0.5; // Fallback price
         }
         
-        // Play sound for trade confirmation
-        function playSound(type) {
-            if (type === 'open') {
-                // Play open trade sound
-                const audio = new Audio('../audio/sfx/open_trade_confirmation.wav');
-                audio.play().catch(console.error);
-            } else if (type === 'close') {
-                // Play close trade sound
-                const audio = new Audio('../audio/sfx/close_trade_confirmation.wav');
-                audio.play().catch(console.error);
-            }
-        }
+
         
         // Show trade opened popup (same as desktop)
         function showTradeOpenedPopup() {
@@ -2185,6 +2316,8 @@
                 }
             }, 3000);
         }
+        
+
     </script>
 </body>
 </html> 
