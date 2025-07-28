@@ -702,12 +702,31 @@ function initializeStrikeTableContainer() {
     return;
   }
   
-  // Find the panel content area (after the header)
-  const panelContent = container.querySelector('.panel-content') || container;
+  // Check if strike table already exists
+  let existingStrikeTable = container.querySelector('#strike-table');
   
-  // Generate and insert the strike table HTML
-  const strikeTableHTML = generateStrikeTableHTML();
-  panelContent.innerHTML = strikeTableHTML;
+  if (!existingStrikeTable) {
+    // Generate and insert the strike table HTML only if it doesn't exist
+    const strikeTableHTML = generateStrikeTableHTML();
+    
+    // Find the existing content after the panel header and replace it
+    const panelHeader = container.querySelector('.panel-header');
+    if (panelHeader) {
+      // Remove any existing content after the header
+      let nextElement = panelHeader.nextElementSibling;
+      while (nextElement) {
+        const temp = nextElement.nextElementSibling;
+        nextElement.remove();
+        nextElement = temp;
+      }
+      
+      // Insert the strike table after the header
+      panelHeader.insertAdjacentHTML('afterend', strikeTableHTML);
+    } else {
+      // Fallback: replace entire container content
+      container.innerHTML = strikeTableHTML;
+    }
+  }
 }
 
 // === CLEAN STRIKE TABLE API ===
