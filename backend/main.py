@@ -1522,6 +1522,28 @@ async def broadcast_fingerprint_display(request: Request):
         print(f"[MAIN] ❌ Error handling fingerprint display update: {e}")
         return {"success": False, "error": str(e)}
 
+@app.post("/api/broadcast_momentum_update")
+async def broadcast_momentum_update(request: Request):
+    """Receive momentum update and broadcast to frontend via WebSocket"""
+    try:
+        data = await request.json()
+        print(f"[MAIN] 🔔 Received momentum update: {data.get('weighted_momentum_score', 0):.3f}")
+        message = {
+            "type": "momentum_update",
+            "data": data
+        }
+        for websocket in connected_clients.copy():
+            try:
+                await websocket.send_text(json.dumps(message))
+            except Exception as e:
+                print(f"Error sending to WebSocket client: {e}")
+                connected_clients.discard(websocket)
+        print(f"[MAIN] ✅ Momentum update broadcasted to {len(connected_clients)} clients")
+        return {"success": True, "message": "Momentum update broadcasted"}
+    except Exception as e:
+        print(f"[MAIN] ❌ Error handling momentum update: {e}")
+        return {"success": False, "error": str(e)}
+
 @app.post("/api/notify_db_change")
 async def notify_db_change(request: Request):
     """Handle database change notifications from kalshi_account_sync"""

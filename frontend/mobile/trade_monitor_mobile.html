@@ -983,6 +983,20 @@
                 updateActiveTradeIndicators(data.data.active_trades);
                 return; // Don't process other WebSocket messages for this type
             }
+
+            // === Momentum Update ===
+            if (data.type === 'momentum_update') {
+                console.log('🔔 Momentum update:', data.data);
+                if (data.data.weighted_momentum_score !== undefined) {
+                    const momentumEl = document.getElementById('momentum-score-display');
+                    if (momentumEl) {
+                        const score = data.data.weighted_momentum_score;
+                        const formatted = score >= 0 ? `+${(score * 100).toFixed(0)}` : `${(score * 100).toFixed(0)}`;
+                        momentumEl.textContent = formatted;
+                    }
+                }
+                return; // Don't process other WebSocket messages for this type
+            }
             
             // Update Auto Entry toggle
             const autoEntryToggle = document.getElementById('autoEntryToggle');
@@ -1240,23 +1254,7 @@
                             }
                         }
                         
-                        // Update momentum score (still from core data for now)
-                        try {
-                            const coreResponse = await fetch('/core');
-                            if (coreResponse.ok) {
-                                const coreData = await coreResponse.json();
-                                if (coreData.weighted_momentum_score !== undefined) {
-                                    const momentumEl = document.getElementById('momentum-score-display');
-                                    if (momentumEl) {
-                                        const score = coreData.weighted_momentum_score;
-                                        const formatted = score >= 0 ? `+${(score * 100).toFixed(0)}` : `${(score * 100).toFixed(0)}`;
-                                        momentumEl.textContent = formatted;
-                                    }
-                                }
-                            }
-                        } catch (error) {
-                            console.error('Error updating momentum score:', error);
-                        }
+                        // Momentum score is now handled by WebSocket - no polling needed
                     }
                     
                     // Update strike table
@@ -1326,14 +1324,7 @@
                 }
             }, 60000); // Poll every minute (same as main trade monitor)
 
-            // Poll for toggle states every 5 seconds
-            setInterval(async () => {
-                try {
-                    await loadToggleStates();
-                } catch (error) {
-                    console.error('Error refreshing toggle states:', error);
-                }
-            }, 5000); // Poll every 5 seconds
+            // Toggle states are now handled by WebSocket - no polling needed
 
 
         }

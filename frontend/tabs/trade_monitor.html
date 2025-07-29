@@ -1026,6 +1026,27 @@ document.addEventListener('DOMContentLoaded', () => {
         return; // Don't process other WebSocket messages for this type
       }
 
+      // === Momentum Update ===
+      if (data.type === 'momentum_update') {
+        console.log('🔔 Momentum update:', data.data);
+        // Update momentum data
+        if (data.data.weighted_momentum_score !== undefined) {
+          window.momentumData.weightedScore = data.data.weighted_momentum_score;
+        }
+        if (data.data.deltas) {
+          Object.entries(data.data.deltas).forEach(([key, value]) => {
+            if (value !== undefined) {
+              window.momentumData.deltas[key] = value;
+            }
+          });
+        }
+        // Trigger momentum panel update
+        if (typeof updateMomentumPanel === 'function') {
+          updateMomentumPanel();
+        }
+        return; // Don't process other WebSocket messages for this type
+      }
+
       if (plusMinusToggle && data.diff_mode !== undefined && document.activeElement !== plusMinusToggle) {
         ignoreWsUpdates = true;
         console.log('Received diff_mode update via WebSocket:', data.diff_mode);

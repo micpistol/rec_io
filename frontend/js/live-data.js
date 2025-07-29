@@ -114,7 +114,6 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchBTCPriceChanges();
 
   // Set up polling intervals
-  setInterval(fetchCore, 1000);                // Core data (momentum only) every second
   setInterval(fetchBTCPriceChanges, 60000);    // Price changes every minute (unchanged frequency)
 });
 

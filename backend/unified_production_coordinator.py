@@ -497,6 +497,41 @@ class UnifiedProductionCoordinator:
         except Exception as e:
             print(f"❌ Error broadcasting fingerprint display: {e}")
     
+    def _broadcast_momentum_update(self, momentum_score):
+        """Broadcast momentum data update via WebSocket to main app"""
+        try:
+            # Get complete momentum analysis
+            momentum_data = self.analyzer.get_momentum_analysis()
+            
+            broadcast_data = {
+                "weighted_momentum_score": momentum_score,
+                "deltas": {
+                    "delta_1m": momentum_data.get("delta_1m"),
+                    "delta_2m": momentum_data.get("delta_2m"),
+                    "delta_3m": momentum_data.get("delta_3m"),
+                    "delta_4m": momentum_data.get("delta_4m"),
+                    "delta_15m": momentum_data.get("delta_15m"),
+                    "delta_30m": momentum_data.get("delta_30m")
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Send to main app via HTTP
+            from core.port_config import get_port
+            from util.paths import get_host
+            port = get_port("main_app")
+            host = get_host()
+            url = f"http://{host}:{port}/api/broadcast_momentum_update"
+            
+            import requests
+            response = requests.post(url, json=broadcast_data, timeout=2)
+            if response.ok:
+                print(f"✅ Momentum update broadcasted: {momentum_score:.3f}")
+            else:
+                print(f"⚠️ Failed to broadcast momentum update: {response.status_code}")
+        except Exception as e:
+            print(f"❌ Error broadcasting momentum update: {e}")
+    
     def start_pipeline(self):
         """Start the unified data pipeline orchestration"""
         if self.running:
@@ -701,6 +736,9 @@ class UnifiedProductionCoordinator:
                 step=250,
                 num_steps=10
             )
+            
+            # Broadcast momentum data update
+            self._broadcast_momentum_update(momentum)
             
             print(f"📊 Probabilities: Price=${btc_price:,.2f}, TTC={ttc_seconds}s, Momentum={momentum:.3f}")
             return PipelineResult(
