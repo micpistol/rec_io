@@ -182,6 +182,31 @@ def log(message: str):
     except Exception as e:
         print(f"Error writing to log file: {e}")
 
+def broadcast_active_trades_change():
+    """Broadcast active trades change via WebSocket to main app"""
+    try:
+        # Get current active trades
+        active_trades = get_all_active_trades()
+        
+        # Send to main app for WebSocket broadcast
+        try:
+            port = get_port("main_app")
+            url = get_service_url(port) + "/api/broadcast_active_trades_change"
+            response = requests.post(url, json={
+                "active_trades": active_trades,
+                "count": len(active_trades),
+                "timestamp": datetime.now().isoformat()
+            }, timeout=2)
+            if response.ok:
+                log(f"✅ Active trades change broadcasted: {len(active_trades)} trades")
+            else:
+                log(f"⚠️ Failed to broadcast active trades change: {response.status_code}")
+        except Exception as e:
+            log(f"❌ Error broadcasting active trades change: {e}")
+            
+    except Exception as e:
+        log(f"❌ Error in broadcast_active_trades_change: {e}")
+
 def check_for_open_trades():
     """
     Check trades.db for any OPEN trades and add them to active monitoring.
@@ -477,6 +502,9 @@ def add_new_active_trade(trade_id: int, ticket_id: str) -> bool:
         # Export updated JSON after adding new trade
         export_active_trades_to_json()
         
+        # Broadcast active trades change
+        broadcast_active_trades_change()
+        
         # Start monitoring loop if this is the first active trade
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -533,6 +561,9 @@ def remove_closed_trade(trade_id: int) -> bool:
             
             # Export updated JSON after removing trade
             export_active_trades_to_json()
+            
+            # Broadcast active trades change
+            broadcast_active_trades_change()
             
             return True
         else:

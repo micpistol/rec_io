@@ -1472,6 +1472,34 @@ async def broadcast_auto_entry_indicator(request: Request):
         print(f"[MAIN] ❌ Error handling auto entry indicator change: {e}")
         return {"success": False, "error": str(e)}
 
+@app.post("/api/broadcast_active_trades_change")
+async def broadcast_active_trades_change(request: Request):
+    """Receive active trades change and broadcast to frontend via WebSocket"""
+    try:
+        data = await request.json()
+        print(f"[MAIN] 🔔 Received active trades change: {data.get('count', 0)} trades")
+        
+        # Broadcast to all connected WebSocket clients
+        message = {
+            "type": "active_trades_change",
+            "data": data
+        }
+        
+        # Send to preferences WebSocket clients
+        for websocket in connected_clients.copy():
+            try:
+                await websocket.send_text(json.dumps(message))
+            except Exception as e:
+                print(f"Error sending to WebSocket client: {e}")
+                connected_clients.discard(websocket)
+        
+        print(f"[MAIN] ✅ Active trades change broadcasted to {len(connected_clients)} clients")
+        return {"success": True, "message": "Active trades change broadcasted"}
+        
+    except Exception as e:
+        print(f"[MAIN] ❌ Error handling active trades change: {e}")
+        return {"success": False, "error": str(e)}
+
 @app.post("/api/notify_db_change")
 async def notify_db_change(request: Request):
     """Handle database change notifications from kalshi_account_sync"""

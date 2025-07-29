@@ -43,6 +43,7 @@
 - **Critical Impact**: Database contention with trade processing
 - **Risk Level**: 🟡 **MEDIUM** - Could slow trade execution
 - **Action Needed**: Add caching to database read endpoints
+- **Status**: ✅ **PARTIALLY FIXED** - Active trade indicators now use WebSocket push
 
 ### **5. Live Data Analysis - `/core` Endpoint**
 - **Issue**: Frontend polls core data every second
@@ -87,6 +88,11 @@
 - **Issue**: Main app proxies to auto_entry_supervisor every second
 - **Critical Impact**: Double load for simple indicator
 - **Status**: ✅ **FIXED** - Eliminated proxy endpoint
+
+### **Active Trade Indicators - Mobile Polling**
+- **Issue**: Mobile frontend polls `/trades` every 2 seconds for active trade indicators
+- **Critical Impact**: Database contention with trade processing
+- **Status**: ✅ **FIXED** - Replaced with WebSocket push notifications
 
 ---
 

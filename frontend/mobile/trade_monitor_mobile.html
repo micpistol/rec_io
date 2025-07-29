@@ -501,7 +501,7 @@
         <!-- Top Row: Market Title, Automated Trading Indicator, and TTC Clock -->
         <div class="top-row">
             <div class="market-title">BTC Price Today</div>
-            <div id="autoEntryIndicator" style="display: none; align-items: center; gap: 4px; padding: 8px; color: white; border-radius: 6px; font-size: 12px; font-weight: bold; background-color: #323c4e; display: flex; justify-content: center;">
+            <div id="autoEntryIndicator" style="display: none; align-items: center; gap: 4px; padding: 8px; color: white; border-radius: 6px; font-size: 12px; font-weight: bold; background-color: #323c4e; justify-content: center;">
                 <div style="width: 8px; height: 8px; background: #00ff2f; border-radius: 50%;"></div>
                 <span>AUTO ON</span>
             </div>
@@ -834,10 +834,7 @@
             // Start Active Trade Supervisor polling
             startActiveTradeSupervisorPolling();
             
-            // Start position indicator updates (separate from table redraws)
-            setInterval(() => {
-                updatePositionIndicatorsOnly();
-            }, 2000); // Update every 2 seconds to reduce flashing
+
         });
 
         function initializeMobileToggles() {
@@ -985,6 +982,13 @@
             if (data.type === 'auto_entry_indicator_change') {
                 console.log('🔔 Auto entry indicator change:', data.data);
                 updateAutoEntryIndicator(data.data);
+                return; // Don't process other WebSocket messages for this type
+            }
+            
+            // === Active Trades Change ===
+            if (data.type === 'active_trades_change') {
+                console.log('🔔 Active trades change:', data.data);
+                updateActiveTradeIndicators(data.data.active_trades);
                 return; // Don't process other WebSocket messages for this type
             }
             
@@ -2530,10 +2534,64 @@
             }
         }
         
+        // Update active trade indicators based on WebSocket data
+        function updateActiveTradeIndicators(activeTrades) {
+            try {
+                // Create a set of current active trade strikes
+                const currentActiveStrikes = new Set();
+                activeTrades.forEach(trade => {
+                    const tradeStrike = parseFloat(trade.strike.replace(/[^\d.-]/g, ''));
+                    currentActiveStrikes.add(tradeStrike);
+                });
+                
+                // Update all strike cells
+                const strikeCells = document.querySelectorAll('#strike-table tbody tr td:first-child');
+                strikeCells.forEach(cell => {
+                    const strikeText = cell.textContent.replace(/[\$,]/g, '');
+                    const strike = parseFloat(strikeText);
+                    if (!isNaN(strike)) {
+                        const hasPosition = currentActiveStrikes.has(strike);
+                        const currentlyHasIndicator = cell.classList.contains('has-active-trade');
+                        
+                        if (hasPosition !== currentlyHasIndicator) {
+                            if (hasPosition) {
+                                cell.classList.add('has-active-trade');
+                            } else {
+                                cell.classList.remove('has-active-trade');
+                            }
+                        }
+                    }
+                });
+                
+                // Update last known state
+                lastActiveTrades = currentActiveStrikes;
+            } catch (e) {
+                console.error('Error updating active trade indicators:', e);
+            }
+        }
+        
         // Fetch initial state when page loads
         document.addEventListener('DOMContentLoaded', () => {
             fetchInitialAutoEntryIndicator();
+            fetchInitialActiveTrades();
         });
+        
+        // Fetch initial active trades state
+        async function fetchInitialActiveTrades() {
+            try {
+                const response = await fetch('/trades', { cache: 'no-store' });
+                if (!response.ok) throw new Error('Failed to fetch active trades');
+                const trades = await response.json();
+                const activeTrades = trades.filter(trade => 
+                    trade.status !== "closed" && 
+                    trade.status !== "expired"
+                );
+                
+                updateActiveTradeIndicators(activeTrades);
+            } catch (error) {
+                console.error('Error fetching initial active trades:', error);
+            }
+        }
 
         // Set up WebSocket connection for database change notifications
         setupDatabaseChangeListener();
