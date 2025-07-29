@@ -37,7 +37,7 @@ function decorateChange(el, val) {
 
 // === CORE DATA FETCHING FUNCTIONS ===
 
-// Fetch core data (BTC price + momentum score)
+// Fetch core data (momentum score only - BTC price now handled by strike table)
 function fetchCore() {
   fetch('/core')
     .then(response => response.json())
@@ -52,13 +52,6 @@ function fetchCore() {
       if (data.delta_4m !== undefined) window.momentumData.deltas['4m'] = data.delta_4m;
       if (data.delta_15m !== undefined) window.momentumData.deltas['15m'] = data.delta_15m;
       if (data.delta_30m !== undefined) window.momentumData.deltas['30m'] = data.delta_30m;
-
-      // Update BTC price display
-      if ('btc_price' in data) {
-        const price = Number(data.btc_price);
-        const el = document.getElementById('btc-price-value');
-        if (el) el.textContent = formatUSD(price);
-      }
 
       // Trigger momentum panel update if function exists
       if (typeof updateMomentumPanel === 'function') {
@@ -121,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchBTCPriceChanges();
 
   // Set up polling intervals
-  setInterval(fetchCore, 1000);                // Core data (BTC price + momentum) every second
+  setInterval(fetchCore, 1000);                // Core data (momentum only) every second
   setInterval(fetchBTCPriceChanges, 60000);    // Price changes every minute (unchanged frequency)
 });
 

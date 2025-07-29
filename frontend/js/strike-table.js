@@ -54,62 +54,69 @@ async function fetchStrikeTableData() {
   }
 }
 
-// Update TTC display from unified endpoint
-async function updateTTCDisplay() {
-  try {
-    const ttcSeconds = await fetchUnifiedTTC();
-    const ttcEl = document.getElementById('strikePanelTTC');
-    if (!ttcEl) return;
+// Update TTC display from strike table data
+function updateTTCDisplay(ttcSeconds) {
+  const ttcEl = document.getElementById('strikePanelTTC');
+  if (!ttcEl) return;
 
-    // Format TTC for display
-    const formatTTC = (seconds) => {
-      if (seconds === null || seconds === undefined || isNaN(seconds)) {
-        return '--:--';
-      }
-      
-      const totalMinutes = Math.floor(seconds / 60);
-      const remainingSeconds = seconds % 60;
-      
-      if (totalMinutes >= 60) {
-        const hours = Math.floor(totalMinutes / 60);
-        const minutes = totalMinutes % 60;
-        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-      } else {
-        return `${totalMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-      }
-    };
-
-    ttcEl.textContent = formatTTC(ttcSeconds);
-
-    // Apply color coding
-    ttcEl.style.backgroundColor = '';
-    ttcEl.style.color = '';
-    ttcEl.style.borderRadius = '';
-    ttcEl.style.padding = '';
-
-    if (ttcSeconds >= 0 && ttcSeconds <= 180) {
-      ttcEl.style.backgroundColor = '#d2372b';
-      ttcEl.style.color = '#fff';
-      ttcEl.style.borderRadius = '6px';
-      ttcEl.style.padding = '0 10px';
-    } else if (ttcSeconds <= 300) {
-      ttcEl.style.backgroundColor = '#ffc107';
-      ttcEl.style.color = '#fff';
-      ttcEl.style.borderRadius = '6px';
-      ttcEl.style.padding = '0 10px';
-    } else if (ttcSeconds <= 720) {
-      ttcEl.style.backgroundColor = '#45d34a';
-      ttcEl.style.color = '#fff';
-      ttcEl.style.borderRadius = '6px';
-      ttcEl.style.padding = '0 10px';
-    } else if (ttcSeconds <= 900) {
-      ttcEl.style.backgroundColor = '#45d34a';
-      ttcEl.style.color = '#fff';
-      ttcEl.style.borderRadius = '6px';
-      ttcEl.style.padding = '0 10px';
+  // Format TTC for display
+  const formatTTC = (seconds) => {
+    if (seconds === null || seconds === undefined || isNaN(seconds)) {
+      return '--:--';
     }
-  } catch (error) {
-    console.error('Error updating TTC display:', error);
+    
+    const totalMinutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    
+    if (totalMinutes >= 60) {
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    } else {
+      return `${totalMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    }
+  };
+
+  ttcEl.textContent = formatTTC(ttcSeconds);
+
+  // Apply color coding
+  ttcEl.style.backgroundColor = '';
+  ttcEl.style.color = '';
+  ttcEl.style.borderRadius = '';
+  ttcEl.style.padding = '';
+
+  if (ttcSeconds >= 0 && ttcSeconds <= 180) {
+    ttcEl.style.backgroundColor = '#d2372b';
+    ttcEl.style.color = '#fff';
+    ttcEl.style.borderRadius = '6px';
+    ttcEl.style.padding = '0 10px';
+  } else if (ttcSeconds <= 300) {
+    ttcEl.style.backgroundColor = '#ffc107';
+    ttcEl.style.color = '#fff';
+    ttcEl.style.borderRadius = '6px';
+    ttcEl.style.padding = '0 10px';
+  } else if (ttcSeconds <= 720) {
+    ttcEl.style.backgroundColor = '#45d34a';
+    ttcEl.style.color = '#fff';
+    ttcEl.style.borderRadius = '6px';
+    ttcEl.style.padding = '0 10px';
+  } else if (ttcSeconds <= 900) {
+    ttcEl.style.backgroundColor = '#45d34a';
+    ttcEl.style.color = '#fff';
+    ttcEl.style.borderRadius = '6px';
+    ttcEl.style.padding = '0 10px';
+  }
+}
+
+// Update BTC price display from strike table data
+function updateBTCPriceDisplay(currentPrice) {
+  const priceEl = document.getElementById('btc-price-value');
+  if (!priceEl) return;
+  
+  if (currentPrice && !isNaN(currentPrice)) {
+    priceEl.textContent = `$${Number(currentPrice).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+  } else {
+    priceEl.textContent = '$—';
   }
 }
 
@@ -142,8 +149,15 @@ async function updateMiddleColumnData() {
     // Update market title
     updateMarketTitle(strikeTableData);
     
-    // Update TTC display
-    await updateTTCDisplay();
+    // Update TTC display from strike table data
+    if (strikeTableData && strikeTableData.ttc !== undefined) {
+      updateTTCDisplay(strikeTableData.ttc);
+    }
+    
+    // Update BTC price display from strike table data
+    if (strikeTableData && strikeTableData.current_price !== undefined) {
+      updateBTCPriceDisplay(strikeTableData.current_price);
+    }
     
   } catch (error) {
     console.error('Error updating middle column data:', error);

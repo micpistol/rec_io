@@ -754,17 +754,9 @@
             // Start TTC clock
             startTTCClock();
             
-            // Initial data fetches (same as main trade monitor)
+            // Initial data fetches (BTC price and TTC now come from strike table data)
+            // Momentum score still fetched from core data initially
             fetch('/core').then(response => response.json()).then(data => {
-                // Update BTC price display
-                if ('btc_price' in data) {
-                    const price = Number(data.btc_price);
-                    const priceEl = document.getElementById('btc-price-value');
-                    if (priceEl) {
-                        priceEl.textContent = `$${price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-                    }
-                }
-                
                 // Update momentum score
                 if (data.weighted_momentum_score !== undefined) {
                     const momentumEl = document.getElementById('momentum-score-display');
@@ -1032,84 +1024,8 @@
         }
 
         function startTTCClock() {
-            async function updateTTCClock() {
-                try {
-                    // Use the same endpoint as the main trade monitor
-                    const response = await fetch('/api/unified_ttc/btc');
-                    if (!response.ok) {
-                        throw new Error('Failed to fetch TTC data');
-                    }
-                    
-                    const data = await response.json();
-                    const ttcSeconds = data.ttc_seconds || 0;
-                    
-                    const ttcClock = document.getElementById('ttc-clock');
-                    if (ttcClock) {
-                        // Use the same formatTTC function as the main trade monitor
-                        const formatTTC = (seconds) => {
-                            if (seconds === null || seconds === undefined || isNaN(seconds)) {
-                                return '--:--';
-                            }
-                            
-                            const totalMinutes = Math.floor(seconds / 60);
-                            const remainingSeconds = seconds % 60;
-                            
-                            if (totalMinutes >= 60) {
-                                const hours = Math.floor(totalMinutes / 60);
-                                const minutes = totalMinutes % 60;
-                                return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-                            } else {
-                                return `${totalMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-                            }
-                        };
-                        
-                        ttcClock.textContent = formatTTC(ttcSeconds);
-                        
-                        // Apply the same color coding as the main trade monitor
-                        ttcClock.style.backgroundColor = '';
-                        ttcClock.style.color = '';
-                        ttcClock.style.borderRadius = '';
-                        ttcClock.style.padding = '';
-                        
-                        if (ttcSeconds >= 0 && ttcSeconds <= 180) {
-                            ttcClock.style.backgroundColor = '#d2372b';
-                            ttcClock.style.color = '#fff';
-                            ttcClock.style.borderRadius = '6px';
-                            ttcClock.style.padding = '8px';
-                        } else if (ttcSeconds <= 300) {
-                            ttcClock.style.backgroundColor = '#ffc107';
-                            ttcClock.style.color = '#fff';
-                            ttcClock.style.borderRadius = '6px';
-                            ttcClock.style.padding = '8px';
-                        } else if (ttcSeconds <= 720) {
-                            ttcClock.style.backgroundColor = '#45d34a';
-                            ttcClock.style.color = '#fff';
-                            ttcClock.style.borderRadius = '6px';
-                            ttcClock.style.padding = '8px';
-                        } else if (ttcSeconds <= 900) {
-                            ttcClock.style.backgroundColor = '#45d34a';
-                            ttcClock.style.color = '#fff';
-                            ttcClock.style.borderRadius = '6px';
-                            ttcClock.style.padding = '8px';
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error updating TTC clock:', error);
-                    // Fallback to show --:-- if API fails
-                    const ttcClock = document.getElementById('ttc-clock');
-                    if (ttcClock) {
-                        ttcClock.textContent = '--:--';
-                        ttcClock.style.backgroundColor = '';
-                        ttcClock.style.color = '';
-                        ttcClock.style.borderRadius = '';
-                        ttcClock.style.padding = '';
-                    }
-                }
-            }
-            
-            // Update immediately and then every second (same as main trade monitor)
-            updateTTCClock();
-            setInterval(updateTTCClock, 1000);
+            // TTC is now handled by the strike table data polling
+            // No separate TTC polling needed
         }
 
         async function loadToggleStates() {
@@ -1239,61 +1155,109 @@
         }
 
         function startMobileDataPolling() {
-            // Poll for core data (same as main trade monitor)
+            // Poll for strike table data (includes BTC price, TTC, and momentum)
             setInterval(async () => {
                 try {
-                    // Fetch core data (BTC price + momentum) - same as main trade monitor
-                    const coreResponse = await fetch('/core');
-                    if (coreResponse.ok) {
-                        const coreData = await coreResponse.json();
+                    // Fetch strike table data (includes BTC price, TTC, and market title)
+                    const strikeResponse = await fetch('/api/strike_tables/btc');
+                    if (strikeResponse.ok) {
+                        const strikeData = await strikeResponse.json();
                         
-                        // Update market title (same as main trade monitor)
+                        // Update market title
                         const marketTitleEl = document.querySelector('.market-title');
                         if (marketTitleEl) {
-                            // Fetch strike table data for market title (same as main trade monitor)
-                            try {
-                                const strikeResponse = await fetch('/api/strike_tables/btc');
-                                if (strikeResponse.ok) {
-                                    const strikeData = await strikeResponse.json();
-                                    
-                                    // Extract time from market_title (same logic as main trade monitor)
-                                    const marketTitle = strikeData.market_title || '';
-                                    const timeMatch = marketTitle.match(/at\s+(.+?)\s+(?:EDT|EST)\?/i);
-                                    const timeStr = timeMatch ? timeMatch[1].trim() : '11pm';
-                                    
-                                    // Format as "<symbol> price today at <time>?" (same as main trade monitor)
-                                    const symbol = strikeData.symbol || 'BTC';
-                                    const formattedTitle = `${symbol} price today at ${timeStr}?`;
-                                    
-                                    marketTitleEl.textContent = formattedTitle;
-                                }
-                            } catch (error) {
-                                console.error('Error updating market title:', error);
-                                marketTitleEl.textContent = 'BTC Price Today';
-                            }
+                            // Extract time from market_title (same logic as main trade monitor)
+                            const marketTitle = strikeData.market_title || '';
+                            const timeMatch = marketTitle.match(/at\s+(.+?)\s+(?:EDT|EST)\?/i);
+                            const timeStr = timeMatch ? timeMatch[1].trim() : '11pm';
+                            
+                            // Format as "<symbol> price today at <time>?" (same as main trade monitor)
+                            const symbol = strikeData.symbol || 'BTC';
+                            const formattedTitle = `${symbol} price today at ${timeStr}?`;
+                            
+                            marketTitleEl.textContent = formattedTitle;
                         }
                         
-                        // Update BTC price display
-                        if ('btc_price' in coreData) {
-                            const price = Number(coreData.btc_price);
+                        // Update BTC price display from strike table data
+                        if (strikeData.current_price !== undefined) {
+                            const price = Number(strikeData.current_price);
                             const priceEl = document.getElementById('btc-price-value');
                             if (priceEl) {
                                 priceEl.textContent = `$${price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
                             }
                         }
                         
-                        // Update momentum score
-                        if (coreData.weighted_momentum_score !== undefined) {
-                            const momentumEl = document.getElementById('momentum-score-display');
-                            if (momentumEl) {
-                                const score = coreData.weighted_momentum_score;
-                                const formatted = score >= 0 ? `+${(score * 100).toFixed(0)}` : `${(score * 100).toFixed(0)}`;
-                                momentumEl.textContent = formatted;
+                        // Update TTC clock from strike table data
+                        if (strikeData.ttc !== undefined) {
+                            const ttcClock = document.getElementById('ttc-clock');
+                            if (ttcClock) {
+                                const formatTTC = (seconds) => {
+                                    if (seconds === null || seconds === undefined || isNaN(seconds)) {
+                                        return '--:--';
+                                    }
+                                    
+                                    const totalMinutes = Math.floor(seconds / 60);
+                                    const remainingSeconds = seconds % 60;
+                                    
+                                    if (totalMinutes >= 60) {
+                                        const hours = Math.floor(totalMinutes / 60);
+                                        const minutes = totalMinutes % 60;
+                                        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+                                    } else {
+                                        return `${totalMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+                                    }
+                                };
+                                
+                                ttcClock.textContent = formatTTC(strikeData.ttc);
+                                
+                                // Apply color coding
+                                ttcClock.style.backgroundColor = '';
+                                ttcClock.style.color = '';
+                                ttcClock.style.borderRadius = '';
+                                ttcClock.style.padding = '';
+                                
+                                if (strikeData.ttc >= 0 && strikeData.ttc <= 180) {
+                                    ttcClock.style.backgroundColor = '#d2372b';
+                                    ttcClock.style.color = '#fff';
+                                    ttcClock.style.borderRadius = '6px';
+                                    ttcClock.style.padding = '8px';
+                                } else if (strikeData.ttc <= 300) {
+                                    ttcClock.style.backgroundColor = '#ffc107';
+                                    ttcClock.style.color = '#fff';
+                                    ttcClock.style.borderRadius = '6px';
+                                    ttcClock.style.padding = '8px';
+                                } else if (strikeData.ttc <= 720) {
+                                    ttcClock.style.backgroundColor = '#45d34a';
+                                    ttcClock.style.color = '#fff';
+                                    ttcClock.style.borderRadius = '6px';
+                                    ttcClock.style.padding = '8px';
+                                } else if (strikeData.ttc <= 900) {
+                                    ttcClock.style.backgroundColor = '#45d34a';
+                                    ttcClock.style.color = '#fff';
+                                    ttcClock.style.borderRadius = '6px';
+                                    ttcClock.style.padding = '8px';
+                                }
                             }
                         }
+                        
+                        // Update momentum score (still from core data for now)
+                        try {
+                            const coreResponse = await fetch('/core');
+                            if (coreResponse.ok) {
+                                const coreData = await coreResponse.json();
+                                if (coreData.weighted_momentum_score !== undefined) {
+                                    const momentumEl = document.getElementById('momentum-score-display');
+                                    if (momentumEl) {
+                                        const score = coreData.weighted_momentum_score;
+                                        const formatted = score >= 0 ? `+${(score * 100).toFixed(0)}` : `${(score * 100).toFixed(0)}`;
+                                        momentumEl.textContent = formatted;
+                                    }
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Error updating momentum score:', error);
+                        }
                     }
-
-
                     
                     // Update strike table
                     await updateMobileStrikeTable();
