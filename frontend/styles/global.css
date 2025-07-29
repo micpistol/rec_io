@@ -79,6 +79,15 @@ a, button, input[type="button"], input[type="submit"], input[type="reset"],
   cursor: pointer !important;
 }
 
+/* Trade Status Styling */
+.closing-trade {
+  background-color: #e74c3c !important;
+  opacity: 0.8;
+}
 
+.closing-trade td {
+  color: #ffffff !important;
+  font-weight: bold;
+}
 
 /* (Removed table column width classes; now page-specific) */

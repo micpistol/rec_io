@@ -1921,7 +1921,8 @@
                 const trades = await tradesRes.json();
                 const activeTrades = trades.filter(trade => 
                     trade.status !== "closed" && 
-                    trade.status !== "expired"
+                    trade.status !== "expired" &&
+                    trade.status !== "error"
                 );
                 
                 // Create a set of current active trade strikes
@@ -1979,7 +1980,8 @@
                 const trades = await tradesRes.json();
                 const activeTrades = trades.filter(trade => 
                     trade.status !== "closed" && 
-                    trade.status !== "expired"
+                    trade.status !== "expired" &&
+                    trade.status !== "error"
                 );
                 
                 // Create a set of current active trade strikes for comparison
@@ -2499,7 +2501,8 @@
                 const trades = await response.json();
                 const activeTrades = trades.filter(trade => 
                     trade.status !== "closed" && 
-                    trade.status !== "expired"
+                    trade.status !== "expired" &&
+                    trade.status !== "error"
                 );
                 
                 updateActiveTradeIndicators(activeTrades);

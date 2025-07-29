@@ -286,7 +286,7 @@ def can_trade_strike(strike_key):
     return True
 
 def is_strike_already_traded(strike_data):
-    """Check if we already have an active trade on this strike"""
+    """Check if we already have an active or pending trade on this strike"""
     try:
         # Get active trades from the active_trade_supervisor
         port = get_port("active_trade_supervisor")
@@ -299,12 +299,13 @@ def is_strike_already_traded(strike_data):
             
         response_data = response.json()
         active_trades = response_data.get('active_trades', [])
-        log(f"[AUTO ENTRY DEBUG] 🔍 Checking {len(active_trades)} active trades for strike {strike_data.get('strike')} {strike_data.get('side')}")
+        log(f"[AUTO ENTRY DEBUG] 🔍 Checking {len(active_trades)} trades (active/pending) for strike {strike_data.get('strike')} {strike_data.get('side')}")
         
         for trade in active_trades:
             # Check if this trade is for the same strike
             trade_strike = trade.get('strike', '')
             trade_side = trade.get('side', '')
+            trade_status = trade.get('status', 'active')  # Default to 'active' for backward compatibility
             
             # Extract strike number from trade_strike (e.g., "$117,500" -> "117500")
             if trade_strike.startswith('$'):
@@ -325,10 +326,10 @@ def is_strike_already_traded(strike_data):
             # Compare strike numbers and sides
             if (trade_strike_num == str(strike_data.get('strike')) and 
                 normalized_trade_side == normalized_strike_side):
-                log(f"[AUTO ENTRY] ⚠️ Found active trade on {strike_data.get('strike')} {strike_data.get('side')}")
+                log(f"[AUTO ENTRY] ⚠️ Found {trade_status} trade on {strike_data.get('strike')} {strike_data.get('side')}")
                 return True
         
-        log(f"[AUTO ENTRY DEBUG] ✅ No active trades found for {strike_data.get('strike')} {strike_data.get('side')}")
+        log(f"[AUTO ENTRY DEBUG] ✅ No active or pending trades found for {strike_data.get('strike')} {strike_data.get('side')}")
         return False
     except Exception as e:
         log(f"[AUTO ENTRY] Error checking active trades: {e}")

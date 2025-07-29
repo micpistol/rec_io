@@ -37,6 +37,10 @@ def create_pending_trade(trade: dict) -> int:
     trade_id = insert_trade(trade)
     log_event(trade["ticket_id"], "MANAGER: TICKET RECEIVED — CONFIRMED")
     log_event(trade["ticket_id"], "MANAGER: TRADE LOGGED PENDING — CONFIRMED")
+    
+    # Notify active trade supervisor about new pending trade
+    notify_active_trade_supervisor_direct(trade_id, trade["ticket_id"], "pending")
+    
     return trade_id
 
 
@@ -167,7 +171,7 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
                     log_event(ticket_id, f"MANAGER: OPEN TRADE CONFIRMED — pos={pos}, price={price}, fees={fees}, diff={diff_formatted}")
                     
                     # Notify active trade supervisor about new open trade
-                    notify_active_trade_supervisor(id, ticket_id, "open")
+                    notify_active_trade_supervisor_direct(id, ticket_id, "open")
                     
                     # Notify frontend about trade database change
                     notify_frontend_trade_change()
@@ -181,6 +185,19 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
     
     conn_pos.close()
     log_event(ticket_id, f"MANAGER: OPEN TRADE polling complete for ticker: {expected_ticker}")
+    
+    # Check if the trade is still pending after timeout - if so, notify about failure
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT status FROM trades WHERE id = ?", (id,))
+    status_row = cursor.fetchone()
+    current_status = status_row[0] if status_row else None
+    conn.close()
+    
+    if current_status == "pending":
+        log_event(ticket_id, f"MANAGER: PENDING TRADE FAILED TO FILL - TIMEOUT")
+        # Notify active trade supervisor about failed pending trade
+        notify_active_trade_supervisor_direct(id, ticket_id, "error")
 
 
 def confirm_close_trade(id: int, ticket_id: str) -> None:
@@ -686,6 +703,46 @@ def notify_active_trade_supervisor(trade_id: int, ticket_id: str, status: str) -
     except Exception as e:
         log(f"❌ Error notifying active trade supervisor: {e}")
 
+def notify_active_trade_supervisor_direct(trade_id: int, ticket_id: str, status: str) -> None:
+    """
+    Send direct notification to active trade supervisor via HTTP API.
+    This is the new preferred method for trade status notifications.
+    """
+    try:
+        import requests
+        from backend.util.paths import get_host
+        
+        # Get the active trade supervisor port
+        from backend.core.port_config import get_port
+        active_trade_supervisor_port = get_port("active_trade_supervisor")
+        
+        notification_url = f"http://{get_host()}:{active_trade_supervisor_port}/api/trade_manager_notification"
+        payload = {
+            "trade_id": trade_id,
+            "ticket_id": ticket_id,
+            "status": status
+        }
+        
+        response = requests.post(notification_url, json=payload, timeout=5)
+        
+        if response.status_code == 200:
+            result = response.json()
+            if result.get("success", False):
+                log(f"✅ Direct notification sent to active trade supervisor: id={trade_id}, status={status}")
+            else:
+                log(f"⚠️ Active trade supervisor returned error: {result.get('message', 'Unknown error')}")
+        else:
+            log(f"⚠️ Failed to send direct notification to active trade supervisor: {response.status_code}")
+            
+    except ImportError:
+        log(f"⚠️ requests not available - falling back to direct import for trade: id={trade_id}")
+        # Fallback to direct import method
+        notify_active_trade_supervisor(trade_id, ticket_id, status)
+    except Exception as e:
+        log(f"❌ Error sending direct notification to active trade supervisor: {e}")
+        # Fallback to direct import method
+        notify_active_trade_supervisor(trade_id, ticket_id, status)
+
 def notify_frontend_trade_change() -> None:
     """
     Send notification to frontend when trades.db is updated.
@@ -1044,7 +1101,7 @@ async def add_trade(request: Request):
             
             if row:
                 trade_id = row[0]
-                notify_active_trade_supervisor(trade_id, data.get('ticket_id'), "closing")
+                notify_active_trade_supervisor_direct(trade_id, data.get('ticket_id'), "closing")
             
             # Confirm close match in positions.db
             try:
@@ -1217,6 +1274,10 @@ async def update_trade_status_api(request: Request):
         update_trade_status(id, "error")
         if ticket_id:
             log_event(ticket_id, "MANAGER: STATUS UPDATED — SET TO 'ERROR'")
+        
+        # Notify active_trade_supervisor to remove the failed trade
+        notify_active_trade_supervisor_direct(id, ticket_id, "error")
+        
         return {"message": "Trade marked error", "id": id}
 
     else:

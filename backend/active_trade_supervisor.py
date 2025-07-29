@@ -331,10 +331,68 @@ def handle_trades_db_change():
         # Check for closed trades
         check_for_closed_trades()
         
-        return jsonify({"status": "success", "message": "Trades.db change processed"}), 200
+        return jsonify({"status": "success", "message": "Trade database change processed"}), 200
         
     except Exception as e:
         log(f"❌ Error handling trades.db change notification: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/trade_manager_notification', methods=['POST'])
+def handle_trade_manager_notification():
+    """Handle direct notifications from trade_manager about trade status changes"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data received"}), 400
+        
+        trade_id = data.get('trade_id')
+        ticket_id = data.get('ticket_id')
+        status = data.get('status')
+        
+        if not all([trade_id, ticket_id, status]):
+            return jsonify({"error": "Missing required fields: trade_id, ticket_id, status"}), 400
+        
+        log(f"📡 DIRECT NOTIFICATION: Received from trade_manager")
+        log(f"📡 DIRECT NOTIFICATION: Trade ID: {trade_id}, Ticket ID: {ticket_id}, Status: {status}")
+        
+        success = False
+        
+        if status == 'pending':
+            # Add new pending trade
+            success = add_pending_trade(trade_id, ticket_id)
+            if success:
+                log(f"✅ Successfully added pending trade: {trade_id}")
+            else:
+                log(f"❌ Failed to add pending trade: {trade_id}")
+                
+        elif status == 'open':
+            # Confirm pending trade as open
+            success = confirm_pending_trade(trade_id, ticket_id)
+            if success:
+                log(f"✅ Successfully confirmed pending trade as open: {trade_id}")
+            else:
+                log(f"❌ Failed to confirm pending trade as open: {trade_id}")
+                
+        elif status == 'error':
+            # Remove failed trade (any status) from active_trades.db
+            success = remove_failed_trade(trade_id, ticket_id)
+            if success:
+                log(f"✅ Successfully removed failed trade: {trade_id}")
+            else:
+                log(f"❌ Failed to remove failed trade: {trade_id}")
+                
+        else:
+            log(f"⚠️ Unknown status in trade_manager notification: {status}")
+            return jsonify({"error": f"Unknown status: {status}"}), 400
+        
+        return jsonify({
+            "status": "success" if success else "error",
+            "message": f"Trade {trade_id} {status} notification processed",
+            "success": success
+        }), 200 if success else 500
+        
+    except Exception as e:
+        log(f"❌ Error handling trade_manager notification: {e}")
         return jsonify({"error": str(e)}), 500
 
 def migrate_database_schema():
@@ -519,6 +577,299 @@ def add_new_active_trade(trade_id: int, ticket_id: str) -> bool:
         
     except Exception as e:
         log(f"❌ Error adding new active trade {trade_id}: {e}")
+        return False
+
+def add_pending_trade(trade_id: int, ticket_id: str) -> bool:
+    """
+    Add a new pending trade to the active trades database when trade_manager creates it.
+    
+    Args:
+        trade_id: The ID from trades.db
+        ticket_id: The ticket ID for the trade
+        
+    Returns:
+        bool: True if successfully added, False otherwise
+    """
+    try:
+        # Get the trade data from trades.db
+        conn = get_trades_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, ticket_id, date, time, strike, side, buy_price, position,
+                   contract, ticker, symbol, market, trade_strategy, symbol_open,
+                   momentum, prob, fees, diff
+            FROM trades 
+            WHERE id = ? AND status = 'pending'
+        """, (trade_id,))
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row:
+            log(f"No pending trade found with id {trade_id}")
+            return False
+            
+        # Unpack the row data
+        (db_id, ticket_id, date, time, strike, side, buy_price, position,
+         contract, ticker, symbol, market, trade_strategy, symbol_open,
+         momentum, prob, fees, diff) = row
+        
+        # Insert into active trades database with 'pending' status
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO active_trades (
+                trade_id, ticket_id, date, time, strike, side, buy_price, position,
+                contract, ticker, symbol, market, trade_strategy, symbol_open,
+                momentum, prob, fees, diff, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+        """, (
+            trade_id, ticket_id, date, time, strike, side, buy_price, position,
+            contract, ticker, symbol, market, trade_strategy, symbol_open,
+            momentum, prob, fees, diff
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        # Log the new pending trade
+        log(f"⏳ NEW PENDING TRADE ADDED TO ACTIVE_TRADES.DB")
+        log(f"   Trade ID: {trade_id}")
+        log(f"   Ticket ID: {ticket_id}")
+        log(f"   Ticker: {ticker}")
+        log(f"   Strike: {strike}")
+        log(f"   Side: {side}")
+        log(f"   Contract: {contract}")
+        log(f"   Strategy: {trade_strategy}")
+        log(f"   Entry Time: {date} {time}")
+        log(f"   Prob: {prob}%")
+        log(f"   Market: {market}")
+        log(f"   Symbol: {symbol}")
+        log(f"   ========================================")
+        
+        # Invalidate cache when new trade is added
+        invalidate_active_trades_cache()
+        
+        # Export updated JSON after adding new trade
+        export_active_trades_to_json()
+        
+        # Broadcast active trades change
+        broadcast_active_trades_change()
+        
+        # Start monitoring loop if this is the first active trade
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
+        active_count = cursor.fetchone()[0]
+        conn.close()
+        
+        if active_count == 1:  # This is the first active trade
+            start_monitoring_loop()
+        
+        return True
+        
+    except Exception as e:
+        log(f"❌ Error adding pending trade {trade_id}: {e}")
+        return False
+
+def confirm_pending_trade(trade_id: int, ticket_id: str) -> bool:
+    """
+    Confirm a pending trade has been filled and update it to 'active' status.
+    
+    Args:
+        trade_id: The ID from trades.db
+        ticket_id: The ticket ID for the trade
+        
+    Returns:
+        bool: True if successfully confirmed, False otherwise
+    """
+    try:
+        # Get the updated trade data from trades.db
+        conn = get_trades_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, ticket_id, date, time, strike, side, buy_price, position,
+                   contract, ticker, symbol, market, trade_strategy, symbol_open,
+                   momentum, prob, fees, diff
+            FROM trades 
+            WHERE id = ? AND status = 'open'
+        """, (trade_id,))
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row:
+            log(f"No open trade found with id {trade_id}")
+            return False
+            
+        # Unpack the row data
+        (db_id, ticket_id, date, time, strike, side, buy_price, position,
+         contract, ticker, symbol, market, trade_strategy, symbol_open,
+         momentum, prob, fees, diff) = row
+        
+        # Update the pending trade in active_trades.db to 'active' status
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE active_trades
+            SET status = 'active',
+                buy_price = ?,
+                position = ?,
+                fees = ?,
+                diff = ?
+            WHERE trade_id = ? AND status = 'pending'
+        """, (buy_price, position, fees, diff, trade_id))
+        
+        if cursor.rowcount == 0:
+            log(f"No pending trade found in active_trades.db for trade_id {trade_id}")
+            conn.close()
+            return False
+        
+        conn.commit()
+        conn.close()
+        
+        # Log the confirmed trade
+        log(f"✅ PENDING TRADE CONFIRMED AND ACTIVATED")
+        log(f"   Trade ID: {trade_id}")
+        log(f"   Ticket ID: {ticket_id}")
+        log(f"   Ticker: {ticker}")
+        log(f"   Strike: {strike}")
+        log(f"   Side: {side}")
+        log(f"   Buy Price: ${buy_price}")
+        log(f"   Position: {position}")
+        log(f"   Contract: {contract}")
+        log(f"   Strategy: {trade_strategy}")
+        log(f"   Entry Time: {date} {time}")
+        log(f"   Prob: {prob}%")
+        log(f"   Diff: {diff}")
+        log(f"   Fees: ${fees}")
+        log(f"   Symbol Open: ${symbol_open}")
+        log(f"   Momentum: {momentum}")
+        log(f"   Market: {market}")
+        log(f"   Symbol: {symbol}")
+        log(f"   ========================================")
+        
+        # Invalidate cache when trade is confirmed
+        invalidate_active_trades_cache()
+        
+        # Export updated JSON after confirming trade
+        export_active_trades_to_json()
+        
+        # Broadcast active trades change
+        broadcast_active_trades_change()
+        
+        # Start monitoring loop if this is the first active trade
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
+        active_count = cursor.fetchone()[0]
+        conn.close()
+        
+        if active_count == 1:  # This is the first active trade
+            start_monitoring_loop()
+        
+        return True
+        
+    except Exception as e:
+        log(f"❌ Error confirming pending trade {trade_id}: {e}")
+        return False
+
+def remove_pending_trade(trade_id: int, ticket_id: str) -> bool:
+    """
+    Remove a pending trade that failed to fill from active_trades.db.
+    
+    Args:
+        trade_id: The ID from trades.db
+        ticket_id: The ticket ID for the trade
+        
+    Returns:
+        bool: True if successfully removed, False otherwise
+    """
+    try:
+        # Remove the pending trade from active_trades.db
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            DELETE FROM active_trades
+            WHERE trade_id = ? AND status = 'pending'
+        """, (trade_id,))
+        
+        if cursor.rowcount == 0:
+            log(f"No pending trade found in active_trades.db for trade_id {trade_id}")
+            conn.close()
+            return False
+        
+        conn.commit()
+        conn.close()
+        
+        # Log the removed pending trade
+        log(f"❌ PENDING TRADE REMOVED (NO FILL)")
+        log(f"   Trade ID: {trade_id}")
+        log(f"   Ticket ID: {ticket_id}")
+        log(f"   ========================================")
+        
+        # Invalidate cache when trade is removed
+        invalidate_active_trades_cache()
+        
+        # Export updated JSON after removing trade
+        export_active_trades_to_json()
+        
+        # Broadcast active trades change
+        broadcast_active_trades_change()
+        
+        return True
+        
+    except Exception as e:
+        log(f"❌ Error removing pending trade {trade_id}: {e}")
+        return False
+
+def remove_failed_trade(trade_id: int, ticket_id: str) -> bool:
+    """
+    Remove a trade that failed (got error status) from active_trades.db.
+    
+    Args:
+        trade_id: The ID from trades.db
+        ticket_id: The ticket ID for the trade
+        
+    Returns:
+        bool: True if successfully removed, False otherwise
+    """
+    try:
+        # Remove the failed trade from active_trades.db (any status)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            DELETE FROM active_trades
+            WHERE trade_id = ?
+        """, (trade_id,))
+        
+        if cursor.rowcount == 0:
+            log(f"No trade found in active_trades.db for trade_id {trade_id}")
+            conn.close()
+            return False
+        
+        conn.commit()
+        conn.close()
+        
+        # Log the removed failed trade
+        log(f"❌ FAILED TRADE REMOVED (ERROR STATUS)")
+        log(f"   Trade ID: {trade_id}")
+        log(f"   Ticket ID: {ticket_id}")
+        log(f"   ========================================")
+        
+        # Invalidate cache when trade is removed
+        invalidate_active_trades_cache()
+        
+        # Export updated JSON after removing trade
+        export_active_trades_to_json()
+        
+        # Broadcast active trades change
+        broadcast_active_trades_change()
+        
+        return True
+        
+    except Exception as e:
+        log(f"❌ Error removing failed trade {trade_id}: {e}")
         return False
 
 def remove_closed_trade(trade_id: int) -> bool:
@@ -1025,7 +1376,7 @@ def export_active_trades_to_json():
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT * FROM active_trades WHERE status = 'active'
+            SELECT * FROM active_trades WHERE status IN ('active', 'pending', 'closing')
         """)
         
         columns = [desc[0] for desc in cursor.description]
@@ -1055,12 +1406,12 @@ def export_active_trades_to_json():
         log(f"Error exporting active trades to JSON: {e}")
 
 def get_all_active_trades() -> List[Dict[str, Any]]:
-    """Get all currently active trades"""
+    """Get all currently active, pending, and closing trades"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT * FROM active_trades WHERE status = 'active'
+            SELECT * FROM active_trades WHERE status IN ('active', 'pending', 'closing')
         """)
         
         columns = [desc[0] for desc in cursor.description]

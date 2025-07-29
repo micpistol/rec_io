@@ -549,7 +549,8 @@ async function updatePositionIndicator(strikeCell, strike) {
     const trades = await tradesRes.json();
     const activeTrades = trades.filter(trade => 
       trade.status !== "closed" && 
-      trade.status !== "expired"
+      trade.status !== "expired" &&
+      trade.status !== "error"
     );
     
     // Check if any active trade has this strike

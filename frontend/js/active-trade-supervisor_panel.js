@@ -6,6 +6,10 @@
 // Global active trade supervisor state
 window.activeTradeSupervisorRowsMap = new Map();
 
+// Polling interval management
+let activeTradeSupervisorRefreshInterval = null;
+let hasPendingTrades = false;
+
 // Helper function to insert row in correct sorted position
 function insertRowInSortedPosition(tableBody, newRow, newStrike) {
   const allRows = Array.from(tableBody.children);
@@ -242,6 +246,17 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
       // Apply status-based styling
       if (trade.status === 'closing') {
         row.classList.add('closing-trade');
+      } else if (trade.status === 'pending') {
+        // For pending trades, show placeholder values but keep normal styling
+        priceCell.textContent = "Pending";
+        posCell.textContent = "Pending";
+        bufferCell.textContent = "Pending";
+        probCell.textContent = "Pending";
+        // Disable close button for pending trades
+        closeSpan.style.cursor = "not-allowed";
+        closeSpan.onclick = null;
+        innerDiv.textContent = "Pending";
+        row.classList.add('pending-trade'); // Add a class for pending trades
       }
       
       // Add the row to the table in sorted position
@@ -251,6 +266,19 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
       // Update existing row with new data
       const row = rowObj.tr;
       const cells = row.querySelectorAll('td');
+      
+      // Update BUY column (price)
+      if (cells.length > 2 && trade.buy_price !== null && trade.buy_price !== undefined) {
+        const price = parseFloat(trade.buy_price);
+        if (!isNaN(price)) {
+          cells[2].textContent = price.toFixed(2);
+        }
+      }
+      
+      // Update POS column (position)
+      if (cells.length > 3 && trade.position !== null && trade.position !== undefined) {
+        cells[3].textContent = trade.position;
+      }
       
       // Update buffer
       if (cells.length > 4 && trade.buffer_from_entry !== null) {
@@ -274,10 +302,30 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
         cells[5].textContent = trade.current_probability.toFixed(1);
       }
       
-      // Update status-based styling
-      row.classList.remove('closing-trade');
+      // Update status-based styling and CLOSE button
+      row.classList.remove('closing-trade', 'pending-trade');
       if (trade.status === 'closing') {
         row.classList.add('closing-trade');
+      } else if (trade.status === 'pending') {
+        row.classList.add('pending-trade');
+        // For pending trades, show placeholder values
+        cells[2].textContent = "Pending";
+        cells[3].textContent = "Pending";
+        // Disable close button for pending trades
+        const closeSpan = cells[6].querySelector('.price-box');
+        if (closeSpan) {
+          closeSpan.style.cursor = "not-allowed";
+          closeSpan.onclick = null;
+          const innerDiv = closeSpan.querySelector('div');
+          if (innerDiv) innerDiv.textContent = "Pending";
+        }
+      } else {
+        // Active trade - enable close button
+        const closeSpan = cells[6].querySelector('.price-box');
+        if (closeSpan) {
+          closeSpan.style.cursor = "pointer";
+          closeSpan.onclick = () => closeActiveTrade(trade.trade_id, trade.ticket_id);
+        }
       }
       
       // Update PnL on close button
@@ -390,10 +438,35 @@ function startActiveTradeSupervisorRefresh() {
   // Initial load
   fetchAndRenderActiveTradeSupervisorTrades();
   
-  // Set up periodic refresh (every 1 second - unchanged frequency)
+  // Set up periodic refresh with dynamic interval
+  function startRefresh() {
+    // Clear any existing interval
+    if (activeTradeSupervisorRefreshInterval) {
+      clearInterval(activeTradeSupervisorRefreshInterval);
+    }
+    
+    // Set interval based on whether we have pending trades
+    const interval = hasPendingTrades ? 500 : 1000; // 500ms if pending, 1000ms if not
+    activeTradeSupervisorRefreshInterval = setInterval(() => {
+      fetchAndRenderActiveTradeSupervisorTrades();
+    }, interval);
+  }
+  
+  // Start initial refresh
+  startRefresh();
+  
+  // Also check for pending trades and adjust interval accordingly
   setInterval(() => {
-    fetchAndRenderActiveTradeSupervisorTrades();
-  }, 1000);
+    const currentHasPending = window.activeTradeSupervisorRowsMap.size > 0 && 
+      Array.from(window.activeTradeSupervisorRowsMap.values()).some(rowObj => 
+        rowObj.tr.classList.contains('pending-trade')
+      );
+    
+    if (currentHasPending !== hasPendingTrades) {
+      hasPendingTrades = currentHasPending;
+      startRefresh(); // Restart with new interval
+    }
+  }, 2000); // Check every 2 seconds
 }
 
 // === INITIALIZATION ===
