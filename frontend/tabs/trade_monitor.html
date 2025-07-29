@@ -596,24 +596,7 @@
       </div>
 
       <div class="panel-container" style="min-height: 100px;" id="watchlistPanel">
-        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
-          <span>Watchlist</span>
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <img 
-              id="autoEntrySettingsIcon"
-              src="../images/icons/panel_settings.png" 
-              alt="Auto Entry Settings" 
-              title="Auto Entry Settings" 
-              style="width: 14px; height: 14px; opacity: 0.7; transition: opacity 0.2s; cursor: pointer; align-self: center;"
-              onmouseover="this.style.opacity='1'" 
-              onmouseout="this.style.opacity='0.7'"
-            />
-            <label style="font-size: 12px; user-select: none; color: white; display: flex; align-items: center; gap: 6px; margin: 0;">
-              AUTO ENTRY
-              <input type="checkbox" id="autoEntryToggle" />
-            </label>
-          </div>
-        </div>
+        <div class="panel-header">Watchlist</div>
         <div style="display: flex; flex-direction: row; align-items: stretch;">
           <table id="watchlist-table" class="strike-table" style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
             <colgroup>
@@ -684,7 +667,24 @@
         </div>
       </div>
       <div class="panel-container" id="buildTrade" style="min-height: 300px;">
-        <div class="panel-header">Trade Builder</div>
+        <div class="panel-header" style="display: flex; align-items: center; justify-content: space-between;">
+          <span>Trade Builder</span>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <img 
+              id="autoEntrySettingsIcon"
+              src="../images/icons/panel_settings.png" 
+              alt="Auto Entry Settings" 
+              title="Auto Entry Settings" 
+              style="width: 14px; height: 14px; opacity: 0.7; transition: opacity 0.2s; cursor: pointer; align-self: center;"
+              onmouseover="this.style.opacity='1'" 
+              onmouseout="this.style.opacity='0.7'"
+            />
+            <label style="font-size: 12px; user-select: none; color: white; display: flex; align-items: center; gap: 6px; margin: 0;">
+              AUTO ENTRY
+              <input type="checkbox" id="autoEntryToggle" />
+            </label>
+          </div>
+        </div>
         <!-- Trade Strategy and Position Size Row -->
         <div style="display: flex; align-items: flex-start; gap: 20px; margin-bottom: 12px;">
           <!-- Trade Strategy Picker -->
@@ -701,11 +701,11 @@
           <div style="flex: 1;">
             <div style="font-weight: bold; margin-bottom: 6px; font-size: 0.9rem;">Position Size: <span id="position-display" style="margin-left: 10px; updatefont-weight: normal; color: #ccc;">100 contracts</span></div>
             <div id="positionSizeSelector" style="display: flex; align-items: center; gap: 10px;">
-              <input type="number" id="position-size" min="1" style="width: 60px; padding: 6px; text-align: right; font-size: 1rem; border-radius: 4px; border: 1px solid #ccc;" />
+              <input type="number" id="position-size" min="1" style="width: 60px; padding: 4px 6px; text-align: right; font-size: 1rem; border-radius: 4px; border: 1px solid #ccc; height: 28px; box-sizing: border-box;" />
               <div>
-                <button class="multiplier-btn" data-multiplier="1">1x</button>
-                <button class="multiplier-btn" data-multiplier="2">2x</button>
-                <button class="multiplier-btn" data-multiplier="3">3x</button>
+                <button class="multiplier-btn" data-multiplier="1" style="height: 28px; padding: 4px 8px; box-sizing: border-box;">1x</button>
+                <button class="multiplier-btn" data-multiplier="2" style="height: 28px; padding: 4px 8px; box-sizing: border-box;">2x</button>
+                <button class="multiplier-btn" data-multiplier="3" style="height: 28px; padding: 4px 8px; box-sizing: border-box;">3x</button>
               </div>
             </div>
           </div>
