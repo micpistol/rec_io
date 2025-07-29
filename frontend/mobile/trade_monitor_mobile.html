@@ -542,17 +542,15 @@
                             <div class="mobile-toggle" id="autoStopToggle"></div>
                             <span class="toggle-label" style="font-size: 10px;">Auto<br>Stop</span>
                         </div>
-                    </div>
-                    <div style="display: flex; flex-direction: column; align-items: center; gap: 2px; margin-right: 12px;">
-                        <div style="display: flex; align-items: center; gap: 4px;">
+                        <div style="display: flex; align-items: center; gap: 4px; margin-left: 8px;">
                             <input type="number" id="position-size" min="1" style="width: 50px; padding: 3px; text-align: right; font-size: 11px; border-radius: 3px; border: 1px solid #ccc; background-color: #323c4e; color: white;" />
                             <div style="display: flex; gap: 2px;">
                                 <button class="multiplier-btn" data-multiplier="1" style="font-size: 9px; padding: 3px 6px;">1x</button>
                                 <button class="multiplier-btn" data-multiplier="2" style="font-size: 9px; padding: 3px 6px;">2x</button>
                                 <button class="multiplier-btn" data-multiplier="3" style="font-size: 9px; padding: 3px 6px;">3x</button>
                             </div>
+                                                         <div id="position-display" style="font-size: 6px; color: #ccc; margin-left: 4px;"><span style="font-size: 10px;">20</span> contracts</div>
                         </div>
-                        <div id="position-display" style="font-size: 9px; color: #ccc;">20 contracts</div>
                     </div>
                 </div>
                 <div style="display: flex; align-items: center;">
@@ -561,7 +559,7 @@
                         src="../images/icons/panel_settings.png" 
                         alt="Trading Settings" 
                         title="Trading Settings" 
-                        style="width: 14px; height: 14px; opacity: 0.7; transition: opacity 0.2s; cursor: pointer; align-self: center;"
+                        style="width: 20px; height: 20px; opacity: 0.7; transition: opacity 0.2s; cursor: pointer; align-self: center;"
                         onmouseover="this.style.opacity='1'" 
                         onmouseout="this.style.opacity='0.7'"
                     />
@@ -1096,7 +1094,7 @@
                 const activeMultiplier = Array.from(multiplierButtons).find(btn => btn.classList.contains('active'));
                 const multiplier = activeMultiplier ? parseInt(activeMultiplier.dataset.multiplier, 10) : 1;
                 const total = baseValue * multiplier;
-                positionDisplay.textContent = `${total} contracts`;
+                positionDisplay.innerHTML = `<span style="font-size: 10px;">${total}</span> contracts`;
             }
         }
 
@@ -1290,9 +1288,9 @@
             strikeTableBody.innerHTML = '';
             mobileStrikeRowsMap.clear();
             
-            // Build strikes around current price (5 above, 5 below)
+            // Build strikes around current price (4 above, 4 below)
             const strikes = [];
-            for (let i = -5; i <= 5; i++) {
+            for (let i = -4; i <= 4; i++) {
                 strikes.push(basePrice + (i * 250));
             }
             
