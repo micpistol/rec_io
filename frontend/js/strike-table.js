@@ -486,13 +486,21 @@ async function updateStrikeTable() {
       }
     }
 
-    // Position spanner row correctly - insert at 6th position (index 6) for 6 rows above and 8 rows below
+    // Position spanner row correctly
     const allRows = Array.from(strikeTableBody.children).filter(row => !row.classList.contains('spanner-row'));
-    let insertIndex = 8; // Insert at 6th position (after 6 rows, before 8 rows)
+    let insertIndex = allRows.length; // default to end
     
-    // Ensure insertIndex is within bounds
-    if (insertIndex > allRows.length) {
-      insertIndex = allRows.length;
+    for (let i = 0; i < allRows.length; i++) {
+      const row = allRows[i];
+      const strikeCell = row.querySelector('td');
+      if (strikeCell && strikeCell.textContent) {
+        const strikeText = strikeCell.textContent.replace(/[\$,]/g, '');
+        const strike = parseFloat(strikeText);
+        if (!isNaN(strike) && currentPrice < strike) {
+          insertIndex = i;
+          break;
+        }
+      }
     }
 
     // Remove spanner row from current position and insert at correct position
