@@ -476,7 +476,6 @@
   }
   #recentTradesTable tbody tr:hover {
     background-color: #4d586f !important;
-    cursor: pointer;
   }
   #recentTradesTable tbody td {
     padding: 4px 6px;
@@ -498,7 +497,6 @@
   }
   #openPositionsTable tbody tr:hover {
     background-color: #4d586f !important;
-    cursor: pointer;
   }
   #openPositionsTable tbody td {
     padding: 4px 6px;
@@ -520,7 +518,6 @@
   }
   #settlementsTable tbody tr:hover {
     background-color: #4d586f !important;
-    cursor: pointer;
   }
   #settlementsTable tbody td {
     padding: 4px 6px;
@@ -1374,13 +1371,74 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="panel-container" style="min-height: 100px;" id="profileDataPanel">
       <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
         <div style="display: flex; gap: 20px;">
-          <span id="open-positions-tab" class="panel-tab active" style="cursor: pointer; opacity: 1; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="if(!this.classList.contains('active')) this.style.opacity='0.3'">Open Positions</span>
+          <span id="trade-history-tab" class="panel-tab active" style="cursor: pointer; opacity: 1; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="if(!this.classList.contains('active')) this.style.opacity='0.3'">Trade History</span>
+          <span id="open-positions-tab" class="panel-tab" style="cursor: pointer; opacity: 0.3; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="if(!this.classList.contains('active')) this.style.opacity='0.3'">Open Positions</span>
           <span id="recent-fills-tab" class="panel-tab" style="cursor: pointer; opacity: 0.3; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="if(!this.classList.contains('active')) this.style.opacity='0.3'">Recent Fills</span>
           <span id="settlements-tab" class="panel-tab" style="cursor: pointer; opacity: 0.3; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="if(!this.classList.contains('active')) this.style.opacity='0.3'">Settlements</span>
         </div>
       </div>
+      <div id="trade-history-content" class="tab-content active">
+        <div style="height: 194px; overflow-y: auto;">
+          <table id="tradeHistoryTable" class="panel-table" style="width: 100%; border-collapse: collapse; font-size: 0.7rem;">
+            <style>
+              #tradeHistoryTable thead th {
+                font-size: 13px;
+                font-weight: bold;
+                background-color: #222c3c;
+                padding: 4px 6px;
+                border-top: none;
+                border-left: none;
+                border-right: none;
+                border-bottom: 1px solid #222c3c;
+                text-align: center;
+              }
+              #tradeHistoryTable tbody tr:hover {
+                background-color: #4d586f !important;
+              }
+              #tradeHistoryTable tbody td {
+                padding: 4px 6px;
+                text-align: center;
+                font-size: 12px;
+              }
+              #tradeHistoryTable .group-odd {
+                background-color: #394559;
+              }
+              #tradeHistoryTable .group-even {
+                background-color: #1f2633;
+              }
+            </style>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Symbol</th>
+                <th>Strategy</th>
+                <th>Contract</th>
+                <th>Strike</th>
+                <th>Side</th>
+                <th>Prob</th>
+                <th>Diff</th>
+                <th>Buy</th>
+                <th>Sell</th>
+                <th>Position</th>
+                <th>Fees</th>
+                <th>PnL</th>
+                <th>Closed</th>
+                <th>Symbol Open</th>
+                <th>Symbol Close</th>
+                <th>Mom</th>
+                <th>W/L</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
       <div id="recent-fills-content" class="tab-content" style="display: none;">
-        <div style="height: 200px; overflow-y: auto;">
+        <div style="height: 194px; overflow-y: auto;">
           <table id="recentTradesTable" class="panel-table" style="width: 100%; border-collapse: collapse;">
             <thead>
               <tr>
@@ -1398,7 +1456,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
       <div id="settlements-content" class="tab-content" style="display: none;">
-        <div style="height: 200px; overflow-y: auto;">
+        <div style="height: 194px; overflow-y: auto;">
           <table id="settlementsTable" class="panel-table" style="width: 100%; border-collapse: collapse;">
             <thead>
               <tr>
@@ -1415,7 +1473,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
 
-      <div id="open-positions-content" class="tab-content active">
+      <div id="open-positions-content" class="tab-content" style="display: none;">
         <table id="openPositionsTable" class="panel-table" style="width: 100%; border-collapse: collapse;">
           <thead>
             <tr>
@@ -2165,6 +2223,109 @@ async function fetchAndRenderRecentTrades() {
   }
 }
 
+// === Trade History Data Fetching and Rendering ===
+async function fetchAndRenderTradeHistory() {
+  try {
+    const res = await fetch('/trades', { cache: 'no-store' });
+    if (!res.ok) throw new Error("Failed to fetch trade history");
+    const trades = await res.json();
+    
+    const tradeHistoryTableBody = document.querySelector('#tradeHistoryTable tbody');
+    if (!tradeHistoryTableBody) return;
+    tradeHistoryTableBody.innerHTML = '';
+    
+    if (trades.length === 0) {
+      const noTradesRow = document.createElement('tr');
+      noTradesRow.innerHTML = '<td colspan="21" style="text-align: center; color: #ccc; padding: 20px;">No Trades</td>';
+      tradeHistoryTableBody.appendChild(noTradesRow);
+      return;
+    }
+    
+    // Sort trades by date (newest first)
+    const sortedTrades = trades.sort((a, b) => new Date(b.date + ' ' + b.time) - new Date(a.date + ' ' + a.time));
+    
+    // Limit to most recent 50 trades for performance
+    const recentTrades = sortedTrades.slice(0, 50);
+    
+    // Group by contract with color coding
+    let lastContract = null;
+    let groupIndex = 0;
+    
+    recentTrades.forEach(trade => {
+      const tr = document.createElement('tr');
+      
+      // Check if this is a new contract group
+      const isNewGroup = trade.contract !== lastContract;
+      if (isNewGroup) {
+        groupIndex++;
+      }
+      lastContract = trade.contract;
+      
+      // Assign group class based on contract grouping
+      tr.classList.add(groupIndex % 2 === 1 ? 'group-odd' : 'group-even');
+      
+      // Helper to format numbers with + sign for positive values
+      function plusSign(val) {
+        if (val === null || val === undefined || val === '') return '';
+        const num = Number(val);
+        if (isNaN(num)) return val;
+        return (num > 0 ? '+' : '') + Math.round(num);
+      }
+      
+      // Format PnL
+      const pnl = trade.pnl !== null && trade.pnl !== undefined ? Number(trade.pnl).toFixed(2) : '';
+      
+      // Format win/loss
+      const winLoss = trade.win_loss || '';
+      
+      // Format momentum
+      const momentum = trade.momentum !== null && trade.momentum !== undefined ? Number(trade.momentum).toFixed(2) : '';
+      
+      // Format symbol prices
+      const symbolOpen = trade.symbol_open !== null && trade.symbol_open !== undefined ? Number(trade.symbol_open).toFixed(2) : '';
+      const symbolClose = trade.symbol_close !== null && trade.symbol_close !== undefined ? Number(trade.symbol_close).toFixed(2) : '';
+      
+      // Format buy/sell prices
+      const buyPrice = trade.buy_price !== null && trade.buy_price !== undefined ? Number(trade.buy_price).toFixed(2) : '';
+      const sellPrice = trade.sell_price !== null && trade.sell_price !== undefined ? Number(trade.sell_price).toFixed(2) : '';
+      
+      // Format probability
+      const prob = trade.prob !== null && trade.prob !== undefined ? Number(trade.prob).toFixed(1) : '';
+      
+      tr.innerHTML = `
+        <td>${trade.id || ''}</td>
+        <td>${trade.status || ''}</td>
+        <td>${trade.date || ''}</td>
+        <td>${trade.time || ''}</td>
+        <td>${trade.symbol || ''}</td>
+        <td>${trade.trade_strategy || ''}</td>
+        <td>${trade.contract || ''}</td>
+        <td>${trade.strike || ''}</td>
+        <td>${trade.side || ''}</td>
+        <td>${prob}</td>
+        <td>${plusSign(trade.diff)}</td>
+        <td>${buyPrice}</td>
+        <td>${sellPrice}</td>
+        <td>${trade.position || ''}</td>
+        <td>${trade.fees || ''}</td>
+        <td>${pnl}</td>
+        <td>${trade.closed_at || ''}</td>
+        <td>${symbolOpen}</td>
+        <td>${symbolClose}</td>
+        <td>${plusSign(momentum)}</td>
+        <td>${plusSign(winLoss)}</td>
+      `;
+      tradeHistoryTableBody.appendChild(tr);
+    });
+  } catch (err) {
+    console.error('Error fetching trade history:', err);
+    const tradeHistoryTableBody = document.querySelector('#tradeHistoryTable tbody');
+    if (tradeHistoryTableBody) {
+      tradeHistoryTableBody.innerHTML = '<tr><td colspan="21" style="text-align: center; color: red; padding: 20px;">Error loading trade history</td></tr>';
+    }
+  }
+}
+
 // === New function: Close all expired trades (set status to closed and closed_at to current time in NY) ===
 async function closeExpiredTrades() {
   try {
@@ -2217,8 +2378,10 @@ async function closeExpiredTrades() {
 
 // === Tab Switching Functionality ===
 function initializeTabSwitching() {
+  const tradeHistoryTab = document.getElementById('trade-history-tab');
   const recentFillsTab = document.getElementById('recent-fills-tab');
   const openPositionsTab = document.getElementById('open-positions-tab');
+  const tradeHistoryContent = document.getElementById('trade-history-content');
   const recentFillsContent = document.getElementById('recent-fills-content');
   const openPositionsContent = document.getElementById('open-positions-content');
 
@@ -2236,9 +2399,37 @@ function initializeTabSwitching() {
     inactiveContent.style.display = 'none';
   }
 
+  // Trade History tab click handler
+  tradeHistoryTab.addEventListener('click', () => {
+    // Hide all tabs and show only trade history
+    recentFillsTab.classList.remove('active');
+    recentFillsTab.style.opacity = '0.3';
+    openPositionsTab.classList.remove('active');
+    openPositionsTab.style.opacity = '0.3';
+    settlementsTab.classList.remove('active');
+    settlementsTab.style.opacity = '0.3';
+    tradeHistoryTab.classList.add('active');
+    tradeHistoryTab.style.opacity = '1';
+    
+    // Hide all content and show only trade history
+    recentFillsContent.classList.remove('active');
+    recentFillsContent.style.display = 'none';
+    openPositionsContent.classList.remove('active');
+    openPositionsContent.style.display = 'none';
+    settlementsContent.classList.remove('active');
+    settlementsContent.style.display = 'none';
+    tradeHistoryContent.classList.add('active');
+    tradeHistoryContent.style.display = 'block';
+    
+    // Refresh trade history data
+    fetchAndRenderTradeHistory();
+  });
+
   // Recent Fills tab click handler
   recentFillsTab.addEventListener('click', () => {
     // Hide all tabs and show only recent fills
+    tradeHistoryTab.classList.remove('active');
+    tradeHistoryTab.style.opacity = '0.3';
     openPositionsTab.classList.remove('active');
     openPositionsTab.style.opacity = '0.3';
     settlementsTab.classList.remove('active');
@@ -2247,6 +2438,8 @@ function initializeTabSwitching() {
     recentFillsTab.style.opacity = '1';
     
     // Hide all content and show only recent fills
+    tradeHistoryContent.classList.remove('active');
+    tradeHistoryContent.style.display = 'none';
     openPositionsContent.classList.remove('active');
     openPositionsContent.style.display = 'none';
     settlementsContent.classList.remove('active');
@@ -2261,6 +2454,8 @@ function initializeTabSwitching() {
   // Open Positions tab click handler
   openPositionsTab.addEventListener('click', () => {
     // Hide all tabs and show only positions
+    tradeHistoryTab.classList.remove('active');
+    tradeHistoryTab.style.opacity = '0.3';
     recentFillsTab.classList.remove('active');
     recentFillsTab.style.opacity = '0.3';
     settlementsTab.classList.remove('active');
@@ -2269,6 +2464,8 @@ function initializeTabSwitching() {
     openPositionsTab.style.opacity = '1';
     
     // Hide all content and show only positions
+    tradeHistoryContent.classList.remove('active');
+    tradeHistoryContent.style.display = 'none';
     recentFillsContent.classList.remove('active');
     recentFillsContent.style.display = 'none';
     settlementsContent.classList.remove('active');
@@ -2286,14 +2483,18 @@ function initializeTabSwitching() {
   
   settlementsTab.addEventListener('click', () => {
     // Hide all tabs and show only settlements
+    tradeHistoryTab.classList.remove('active');
+    tradeHistoryTab.style.opacity = '0.3';
     recentFillsTab.classList.remove('active');
-    recentFillsTab.style.opacity = '0.5';
+    recentFillsTab.style.opacity = '0.3';
     openPositionsTab.classList.remove('active');
-    openPositionsTab.style.opacity = '0.5';
+    openPositionsTab.style.opacity = '0.3';
     settlementsTab.classList.add('active');
     settlementsTab.style.opacity = '1';
     
     // Hide all content and show only settlements
+    tradeHistoryContent.classList.remove('active');
+    tradeHistoryContent.style.display = 'none';
     recentFillsContent.classList.remove('active');
     recentFillsContent.style.display = 'none';
     openPositionsContent.classList.remove('active');
@@ -2430,8 +2631,9 @@ async function fetchAndRenderOpenPositions() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  fetchAndRenderTradeHistory(); // Load trade history data since it's now the default tab
   fetchAndRenderRecentTrades();
-  fetchAndRenderPositions(); // Load positions data since it's the default tab
+  fetchAndRenderPositions();
   initializeTabSwitching();
   
   // Set up WebSocket connection for database change notifications
@@ -2461,6 +2663,9 @@ function setupDatabaseChangeListener() {
       } else if (data.database === 'settlements') {
         console.log('🔄 Refreshing settlements table due to database change');
         fetchAndRenderSettlements();
+      } else if (data.database === 'trades') {
+        console.log('🔄 Refreshing trade history table due to database change');
+        fetchAndRenderTradeHistory();
       }
     } catch (error) {
       console.error('❌ Error parsing database change notification:', error);
