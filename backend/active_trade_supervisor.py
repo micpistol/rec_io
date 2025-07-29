@@ -562,7 +562,7 @@ def get_current_btc_price() -> Optional[float]:
             # Only log BTC price every 30 seconds to reduce noise
             current_time = time.time()
             if not hasattr(get_current_btc_price, 'last_log_time') or current_time - get_current_btc_price.last_log_time > 30:
-                log(f"📊 BTC PRICE: Current BTC price: ${btc_price:,.2f}")
+                # Only log BTC price occasionally to reduce noise
                 get_current_btc_price.last_log_time = current_time
             return btc_price
         else:
@@ -622,7 +622,7 @@ def get_current_closing_price_for_trade(trade_ticker: str, trade_side: str) -> O
                 if closing_price_cents is not None:
                     # Convert from cents to decimal (e.g., 94 -> 0.94)
                     closing_price_decimal = closing_price_cents / 100.0
-                    log(f"📊 CLOSING PRICE: Found closing price for {trade_ticker} ({trade_side}): {closing_price_cents} cents = {closing_price_decimal}")
+                    # Only log closing price data occasionally to reduce noise
                     return closing_price_decimal
                 else:
                     log(f"⚠️ No closing price found for {trade_ticker} ({trade_side})")
@@ -786,8 +786,8 @@ def update_active_trade_monitoring_data():
                 """, (current_btc_price, current_probability, buffer_from_strike, time_since_entry, current_market_price, pnl_formatted, active_id))
                 conn.commit()
                 conn.close()
-                # Only log significant updates (every 10 seconds) to reduce noise
-                if time_since_entry % 10 == 0:
+                # Only log significant updates (every 60 seconds) to reduce noise
+                if time_since_entry % 60 == 0:
                     log(f"📊 MONITORING: Updated trade {trade_id} - symbol_price: {current_btc_price}, market_price: {current_market_price}, buffer: {buffer_from_strike}, prob: {current_probability}, pnl: {pnl_formatted}")
                 
             except Exception as e:
@@ -831,6 +831,12 @@ def start_monitoring_loop():
             
             # Export JSON after each update
             export_active_trades_to_json()
+            
+            # Log monitoring status every 60 seconds
+            current_time = time.time()
+            if not hasattr(monitoring_worker, 'last_status_log') or current_time - monitoring_worker.last_status_log > 60:
+                log(f"📊 MONITORING: Checking {len(active_trades)} active trades")
+                monitoring_worker.last_status_log = current_time
             
             # === AUTO STOP LOGIC ===
             if is_auto_stop_enabled():
@@ -917,7 +923,7 @@ def export_active_trades_to_json():
         # Only log JSON export every 30 seconds to reduce noise
         current_time = time.time()
         if not hasattr(export_active_trades_to_json, 'last_log_time') or current_time - export_active_trades_to_json.last_log_time > 30:
-            log(f"📄 JSON EXPORT: Exported {len(active_trades)} active trades to active_trades.json")
+            # Only log JSON export occasionally to reduce noise
             export_active_trades_to_json.last_log_time = current_time
         
     except Exception as e:
