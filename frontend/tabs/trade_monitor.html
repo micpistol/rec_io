@@ -1500,39 +1500,10 @@ document.addEventListener('DOMContentLoaded', () => {
       renderMomentumBarChart(deltas);
       drawRollingMomentumChart();
       
-      // Update fingerprint display
-      updateFingerprintDisplay();
+      // Fingerprint now updated from consolidated strike table data - no separate API call needed
     }
     
-    // Function to update the fingerprint display
-    // CACHE-BUSTING: Updated fingerprint display logic - 2025-07-19
-    async function updateFingerprintDisplay() {
-      const fingerprintEl = document.getElementById('fingerprint-display');
-      if (!fingerprintEl) return;
-      try {
-        // Try new live probabilities endpoint first
-        const response = await fetch('/api/live_probabilities');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.fingerprint_csv) {
-            fingerprintEl.textContent = `Fingerprint: ${data.fingerprint_csv}`;
-            return;
-          }
-        }
-        // Fallback to old endpoint if not present
-        const fallback = await fetch('/api/current_fingerprint');
-        if (fallback.ok) {
-          const data = await fallback.json();
-          if (data.fingerprint) {
-            fingerprintEl.textContent = `Fingerprint: ${data.fingerprint}`;
-            return;
-          }
-        }
-        fingerprintEl.textContent = "Fingerprint: —";
-      } catch (error) {
-        fingerprintEl.textContent = "Fingerprint: —";
-      }
-    }
+    // Fingerprint display now handled by consolidated strike table data in strike-table.js
 
     // Chart.js-based momentum bar chart (flicker-free: update data in place)
     let momentumBarChart = null;

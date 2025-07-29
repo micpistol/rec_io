@@ -776,10 +776,23 @@ class UnifiedProductionCoordinator:
                 data = calculate_strike_data(strike, btc_price, probabilities, market_data)
                 strike_data.append(data)
             
-            # Get fingerprint info from probability calculator
-            from util.probability_calculator import get_probability_calculator
-            calculator = get_probability_calculator()
-            fingerprint_filename = f"btc_fingerprint_directional_momentum_{calculator.current_momentum_bucket:03d}.csv" if calculator.current_momentum_bucket is not None else "unknown"
+            # Get fingerprint info from the live probabilities file (which is written correctly by the probability calculator)
+            fingerprint_filename = "unknown"
+            try:
+                from util.paths import get_data_dir
+                import os
+                live_probabilities_path = os.path.join(get_data_dir(), "live_probabilities", "btc_live_probabilities.json")
+                if os.path.exists(live_probabilities_path):
+                    live_prob_data = safe_read_json(live_probabilities_path)
+                    if live_prob_data and "fingerprint_csv" in live_prob_data:
+                        fingerprint_filename = live_prob_data["fingerprint_csv"]
+                        print(f"✅ Read fingerprint from live probabilities: {fingerprint_filename}")
+                    else:
+                        print(f"⚠️ No fingerprint_csv found in live probabilities file")
+                else:
+                    print(f"⚠️ Live probabilities file not found: {live_probabilities_path}")
+            except Exception as e:
+                print(f"⚠️ Error reading fingerprint from live probabilities: {e}")
             
             # Get momentum data
             momentum_data = self.analyzer.get_momentum_analysis()

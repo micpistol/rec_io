@@ -1269,64 +1269,7 @@
                 }
             }, 1000); // Poll every second (same as main trade monitor)
 
-            // Poll for BTC price changes (same as main trade monitor)
-            setInterval(async () => {
-                try {
-                    const res = await fetch('/btc_price_changes');
-                    if (res.ok) {
-                        const data = await res.json();
-                        
-                        // Update price change displays
-                        if ('change1h' in data) {
-                            const el = document.getElementById('change-1h');
-                            if (el) {
-                                const num = parseFloat(data.change1h);
-                                if (!isNaN(num)) {
-                                    const triangle = num >= 0 ? " ▲" : " ▼";
-                                    el.textContent = `${Math.abs(num).toFixed(2)}%${triangle}`;
-                                    el.style.color = "#fff";
-                                    el.style.backgroundColor = num >= 0 ? "#28a745" : "#dc3545";
-                                    el.style.padding = "2px 6px";
-                                    el.style.borderRadius = "4px";
-                                    el.style.display = "inline-block";
-                                }
-                            }
-                        }
-                        if ('change3h' in data) {
-                            const el = document.getElementById('change-3h');
-                            if (el) {
-                                const num = parseFloat(data.change3h);
-                                if (!isNaN(num)) {
-                                    const triangle = num >= 0 ? " ▲" : " ▼";
-                                    el.textContent = `${Math.abs(num).toFixed(2)}%${triangle}`;
-                                    el.style.color = "#fff";
-                                    el.style.backgroundColor = num >= 0 ? "#28a745" : "#dc3545";
-                                    el.style.padding = "2px 6px";
-                                    el.style.borderRadius = "4px";
-                                    el.style.display = "inline-block";
-                                }
-                            }
-                        }
-                        if ('change1d' in data) {
-                            const el = document.getElementById('change-1d');
-                            if (el) {
-                                const num = parseFloat(data.change1d);
-                                if (!isNaN(num)) {
-                                    const triangle = num >= 0 ? " ▲" : " ▼";
-                                    el.textContent = `${Math.abs(num).toFixed(2)}%${triangle}`;
-                                    el.style.color = "#fff";
-                                    el.style.backgroundColor = num >= 0 ? "#28a745" : "#dc3545";
-                                    el.style.padding = "2px 6px";
-                                    el.style.borderRadius = "4px";
-                                    el.style.display = "inline-block";
-                                }
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error fetching BTC price changes:', error);
-                }
-            }, 60000); // Poll every minute (same as main trade monitor)
+            // Mobile monitor doesn't have price change display elements - no polling needed
 
             // Toggle states are now handled by WebSocket - no polling needed
 
@@ -1805,16 +1748,18 @@
             // Get current BTC price
             const symbol_open = typeof getCurrentBTCTickerPrice === 'function' ? getCurrentBTCTickerPrice() : null;
             
-            // Get momentum from API
+            // Get momentum from consolidated strike table data
             let momentum = null;
             try {
-                const momentumResponse = await fetch('/api/momentum');
-                if (momentumResponse.ok) {
-                    const momentumData = await momentumResponse.json();
-                    momentum = momentumData.momentum_score;
+                const strikeResponse = await fetch('/api/strike_tables/btc');
+                if (strikeResponse.ok) {
+                    const strikeData = await strikeResponse.json();
+                    if (strikeData.momentum && strikeData.momentum.weighted_score !== undefined) {
+                        momentum = strikeData.momentum.weighted_score;
+                    }
                 }
             } catch (error) {
-                console.error('Failed to fetch momentum from API:', error);
+                console.error('Failed to fetch momentum from strike table:', error);
             }
             
             // Get probability from the strike table
