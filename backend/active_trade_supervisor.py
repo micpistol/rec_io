@@ -47,6 +47,11 @@ CORS(app)  # Enable CORS for all routes
 monitoring_thread = None
 monitoring_thread_lock = threading.Lock()
 
+# Cache for active trades data to reduce frontend load
+active_trades_cache = None
+active_trades_cache_time = 0
+CACHE_DURATION = 2  # Cache for 2 seconds
+
 # Health check endpoint
 @app.route("/health")
 def health_check():
@@ -62,14 +67,54 @@ def health_check():
 # Active trades data endpoint
 @app.route("/api/active_trades")
 def get_active_trades():
-    """Get all active trades for frontend display"""
+    """Get all active trades for frontend display with caching to prevent backend interference"""
+    global active_trades_cache, active_trades_cache_time
+    
     try:
+        current_time = time.time()
+        
+        # Check if auto-stop is enabled to determine caching behavior
+        auto_stop_enabled = is_auto_stop_enabled()
+        
+        # If auto-stop is disabled, always return fresh data (no caching)
+        if not auto_stop_enabled:
+            active_trades = get_all_active_trades()
+            return jsonify({
+                "status": "success",
+                "timestamp": datetime.now().isoformat(),
+                "active_trades": active_trades,
+                "count": len(active_trades),
+                "cached": False,
+                "auto_stop_enabled": False
+            })
+        
+        # Auto-stop is enabled - use caching to protect critical functionality
+        # Return cached data if it's still fresh
+        if (active_trades_cache is not None and 
+            current_time - active_trades_cache_time < CACHE_DURATION):
+            return jsonify({
+                "status": "success",
+                "timestamp": datetime.now().isoformat(),
+                "active_trades": active_trades_cache,
+                "count": len(active_trades_cache),
+                "cached": True,
+                "auto_stop_enabled": True
+            })
+        
+        # Fetch fresh data from database
         active_trades = get_all_active_trades()
+        
+        # Update cache
+        active_trades_cache = active_trades
+        active_trades_cache_time = current_time
+        
         return jsonify({
             "status": "success",
             "timestamp": datetime.now().isoformat(),
             "active_trades": active_trades,
-            "count": len(active_trades)
+            "count": len(active_trades),
+            "cached": False,
+            "auto_stop_enabled": True
         })
     except Exception as e:
         log(f"❌ Error serving active trades: {e}")
@@ -426,6 +471,9 @@ def add_new_active_trade(trade_id: int, ticket_id: str) -> bool:
         log(f"   Symbol: {symbol}")
         log(f"   ========================================")
         
+        # Invalidate cache when new trade is added
+        invalidate_active_trades_cache()
+        
         # Export updated JSON after adding new trade
         export_active_trades_to_json()
         
@@ -480,6 +528,9 @@ def remove_closed_trade(trade_id: int) -> bool:
             log(f"   Trade ID: {trade_id}")
             log(f"   ========================================")
             
+            # Invalidate cache when trade is removed
+            invalidate_active_trades_cache()
+            
             # Export updated JSON after removing trade
             export_active_trades_to_json()
             
@@ -526,6 +577,9 @@ def update_trade_status_to_closing(trade_id: int) -> bool:
             log(f"🔄 TRADE STATUS UPDATED TO CLOSING IN ACTIVE_TRADES.DB")
             log(f"   Trade ID: {trade_id}")
             log(f"   ========================================")
+            
+            # Invalidate cache when trade status changes
+            invalidate_active_trades_cache()
             
             # Export updated JSON after updating trade
             export_active_trades_to_json()
@@ -786,6 +840,10 @@ def update_active_trade_monitoring_data():
                 """, (current_btc_price, current_probability, buffer_from_strike, time_since_entry, current_market_price, pnl_formatted, active_id))
                 conn.commit()
                 conn.close()
+                
+                # Invalidate cache when trade data is updated
+                invalidate_active_trades_cache()
+                
                 # Only log significant updates (every 60 seconds) to reduce noise
                 if time_since_entry % 60 == 0:
                     log(f"📊 MONITORING: Updated trade {trade_id} - symbol_price: {current_btc_price}, market_price: {current_market_price}, buffer: {buffer_from_strike}, prob: {current_probability}, pnl: {pnl_formatted}")
@@ -813,65 +871,95 @@ def start_monitoring_loop():
         global monitoring_thread
         log("📊 MONITORING: Starting monitoring loop for active trades")
         auto_stop_triggered_trades = set()
-        while True:
-            # Check if there are still active trades
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM active_trades WHERE status = 'active'")
-            columns = [desc[0] for desc in cursor.description]
-            active_trades = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            conn.close()
+        
+        try:
+            while True:
+                # Check if there are still active trades
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM active_trades WHERE status = 'active'")
+                columns = [desc[0] for desc in cursor.description]
+                active_trades = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                conn.close()
+                
+                if not active_trades:
+                    log("📊 MONITORING: No more active trades, stopping monitoring loop")
+                    break
+                
+                # Update monitoring data
+                update_active_trade_monitoring_data()
+                
+                # Export JSON after each update
+                export_active_trades_to_json()
+                
+                # Log monitoring status every 60 seconds
+                current_time = time.time()
+                if not hasattr(monitoring_worker, 'last_status_log') or current_time - monitoring_worker.last_status_log > 60:
+                    log(f"📊 MONITORING: Checking {len(active_trades)} active trades")
+                    monitoring_worker.last_status_log = current_time
+                
+                # === AUTO STOP LOGIC ===
+                if is_auto_stop_enabled():
+                    threshold = get_auto_stop_threshold()
+                    min_ttc_seconds = get_min_ttc_seconds()
+                    for trade in active_trades:
+                        prob = trade.get('current_probability')
+                        trade_id = trade.get('trade_id')
+                        ttc_seconds = trade.get('time_since_entry')
+                        
+                        # Only trigger if not already closing/closed and not already triggered
+                        if (
+                            prob is not None and
+                            isinstance(prob, (int, float)) and
+                            prob < threshold and
+                            trade.get('status') == 'active' and
+                            trade_id not in auto_stop_triggered_trades and
+                            ttc_seconds is not None and
+                            ttc_seconds >= min_ttc_seconds # Respect min_ttc_seconds setting
+                        ):
+                            log(f"[AUTO STOP] Triggering auto stop for trade {trade_id} (prob={prob}, ttc={ttc_seconds}s, min_ttc={min_ttc_seconds}s)")
+                            trigger_auto_stop_close(trade)
+                            auto_stop_triggered_trades.add(trade_id)
+                        elif (
+                            prob is not None and
+                            isinstance(prob, (int, float)) and
+                            prob < threshold and
+                            trade.get('status') == 'active' and
+                            trade_id not in auto_stop_triggered_trades and
+                            (ttc_seconds is None or ttc_seconds < min_ttc_seconds)
+                        ):
+                            log(f"[AUTO STOP] Skipping auto stop for trade {trade_id} - TTC ({ttc_seconds}s) below minimum ({min_ttc_seconds}s)")
+                
+                # Sleep for 1 second
+                time.sleep(1)
+        
+        except Exception as e:
+            log(f"🚨 CRITICAL: Monitoring loop crashed with error: {e}")
             
-            if not active_trades:
-                log("📊 MONITORING: No more active trades, stopping monitoring loop")
-                break
-            
-            # Update monitoring data
-            update_active_trade_monitoring_data()
-            
-            # Export JSON after each update
-            export_active_trades_to_json()
-            
-            # Log monitoring status every 60 seconds
-            current_time = time.time()
-            if not hasattr(monitoring_worker, 'last_status_log') or current_time - monitoring_worker.last_status_log > 60:
-                log(f"📊 MONITORING: Checking {len(active_trades)} active trades")
-                monitoring_worker.last_status_log = current_time
-            
-            # === AUTO STOP LOGIC ===
-            if is_auto_stop_enabled():
-                threshold = get_auto_stop_threshold()
-                min_ttc_seconds = get_min_ttc_seconds()
-                for trade in active_trades:
-                    prob = trade.get('current_probability')
-                    trade_id = trade.get('trade_id')
-                    ttc_seconds = trade.get('time_since_entry')
+            # Check if there are still active trades that need monitoring
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
+                active_count = cursor.fetchone()[0]
+                conn.close()
+                
+                if active_count > 0:
+                    log(f"🚨 CRITICAL: Monitoring loop crashed but {active_count} active trades still need monitoring!")
+                    log("🔄 AUTO-RESTART: Attempting to restart monitoring loop in 5 seconds...")
                     
-                    # Only trigger if not already closing/closed and not already triggered
-                    if (
-                        prob is not None and
-                        isinstance(prob, (int, float)) and
-                        prob < threshold and
-                        trade.get('status') == 'active' and
-                        trade_id not in auto_stop_triggered_trades and
-                        ttc_seconds is not None and
-                        ttc_seconds >= min_ttc_seconds # Respect min_ttc_seconds setting
-                    ):
-                        log(f"[AUTO STOP] Triggering auto stop for trade {trade_id} (prob={prob}, ttc={ttc_seconds}s, min_ttc={min_ttc_seconds}s)")
-                        trigger_auto_stop_close(trade)
-                        auto_stop_triggered_trades.add(trade_id)
-                    elif (
-                        prob is not None and
-                        isinstance(prob, (int, float)) and
-                        prob < threshold and
-                        trade.get('status') == 'active' and
-                        trade_id not in auto_stop_triggered_trades and
-                        (ttc_seconds is None or ttc_seconds < min_ttc_seconds)
-                    ):
-                        log(f"[AUTO STOP] Skipping auto stop for trade {trade_id} - TTC ({ttc_seconds}s) below minimum ({min_ttc_seconds}s)")
-            
-            # Sleep for 1 second
-            time.sleep(1)
+                    # Clear the thread reference so we can restart
+                    with monitoring_thread_lock:
+                        monitoring_thread = None
+                    
+                    # Wait 5 seconds then restart
+                    time.sleep(5)
+                    start_monitoring_loop()
+                    return
+                else:
+                    log("📊 MONITORING: No active trades, monitoring loop can safely stop")
+            except Exception as restart_error:
+                log(f"🚨 CRITICAL: Failed to check for active trades during restart: {restart_error}")
         
         # Export final JSON after monitoring stops
         export_active_trades_to_json()
@@ -893,6 +981,12 @@ def update_monitoring_on_demand():
     """
     update_active_trade_monitoring_data()
     export_active_trades_to_json()
+
+def invalidate_active_trades_cache():
+    """Invalidate the active trades cache to force fresh data on next request"""
+    global active_trades_cache, active_trades_cache_time
+    active_trades_cache = None
+    active_trades_cache_time = 0
 
 def export_active_trades_to_json():
     """Export active trades to JSON for easy access by other scripts"""
