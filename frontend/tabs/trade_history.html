@@ -577,28 +577,6 @@
       }
     }
 
-    // Hook up the filter to the dropdown
-    const dateFilterPicker = document.getElementById('date-filter-picker');
-    if (dateFilterPicker) {
-      dateFilterPicker.addEventListener('change', applyFilters);
-    }
-
-
-
-    // Update day names in dropdown based on current date (no longer needed, so comment out)
-    // function updateDayNames() {
-    //   const dayOptions = document.querySelectorAll('#date-filter-picker option[value^="DAY-"]');
-    //   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      
-    //   dayOptions.forEach((option, index) => {
-    //     const daysAgo = index + 1;
-    //     const date = new Date();
-    //     date.setDate(date.getDate() - daysAgo);
-    //     const dayName = dayNames[date.getDay()];
-    //     option.textContent = `- ${dayName}`;
-    //   });
-    // }
-    
     // Update date range display
     async function updateDateRangeDisplay() {
       const filterPicker = document.getElementById('date-filter-picker');
@@ -791,18 +769,50 @@
 
     // On initial load, show filtered trades
     window.addEventListener('DOMContentLoaded', async () => {
+      // Load preferences and apply to UI
+      fetch(window.location.origin + '/api/get_trade_history_preferences')
+        .then(res => res.json())
+        .then(data => {
+          // Apply date filter
+          const dateFilterPicker = document.getElementById('date-filter-picker');
+          if (dateFilterPicker && data.date_filter) {
+            dateFilterPicker.value = data.date_filter;
+          }
+          
+          // Apply win/loss filters
+          const filterWin = document.getElementById('filter-win');
+          const filterLoss = document.getElementById('filter-loss');
+          if (filterWin && data.win_filter !== undefined) {
+            filterWin.checked = data.win_filter;
+          }
+          if (filterLoss && data.loss_filter !== undefined) {
+            filterLoss.checked = data.loss_filter;
+          }
+          
+          // Apply sort settings
+          if (data.sort_key) {
+            currentSort.key = data.sort_key;
+            currentSort.asc = data.sort_asc !== undefined ? data.sort_asc : true;
+          }
+          
+          // Update date range display
+          updateDateRangeDisplay();
+        })
+        .catch(error => {
+          console.error('Error loading preferences:', error);
+        });
+
       // updateDayNames(); // Update day names
       await updateDateRangeDisplay(); // Update date range display
       fetchAllTrades();
       
-      // Set up WebSocket connection for database change notifications
-      setupDatabaseChangeListener();
-
-      // Add event listener for dropdown changes
+      // Set up event listeners
       const filterPicker = document.getElementById('date-filter-picker');
       if (filterPicker) {
         filterPicker.addEventListener('change', () => {
           updateDateRangeDisplay();
+          applyFilters();
+          savePreferences();
         });
       }
 
@@ -813,6 +823,7 @@
           const key = th.getAttribute('data-key');
           if (key) {
             sortTrades(key);
+            savePreferences();
           }
         });
       });
@@ -821,10 +832,16 @@
       const filterWin = document.getElementById('filter-win');
       const filterLoss = document.getElementById('filter-loss');
       if (filterWin) {
-        filterWin.addEventListener('change', applyFilters);
+        filterWin.addEventListener('change', () => {
+          applyFilters();
+          savePreferences();
+        });
       }
       if (filterLoss) {
-        filterLoss.addEventListener('change', applyFilters);
+        filterLoss.addEventListener('change', () => {
+          applyFilters();
+          savePreferences();
+        });
       }
 
       // Hook up All/None buttons
@@ -836,6 +853,7 @@
           if (filterWin) filterWin.checked = true;
           if (filterLoss) filterLoss.checked = true;
           applyFilters();
+          savePreferences();
         });
       }
       
@@ -844,9 +862,48 @@
           if (filterWin) filterWin.checked = false;
           if (filterLoss) filterLoss.checked = false;
           applyFilters();
+          savePreferences();
         });
       }
+      
+      // Set up WebSocket connection for database change notifications
+      setupDatabaseChangeListener();
     });
+
+    // Simple function to save preferences
+    function savePreferences() {
+      const dateFilterPicker = document.getElementById('date-filter-picker');
+      const filterWin = document.getElementById('filter-win');
+      const filterLoss = document.getElementById('filter-loss');
+      
+      const preferences = {
+        date_filter: dateFilterPicker ? dateFilterPicker.value : 'ALL',
+        win_filter: filterWin ? filterWin.checked : true,
+        loss_filter: filterLoss ? filterLoss.checked : true,
+        sort_key: currentSort.key,
+        sort_asc: currentSort.asc,
+        page_size: 50,
+        last_search_timestamp: Date.now()
+      };
+      
+      fetch(window.location.origin + '/api/set_trade_history_preferences', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(preferences)
+      })
+      .then(response => {
+        if (response.ok) {
+          console.log('Preferences saved');
+        } else {
+          console.error('Failed to save preferences');
+        }
+      })
+      .catch(error => {
+        console.error('Error saving preferences:', error);
+      });
+    }
   </script>
 </body>
 </html>
