@@ -60,6 +60,65 @@ async function updateWatchlistTable() {
       initializeWatchlistTableRows(data.strikes);
     }
     
+    // Check for new strikes that aren't in the current watchlistRowsMap
+    const currentStrikes = Array.from(window.watchlistRowsMap.keys());
+    const newStrikes = data.strikes.filter(strikeData => !currentStrikes.includes(strikeData.strike));
+    
+    // If there are new strikes, add them to the table
+    if (newStrikes.length > 0) {
+      newStrikes.forEach(strikeData => {
+        const row = document.createElement('tr');
+        const strike = strikeData.strike;
+        
+        // Strike cell (EXACT SAME as main strike table)
+        const strikeTd = document.createElement('td');
+        strikeTd.textContent = '$' + strike.toLocaleString();
+        strikeTd.classList.add('center');
+        row.appendChild(strikeTd);
+        
+        // Buffer cell (EXACT SAME as main strike table)
+        const bufferTd = document.createElement('td');
+        bufferTd.classList.add('center');
+        row.appendChild(bufferTd);
+        
+        // B/M cell (EXACT SAME as main strike table)
+        const bmTd = document.createElement('td');
+        bmTd.classList.add('center');
+        row.appendChild(bmTd);
+        
+        // Risk cell (now Prob Touch (%)) (EXACT SAME as main strike table)
+        const probTd = document.createElement('td');
+        probTd.classList.add('center');
+        row.appendChild(probTd);
+        
+        // Side cell (NEW - shows YES/NO)
+        const sideTd = document.createElement('td');
+        sideTd.classList.add('center');
+        row.appendChild(sideTd);
+        
+        // Buy button cell and span (NEW - single button)
+        const buyTd = document.createElement('td');
+        buyTd.setAttribute('data-ticker', '');
+        buyTd.classList.add('center');
+        const buySpan = document.createElement('span');
+        buyTd.appendChild(buySpan);
+        row.appendChild(buyTd);
+        
+        // Add row to table
+        watchlistTableBody.appendChild(row);
+        
+        // Store row data for updates
+        window.watchlistRowsMap.set(strike, {
+          row,
+          sideTd,
+          bufferTd,
+          bmTd,
+          probTd,
+          buySpan
+        });
+      });
+    }
+    
     // Track update frequency (no logging)
     if (!window.lastWatchlistUpdate) {
       window.lastWatchlistUpdate = Date.now();
@@ -178,14 +237,17 @@ function initializeWatchlistTableRows(strikes) {
     
     // Buffer cell (EXACT SAME as main strike table)
     const bufferTd = document.createElement('td');
+    bufferTd.classList.add('center');
     row.appendChild(bufferTd);
     
     // B/M cell (EXACT SAME as main strike table)
     const bmTd = document.createElement('td');
+    bmTd.classList.add('center');
     row.appendChild(bmTd);
     
     // Risk cell (now Prob Touch (%)) (EXACT SAME as main strike table)
     const probTd = document.createElement('td');
+    probTd.classList.add('center');
     row.appendChild(probTd);
     
     // Side cell (NEW - shows YES/NO)
@@ -196,6 +258,7 @@ function initializeWatchlistTableRows(strikes) {
     // Buy button cell and span (NEW - single button)
     const buyTd = document.createElement('td');
     buyTd.setAttribute('data-ticker', '');
+    buyTd.classList.add('center');
     const buySpan = document.createElement('span');
     buyTd.appendChild(buySpan);
     row.appendChild(buyTd);
