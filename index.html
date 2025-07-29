@@ -150,9 +150,9 @@
       opacity: 1;
       max-width: 180px;
       transition: 
-        opacity 0.3s ease,
-        max-width 0.3s ease,
-        visibility 0.3s ease;
+        opacity 0.2s ease,
+        max-width 0.2s ease,
+        visibility 0.2s ease;
       margin-left: 5px;
       visibility: visible;
     }
@@ -230,12 +230,23 @@
       flex: 1;
       height: calc(var(--vh, 1vh) * 100);
       overflow: hidden;
+      position: relative;
     }
     
     .content-frame {
       width: 100%;
       height: 100%;
       border: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .content-frame.active {
+      opacity: 1;
+      z-index: 1;
     }
     
     /* Rotate the arrow icon when sidebar is collapsed */
@@ -311,11 +322,11 @@
       
       <!-- User Section -->
       <div class="user-section">
-        <a href="/tabs/user_config.html" class="nav-item" data-page="user-config" data-tooltip="User ID">
+        <a href="/tabs/settings.html" class="nav-item" data-page="settings" data-tooltip="Settings">
           <span class="nav-icon">
-            <img src="/images/icons/user_icon.png" alt="User" style="width: 25px; height: px; object-fit: contain;">
+            <img src="/images/icons/user_icon.png" alt="Settings" style="width: 25px; height: 25px; object-fit: contain;">
           </span>
-          <span class="nav-label">User ID</span>
+          <span class="nav-label">Settings</span>
         </a>
       </div>
       
@@ -332,7 +343,11 @@
     
     <!-- Main Content Area -->
     <div class="main-content">
-      <iframe id="contentFrame" class="content-frame" src="about:blank"></iframe>
+      <!-- Preloaded iframes for each tab -->
+      <iframe id="tradeMonitorFrame" class="content-frame active" src="/tabs/trade_monitor.html"></iframe>
+      <iframe id="tradeHistoryFrame" class="content-frame" src="/tabs/trade_history.html"></iframe>
+      <iframe id="accountManagerFrame" class="content-frame" src="/tabs/account_manager.html"></iframe>
+      <iframe id="settingsFrame" class="content-frame" src="/tabs/settings.html"></iframe>
     </div>
   </div>
 
@@ -341,12 +356,15 @@
     const sidebar = document.getElementById('sidebar');
     const sidebarToggle = document.getElementById('sidebarToggle');
     const navItems = document.querySelectorAll('.nav-item');
-    const contentFrame = document.getElementById('contentFrame');
+    const contentFrames = document.querySelectorAll('.content-frame');
     
-    // On initial page load, force refresh for default page
-    window.addEventListener('DOMContentLoaded', () => {
-      contentFrame.src = '/tabs/trade_monitor.html?v=' + Date.now() + '&version=' + Math.random();
-    });
+    // Tab configuration
+    const tabConfig = {
+      'trade-monitor': 'tradeMonitorFrame',
+      'history': 'tradeHistoryFrame', 
+      'account': 'accountManagerFrame',
+      'settings': 'settingsFrame'
+    };
     
     // Toggle sidebar collapse/expand
     sidebarToggle.addEventListener('click', () => {
@@ -364,10 +382,29 @@
         // Add active class to clicked item
         item.classList.add('active');
         
-        // Load content in iframe with cache-busting
-        const href = item.getAttribute('href');
-        contentFrame.src = href + '?v=' + Date.now();
+        // Get the target frame ID
+        const pageType = item.getAttribute('data-page');
+        const targetFrameId = tabConfig[pageType];
+        
+        if (targetFrameId) {
+          // Hide all frames
+          contentFrames.forEach(frame => {
+            frame.classList.remove('active');
+          });
+          
+          // Show target frame
+          const targetFrame = document.getElementById(targetFrameId);
+          if (targetFrame) {
+            targetFrame.classList.add('active');
+          }
+        }
       });
+    });
+    
+    // Initialize with trade monitor active
+    window.addEventListener('DOMContentLoaded', () => {
+      // All frames are preloaded, trade monitor is already active
+      console.log('All tabs preloaded and ready');
     });
   </script>
 
