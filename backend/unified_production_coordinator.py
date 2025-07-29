@@ -469,6 +469,34 @@ class UnifiedProductionCoordinator:
         print(f"   - Strike table: {self.strike_table_path}")
         print(f"   - Watchlist: {self.watchlist_path}")
     
+    def _broadcast_fingerprint_display(self):
+        """Broadcast fingerprint display update (for debugging only)"""
+        try:
+            # Get current fingerprint for display only
+            from util.probability_calculator import get_probability_calculator
+            calculator = get_probability_calculator()
+            
+            display_data = {
+                "fingerprint": f"{calculator.symbol}_fingerprint_directional_momentum_{calculator.current_momentum_bucket:03d}.csv",
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Send to main app via HTTP
+            from core.port_config import get_port
+            from util.paths import get_host
+            port = get_port("main_app")
+            host = get_host()
+            url = f"http://{host}:{port}/api/broadcast_fingerprint_display"
+            
+            import requests
+            response = requests.post(url, json=display_data, timeout=2)
+            if response.ok:
+                print(f"✅ Fingerprint display update broadcasted: {display_data['fingerprint']}")
+            else:
+                print(f"⚠️ Failed to broadcast fingerprint display: {response.status_code}")
+        except Exception as e:
+            print(f"❌ Error broadcasting fingerprint display: {e}")
+    
     def start_pipeline(self):
         """Start the unified data pipeline orchestration"""
         if self.running:

@@ -1500,6 +1500,28 @@ async def broadcast_active_trades_change(request: Request):
         print(f"[MAIN] ❌ Error handling active trades change: {e}")
         return {"success": False, "error": str(e)}
 
+@app.post("/api/broadcast_fingerprint_display")
+async def broadcast_fingerprint_display(request: Request):
+    """Receive fingerprint display update and broadcast to frontend via WebSocket"""
+    try:
+        data = await request.json()
+        print(f"[MAIN] 🔔 Received fingerprint display update: {data.get('fingerprint', 'unknown')}")
+        message = {
+            "type": "fingerprint_display_update",
+            "data": data
+        }
+        for websocket in connected_clients.copy():
+            try:
+                await websocket.send_text(json.dumps(message))
+            except Exception as e:
+                print(f"Error sending to WebSocket client: {e}")
+                connected_clients.discard(websocket)
+        print(f"[MAIN] ✅ Fingerprint display update broadcasted to {len(connected_clients)} clients")
+        return {"success": True, "message": "Fingerprint display update broadcasted"}
+    except Exception as e:
+        print(f"[MAIN] ❌ Error handling fingerprint display update: {e}")
+        return {"success": False, "error": str(e)}
+
 @app.post("/api/notify_db_change")
 async def notify_db_change(request: Request):
     """Handle database change notifications from kalshi_account_sync"""

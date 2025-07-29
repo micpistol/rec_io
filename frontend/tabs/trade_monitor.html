@@ -1016,6 +1016,16 @@ document.addEventListener('DOMContentLoaded', () => {
         return; // Don't process other WebSocket messages for this type
       }
 
+      // === Fingerprint Display Update ===
+      if (data.type === 'fingerprint_display_update') {
+        console.log('🔔 Fingerprint display update:', data.data);
+        const fingerprintEl = document.getElementById('fingerprint-display');
+        if (fingerprintEl && data.data.fingerprint) {
+          fingerprintEl.textContent = `Fingerprint: ${data.data.fingerprint}`;
+        }
+        return; // Don't process other WebSocket messages for this type
+      }
+
       if (plusMinusToggle && data.diff_mode !== undefined && document.activeElement !== plusMinusToggle) {
         ignoreWsUpdates = true;
         console.log('Received diff_mode update via WebSocket:', data.diff_mode);
