@@ -1007,7 +1007,13 @@ document.addEventListener('DOMContentLoaded', () => {
           window.StrikeTable.setAutoEntry(data.auto_entry);
         }
         
-        ignoreWsUpdates = false;
+      }
+
+      // === Auto Entry Indicator Change ===
+      if (data.type === 'auto_entry_indicator_change') {
+        console.log('🔔 Auto entry indicator change:', data.data);
+        updateAutoEntryIndicator(data.data);
+        return; // Don't process other WebSocket messages for this type
       }
 
       if (plusMinusToggle && data.diff_mode !== undefined && document.activeElement !== plusMinusToggle) {
@@ -3207,8 +3213,8 @@ function initTimeWindowSliderOnShow() {
 
 // === AUTO ENTRY INDICATOR FUNCTIONS ===
 
-// Fetch auto entry indicator state from auto_entry_supervisor
-async function fetchAutoEntryIndicator() {
+// Fetch initial auto entry indicator state
+async function fetchInitialAutoEntryIndicator() {
     try {
         const response = await fetch('/api/auto_entry_indicator');
         if (!response.ok) throw new Error('Failed to fetch auto entry indicator');
@@ -3217,7 +3223,7 @@ async function fetchAutoEntryIndicator() {
         // Update the indicator display
         updateAutoEntryIndicator(data);
     } catch (error) {
-        console.error('Error fetching auto entry indicator:', error);
+        console.error('Error fetching initial auto entry indicator:', error);
     }
 }
 
@@ -3238,19 +3244,15 @@ function updateAutoEntryIndicator(data) {
     }
 }
 
-// Start polling for auto entry indicator updates
-function startAutoEntryIndicatorPolling() {
-    // Initial fetch
-    fetchAutoEntryIndicator();
-    
-    // Poll every 5 seconds
-    setInterval(fetchAutoEntryIndicator, 5000);
-}
-
-// Start polling when page loads
+// Fetch initial state when page loads
 document.addEventListener('DOMContentLoaded', () => {
-    startAutoEntryIndicatorPolling();
+    fetchInitialAutoEntryIndicator();
 });
+
+// Also fetch initial state when live-data.js loads
+if (typeof window.liveData !== 'undefined') {
+    fetchInitialAutoEntryIndicator();
+}
 </script>
 
 </html>

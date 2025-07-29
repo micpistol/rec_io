@@ -776,8 +776,7 @@
                 }
             }).catch(console.error);
             
-            // Initial auto entry indicator fetch
-            fetchAutoEntryIndicator();
+
             
             // Initial BTC price changes fetch
             fetch('/btc_price_changes').then(response => response.json()).then(data => {
@@ -982,6 +981,13 @@
         }
 
         function updateTogglesFromWebSocket(data) {
+            // === Auto Entry Indicator Change ===
+            if (data.type === 'auto_entry_indicator_change') {
+                console.log('🔔 Auto entry indicator change:', data.data);
+                updateAutoEntryIndicator(data.data);
+                return; // Don't process other WebSocket messages for this type
+            }
+            
             // Update Auto Entry toggle
             const autoEntryToggle = document.getElementById('autoEntryToggle');
             if (autoEntryToggle && data.auto_entry !== undefined) {
@@ -1361,14 +1367,7 @@
                 }
             }, 5000); // Poll every 5 seconds
 
-            // Poll for auto entry indicator every second (same as main trade monitor)
-            setInterval(async () => {
-                try {
-                    await fetchAutoEntryIndicator();
-                } catch (error) {
-                    console.error('Error fetching auto entry indicator:', error);
-                }
-            }, 1000); // Poll every second
+
         }
 
 
@@ -2498,10 +2497,10 @@
             }, 3000);
         }
 
-        // === AUTO ENTRY INDICATOR FUNCTIONS (SAME AS DESKTOP) ===
+        // === AUTO ENTRY INDICATOR FUNCTIONS ===
         
-        // Fetch auto entry indicator state from auto_entry_supervisor
-        async function fetchAutoEntryIndicator() {
+        // Fetch initial auto entry indicator state
+        async function fetchInitialAutoEntryIndicator() {
             try {
                 const response = await fetch('/api/auto_entry_indicator');
                 if (!response.ok) throw new Error('Failed to fetch auto entry indicator');
@@ -2510,10 +2509,10 @@
                 // Update the indicator display
                 updateAutoEntryIndicator(data);
             } catch (error) {
-                console.error('Error fetching auto entry indicator:', error);
+                console.error('Error fetching initial auto entry indicator:', error);
             }
         }
-
+        
         // Update the auto entry indicator display
         function updateAutoEntryIndicator(data) {
             const indicator = document.getElementById('autoEntryIndicator');
@@ -2530,6 +2529,11 @@
                 indicator.style.display = 'none';
             }
         }
+        
+        // Fetch initial state when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchInitialAutoEntryIndicator();
+        });
 
         // Set up WebSocket connection for database change notifications
         setupDatabaseChangeListener();

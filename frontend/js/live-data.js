@@ -95,20 +95,6 @@ async function fetchBTCPriceChanges() {
 
 // === AUTO ENTRY INDICATOR FUNCTIONS ===
 
-// Fetch auto entry indicator state from auto_entry_supervisor
-async function fetchAutoEntryIndicator() {
-  try {
-    const response = await fetch('/api/auto_entry_indicator');
-    if (!response.ok) throw new Error('Failed to fetch auto entry indicator');
-    const data = await response.json();
-    
-    // Update the indicator display
-    updateAutoEntryIndicator(data);
-  } catch (error) {
-    console.error('Error fetching auto entry indicator:', error);
-  }
-}
-
 // Update the auto entry indicator display
 function updateAutoEntryIndicator(data) {
   const indicator = document.getElementById('autoEntryIndicator');
@@ -133,12 +119,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initial data fetches
   fetchCore();
   fetchBTCPriceChanges();
-  fetchAutoEntryIndicator();
 
   // Set up polling intervals
   setInterval(fetchCore, 1000);                // Core data (BTC price + momentum) every second
   setInterval(fetchBTCPriceChanges, 60000);    // Price changes every minute (unchanged frequency)
-  setInterval(fetchAutoEntryIndicator, 1000);  // Auto entry indicator every second
 });
 
 // Export functions for use by other modules

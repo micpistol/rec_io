@@ -50,6 +50,9 @@ auto_entry_indicator_state = {
     "last_updated": None
 }
 
+# Track previous state to detect changes
+previous_indicator_state = None
+
 def log(message: str):
     """Log messages with timestamp"""
     timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
@@ -65,6 +68,44 @@ def log(message: str):
             f.write(f"[{timestamp}] {message}\n")
     except Exception as e:
         print(f"Error writing to log file: {e}")
+
+def broadcast_auto_entry_indicator_change():
+    """Broadcast auto entry indicator state change via WebSocket to main app"""
+    global auto_entry_indicator_state, previous_indicator_state
+    
+    try:
+        # Check if state has actually changed
+        current_state = {
+            "enabled": auto_entry_indicator_state["enabled"],
+            "ttc_within_window": auto_entry_indicator_state["ttc_within_window"]
+        }
+        
+        log(f"[AUTO ENTRY DEBUG] 🔍 Checking indicator state change:")
+        log(f"[AUTO ENTRY DEBUG]   Current: {current_state}")
+        log(f"[AUTO ENTRY DEBUG]   Previous: {previous_indicator_state}")
+        
+        if previous_indicator_state == current_state:
+            log(f"[AUTO ENTRY DEBUG]   No change detected, skipping broadcast")
+            return  # No change, don't broadcast
+        
+        # Update previous state
+        previous_indicator_state = current_state.copy()
+        log(f"[AUTO ENTRY DEBUG]   State changed, broadcasting...")
+        
+        # Send to main app for WebSocket broadcast
+        try:
+            port = get_port("main_app")
+            url = get_service_url(port) + "/api/broadcast_auto_entry_indicator"
+            response = requests.post(url, json=auto_entry_indicator_state, timeout=2)
+            if response.ok:
+                log(f"[AUTO ENTRY] ✅ Auto entry indicator change broadcasted: {current_state}")
+            else:
+                log(f"[AUTO ENTRY] ⚠️ Failed to broadcast indicator change: {response.status_code}")
+        except Exception as e:
+            log(f"[AUTO ENTRY] ❌ Error broadcasting indicator change: {e}")
+            
+    except Exception as e:
+        log(f"[AUTO ENTRY] ❌ Error in broadcast_auto_entry_indicator_change: {e}")
 
 def is_auto_entry_enabled():
     """Check if AUTO ENTRY is enabled in trade_preferences.json"""
@@ -308,6 +349,8 @@ def check_auto_entry_conditions():
                 "current_ttc": 0,
                 "last_updated": datetime.now().isoformat()
             })
+            # Broadcast indicator state change
+            broadcast_auto_entry_indicator_change()
             return
         
         # Get auto entry settings
@@ -332,6 +375,9 @@ def check_auto_entry_conditions():
             "max_time": max_time,
             "last_updated": datetime.now().isoformat()
         })
+        
+        # Broadcast indicator state change
+        broadcast_auto_entry_indicator_change()
         
         if not ttc_within_window:
             return

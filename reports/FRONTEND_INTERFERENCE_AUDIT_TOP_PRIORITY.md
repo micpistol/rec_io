@@ -11,23 +11,27 @@
 ### **1. Trade Executor - `/trigger_trade` (POST)**
 - **Issue**: Frontend can trigger actual trades via POST requests
 - **Critical Impact**: Direct trade execution interference
-- **Risk Level**: 🔴 **HIGH** - Could interfere with auto-entry trades
+- **Risk Level**: 🟢 **LOW** - Users won't frequently make manual trades during auto-entry
 - **Location**: `backend/trade_executor.py:150`
-- **Action Needed**: Add rate limiting and protection
+- **Action Needed**: None - may disable manual entries during auto-entry periods
+- **Status**: ✅ **NOT AN ISSUE** - Manual trades are infrequent during auto-entry
 
-### **2. Auto Entry Supervisor - `/api/auto_entry_indicator`**
-- **Issue**: Frontend polls every second for auto-entry status
-- **Critical Impact**: Could interfere with auto-entry decision making
-- **Risk Level**: 🟡 **MEDIUM** - Read-only but high frequency
+### **2. Auto Entry Indicator - `/api/auto_entry_indicator`**
+- **Issue**: Frontend polls every second for "Automation ON" indicator status
+- **Critical Impact**: Unnecessary load for simple ON/OFF indicator
+- **Risk Level**: 🟡 **MEDIUM** - Inefficient polling for simple boolean
 - **Location**: `backend/auto_entry_supervisor.py:509`
-- **Action Needed**: Add caching to reduce polling frequency
+- **Action Needed**: Find more efficient way to control this indicator
+- **Note**: This is purely about the Automation ON indicator in trade monitor
+- **Status**: ✅ **FIXED** - Replaced with WebSocket push notifications
 
 ### **3. Main App - `/api/auto_entry_indicator` (Proxy)**
 - **Issue**: Main app proxies to auto_entry_supervisor every second
-- **Critical Impact**: Double load on auto-entry system
+- **Critical Impact**: Double load for simple indicator
 - **Risk Level**: 🟡 **MEDIUM** - Unnecessary proxy layer
 - **Location**: `backend/main.py:1338`
-- **Action Needed**: Eliminate proxy or add caching
+- **Action Needed**: Eliminate proxy or find more efficient indicator method
+- **Status**: ✅ **FIXED** - Eliminated proxy endpoint
 
 ---
 
@@ -74,21 +78,31 @@
 - **Critical Impact**: Database contention with monitoring loop
 - **Status**: ✅ **FIXED** - Added smart caching based on auto-stop status
 
+### **Auto Entry Indicator - `/api/auto_entry_indicator`**
+- **Issue**: Frontend polls every second for "Automation ON" indicator status
+- **Critical Impact**: Unnecessary load for simple ON/OFF indicator
+- **Status**: ✅ **FIXED** - Replaced with WebSocket push notifications
+
+### **Main App Proxy - `/api/auto_entry_indicator`**
+- **Issue**: Main app proxies to auto_entry_supervisor every second
+- **Critical Impact**: Double load for simple indicator
+- **Status**: ✅ **FIXED** - Eliminated proxy endpoint
+
 ---
 
 ## 🎯 TOMORROW'S ACTION PLAN:
 
-### **Priority 1 - Critical Protection:**
-1. **Trade Executor Rate Limiting**: Add protection to `/trigger_trade` endpoint
-2. **Auto Entry Indicator Caching**: Reduce polling frequency for auto-entry status
+### **Priority 1 - Performance Optimization:**
+1. **Database Endpoint Caching**: Add caching to `/api/db/*` endpoints
+2. **Live Data Analysis Optimization**: Optimize `/core` endpoint polling
 
-### **Priority 2 - Performance Optimization:**
-3. **Database Endpoint Caching**: Add caching to `/api/db/*` endpoints
-4. **Proxy Layer Cleanup**: Eliminate unnecessary proxy endpoints
+### **Priority 2 - System Optimization:**
+3. **Strike Table Caching**: Add caching to strike table data
+4. **Manual Trade Controls**: Consider disabling manual trades during auto-entry periods
 
-### **Priority 3 - System Optimization:**
-5. **Live Data Analysis Optimization**: Optimize `/core` endpoint polling
-6. **Strike Table Caching**: Add caching to strike table data
+### **Priority 3 - Additional Optimizations:**
+5. **Review remaining endpoints** for potential caching opportunities
+6. **Monitor WebSocket performance** for any issues
 
 ---
 
