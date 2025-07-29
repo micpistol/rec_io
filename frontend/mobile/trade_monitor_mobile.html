@@ -1267,6 +1267,19 @@
                 }
             }, 1000); // Poll every second (same as main trade monitor)
 
+            // Force redraw strike table every 30 seconds
+            setInterval(async () => {
+                try {
+                    console.log('Force redrawing mobile strike table...');
+                    // Clear the strike rows map to force a complete rebuild
+                    mobileStrikeRowsMap.clear();
+                    // Trigger a full strike table update
+                    await updateMobileStrikeTable();
+                } catch (error) {
+                    console.error('Error in force redraw:', error);
+                }
+            }, 30000); // Force redraw every 30 seconds
+
             // Mobile monitor doesn't have price change display elements - no polling needed
 
             // Toggle states are now handled by WebSocket - no polling needed
