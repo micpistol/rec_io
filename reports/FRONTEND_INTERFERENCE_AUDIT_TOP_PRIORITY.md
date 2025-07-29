@@ -23,7 +23,7 @@
 - **Location**: `backend/auto_entry_supervisor.py:509`
 - **Action Needed**: Find more efficient way to control this indicator
 - **Note**: This is purely about the Automation ON indicator in trade monitor
-- **Status**: ✅ **FIXED** - Replaced with WebSocket push notifications
+- **Status**: ✅ **FIXED** - Replaced with WebSocket push notifications (Desktop & Mobile)
 
 ### **3. Main App - `/api/auto_entry_indicator` (Proxy)**
 - **Issue**: Main app proxies to auto_entry_supervisor every second
@@ -31,7 +31,7 @@
 - **Risk Level**: 🟡 **MEDIUM** - Unnecessary proxy layer
 - **Location**: `backend/main.py:1338`
 - **Action Needed**: Eliminate proxy or find more efficient indicator method
-- **Status**: ✅ **FIXED** - Eliminated proxy endpoint
+- **Status**: ✅ **FIXED** - Eliminated proxy endpoint (Desktop & Mobile)
 
 ---
 
@@ -41,9 +41,9 @@
 - **Issue**: Frontend polls database endpoints frequently
 - **Endpoints**: `/api/db/positions`, `/api/db/fills`, `/api/db/settlements`
 - **Critical Impact**: Database contention with trade processing
-- **Risk Level**: 🟡 **MEDIUM** - Could slow trade execution
-- **Action Needed**: Add caching to database read endpoints
-- **Status**: ✅ **PARTIALLY FIXED** - Active trade indicators now use WebSocket push
+- **Risk Level**: 🟢 **LOW** - Only polled on account manager page load, not frequent
+- **Action Needed**: None - polling is minimal and non-interfering
+- **Status**: ✅ **NOT AN ISSUE** - Database endpoints only polled once on page load
 
 ### **5. Live Data Analysis - `/core` Endpoint**
 - **Issue**: Frontend polls core data every second
@@ -52,10 +52,11 @@
 - **Action Needed**: Optimize polling frequency or add caching
 
 ### **6. Strike Table Data - `/api/strike_table`**
-- **Issue**: Frontend polls strike table data frequently
+- **Issue**: Frontend polls strike table data every 1 second
 - **Critical Impact**: Database contention with market data processing
-- **Risk Level**: 🟡 **MEDIUM** - Could slow market data updates
-- **Action Needed**: Add caching to reduce database load
+- **Risk Level**: 🟢 **LOW** - Essential core UI functionality
+- **Action Needed**: Future major version - implement WebSocket/push/delta-based updating system
+- **Status**: 🔄 **DEFERRED** - Core functionality, 1s polling required for current UI
 
 ---
 
@@ -82,17 +83,17 @@
 ### **Auto Entry Indicator - `/api/auto_entry_indicator`**
 - **Issue**: Frontend polls every second for "Automation ON" indicator status
 - **Critical Impact**: Unnecessary load for simple ON/OFF indicator
-- **Status**: ✅ **FIXED** - Replaced with WebSocket push notifications
+- **Status**: ✅ **FIXED** - Replaced with WebSocket push notifications (Desktop & Mobile)
 
 ### **Main App Proxy - `/api/auto_entry_indicator`**
 - **Issue**: Main app proxies to auto_entry_supervisor every second
 - **Critical Impact**: Double load for simple indicator
-- **Status**: ✅ **FIXED** - Eliminated proxy endpoint
+- **Status**: ✅ **FIXED** - Eliminated proxy endpoint (Desktop & Mobile)
 
 ### **Active Trade Indicators - Mobile Polling**
 - **Issue**: Mobile frontend polls `/trades` every 2 seconds for active trade indicators
 - **Critical Impact**: Database contention with trade processing
-- **Status**: ✅ **FIXED** - Replaced with WebSocket push notifications
+- **Status**: ✅ **FIXED** - Replaced with WebSocket push notifications (Desktop & Mobile)
 
 ---
 
