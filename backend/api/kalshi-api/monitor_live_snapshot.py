@@ -11,7 +11,7 @@ from datetime import datetime
 
 def load_snapshot():
     """Load the current snapshot file"""
-    snapshot_file = '/Users/ericwais1/rec_io_20/backend/data/kalshi/live_orderbook_snapshot.json'
+    snapshot_file = os.path.join(os.path.dirname(__file__), '../../data/kalshi/live_orderbook_snapshot.json')
     try:
         with open(snapshot_file, 'r') as f:
             return json.load(f)
@@ -62,7 +62,7 @@ def monitor_snapshot():
     
     try:
         while True:
-            snapshot_file = '/Users/ericwais1/rec_io_20/backend/data/kalshi/live_orderbook_snapshot.json'
+            snapshot_file = os.path.join(os.path.dirname(__file__), '../../data/kalshi/live_orderbook_snapshot.json')
             
             if os.path.exists(snapshot_file):
                 current_modified = os.path.getmtime(snapshot_file)

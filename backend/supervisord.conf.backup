@@ -13,7 +13,7 @@ file=/tmp/supervisord.sock
 supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
 
 [program:main_app]
-command=python backend/main.py
+command=venv/bin/python backend/main.py
 directory=.
 autostart=true
 autorestart=true
@@ -22,10 +22,10 @@ stopasgroup=true
 killasgroup=true
 stderr_logfile=logs/main_app.err.log
 stdout_logfile=logs/main_app.out.log
-environment=PATH="venv/bin",PYTHONPATH="."
+environment=PATH="venv/bin",PYTHONPATH=".",PYTHONGC=1,PYTHONDNSCACHE=1
 
 [program:trade_manager]
-command=python backend/trade_manager.py
+command=venv/bin/python backend/trade_manager.py
 directory=.
 autostart=true
 autorestart=true
@@ -34,10 +34,10 @@ stopasgroup=true
 killasgroup=true
 stderr_logfile=logs/trade_manager.err.log
 stdout_logfile=logs/trade_manager.out.log
-environment=PATH="venv/bin",PYTHONPATH="."
+environment=PATH="venv/bin",PYTHONPATH=".",PYTHONGC=1,PYTHONDNSCACHE=1
 
 [program:trade_executor]
-command=python backend/trade_executor.py
+command=venv/bin/python backend/trade_executor.py
 directory=.
 autostart=true
 autorestart=true
@@ -46,10 +46,10 @@ stopasgroup=true
 killasgroup=true
 stderr_logfile=logs/trade_executor.err.log
 stdout_logfile=logs/trade_executor.out.log
-environment=PATH="venv/bin",PYTHONPATH="."
+environment=PATH="venv/bin",PYTHONPATH=".",PYTHONGC=1,PYTHONDNSCACHE=1
 
 [program:trade_initiator]
-command=python backend/trade_initiator.py
+command=venv/bin/python backend/trade_initiator.py
 directory=.
 autostart=true
 autorestart=true
@@ -58,10 +58,10 @@ stopasgroup=true
 killasgroup=true
 stderr_logfile=logs/trade_initiator.err.log
 stdout_logfile=logs/trade_initiator.out.log
-environment=PATH="venv/bin",PYTHONPATH="."
+environment=PATH="venv/bin",PYTHONPATH=".",PYTHONGC=1,PYTHONDNSCACHE=1
 
 [program:active_trade_supervisor]
-command=python backend/active_trade_supervisor.py
+command=venv/bin/python backend/active_trade_supervisor.py
 directory=.
 autostart=true
 autorestart=true
@@ -70,10 +70,10 @@ stopasgroup=true
 killasgroup=true
 stderr_logfile=logs/active_trade_supervisor.err.log
 stdout_logfile=logs/active_trade_supervisor.out.log
-environment=PATH="venv/bin",PYTHONPATH="."
+environment=PATH="venv/bin",PYTHONPATH=".",PYTHONGC=1,PYTHONDNSCACHE=1
 
 [program:auto_entry_supervisor]
-command=python backend/auto_entry_supervisor.py
+command=venv/bin/python backend/auto_entry_supervisor.py
 directory=.
 autostart=true
 autorestart=true
@@ -82,10 +82,10 @@ stopasgroup=true
 killasgroup=true
 stderr_logfile=logs/auto_entry_supervisor.err.log
 stdout_logfile=logs/auto_entry_supervisor.out.log
-environment=PATH="venv/bin",PYTHONPATH="."
+environment=PATH="venv/bin",PYTHONPATH=".",PYTHONGC=1,PYTHONDNSCACHE=1
 
 [program:btc_price_watchdog]
-command=python backend/api/coinbase-api/coinbase-btc/btc_price_watchdog.py
+command=venv/bin/python backend/api/coinbase-api/coinbase-btc/btc_price_watchdog.py
 directory=.
 autostart=true
 autorestart=true
@@ -94,10 +94,10 @@ stopasgroup=true
 killasgroup=true
 stderr_logfile=logs/btc_price_watchdog.err.log
 stdout_logfile=logs/btc_price_watchdog.out.log
-environment=PATH="venv/bin",PYTHONPATH="."
+environment=PATH="venv/bin",PYTHONPATH=".",PYTHONGC=1,PYTHONDNSCACHE=1
 
 [program:db_poller]
-command=python backend/db_poller.py
+command=venv/bin/python backend/db_poller.py
 directory=.
 autostart=true
 autorestart=true
@@ -106,10 +106,10 @@ stopasgroup=true
 killasgroup=true
 stderr_logfile=logs/db_poller.err.log
 stdout_logfile=logs/db_poller.out.log
-environment=PATH="venv/bin",PYTHONPATH="."
+environment=PATH="venv/bin",PYTHONPATH=".",PYTHONGC=1,PYTHONDNSCACHE=1
 
 [program:kalshi_account_sync]
-command=python backend/api/kalshi-api/kalshi_account_sync.py
+command=venv/bin/python backend/api/kalshi-api/kalshi_account_sync.py
 directory=.
 autostart=true
 autorestart=true
@@ -118,10 +118,10 @@ stopasgroup=true
 killasgroup=true
 stderr_logfile=logs/kalshi_account_sync.err.log
 stdout_logfile=logs/kalshi_account_sync.out.log
-environment=PATH="venv/bin",PYTHONPATH="."
+environment=PATH="venv/bin",PYTHONPATH=".",PYTHONGC=1,PYTHONDNSCACHE=1
 
 [program:kalshi_api_watchdog]
-command=python backend/api/kalshi-api/kalshi_api_watchdog.py
+command=venv/bin/python backend/api/kalshi-api/kalshi_api_watchdog.py
 directory=.
 autostart=true
 autorestart=true
@@ -130,13 +130,10 @@ stopasgroup=true
 killasgroup=true
 stderr_logfile=logs/kalshi_api_watchdog.err.log
 stdout_logfile=logs/kalshi_api_watchdog.out.log
-environment=PATH="venv/bin",PYTHONPATH="."
-
-
-
+environment=PATH="venv/bin",PYTHONPATH=".",PYTHONGC=1,PYTHONDNSCACHE=1
 
 [program:unified_production_coordinator]
-command=python backend/unified_production_coordinator_api.py
+command=venv/bin/python backend/unified_production_coordinator_api.py
 directory=.
 autostart=true
 autorestart=true
@@ -145,10 +142,10 @@ stopasgroup=true
 killasgroup=true
 stderr_logfile=logs/unified_production_coordinator.err.log
 stdout_logfile=logs/unified_production_coordinator.out.log
-environment=PATH="venv/bin",PYTHONPATH=".",TRADING_SYSTEM_HOST="localhost"
+environment=PATH="venv/bin",PYTHONPATH=".",PYTHONGC=1,PYTHONDNSCACHE=1,TRADING_SYSTEM_HOST="localhost"
 
 [program:cascading_failure_detector]
-command=python backend/cascading_failure_detector.py
+command=venv/bin/python backend/cascading_failure_detector.py
 directory=.
 autostart=true
 autorestart=true
@@ -157,5 +154,5 @@ stopasgroup=true
 killasgroup=true
 stderr_logfile=logs/cascading_failure_detector.err.log
 stdout_logfile=logs/cascading_failure_detector.out.log
-environment=PATH="venv/bin",PYTHONPATH="."
+environment=PATH="venv/bin",PYTHONPATH=".",PYTHONGC=1,PYTHONDNSCACHE=1
 

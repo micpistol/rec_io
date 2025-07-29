@@ -283,7 +283,8 @@ class LiveOrderbookSnapshot:
     def save_snapshot(self, snapshot):
         """Save the market snapshot to file"""
         try:
-            snapshot_file = '/Users/ericwais1/rec_io_20/backend/data/kalshi/live_orderbook_snapshot.json'
+            import os
+            snapshot_file = os.path.join(os.path.dirname(__file__), '../../data/kalshi/live_orderbook_snapshot.json')
             with open(snapshot_file, 'w') as f:
                 json.dump(snapshot, f, indent=2, default=str)
             print(f"💾 Saved live snapshot: {snapshot['summary']['active_markets']} active markets, {snapshot['summary']['total_volume']} total volume")

@@ -11,7 +11,8 @@ from zoneinfo import ZoneInfo
 import requests
 
 # Add the project root to the Python path
-sys.path.insert(0, '/Users/ericwais1/rec_io_20')
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
 
 def get_current_event_ticker():
     """Dynamically find the current active event ticker"""
