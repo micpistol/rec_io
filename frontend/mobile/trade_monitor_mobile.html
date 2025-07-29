@@ -514,15 +514,23 @@
             <div class="price-display">
                 <div class="price-info">
                     <div class="current-price" id="btc-price-value">$—</div>
-                    <div class="price-change" id="btc-changes-cell" style="padding-top: 10px;">
-                        1h <span id="change-1h">—</span> • 3h <span id="change-3h">—</span> • 1d <span id="change-1d">—</span>
-                    </div>
                 </div>
-                <div class="momentum-info">
+                <div class="price-change" id="btc-changes-cell" style="font-size: 10px; color: #c4c4c4; text-align: center; min-width: 80px;">
+                    1h <span id="change-1h">—</span> • 3h <span id="change-3h">—</span> • 1d <span id="change-1d">—</span>
+                </div>
+                <div class="momentum-info" style=" text-align: center; align-self: flex-end;">
                     <div class="momentum-label">Momentum</div>
                     <div class="momentum-score" id="momentum-score-display">—</div>
                 </div>
             </div>
+            
+            <!-- Chart Toggle -->
+            <div id="chart-toggle" style="margin-top: 5px; text-align: left; cursor: pointer; color: #c4c4c4; font-size: 8px; user-select: none;" onclick="toggleChart()">
+                CHART ▼
+            </div>
+            
+            <!-- TradingView Chart -->
+            <div id="tradingview_12345" style="width: 100%; height: 300px; margin-top: 5px;"></div>
         </div>
 
         <!-- Control Toggles -->
@@ -2926,6 +2934,47 @@
             const remainingSeconds = seconds % 60;
             return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
         }
+
+        // Chart toggle functionality
+        function toggleChart() {
+            const chartContainer = document.getElementById('tradingview_12345');
+            const chartToggle = document.getElementById('chart-toggle');
+            
+            if (chartContainer.style.display === 'none') {
+                // Show chart
+                chartContainer.style.display = 'block';
+                chartToggle.innerHTML = 'CHART ▼';
+            } else {
+                // Hide chart
+                chartContainer.style.display = 'none';
+                chartToggle.innerHTML = 'CHART ▶';
+            }
+        }
+    </script>
+
+    <!-- TradingView Chart Widget -->
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    <script type="text/javascript">
+        new TradingView.widget({
+            "width": "100%",
+            "height": "300",
+            "symbol": "COINBASE:BTCUSD",
+            "interval": "1",
+            "timezone": "Etc/UTC",
+            "theme": "dark",
+            "style": "1",
+            "locale": "en",
+            "toolbar_bg": "#f1f3f6",
+            "scalesProperties.textColor": "#FFFFFF",
+            "backgroundColor": "#1e2733",
+            "enable_publishing": false,
+            "hide_top_toolbar": true,
+            "hide_legend": true,
+            "save_image": false,
+            "disabled_features": ["volume_force_overlay", "create_volume_indicator_by_default"],
+            "studies": [],
+            "container_id": "tradingview_12345"
+        });
     </script>
 </body>
 </html> 
