@@ -237,8 +237,8 @@ async function buildStrikeTableRows(basePrice) {
   const strikeTier = strikeTableData.strike_tier;
   const step = strikeTier;
   const rows = [];
-  // Generate two extra rows: one above, one below
-  for (let i = basePrice - 7 * step; i <= basePrice + 7 * step; i += step) {
+  // Generate 8 rows above and 8 rows below the current price (16 total, 14 visible after hiding first/last)
+  for (let i = basePrice - 8 * step; i <= basePrice + 7 * step; i += step) {
     rows.push(i);
   }
   return rows;
