@@ -488,6 +488,10 @@ def start_monitoring_loop():
         global monitoring_thread
         log("📊 MONITORING: Starting auto entry monitoring loop")
         
+        # Broadcast initial state immediately on startup
+        log("📊 MONITORING: Broadcasting initial auto entry state")
+        check_auto_entry_conditions()
+        
         check_count = 0
         while True:
             try:
@@ -603,6 +607,11 @@ def start_event_driven_supervisor():
             host = get_host()
             port = AUTO_ENTRY_SUPERVISOR_PORT
             log(f"🌐 Starting HTTP server on {host}:{port}")
+            
+            # Broadcast initial state immediately when server starts
+            log("🌐 Broadcasting initial auto entry state on server startup")
+            check_auto_entry_conditions()
+            
             app.run(host=host, port=port, debug=False, use_reloader=False)
         except Exception as e:
             log(f"❌ Error starting HTTP server: {e}")
