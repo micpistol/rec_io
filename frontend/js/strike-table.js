@@ -432,12 +432,13 @@ async function updateStrikeTable() {
           updatePositionIndicator(strikeCell, strike);
         }
       } else {
-        // No data for this strike, show placeholders but don't update buttons
-        // This preserves the initial button state (empty but present)
+        // No data for this strike, show placeholders and ensure buttons are drawn in disabled state
         bufferTd.textContent = '—';
         bmTd.textContent = '—';
         probTd.textContent = '—';
-        // Don't call updateYesNoButton for strikes without data to preserve initial state
+        // Always update buttons to ensure they are drawn (even in disabled state)
+        updateYesNoButton(yesSpan, strike, "yes", null, false, null, false, diffMode, null);
+        updateYesNoButton(noSpan, strike, "no", null, false, null, false, diffMode, null);
       }
     });
 
