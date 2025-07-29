@@ -984,19 +984,7 @@
                 return; // Don't process other WebSocket messages for this type
             }
 
-            // === Momentum Update ===
-            if (data.type === 'momentum_update') {
-                console.log('🔔 Momentum update:', data.data);
-                if (data.data.weighted_momentum_score !== undefined) {
-                    const momentumEl = document.getElementById('momentum-score-display');
-                    if (momentumEl) {
-                        const score = data.data.weighted_momentum_score;
-                        const formatted = score >= 0 ? `+${(score * 100).toFixed(0)}` : `${(score * 100).toFixed(0)}`;
-                        momentumEl.textContent = formatted;
-                    }
-                }
-                return; // Don't process other WebSocket messages for this type
-            }
+            // Momentum now consolidated in strike table - no separate WebSocket handler needed
             
             // Update Auto Entry toggle
             const autoEntryToggle = document.getElementById('autoEntryToggle');
@@ -1254,7 +1242,23 @@
                             }
                         }
                         
-                        // Momentum score is now handled by WebSocket - no polling needed
+                        // Update momentum score from consolidated strike table data
+                        if (strikeData.momentum && strikeData.momentum.weighted_score !== undefined) {
+                            const momentumEl = document.getElementById('momentum-score-display');
+                            if (momentumEl) {
+                                const score = strikeData.momentum.weighted_score;
+                                const formatted = score >= 0 ? `+${(score * 100).toFixed(0)}` : `${(score * 100).toFixed(0)}`;
+                                momentumEl.textContent = formatted;
+                            }
+                        }
+                        
+                        // Update fingerprint display from consolidated strike table data
+                        if (strikeData.fingerprint) {
+                            const fingerprintEl = document.getElementById('fingerprint-display');
+                            if (fingerprintEl) {
+                                fingerprintEl.textContent = `Fingerprint: ${strikeData.fingerprint}`;
+                            }
+                        }
                     }
                     
                     // Update strike table

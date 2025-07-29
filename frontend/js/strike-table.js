@@ -159,6 +159,36 @@ async function updateMiddleColumnData() {
       updateBTCPriceDisplay(strikeTableData.current_price);
     }
     
+    // Update momentum data from consolidated strike table data
+    if (strikeTableData && strikeTableData.momentum) {
+      // Update global momentum data
+      if (window.momentumData) {
+        if (strikeTableData.momentum.weighted_score !== undefined) {
+          window.momentumData.weightedScore = strikeTableData.momentum.weighted_score;
+        }
+        if (strikeTableData.momentum.deltas) {
+          Object.entries(strikeTableData.momentum.deltas).forEach(([key, value]) => {
+            if (value !== undefined) {
+              window.momentumData.deltas[key] = value;
+            }
+          });
+        }
+      }
+      
+      // Trigger momentum panel update if function exists
+      if (typeof updateMomentumPanel === 'function') {
+        updateMomentumPanel();
+      }
+    }
+    
+    // Update fingerprint display from consolidated strike table data
+    if (strikeTableData && strikeTableData.fingerprint) {
+      const fingerprintEl = document.getElementById('fingerprint-display');
+      if (fingerprintEl) {
+        fingerprintEl.textContent = `Fingerprint: ${strikeTableData.fingerprint}`;
+      }
+    }
+    
   } catch (error) {
     console.error('Error updating middle column data:', error);
     // Show error state in market title

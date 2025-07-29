@@ -1016,36 +1016,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return; // Don't process other WebSocket messages for this type
       }
 
-      // === Fingerprint Display Update ===
-      if (data.type === 'fingerprint_display_update') {
-        console.log('🔔 Fingerprint display update:', data.data);
-        const fingerprintEl = document.getElementById('fingerprint-display');
-        if (fingerprintEl && data.data.fingerprint) {
-          fingerprintEl.textContent = `Fingerprint: ${data.data.fingerprint}`;
-        }
-        return; // Don't process other WebSocket messages for this type
-      }
-
-      // === Momentum Update ===
-      if (data.type === 'momentum_update') {
-        console.log('🔔 Momentum update:', data.data);
-        // Update momentum data
-        if (data.data.weighted_momentum_score !== undefined) {
-          window.momentumData.weightedScore = data.data.weighted_momentum_score;
-        }
-        if (data.data.deltas) {
-          Object.entries(data.data.deltas).forEach(([key, value]) => {
-            if (value !== undefined) {
-              window.momentumData.deltas[key] = value;
-            }
-          });
-        }
-        // Trigger momentum panel update
-        if (typeof updateMomentumPanel === 'function') {
-          updateMomentumPanel();
-        }
-        return; // Don't process other WebSocket messages for this type
-      }
+      // Fingerprint and momentum now consolidated in strike table - no separate WebSocket handlers needed
 
       if (plusMinusToggle && data.diff_mode !== undefined && document.activeElement !== plusMinusToggle) {
         ignoreWsUpdates = true;

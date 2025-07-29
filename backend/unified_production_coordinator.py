@@ -737,9 +737,6 @@ class UnifiedProductionCoordinator:
                 num_steps=10
             )
             
-            # Broadcast momentum data update
-            self._broadcast_momentum_update(momentum)
-            
             print(f"📊 Probabilities: Price=${btc_price:,.2f}, TTC={ttc_seconds}s, Momentum={momentum:.3f}")
             return PipelineResult(
                 step=PipelineStep.PROBABILITIES,
@@ -779,6 +776,14 @@ class UnifiedProductionCoordinator:
                 data = calculate_strike_data(strike, btc_price, probabilities, market_data)
                 strike_data.append(data)
             
+            # Get fingerprint info from probability calculator
+            from util.probability_calculator import get_probability_calculator
+            calculator = get_probability_calculator()
+            fingerprint_filename = f"btc_fingerprint_directional_momentum_{calculator.current_momentum_bucket:03d}.csv" if calculator.current_momentum_bucket is not None else "unknown"
+            
+            # Get momentum data
+            momentum_data = self.analyzer.get_momentum_analysis()
+            
             # Create output
             output = {
                 "symbol": "BTC",
@@ -790,7 +795,20 @@ class UnifiedProductionCoordinator:
                 "strike_tier": market_data.get("strike_tier"),
                 "market_status": market_data.get("market_status"),
                 "last_updated": datetime.now().isoformat(),
-                "strikes": strike_data
+                "strikes": strike_data,
+                # Add consolidated data
+                "momentum": {
+                    "weighted_score": prob_data.get("momentum", 0.0),
+                    "deltas": {
+                        "delta_1m": momentum_data.get("delta_1m"),
+                        "delta_2m": momentum_data.get("delta_2m"),
+                        "delta_3m": momentum_data.get("delta_3m"),
+                        "delta_4m": momentum_data.get("delta_4m"),
+                        "delta_15m": momentum_data.get("delta_15m"),
+                        "delta_30m": momentum_data.get("delta_30m")
+                    }
+                },
+                "fingerprint": fingerprint_filename
             }
             
             # Write to file
