@@ -695,7 +695,7 @@
         </div>
         
         <!-- Watchlist Table -->
-        <div style="margin-top: 20px;">
+        <div style="margin-top: 20px; max-height: 250px; overflow-y: auto;">
           <table id="watchlist-table" class="strike-table" style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
             <colgroup>
               <col class="col-strike">
@@ -3466,6 +3466,62 @@ if (typeof window.liveData !== 'undefined') {
             });
         }, 500);
       }, 100);
+    });
+  </script>
+  
+  <script>
+    // Expose trade refresh functions to global scope
+    window.fetchAndRenderTrades = fetchAndRenderTrades;
+    window.fetchAndRenderRecentTrades = fetchAndRenderRecentTrades;
+    window.fetchAndRenderTradeHistory = fetchAndRenderTradeHistory;
+  </script>
+  
+  <script>
+    // Auto-refresh trade history table every 10 seconds
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('Setting up auto-refresh for trade history table (every 10 seconds)');
+      
+      // Set up the auto-refresh interval
+      const refreshInterval = setInterval(function() {
+        console.log('Auto-refreshing trade history table...');
+        
+        // Refresh trade history data without reloading the page
+        // These functions are defined in this file, so they should be available
+        try {
+          if (typeof fetchAndRenderTrades === 'function') {
+            console.log('Calling fetchAndRenderTrades...');
+            fetchAndRenderTrades();
+          } else {
+            console.log('fetchAndRenderTrades function not found');
+          }
+          
+          if (typeof fetchAndRenderRecentTrades === 'function') {
+            console.log('Calling fetchAndRenderRecentTrades...');
+            fetchAndRenderRecentTrades();
+          } else {
+            console.log('fetchAndRenderRecentTrades function not found');
+          }
+          
+          // Also try to refresh other trade-related data
+          if (typeof fetchAndRenderTradeHistory === 'function') {
+            console.log('Calling fetchAndRenderTradeHistory...');
+            fetchAndRenderTradeHistory();
+          }
+          
+        } catch (error) {
+          console.error('Error during auto-refresh:', error);
+        }
+      }, 10000); // 10 seconds = 10000 milliseconds
+      
+      // Store the interval ID so it can be cleared if needed
+      window.tradeHistoryRefreshInterval = refreshInterval;
+      
+      // Optional: Clear interval when page is unloaded
+      window.addEventListener('beforeunload', function() {
+        if (window.tradeHistoryRefreshInterval) {
+          clearInterval(window.tradeHistoryRefreshInterval);
+        }
+      });
     });
   </script>
 </body>

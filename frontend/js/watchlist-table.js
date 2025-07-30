@@ -205,9 +205,46 @@ async function updateWatchlistTable() {
       }
     });
     
+    // Maintain probability ordering (highest to lowest)
+    maintainWatchlistProbabilityOrder(data.strikes);
+    
   } catch (error) {
     console.error('Error updating watchlist table:', error);
   }
+}
+
+// === WATCHLIST PROBABILITY ORDERING ===
+
+function maintainWatchlistProbabilityOrder(strikes) {
+  const watchlistTableBody = document.querySelector('#watchlist-table tbody');
+  if (!watchlistTableBody || !window.watchlistRowsMap) return;
+  
+  // Create a map of strike to probability for quick lookup
+  const strikeProbabilityMap = new Map();
+  strikes.forEach(strikeData => {
+    strikeProbabilityMap.set(strikeData.strike, strikeData.probability);
+  });
+  
+  // Get all visible rows (strikes that are in the watchlist)
+  const visibleRows = [];
+  window.watchlistRowsMap.forEach((cells, strike) => {
+    if (cells.row.style.display !== 'none') {
+      const probability = strikeProbabilityMap.get(strike) || 0;
+      visibleRows.push({
+        strike,
+        probability,
+        row: cells.row
+      });
+    }
+  });
+  
+  // Sort by probability (highest to lowest)
+  visibleRows.sort((a, b) => b.probability - a.probability);
+  
+  // Reorder rows in the DOM to match the sorted order
+  visibleRows.forEach(({ row }) => {
+    watchlistTableBody.appendChild(row);
+  });
 }
 
 // === WATCHLIST TABLE ROW INITIALIZATION ===
@@ -225,7 +262,10 @@ function initializeWatchlistTableRows(strikes) {
   watchlistTableBody.innerHTML = '';
   window.watchlistRowsMap.clear();
   
-  strikes.forEach((strikeData) => {
+  // Sort strikes by probability (highest to lowest) before creating rows
+  const sortedStrikes = [...strikes].sort((a, b) => b.probability - a.probability);
+  
+  sortedStrikes.forEach((strikeData) => {
     const row = document.createElement('tr');
     const strike = strikeData.strike;
     
@@ -458,4 +498,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Export functions for global access (same as main strike table)
 window.updateWatchlistTable = updateWatchlistTable;
-window.updateWatchlistPositionIndicator = updateWatchlistPositionIndicator; 
+window.updateWatchlistPositionIndicator = updateWatchlistPositionIndicator;
+window.maintainWatchlistProbabilityOrder = maintainWatchlistProbabilityOrder; 
