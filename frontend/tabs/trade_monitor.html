@@ -3425,4 +3425,48 @@ if (typeof window.liveData !== 'undefined') {
 }
 </script>
 
+  <script>
+    // Force initialize strike table after DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('DOMContentLoaded - Force initializing strike table');
+      
+      // Wait a bit for all scripts to load
+      setTimeout(function() {
+        console.log('Checking strike table functions...');
+        console.log('window.StrikeTable:', typeof window.StrikeTable);
+        console.log('window.initializeStrikeTableContainer:', typeof window.initializeStrikeTableContainer);
+        console.log('window.updateStrikeTable:', typeof window.updateStrikeTable);
+        
+        if (typeof window.StrikeTable !== 'undefined' && typeof window.StrikeTable.initialize === 'function') {
+          console.log('Initializing StrikeTable...');
+          window.StrikeTable.initialize();
+        } else {
+          console.log('StrikeTable not available, trying direct initialization...');
+          if (typeof window.initializeStrikeTableContainer === 'function') {
+            console.log('Calling initializeStrikeTableContainer...');
+            window.initializeStrikeTableContainer();
+          }
+          if (typeof window.updateStrikeTable === 'function') {
+            console.log('Calling updateStrikeTable...');
+            window.updateStrikeTable();
+          }
+        }
+        
+        // Test API call directly
+        setTimeout(function() {
+          console.log('Testing API call...');
+          fetch('/api/strike_tables/btc')
+            .then(response => response.json())
+            .then(data => {
+              console.log('API response:', data);
+              console.log('Strikes count:', data.strikes ? data.strikes.length : 'no strikes');
+            })
+            .catch(error => {
+              console.error('API error:', error);
+            });
+        }, 500);
+      }, 100);
+    });
+  </script>
+</body>
 </html>

@@ -381,6 +381,14 @@ def handle_trade_manager_notification():
             else:
                 log(f"❌ Failed to remove failed trade: {trade_id}")
                 
+        elif status == 'expired':
+            # Remove expired trade from active_trades.db
+            success = remove_closed_trade(trade_id)
+            if success:
+                log(f"✅ Successfully removed expired trade: {trade_id}")
+            else:
+                log(f"❌ Failed to remove expired trade: {trade_id}")
+                
         else:
             log(f"⚠️ Unknown status in trade_manager notification: {status}")
             return jsonify({"error": f"Unknown status: {status}"}), 400
@@ -1495,7 +1503,7 @@ def start_event_driven_supervisor():
     # Start HTTP server in a separate thread
     def start_http_server():
         try:
-            host = get_host()
+            host = "localhost"  # Use localhost for internal service communication
             port = ACTIVE_TRADE_SUPERVISOR_PORT
             log(f"🌐 Starting HTTP server on {host}:{port}")
             app.run(host=host, port=port, debug=False, use_reloader=False)

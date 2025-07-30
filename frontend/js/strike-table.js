@@ -234,6 +234,14 @@ function generateStrikeTableHTML() {
 
 async function buildStrikeTableRows(basePrice) {
   const strikeTableData = await fetchStrikeTableData();
+  
+  // Use actual strikes from API response instead of generating based on current price
+  if (strikeTableData && strikeTableData.strikes && strikeTableData.strikes.length > 0) {
+    // Sort strikes by price and return them directly
+    return strikeTableData.strikes.map(s => s.strike).sort((a, b) => a - b);
+  }
+  
+  // Fallback to original logic if no strikes in API response
   const strikeTier = strikeTableData.strike_tier;
   const step = strikeTier;
   const rows = [];

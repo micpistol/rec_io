@@ -95,7 +95,7 @@ def broadcast_auto_entry_indicator_change():
         # Send to main app for WebSocket broadcast
         try:
             port = get_port("main_app")
-            url = get_service_url(port) + "/api/broadcast_auto_entry_indicator"
+            url = f"http://localhost:{port}/api/broadcast_auto_entry_indicator"
             response = requests.post(url, json=auto_entry_indicator_state, timeout=2)
             if response.ok:
                 log(f"[AUTO ENTRY] ✅ Auto entry indicator change broadcasted: {current_state}")
@@ -149,7 +149,7 @@ def get_current_ttc():
     """Get current TTC from unified TTC endpoint"""
     try:
         port = get_port("main_app")
-        url = get_service_url(port) + "/api/unified_ttc/btc"
+        url = f"http://localhost:{port}/api/unified_ttc/btc"
         response = requests.get(url, timeout=2)
         if response.ok:
             data = response.json()
@@ -201,7 +201,7 @@ def trigger_auto_entry_trade(strike_data):
     
     try:
         port = get_port("trade_initiator")
-        url = get_service_url(port) + "/api/initiate_trade"
+        url = f"http://localhost:{port}/api/initiate_trade"
         
         # Get contract name from watchlist market_title
         watchlist_data = get_watchlist_data()
@@ -242,7 +242,7 @@ def trigger_auto_entry_trade(strike_data):
             # Send WebSocket notification to frontend for audio/popup alerts
             try:
                 main_port = get_port("main_app")
-                main_url = get_service_url(main_port) + "/api/notify_automated_trade"
+                main_url = f"http://localhost:{main_port}/api/notify_automated_trade"
                 notification_data = {
                     "strike": strike_data.get("strike"),
                     "side": strike_data.get("side"),
@@ -290,7 +290,7 @@ def is_strike_already_traded(strike_data):
     try:
         # Get active trades from the active_trade_supervisor
         port = get_port("active_trade_supervisor")
-        url = get_service_url(port) + "/api/active_trades"
+        url = f"http://localhost:{port}/api/active_trades"
         response = requests.get(url, timeout=2)
         
         if not response.ok:
@@ -574,7 +574,7 @@ def notify_automated_trade():
         # Forward the notification to the main app for WebSocket broadcast
         try:
             port = get_port("main_app")
-            url = get_service_url(port) + "/api/notify_automated_trade"
+            url = f"http://localhost:{port}/api/notify_automated_trade"
             response = requests.post(url, json=data, timeout=2)
             if response.ok:
                 log(f"[AUTO ENTRY] ✅ Frontend notification sent successfully")
@@ -605,7 +605,7 @@ def start_event_driven_supervisor():
     # Start HTTP server
     def start_http_server():
         try:
-            host = get_host()
+            host = "localhost"  # Use localhost for internal service communication
             port = AUTO_ENTRY_SUPERVISOR_PORT
             log(f"🌐 Starting HTTP server on {host}:{port}")
             

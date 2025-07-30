@@ -148,7 +148,8 @@ def list_all_ports() -> Dict[str, int]:
 def get_port_info() -> Dict:
     """Get comprehensive port information for API endpoints using universal host system."""
     ports = list_all_ports()
-    host = get_host()
+    # Use localhost for frontend communication to ensure portability
+    host = "localhost"
     return {
         "ports": ports,
         "service_urls": {name: f"http://{host}:{port}" for name, port in ports.items()},
