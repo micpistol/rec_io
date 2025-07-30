@@ -36,17 +36,19 @@ class SystemMonitor:
         }
     
     def check_service_health(self, service_name: str, port: int) -> Dict[str, Any]:
-        """Check health of a specific service."""
+        """Check health of a specific service using supervisor status only."""
         try:
-            from backend.util.paths import get_host
-            host = get_host()
-            response = requests.get(f"http://{host}:{port}/health", timeout=5)
-            if response.status_code == 200:
+            # Use supervisor status check instead of HTTP health endpoint
+            result = subprocess.run(
+                ["supervisorctl", "-c", "backend/supervisord.conf", "status", service_name],
+                capture_output=True, text=True, timeout=5
+            )
+            if "RUNNING" in result.stdout:
                 return {
                     "service": service_name,
                     "status": "healthy",
                     "port": port,
-                    "response_time": response.elapsed.total_seconds(),
+                    "response_time": 0.0,  # No HTTP request
                     "timestamp": datetime.now().isoformat()
                 }
             else:
@@ -54,7 +56,7 @@ class SystemMonitor:
                     "service": service_name,
                     "status": "unhealthy",
                     "port": port,
-                    "error": f"HTTP {response.status_code}",
+                    "error": "Service not running in supervisor",
                     "timestamp": datetime.now().isoformat()
                 }
         except Exception as e:

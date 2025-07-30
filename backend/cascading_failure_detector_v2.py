@@ -154,20 +154,7 @@ class CascadingFailureDetectorV2:
             return False
             
         try:
-            # Method 1: HTTP health check if service has health endpoint
-            if health.has_health_endpoint and health.port:
-                try:
-                    url = f"http://{get_host()}:{health.port}/health"
-                    response = requests.get(url, timeout=3)
-                    if response.status_code == 200:
-                        health.status = "healthy"
-                        health.consecutive_failures = 0
-                        health.last_check = datetime.now()
-                        return True
-                except Exception:
-                    pass  # Fall through to supervisor check
-            
-            # Method 2: Supervisor status check (more reliable)
+            # Use supervisor status check only (HTTP health checks disabled)
             try:
                 result = subprocess.run(
                     ["supervisorctl", "-c", "backend/supervisord.conf", "status", service_name],

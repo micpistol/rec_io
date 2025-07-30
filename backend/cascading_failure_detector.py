@@ -143,11 +143,13 @@ class CascadingFailureDetector:
             return False
             
         try:
-            # Try HTTP health check if service has a port
-            if health.port:
-                url = f"http://{get_host()}:{health.port}/health"
-                response = requests.get(url, timeout=2)
-                if response.status_code == 200:
+            # Use supervisor status check only (HTTP health checks disabled)
+            try:
+                result = subprocess.run(
+                    ["supervisorctl", "-c", "backend/supervisord.conf", "status", service_name],
+                    capture_output=True, text=True, timeout=5
+                )
+                if "RUNNING" in result.stdout:
                     health.status = "healthy"
                     health.consecutive_failures = 0
                     health.last_check = datetime.now()
@@ -157,28 +159,11 @@ class CascadingFailureDetector:
                     health.consecutive_failures += 1
                     health.last_check = datetime.now()
                     return False
-            else:
-                # Fallback to supervisor status check
-                try:
-                    result = subprocess.run(
-                        ["supervisorctl", "-c", "backend/supervisord.conf", "status", service_name],
-                        capture_output=True, text=True, timeout=5
-                    )
-                    if "RUNNING" in result.stdout:
-                        health.status = "healthy"
-                        health.consecutive_failures = 0
-                        health.last_check = datetime.now()
-                        return True
-                    else:
-                        health.status = "unhealthy"
-                        health.consecutive_failures += 1
-                        health.last_check = datetime.now()
-                        return False
-                except Exception:
-                    health.status = "unknown"
-                    health.consecutive_failures += 1
-                    health.last_check = datetime.now()
-                    return False
+            except Exception:
+                health.status = "unknown"
+                health.consecutive_failures += 1
+                health.last_check = datetime.now()
+                return False
                     
         except Exception as e:
             health.status = "error"

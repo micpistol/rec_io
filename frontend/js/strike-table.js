@@ -235,18 +235,24 @@ function generateStrikeTableHTML() {
 async function buildStrikeTableRows(basePrice) {
   const strikeTableData = await fetchStrikeTableData();
   
-  // Use actual strikes from API response instead of generating based on current price
+  // Use actual strikes from API response but limit to 14 total (7 above + 7 below current price)
   if (strikeTableData && strikeTableData.strikes && strikeTableData.strikes.length > 0) {
-    // Sort strikes by price and return them directly
-    return strikeTableData.strikes.map(s => s.strike).sort((a, b) => a - b);
+    const currentPrice = strikeTableData.current_price;
+    const allStrikes = strikeTableData.strikes.map(s => s.strike).sort((a, b) => a - b);
+    
+    // Find strikes closest to current price
+    const strikesBelow = allStrikes.filter(s => s < currentPrice).slice(-7); // 7 closest below
+    const strikesAbove = allStrikes.filter(s => s >= currentPrice).slice(0, 7); // 7 closest above
+    
+    return [...strikesBelow, ...strikesAbove];
   }
   
   // Fallback to original logic if no strikes in API response
   const strikeTier = strikeTableData.strike_tier;
   const step = strikeTier;
   const rows = [];
-  // Generate 8 rows above and 8 rows below the current price (16 total, 14 visible after hiding first/last)
-  for (let i = basePrice - 8 * step; i <= basePrice + 7 * step; i += step) {
+  // Generate 7 rows above and 7 rows below the current price (14 total)
+  for (let i = basePrice - 7 * step; i <= basePrice + 7 * step; i += step) {
     rows.push(i);
   }
   return rows;
@@ -328,11 +334,7 @@ async function initializeStrikeTable(basePrice) {
     noTd.appendChild(noSpan);
     row.appendChild(noTd);
 
-    // Hide the first and last row (buffer rows)
-    if (idx === 0 || idx === strikes.length - 1) {
-      row.classList.add('strike-row-buffer');
-      row.style.display = 'none';
-    }
+    // All rows are now visible (7 above + 7 below = 14 total)
     strikeTableBody.appendChild(row);
 
     window.strikeRowsMap.set(strike, {

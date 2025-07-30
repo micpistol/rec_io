@@ -1172,7 +1172,7 @@ async def trigger_open_trade(request: Request):
             "ticker": ticker,
             "buy_price": buy_price,
             "prob": prob,
-            "strategy": trade_strategy or "*** TEST ***",
+            "trade_strategy": trade_strategy or "*** TEST ***",
             "contract": contract or "BTC 12pm",
             "symbol_open": symbol_open,
             "momentum": momentum,

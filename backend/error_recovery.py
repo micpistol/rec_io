@@ -105,11 +105,14 @@ class ErrorRecoverySystem:
             return False
     
     def check_service_health(self, service_name: str, port: int) -> bool:
-        """Check if a service is healthy."""
+        """Check if a service is healthy using supervisor status only."""
         try:
-            host = get_host()
-            response = requests.get(f"http://{host}:{port}/health", timeout=5)
-            return response.status_code == 200
+            # Use supervisor status check instead of HTTP health endpoint
+            result = subprocess.run(
+                ["supervisorctl", "-c", "backend/supervisord.conf", "status", service_name],
+                capture_output=True, text=True, timeout=5
+            )
+            return "RUNNING" in result.stdout
         except Exception as e:
             print(f"❌ Service {service_name} health check failed: {e}")
             return False

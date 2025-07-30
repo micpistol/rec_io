@@ -94,9 +94,7 @@
   font-size: 16px !important;
 }
 
-.strike-row-buffer {
-  display: none;
-}
+/* Buffer rows no longer used - all 14 rows are now visible */
 
 /* Unified spanner row styling for ALL tables */
 tr.spanner-row td {
