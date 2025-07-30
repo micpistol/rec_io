@@ -473,8 +473,8 @@ async def get_core_data():
         btc_price = 0
         try:
             # First try to get the latest price from the watchdog's database
-            from backend.util.paths import get_price_history_dir
-            btc_price_history_db = os.path.join(get_price_history_dir(), "btc_price_history.db")
+            from backend.util.paths import get_btc_price_history_dir
+            btc_price_history_db = os.path.join(get_btc_price_history_dir(), "btc_price_history.db")
             
             if os.path.exists(btc_price_history_db):
                 conn = sqlite3.connect(btc_price_history_db)
@@ -851,11 +851,29 @@ async def get_current_momentum():
 
 @app.get("/api/btc_price")
 async def get_btc_price():
-    """Get current BTC price."""
+    """Get current BTC price directly from btc_price_watchdog database."""
     try:
-        from live_data_analysis import get_btc_price
-        price = get_btc_price()
-        return {"price": price}
+        from backend.util.paths import get_btc_price_history_dir
+        import sqlite3
+        import os
+        
+        btc_price_history_db = os.path.join(get_btc_price_history_dir(), "btc_price_history.db")
+        
+        if not os.path.exists(btc_price_history_db):
+            return {"price": None, "error": "BTC price database not found"}
+        
+        conn = sqlite3.connect(btc_price_history_db)
+        cursor = conn.cursor()
+        cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            price = float(result[0])
+            return {"price": price, "source": "btc_price_watchdog"}
+        else:
+            return {"price": None, "error": "No price data available"}
+            
     except Exception as e:
         print(f"Error getting BTC price: {e}")
         return {"price": None, "error": str(e)}

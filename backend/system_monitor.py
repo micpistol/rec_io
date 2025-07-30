@@ -97,7 +97,8 @@ class SystemMonitor:
         
         # Check price history database
         try:
-            db_path = os.path.join(get_price_history_dir(), "btc_price_history.db")
+            from backend.util.paths import get_btc_price_history_dir
+            db_path = os.path.join(get_btc_price_history_dir(), "btc_price_history.db")
             if os.path.exists(db_path):
                 conn = sqlite3.connect(db_path)
                 cursor = conn.cursor()

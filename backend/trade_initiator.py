@@ -54,16 +54,29 @@ def generate_ticket_id():
     return f'TICKET-{random.randint(100000000, 999999999)}-{int(time.time() * 1000)}'
 
 def get_current_btc_price():
-    """Get current BTC price for symbol_open/symbol_close"""
+    """Get current BTC price for symbol_open/symbol_close from unified endpoint"""
     try:
-        btc_price_file = os.path.join(get_data_dir(), "coinbase", "btc_price.json")
-        if os.path.exists(btc_price_file):
-            with open(btc_price_file, 'r') as f:
-                btc_data = json.load(f)
-                return btc_data.get('price')
+        import requests
+        from backend.core.port_config import get_port
+        from backend.util.paths import get_host
+        
+        main_port = get_port("main_app")
+        response = requests.get(f"http://{get_host()}:{main_port}/api/btc_price", timeout=5)
+        if response.ok:
+            btc_data = response.json()
+            price = btc_data.get('price')
+            if price:
+                log(f"Got BTC price from unified endpoint: {price}")
+                return price
+            else:
+                log(f"Warning: No price data in unified endpoint response")
+                return None
+        else:
+            log(f"Warning: Unified BTC price endpoint returned status {response.status_code}")
+            return None
     except Exception as e:
-        log(f"Warning: Could not get BTC price: {e}")
-    return None
+        log(f"Warning: Could not get BTC price from unified endpoint: {e}")
+        return None
 
 def get_current_momentum():
     """Get current momentum score"""

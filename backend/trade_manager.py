@@ -310,12 +310,23 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                 # Get current symbol price from API for symbol_close
                 symbol_close = None
                 try:
-                    # Get current BTC price from the API
-                    from active_trade_supervisor import get_current_btc_price
-                    symbol_close = get_current_btc_price()
-                    log_event(ticket_id, f"MANAGER: Retrieved current symbol price for close: {symbol_close}")
+                    # Get current BTC price from the unified endpoint
+                    import requests
+                    main_port = get_port("main_app")
+                    response = requests.get(f"http://{get_host()}:{main_port}/api/btc_price", timeout=5)
+                    if response.ok:
+                        btc_data = response.json()
+                        symbol_close = btc_data.get('price')
+                        if symbol_close:
+                            log_event(ticket_id, f"MANAGER: Retrieved current symbol price for close: {symbol_close}")
+                        else:
+                            log_event(ticket_id, f"MANAGER: No price data in unified endpoint response")
+                            symbol_close = None
+                    else:
+                        log_event(ticket_id, f"MANAGER: Unified BTC price endpoint returned status {response.status_code}")
+                        symbol_close = None
                 except Exception as e:
-                    log_event(ticket_id, f"MANAGER: Failed to get current symbol price: {e}")
+                    log_event(ticket_id, f"MANAGER: Failed to get current symbol price from unified endpoint: {e}")
                     symbol_close = None
                 
                 # Calculate PnL with fees included
@@ -904,28 +915,22 @@ def insert_trade(trade):
     
     # ALWAYS get current BTC price for symbol_open
     try:
-        btc_price_log = os.path.join(get_data_dir(), "coinbase", "btc_price_log.txt")
-        if os.path.exists(btc_price_log):
-            with open(btc_price_log, 'r') as f:
-                lines = f.readlines()
-                if lines:
-                    last_line = lines[-1].strip()
-                    # Extract price from format: "2025-07-24T15:45:12 | $119,098.68"
-                    if " | $" in last_line:
-                        price_str = last_line.split(" | $")[1]
-                        symbol_open = float(price_str.replace(",", ""))
-                        print(f"[TRADE_MANAGER] Got symbol_open from log: {symbol_open}")
-                    else:
-                        print(f"[TRADE_MANAGER] Warning: Could not parse price from log line: {last_line}")
-                        symbol_open = None
-                else:
-                    print(f"[TRADE_MANAGER] Warning: BTC price log is empty")
-                    symbol_open = None
+        import requests
+        main_port = get_port("main_app")
+        response = requests.get(f"http://{get_host()}:{main_port}/api/btc_price", timeout=5)
+        if response.ok:
+            btc_data = response.json()
+            symbol_open = btc_data.get('price')
+            if symbol_open:
+                print(f"[TRADE_MANAGER] Got symbol_open from unified endpoint: {symbol_open}")
+            else:
+                print(f"[TRADE_MANAGER] Warning: No price data in unified endpoint response")
+                symbol_open = None
         else:
-            print(f"[TRADE_MANAGER] Warning: BTC price log not found: {btc_price_log}")
+            print(f"[TRADE_MANAGER] Warning: Unified BTC price endpoint returned status {response.status_code}")
             symbol_open = None
     except Exception as e:
-        print(f"[TRADE_MANAGER] Error getting BTC price: {e}")
+        print(f"[TRADE_MANAGER] Error getting BTC price from unified endpoint: {e}")
         symbol_open = None
     
     # Get current momentum from API and format it correctly for database
@@ -1377,18 +1382,24 @@ def check_expired_trades():
         now_est = datetime.now(ZoneInfo("America/New_York"))
         closed_at = now_est.strftime("%H:%M:%S")
         
-        # Get current BTC price from watchdog
+        # Get current BTC price from unified endpoint
         try:
             import requests
             main_port = get_port("main_app")
-            response = requests.get(f"http://{get_host()}:{main_port}/core", timeout=5)
+            response = requests.get(f"http://{get_host()}:{main_port}/api/btc_price", timeout=5)
             if response.ok:
-                core_data = response.json()
-                symbol_close = core_data.get('btc_price')
+                btc_data = response.json()
+                symbol_close = btc_data.get('price')
+                if symbol_close:
+                    print(f"[EXPIRATION] Got BTC price from unified endpoint: {symbol_close}")
+                else:
+                    print(f"[EXPIRATION] Warning: No price data in unified endpoint response")
+                    symbol_close = None
             else:
+                print(f"[EXPIRATION] Warning: Unified BTC price endpoint returned status {response.status_code}")
                 symbol_close = None
         except Exception as e:
-            print(f"[EXPIRATION] Failed to get BTC price: {e}")
+            print(f"[EXPIRATION] Failed to get BTC price from unified endpoint: {e}")
             symbol_close = None
         
         # Mark trades as expired

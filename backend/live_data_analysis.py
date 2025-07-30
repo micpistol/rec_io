@@ -18,12 +18,12 @@ from typing import Dict, Any, List, Optional
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from backend.core.port_config import get_port, get_port_info
-from backend.util.paths import get_data_dir, get_kalshi_data_dir, get_price_history_dir
+from backend.util.paths import get_data_dir, get_kalshi_data_dir, get_btc_price_history_dir
 from backend.core.config.settings import config
 
 class LiveDataAnalyzer:
     def __init__(self):
-        self.price_history_db = os.path.join(get_price_history_dir(), "btc_price_history.db")
+        self.price_history_db = os.path.join(get_btc_price_history_dir(), "btc_price_history.db")
         self.cache = {}
         self.last_update = None
         # Use EST timezone for all calculations
@@ -198,6 +198,10 @@ def get_momentum_data() -> Dict:
 def get_ttc_data() -> Dict:
     """Get TTC data for external use"""
     return analyzer.get_ttc_data()
+
+def get_btc_price() -> Optional[float]:
+    """Get current BTC price from watchdog database for external use"""
+    return analyzer.get_current_price()
 
 if __name__ == "__main__":
     # Test the analyzer

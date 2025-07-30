@@ -18,14 +18,13 @@ print('DEBUG sys.path:', sys.path)
 # Now import everything else
 from backend.core.config.settings import config
 from backend.core.port_config import get_port
-from backend.util.paths import get_coinbase_data_dir, get_price_history_dir, ensure_data_dirs
+from backend.util.paths import get_coinbase_data_dir, get_btc_price_history_dir, ensure_data_dirs
 
 # Ensure all data directories exist
 ensure_data_dirs()
 
-BTC_LOG_PATH = os.path.join(get_coinbase_data_dir(), "btc_price_log.txt")
 BTC_HEARTBEAT_PATH = os.path.join(get_coinbase_data_dir(), "btc_logger_heartbeat.txt")
-BTC_PRICE_HISTORY_DB = os.path.join(get_price_history_dir(), "btc_price_history.db")
+BTC_PRICE_HISTORY_DB = os.path.join(get_btc_price_history_dir(), "btc_price_history.db")
 COINBASE_WS_URL = "wss://ws-feed.exchange.coinbase.com"
 
 last_logged_second = None
@@ -90,12 +89,6 @@ async def log_btc_price():
 
                         rounded_timestamp = now.strftime("%Y-%m-%dT%H:%M:%S")
                         formatted_price = f"${price:,.2f}"
-                        log_entry = f"{rounded_timestamp} | {formatted_price}\n"
-
-                        # Ensure the directory exists before writing to the log file
-                        os.makedirs(os.path.dirname(BTC_LOG_PATH), exist_ok=True)
-                        with open(BTC_LOG_PATH, "a") as f:
-                            f.write(log_entry)
 
                         insert_tick(rounded_timestamp, price)
 

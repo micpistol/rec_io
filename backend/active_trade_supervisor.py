@@ -979,9 +979,8 @@ def get_current_btc_price() -> Optional[float]:
     """Get the current BTC price from the price_log table"""
     try:
         # Get the path to the price history database
-        from backend.util.paths import get_price_history_dir
-        price_history_dir = get_price_history_dir()
-        btc_price_db = os.path.join(price_history_dir, "btc_price_history.db")
+        from backend.util.paths import get_btc_price_history_dir
+        btc_price_db = os.path.join(get_btc_price_history_dir(), "btc_price_history.db")
         
         if not os.path.exists(btc_price_db):
             log("⚠️ BTC price database not found")
