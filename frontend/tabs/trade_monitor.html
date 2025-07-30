@@ -643,7 +643,6 @@
             <option value="live">PROD</option>
             <option value="demo">DEMO</option>
           </select>
-          <span id="account-status" style="font-weight: bold; color: #00ff00; margin-left: 10px;"></span>
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end;">
           <span style="font-size: 11px; color: #ccc; font-weight: normal; margin-bottom: 0px;">Balance</span>
@@ -766,15 +765,7 @@
         .then(data => {
           const mode = data.mode;
           const selector = document.getElementById("account-selector");
-          const statusEl = document.getElementById("account-status");
           selector.value = mode === 'prod' ? 'live' : 'demo';
-          if (mode === 'prod') {
-            statusEl.textContent = "LIVE TRADING";
-            statusEl.style.color = "#00ff00";
-          } else {
-            statusEl.textContent = "Paper Trading";
-            statusEl.style.color = "orange";
-          }
           
           // Fetch and update account balance
           updateAccountBalance(mode);
@@ -782,15 +773,7 @@
 
       document.getElementById("account-selector").addEventListener("change", () => {
         const selected = document.getElementById("account-selector").value;
-        const statusEl = document.getElementById("account-status");
         const mode = selected === "live" ? "prod" : "demo";
-        if (mode === "prod") {
-          statusEl.textContent = "LIVE TRADING";
-          statusEl.style.color = "#00ff00";
-        } else {
-          statusEl.textContent = "Paper Trading";
-          statusEl.style.color = "orange";
-        }
         fetch('/api/set_account_mode', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -988,11 +971,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // === Account Mode Sync ===
       if (data.account_mode) {
         const selector = document.getElementById("account-selector");
-        const statusEl = document.getElementById("account-status");
-        if (selector && statusEl) {
+        if (selector) {
           selector.value = data.account_mode === "prod" ? "live" : "demo";
-          statusEl.textContent = data.account_mode === "prod" ? "LIVE TRADING" : "Paper Trading";
-          statusEl.style.color = data.account_mode === "prod" ? "#00ff00" : "orange";
         }
       }
 
