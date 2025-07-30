@@ -389,6 +389,22 @@ def handle_trade_manager_notification():
             else:
                 log(f"❌ Failed to remove expired trade: {trade_id}")
                 
+        elif status == 'closing':
+            # Update trade status to closing
+            success = update_trade_status_to_closing(trade_id)
+            if success:
+                log(f"✅ Successfully updated trade to closing status: {trade_id}")
+            else:
+                log(f"❌ Failed to update trade to closing status: {trade_id}")
+                
+        elif status == 'closed':
+            # Remove closed trade from active_trades.db
+            success = remove_closed_trade(trade_id)
+            if success:
+                log(f"✅ Successfully removed closed trade: {trade_id}")
+            else:
+                log(f"❌ Failed to remove closed trade: {trade_id}")
+                
         else:
             log(f"⚠️ Unknown status in trade_manager notification: {status}")
             return jsonify({"error": f"Unknown status: {status}"}), 400

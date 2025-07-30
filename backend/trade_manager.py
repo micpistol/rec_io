@@ -220,139 +220,142 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
         log_event(ticket_id, f"MANAGER: positions.db not found at {POSITIONS_DB_PATH}")
         return
     
-    max_attempts = 15
-    attempt = 0
-    
-    while attempt < max_attempts:
-        try:
+    # Check position once - positions change notification should handle timing
+    try:
+        log(f"[DEBUG] Checking position for ticker: {expected_ticker} in database: {POSITIONS_DB_PATH}")
+        conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
+        cursor_pos = conn_pos.cursor()
+        cursor_pos.execute("SELECT position FROM positions WHERE ticker = ?", (expected_ticker,))
+        row = cursor_pos.fetchone()
+        conn_pos.close()
+        
+        log(f"[DEBUG] Position query result: {row}")
+        log(f"[DEBUG] Checking if position is zero: row={row}, row[0]={row[0] if row else 'None'}")
+        
+        if row and row[0] == 0:
+            log(f"[DEBUG] Position is zero - proceeding to confirm close for trade {id}")
+            log_event(ticket_id, f"MANAGER: POSITION ZEROED OUT for {expected_ticker}")
+            
+            now_est = datetime.now(ZoneInfo("America/New_York"))
+            closed_at = now_est.strftime("%H:%M:%S")
+            
             conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
             cursor_pos = conn_pos.cursor()
-            cursor_pos.execute("SELECT position FROM positions WHERE ticker = ?", (expected_ticker,))
-            row = cursor_pos.fetchone()
+            cursor_pos.execute("SELECT fees_paid FROM positions WHERE ticker = ?", (expected_ticker,))
+            fees_row = cursor_pos.fetchone()
             conn_pos.close()
             
-            if row and row[0] == 0:
-                log_event(ticket_id, f"MANAGER: POSITION ZEROED OUT for {expected_ticker}")
-                
-                now_est = datetime.now(ZoneInfo("America/New_York"))
-                closed_at = now_est.strftime("%H:%M:%S")
-                
-                conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
-                cursor_pos = conn_pos.cursor()
-                cursor_pos.execute("SELECT fees_paid FROM positions WHERE ticker = ?", (expected_ticker,))
-                fees_row = cursor_pos.fetchone()
-                conn_pos.close()
-                
-                total_fees_paid = float(fees_row[0]) if fees_row and fees_row[0] is not None else 0.0
-                
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT side FROM trades WHERE id = ?", (id,))
-                side_row = cursor.fetchone()
-                conn.close()
-                
-                original_side = side_row[0] if side_row else None
-                FILLS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "fills.db")
-                sell_price = 999
-                
-                if os.path.exists(FILLS_DB_PATH):
-                    conn_fills = sqlite3.connect(FILLS_DB_PATH, timeout=0.25)
-                    cursor_fills = conn_fills.cursor()
-                    opposite_side = 'no' if original_side == 'Y' else 'yes'
-                    
-                    cursor_fills.execute("""
-                        SELECT yes_price, no_price, created_time, side 
-                        FROM fills 
-                        WHERE ticker = ? AND side = ? 
-                        ORDER BY created_time DESC 
-                        LIMIT 1
-                    """, (expected_ticker, opposite_side))
-                    fill_row = cursor_fills.fetchone()
-                    conn_fills.close()
-                    
-                    if fill_row and original_side:
-                        yes_price, no_price, fill_time, fill_side = fill_row
-                        
-                        if original_side == 'Y':
-                            sell_price = 1 - float(no_price)
-                        elif original_side == 'N':
-                            sell_price = 1 - float(yes_price)
-                        
-                        log_event(ticket_id, f"MANAGER: Found closing fill at {fill_time} - side={fill_side}, yes_price={yes_price}, no_price={no_price}, using sell_price={sell_price}")
-                    else:
-                        log_event(ticket_id, f"MANAGER: No closing fill found for {opposite_side} side yet, waiting...")
-                        conn_fills.close()
-                        time.sleep(1)
-                        continue
-                
-                symbol_close = None
-                try:
-                    import requests
-                    main_port = get_port("main_app")
-                    response = requests.get(f"http://localhost:{main_port}/api/btc_price", timeout=5)
-                    if response.ok:
-                        btc_data = response.json()
-                        symbol_close = btc_data.get('price')
-                        if symbol_close:
-                            log_event(ticket_id, f"MANAGER: Retrieved current symbol price for close: {symbol_close}")
-                        else:
-                            log_event(ticket_id, f"MANAGER: No price data in unified endpoint response")
-                            symbol_close = None
-                    else:
-                        log_event(ticket_id, f"MANAGER: Unified BTC price endpoint returned status {response.status_code}")
-                        symbol_close = None
-                except Exception as e:
-                    log_event(ticket_id, f"MANAGER: Failed to get current symbol price from unified endpoint: {e}")
-                    symbol_close = None
-                
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT buy_price, position FROM trades WHERE id = ?", (id,))
-                trade_data = cursor.fetchone()
-                conn.close()
-                
-                if trade_data:
-                    buy_price, position = trade_data
-                    buy_value = buy_price * position
-                    sell_value = sell_price * position
-                    fees = total_fees_paid if total_fees_paid is not None else 0.0
-                    pnl = round(sell_value - buy_value - fees, 2)
-                    win_loss = "W" if pnl > 0 else "L" if pnl < 0 else "D"
-                    
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT close_method FROM trades WHERE id = ?", (id,))
-                    close_method_row = cursor.fetchone()
-                    close_method = close_method_row[0] if close_method_row else "manual"
-                    conn.close()
-                    
-                    update_trade_status(id, "closed", closed_at, sell_price, symbol_close, win_loss, pnl, close_method)
-                    
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("UPDATE trades SET fees = ? WHERE id = ?", (total_fees_paid, id))
-                    conn.commit()
-                    conn.close()
-                    
-                    log_event(ticket_id, f"MANAGER: CLOSE TRADE CONFIRMED - PnL: {pnl}, W/L: {win_loss}, Fees: {total_fees_paid}")
-                    log(f"[✅ CLOSE TRADE CONFIRMED] id={id}, ticker={expected_ticker}, PnL={pnl}, W/L={win_loss}, Fees={total_fees_paid}")
-                    notify_active_trade_supervisor_direct(id, ticket_id, "closed")
-                    return
-                else:
-                    log_event(ticket_id, f"MANAGER: Could not get trade data for PnL calculation")
-                    return
+            total_fees_paid = float(fees_row[0]) if fees_row and fees_row[0] is not None else 0.0
+            
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT side FROM trades WHERE id = ?", (id,))
+            side_row = cursor.fetchone()
+            conn.close()
+            
+            original_side = side_row[0] if side_row else None
+            FILLS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "fills.db")
+            
+            if not os.path.exists(FILLS_DB_PATH):
+                log_event(ticket_id, f"MANAGER: fills.db not found at {FILLS_DB_PATH}")
+                return
+            
+            conn_fills = sqlite3.connect(FILLS_DB_PATH, timeout=0.25)
+            cursor_fills = conn_fills.cursor()
+            opposite_side = 'no' if original_side == 'Y' else 'yes'
+            
+            cursor_fills.execute("""
+                SELECT yes_price, no_price, created_time, side 
+                FROM fills 
+                WHERE ticker = ? AND side = ? 
+                ORDER BY created_time DESC 
+                LIMIT 1
+            """, (expected_ticker, opposite_side))
+            fill_row = cursor_fills.fetchone()
+            conn_fills.close()
+            
+            if not fill_row or not original_side:
+                log_event(ticket_id, f"MANAGER: No closing fill found for {opposite_side} side - cannot calculate sell price")
+                return
+            
+            yes_price, no_price, fill_time, fill_side = fill_row
+            
+            # Use the price for the opposite side (the side we're buying to close)
+            # Sell price should be 1 - the price we're paying to close
+            if original_side == 'Y':  # Original was YES, so use NO price (we're buying NO to close)
+                sell_price = 1 - float(no_price)  # Keep as decimal
+            elif original_side == 'N':  # Original was NO, so use YES price (we're buying YES to close)
+                sell_price = 1 - float(yes_price)  # Keep as decimal
             else:
-                position_value = row[0] if row else "None"
-                log_event(ticket_id, f"MANAGER: Waiting for position to zero out... Current: {position_value}")
+                log_event(ticket_id, f"MANAGER: Invalid original side: {original_side}")
+                return
+            
+            log(f"[CONFIRM_CLOSE] Found closing fill at {fill_time} - side={fill_side}, yes_price={yes_price}, no_price={no_price}, using sell_price={sell_price}")
+            
+            symbol_close = None
+            try:
+                import requests
+                main_port = get_port("main_app")
+                response = requests.get(f"http://localhost:{main_port}/api/btc_price", timeout=5)
+                if response.ok:
+                    btc_data = response.json()
+                    symbol_close = btc_data.get('price')
+                    if symbol_close:
+                        log_event(ticket_id, f"MANAGER: Retrieved current symbol price for close: {symbol_close}")
+                    else:
+                        log_event(ticket_id, f"MANAGER: No price data in unified endpoint response")
+                        symbol_close = None
+                else:
+                    log_event(ticket_id, f"MANAGER: Unified BTC price endpoint returned status {response.status_code}")
+                    symbol_close = None
+            except Exception as e:
+                log_event(ticket_id, f"MANAGER: Failed to get current symbol price from unified endpoint: {e}")
+                symbol_close = None
+            
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT buy_price, position FROM trades WHERE id = ?", (id,))
+            trade_data = cursor.fetchone()
+            conn.close()
+            
+            if trade_data:
+                buy_price, position = trade_data
+                buy_value = buy_price * position
+                sell_value = sell_price * position
+                fees = total_fees_paid if total_fees_paid is not None else 0.0
+                pnl = round(sell_value - buy_value - fees, 2)
+                win_loss = "W" if pnl > 0 else "L" if pnl < 0 else "D"
                 
-        except Exception as e:
-            log_event(ticket_id, f"MANAGER: Error checking position: {e}")
-        
-        attempt += 1
-        time.sleep(1)
-    
-    log_event(ticket_id, f"MANAGER: TIMEOUT - Position never zeroed out for {expected_ticker}")
-    log(f"[❌ CLOSE TRADE TIMEOUT] id={id}, ticker={expected_ticker}")
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT close_method FROM trades WHERE id = ?", (id,))
+                close_method_row = cursor.fetchone()
+                close_method = close_method_row[0] if close_method_row else "manual"
+                conn.close()
+                
+                update_trade_status(id, "closed", closed_at, sell_price, symbol_close, win_loss, pnl, close_method)
+                
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("UPDATE trades SET fees = ? WHERE id = ?", (total_fees_paid, id))
+                conn.commit()
+                conn.close()
+                
+                log_event(ticket_id, f"MANAGER: CLOSE TRADE CONFIRMED - PnL: {pnl}, W/L: {win_loss}, Fees: {total_fees_paid}")
+                log(f"[✅ CLOSE TRADE CONFIRMED] id={id}, ticker={expected_ticker}, PnL={pnl}, W/L={win_loss}, Fees={total_fees_paid}")
+                notify_active_trade_supervisor_direct(id, ticket_id, "closed")
+                return
+            else:
+                log_event(ticket_id, f"MANAGER: Could not get trade data for PnL calculation")
+                return
+        else:
+            position_value = row[0] if row else "None"
+            log(f"[DEBUG] Position not zeroed out - Current: {position_value}, Expected: 0")
+            log_event(ticket_id, f"MANAGER: Position not zeroed out yet - Current: {position_value}")
+            return
+    except Exception as e:
+        log_event(ticket_id, f"MANAGER: Error checking position: {e}")
+        return
 
 # ---------- UTILITY FUNCTIONS ----------------------------------------------------
 
@@ -591,24 +594,8 @@ async def add_trade(request: Request):
         ticker = data.get("ticker")
         if ticker:
             symbol_close = None
-            try:
-                import requests
-                main_port = get_port("main_app")
-                response = requests.get(f"http://localhost:{main_port}/api/btc_price", timeout=5)
-                if response.ok:
-                    btc_data = response.json()
-                    symbol_close = btc_data.get('price')
-                    if symbol_close:
-                        log(f"[TRADE_MANAGER] Got symbol_close from unified endpoint: {symbol_close}")
-                    else:
-                        log(f"[TRADE_MANAGER] Warning: No price data in unified endpoint response")
-                        symbol_close = None
-                else:
-                    log(f"[TRADE_MANAGER] Warning: Unified BTC price endpoint returned status {response.status_code}")
-                    symbol_close = None
-            except Exception as e:
-                log(f"[TRADE_MANAGER] Error getting BTC price from unified endpoint: {e}")
-                symbol_close = None
+            # Remove the BTC price request that causes unnecessary delay
+            # The symbol_close will be set to None and updated later if needed
             
             conn = get_db_connection()
             cursor = conn.cursor()
@@ -662,6 +649,7 @@ async def add_trade(request: Request):
                 log(f"[CLOSE CHECK ERROR] Exception while checking close match for {ticker}: {e}")
 
             try:
+                import requests
                 executor_port = get_executor_port()
                 log(f"[CLOSE EXECUTOR] Sending close trade to executor on port {executor_port}")
                 close_payload = {
@@ -689,8 +677,8 @@ async def add_trade(request: Request):
 
             if row:
                 trade_id = row[0]
-                log(f"[🧵 STARTING CONFIRM CLOSE TRADE THREAD] id={trade_id}, ticket_id={data.get('ticket_id')}")
-                threading.Thread(target=confirm_close_trade, args=(trade_id, data.get("ticket_id")), daemon=True).start()
+                log(f"[✅ CLOSE TICKET RECEIVED - WAITING FOR POSITIONS CHANGE] id={trade_id}, ticket_id={data.get('ticket_id')}")
+                # Removed timer-based confirm_close_trade thread - positions change notification will handle confirmation
             else:
                 log(f"[CONFIRM CLOSE THREAD ERROR] Could not find trade id for ticker: {ticker}")
 
