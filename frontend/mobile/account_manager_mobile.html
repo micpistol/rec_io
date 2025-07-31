@@ -372,6 +372,12 @@
         // Respect backend-set mode only
         loadAccountData();
         
+        // Add periodic polling for account data (every 10 seconds)
+        setInterval(() => {
+            console.log('🔄 Periodic account data refresh (mobile)');
+            loadAccountData();
+        }, 10000);
+        
         // WebSocket connection for database change notifications
         function setupDatabaseChangeListener() {
             const ws = new WebSocket(`ws://${window.location.host}/ws/db_changes`);
@@ -417,6 +423,21 @@
         
         // Set up WebSocket connection for database change notifications
         setupDatabaseChangeListener();
+        
+        // Mobile iframe coordination message handling
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'refresh_data') {
+                console.log('📱 Account manager mobile received refresh request');
+                // Trigger immediate data refresh
+                loadAccountData();
+                // Notify parent of data update
+                window.parent.postMessage({
+                    type: 'data_updated',
+                    source: 'account_manager_mobile',
+                    timestamp: Date.now()
+                }, '*');
+            }
+        });
     </script>
 </body>
 </html> 

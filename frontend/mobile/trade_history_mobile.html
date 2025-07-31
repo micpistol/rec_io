@@ -7,6 +7,13 @@
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../styles/global.css">
     <script src="../js/globals.js"></script>
+    <script>
+        // Mobile-specific port configuration
+        function getMainAppUrl() {
+            // For mobile, use the same host as the current page
+            return window.location.origin;
+        }
+    </script>
     <style>
         body {
             margin: 0;
@@ -628,7 +635,62 @@
         fetchAllTrades();
 
         // Auto-refresh every 30 seconds
-        setInterval(fetchAllTrades, 30000);
+        setInterval(fetchAllTrades, 10000); // Reduced from 30 seconds to 10 seconds for more responsive updates
+        
+        // Add WebSocket connection for real-time trade updates
+        function setupTradeHistoryWebSocket() {
+            const ws = new WebSocket(`ws://${window.location.host}/ws/db_changes`);
+            
+            ws.onopen = function() {
+                console.log('🔗 Connected to trade history WebSocket (mobile)');
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log('📡 Received database change notification (trade history mobile):', data);
+                    
+                    // Refresh trades immediately on any database change
+                    if (data.database === 'trades' || data.database === 'fills' || data.database === 'positions') {
+                        console.log('🔄 Refreshing trade history due to database change (mobile)');
+                        fetchAllTrades();
+                    }
+                } catch (error) {
+                    console.error('❌ Error parsing WebSocket message (trade history mobile):', error);
+                }
+            };
+            
+            ws.onerror = function(error) {
+                console.error('❌ WebSocket error (trade history mobile):', error);
+            };
+            
+            ws.onclose = function() {
+                console.log('🔌 Trade history WebSocket connection closed (mobile)');
+                // Attempt to reconnect after a delay
+                setTimeout(() => {
+                    console.log('🔄 Attempting to reconnect trade history WebSocket (mobile)...');
+                    setupTradeHistoryWebSocket();
+                }, 5000);
+            };
+        }
+        
+        // Set up WebSocket for real-time trade updates
+        setupTradeHistoryWebSocket();
+        
+        // Mobile iframe coordination message handling
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'refresh_data') {
+                console.log('📱 Trade history mobile received refresh request');
+                // Trigger immediate data refresh
+                fetchAllTrades();
+                // Notify parent of data update
+                window.parent.postMessage({
+                    type: 'data_updated',
+                    source: 'trade_history_mobile',
+                    timestamp: Date.now()
+                }, '*');
+            }
+        });
     </script>
 </body>
 </html> 

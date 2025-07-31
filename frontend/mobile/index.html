@@ -209,6 +209,39 @@
             } catch (e) {}
         }
         setInterval(checkFrontendChanges, 10000);
+        
+        // Mobile iframe coordination for live data
+        function setupMobileIframeCoordination() {
+            // Send messages to iframes to trigger data refresh
+            function refreshAllIframes() {
+                const iframes = document.querySelectorAll('.page-frame');
+                iframes.forEach(iframe => {
+                    try {
+                        if (iframe.contentWindow) {
+                            iframe.contentWindow.postMessage({
+                                type: 'refresh_data',
+                                timestamp: Date.now()
+                            }, '*');
+                        }
+                    } catch (e) {
+                        // Ignore cross-origin errors
+                    }
+                });
+            }
+            
+            // Set up periodic coordination (every 5 seconds)
+            setInterval(refreshAllIframes, 5000);
+            
+            // Listen for messages from iframes
+            window.addEventListener('message', function(event) {
+                if (event.data && event.data.type === 'data_updated') {
+                    console.log('📱 Mobile iframe data updated:', event.data.source);
+                }
+            });
+        }
+        
+        // Initialize mobile iframe coordination
+        setupMobileIframeCoordination();
     </script>
 </body>
 </html> 

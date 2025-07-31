@@ -1519,7 +1519,7 @@ def start_event_driven_supervisor():
     # Start HTTP server in a separate thread
     def start_http_server():
         try:
-            host = "localhost"  # Use localhost for internal service communication
+            host = "0.0.0.0"  # Listen on all interfaces for mobile access
             port = ACTIVE_TRADE_SUPERVISOR_PORT
             log(f"🌐 Starting HTTP server on {host}:{port}")
             app.run(host=host, port=port, debug=False, use_reloader=False)

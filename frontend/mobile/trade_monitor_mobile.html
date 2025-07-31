@@ -8,6 +8,14 @@
     <link rel="stylesheet" href="../styles/global.css?v=1.0.1">
     <script src="../js/live-data.js"></script>
     <script src="../js/globals.js?v=1"></script>
+    <script>
+        // Mobile-specific port configuration
+        function getActiveTradeSupervisorUrl(endpoint = '') {
+            // For mobile, use the same host as the current page with the active trade supervisor port
+            const host = window.location.origin;
+            return `${host.replace(/:\d+/, ':8007')}${endpoint}`;
+        }
+    </script>
 
     <script src="../js/trade-execution-controller.js"></script>
     <script src="../js/active-trade-supervisor_panel.js"></script>
@@ -2514,6 +2522,23 @@
 
         // Set up WebSocket connection for database change notifications
         setupDatabaseChangeListener();
+        
+        // Mobile iframe coordination message handling
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'refresh_data') {
+                console.log('📱 Trade monitor mobile received refresh request');
+                // Trigger immediate data refresh
+                if (typeof updateMobileStrikeTable === 'function') {
+                    updateMobileStrikeTable();
+                }
+                // Notify parent of data update
+                window.parent.postMessage({
+                    type: 'data_updated',
+                    source: 'trade_monitor_mobile',
+                    timestamp: Date.now()
+                }, '*');
+            }
+        });
     </script>
 
     <!-- Mobile Settings Modal JavaScript -->
