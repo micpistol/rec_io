@@ -839,6 +839,10 @@ async def positions_updated_api(request: Request):
 def check_expired_trades():
     """Check for expired trades at top of every hour"""
     try:
+        # Step 1: Delete trades with status ERROR
+        delete_error_trades()
+        
+        # Step 2: Check for open trades to mark as expired
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT id, ticker FROM trades WHERE status = 'open'")
@@ -890,6 +894,35 @@ def check_expired_trades():
         
     except Exception as e:
         pass
+
+def delete_error_trades():
+    """Delete trades with status ERROR from trades.db"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Count ERROR trades before deletion
+        cursor.execute("SELECT COUNT(*) FROM trades WHERE status = 'error'")
+        error_count = cursor.fetchone()[0]
+        
+        if error_count > 0:
+            # Delete trades with status ERROR
+            cursor.execute("DELETE FROM trades WHERE status = 'error'")
+            deleted_count = cursor.rowcount
+            conn.commit()
+            
+            log(f"🧹 DELETED {deleted_count} ERROR trades from database")
+        else:
+            log(f"🧹 No ERROR trades found to delete")
+            
+        conn.close()
+        
+    except Exception as e:
+        log(f"❌ Error deleting ERROR trades: {e}")
+        try:
+            conn.close()
+        except:
+            pass
 
 def poll_settlements_for_matches(expired_tickers):
     """Poll settlements.db for matches to expired trades"""

@@ -763,6 +763,18 @@
       };
     }
 
+    // Periodic auto-refresh every 10 seconds
+    function setupPeriodicRefresh() {
+      const refreshInterval = 10000; // 10 seconds
+      
+      setInterval(() => {
+        console.log('⏰ Periodic refresh triggered (trade history)');
+        fetchAllTrades();
+      }, refreshInterval);
+      
+      console.log('⏰ Periodic refresh setup: every 10 seconds (trade history)');
+    }
+
     // On initial load, show filtered trades
     window.addEventListener('DOMContentLoaded', async () => {
       try {
@@ -863,6 +875,9 @@
       
       // Set up WebSocket connection for database change notifications
       setupDatabaseChangeListener();
+      
+      // Set up periodic auto-refresh every 10 seconds
+      setupPeriodicRefresh();
     });
 
     // Simple function to save preferences
