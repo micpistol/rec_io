@@ -113,8 +113,8 @@ fi
 
 # Restore active trades database
 if [ -f "backup/databases/active_trades.db.backup" ]; then
-    mkdir -p backend/data/active_trades
-    cp backup/databases/active_trades.db.backup backend/data/active_trades/active_trades.db
+    mkdir -p backend/data/users/user_0001/active_trades
+    cp backup/databases/active_trades.db.backup backend/data/users/user_0001/active_trades/active_trades.db
     echo "✅ Restored active_trades.db"
 fi
 

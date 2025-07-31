@@ -25,11 +25,11 @@ ACTIVE_TRADE_SUPERVISOR_PORT = get_port("active_trade_supervisor")
 print(f"[ACTIVE_TRADE_SUPERVISOR] 🚀 Using centralized port: {ACTIVE_TRADE_SUPERVISOR_PORT}")
 
 # Import centralized path utilities
-from backend.util.paths import get_project_root, get_data_dir, get_trade_history_dir, get_kalshi_data_dir, get_service_url
+from backend.util.paths import get_project_root, get_data_dir, get_trade_history_dir, get_kalshi_data_dir, get_service_url, get_active_trades_dir
 
 # Configuration using centralized paths
-ACTIVE_TRADES_DB_PATH = os.path.join(get_data_dir(), "active_trades", "active_trades.db")
-ACTIVE_TRADES_JSON_PATH = os.path.join(get_data_dir(), "active_trades", "active_trades.json")
+ACTIVE_TRADES_DB_PATH = os.path.join(get_active_trades_dir(), "active_trades.db")
+ACTIVE_TRADES_JSON_PATH = os.path.join(get_active_trades_dir(), "active_trades.json")
 
 # Ensure directory exists
 os.makedirs(os.path.dirname(ACTIVE_TRADES_DB_PATH), exist_ok=True)

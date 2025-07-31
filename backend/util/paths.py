@@ -45,6 +45,16 @@ def get_trade_history_dir():
     # Fallback to legacy location
     return os.path.join(get_data_dir(), "trade_history")
 
+def get_active_trades_dir():
+    """Get the active trades directory path."""
+    # Check for user-specific active trades first
+    user_active_trades = os.path.join(get_data_dir(), "users", "user_0001", "active_trades")
+    if os.path.exists(user_active_trades):
+        return user_active_trades
+    
+    # Fallback to legacy location
+    return os.path.join(get_data_dir(), "active_trades")
+
 def get_logs_dir():
     """Get the logs directory path."""
     return os.path.join(get_project_root(), "logs")

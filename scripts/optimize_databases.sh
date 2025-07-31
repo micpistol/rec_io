@@ -15,7 +15,7 @@ SQL
 
 # Optimize active_trades.db
 echo "  Optimizing active_trades.db..."
-sqlite3 backend/data/active_trades/active_trades.db << 'SQL'
+sqlite3 backend/data/users/user_0001/active_trades/active_trades.db << 'SQL'
 CREATE INDEX IF NOT EXISTS idx_active_trades_symbol ON active_trades(symbol);
 CREATE INDEX IF NOT EXISTS idx_active_trades_status ON active_trades(status);
 ANALYZE;

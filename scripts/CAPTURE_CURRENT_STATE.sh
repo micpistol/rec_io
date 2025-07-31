@@ -82,8 +82,8 @@ if [ -f backend/data/users/user_0001/trade_history/trades.db ]; then
 fi
 
 # Backup active trades database
-if [ -f backend/data/active_trades/active_trades.db ]; then
-    cp backend/data/active_trades/active_trades.db backup/databases/active_trades.db.backup
+if [ -f backend/data/users/user_0001/active_trades/active_trades.db ]; then
+    cp backend/data/users/user_0001/active_trades/active_trades.db backup/databases/active_trades.db.backup
 fi
 
 # Backup account data
