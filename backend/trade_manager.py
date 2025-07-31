@@ -245,7 +245,7 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                 conn_pos.close()
                 
                 total_fees_paid = float(fees_row[0]) if fees_row and fees_row[0] is not None else 0.0
-                log(f"[CONFIRM_CLOSE] Total fees paid: {total_fees_paid}")
+                # log(f"[CONFIRM_CLOSE] Total fees paid: {total_fees_paid}")
                 
                 conn = get_db_connection()
                 cursor = conn.cursor()
@@ -385,13 +385,6 @@ def log(msg):
     """Log messages with timestamp"""
     timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%H:%M:%S")
     print(f"[TRADE_MANAGER {timestamp}] {msg}")
-    
-    try:
-        log_path = os.path.join(get_logs_dir(), "trade_manager.out.log")
-        with open(log_path, "a") as f:
-            f.write(f"{datetime.now().isoformat()} | {msg}\n")
-    except Exception as e:
-        print(f"Error writing to log file: {e}")
 
 def log_event(ticket_id, message):
     try:

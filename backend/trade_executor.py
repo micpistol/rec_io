@@ -167,7 +167,7 @@ def trigger_trade():
         if ticket_id.count("TICKET-") > 1:
             ticket_id = ticket_id.split("TICKET-")[-1]
             ticket_id = f"TICKET-{ticket_id}"
-        log_event(ticket_id, "📥 RECEIVED TICKET")
+        log_event(ticket_id, "RECEIVED TICKET")
 
         ticker = data.get("ticker")
         raw_side = data.get("side", "yes")
@@ -200,7 +200,7 @@ def trigger_trade():
         }
 
         url = f"{get_base_url()}{path}"
-        log_event(ticket_id, "📤 SENDING TO KALSHI")
+        log_event(ticket_id, "SENDING TO KALSHI")
         response = requests.post(url, headers=headers, json=order_payload, timeout=10)
 
         if response.status_code >= 400:
@@ -221,7 +221,7 @@ def trigger_trade():
             threading.Thread(target=notify_error, daemon=True).start()
             return jsonify({"status": "rejected", "error": response.text}), response.status_code
         elif response.status_code in [200, 201]:
-            log_event(ticket_id, "✅ TRADE SUCCESS")
+            log_event(ticket_id, "TRADE SUCCESS")
             # Use the trade ID if provided, otherwise use ticket_id
             trade_id = data.get("id")
             if trade_id:
