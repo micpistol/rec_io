@@ -20,7 +20,7 @@ DEFAULT_PORTS = {
     "trade_executor": 8001,
     "active_trade_supervisor": 6000,
     "btc_price_watchdog": 8002,
-    "db_poller": 8003,
+
     "kalshi_account_sync": 8004,
     "kalshi_api_watchdog": 8005,
     "unified_production_coordinator": 8010
@@ -62,11 +62,7 @@ def ensure_port_config_exists():
                     "description": "Bitcoin price monitoring",
                     "status": "RUNNING"
                 },
-                "db_poller": {
-                    "port": 8003,
-                    "description": "Database polling service",
-                    "status": "RUNNING"
-                },
+
                 "kalshi_account_sync": {
                     "port": 8004,
                     "description": "Kalshi account synchronization",

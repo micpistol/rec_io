@@ -579,6 +579,21 @@ def sync_fills():
     print(f"💾 {new_count} new fills written to {FILLS_DB_PATH}")
 
     notify_frontend_db_change("fills", {"fills": len(all_fills)})
+    
+    # Notify trade_manager about fills update
+    try:
+        trade_manager_port = get_port("trade_manager")
+        response = requests.post(
+            f"http://localhost:{trade_manager_port}/api/positions_updated",
+            json={"database": "fills"},
+            timeout=5
+        )
+        if response.status_code == 200:
+            print(f"✅ Notified trade_manager about fills update")
+        else:
+            print(f"⚠️ Failed to notify trade_manager: {response.status_code}")
+    except Exception as e:
+        print(f"❌ Error notifying trade_manager: {e}")
 
 
 def sync_settlements():
