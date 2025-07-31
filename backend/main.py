@@ -729,7 +729,7 @@ async def get_kalshi_snapshot():
     """Get Kalshi market snapshot."""
     try:
         # Read from the latest market snapshot file
-        snapshot_file = os.path.join("backend", "data", "kalshi", "latest_market_snapshot.json")
+        snapshot_file = os.path.join("backend", "data", "live_data", "markets", "kalshi", "latest_market_snapshot.json")
         
         if os.path.exists(snapshot_file):
             with open(snapshot_file, 'r') as f:
@@ -1382,7 +1382,7 @@ async def get_strike_table(symbol: str):
     try:
         # Convert symbol to lowercase for consistency
         symbol_lower = symbol.lower()
-        strike_table_file = os.path.join(get_data_dir(), "strike_tables", f"{symbol_lower}_strike_table.json")
+        strike_table_file = os.path.join(get_data_dir(), "live_data", "markets", "kalshi", "strike_tables", f"{symbol_lower}_strike_table.json")
         
         if os.path.exists(strike_table_file):
             data = safe_read_json(strike_table_file)
@@ -1400,7 +1400,7 @@ async def get_watchlist(symbol: str):
     try:
         # Convert symbol to lowercase for consistency
         symbol_lower = symbol.lower()
-        watchlist_file = os.path.join(get_data_dir(), "strike_tables", f"{symbol_lower}_watchlist.json")
+        watchlist_file = os.path.join(get_data_dir(), "live_data", "markets", "kalshi", "strike_tables", f"{symbol_lower}_watchlist.json")
         
         if os.path.exists(watchlist_file):
             data = safe_read_json(watchlist_file)
@@ -1436,10 +1436,9 @@ async def get_auto_entry_indicator():
     """Proxy endpoint to get auto entry indicator state from auto_entry_supervisor"""
     try:
         from backend.core.port_config import get_port
-        from backend.util.paths import get_host
         port = get_port("auto_entry_supervisor")
-        host = get_host()
-        url = f"http://{host}:{port}/api/auto_entry_indicator"
+        # Use localhost for internal service communication
+        url = f"http://localhost:{port}/api/auto_entry_indicator"
         response = requests.get(url, timeout=2)
         if response.ok:
             return response.json()

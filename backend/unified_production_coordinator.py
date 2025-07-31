@@ -437,8 +437,8 @@ class UnifiedProductionCoordinator:
         
         # Output paths
         self.live_probabilities_path = os.path.join(self.data_dir, "live_data", "live_probabilities", "btc_live_probabilities.json")
-        self.strike_table_path = os.path.join(self.data_dir, "strike_tables", "btc_strike_table.json")
-        self.watchlist_path = os.path.join(self.data_dir, "strike_tables", "btc_watchlist.json")
+        self.strike_table_path = os.path.join(self.data_dir, "live_data", "markets", "kalshi", "strike_tables", "btc_strike_table.json")
+        self.watchlist_path = os.path.join(self.data_dir, "live_data", "markets", "kalshi", "strike_tables", "btc_watchlist.json")
         
         # Ensure directories exist
         os.makedirs(os.path.dirname(self.live_probabilities_path), exist_ok=True)

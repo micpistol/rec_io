@@ -168,7 +168,7 @@ def get_current_ttc():
 def get_watchlist_data():
     """Get current watchlist data"""
     try:
-        watchlist_path = os.path.join(get_data_dir(), "strike_tables", "btc_watchlist.json")
+        watchlist_path = os.path.join(get_data_dir(), "live_data", "markets", "kalshi", "strike_tables", "btc_watchlist.json")
         if os.path.exists(watchlist_path):
             with open(watchlist_path, "r") as f:
                 data = json.load(f)

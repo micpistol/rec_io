@@ -11,7 +11,7 @@ def get_data_dir():
 
 def get_kalshi_data_dir():
     """Get the Kalshi data directory path."""
-    return os.path.join(get_data_dir(), "kalshi")
+    return os.path.join(get_data_dir(), "live_data", "markets", "kalshi")
 
 def get_coinbase_data_dir():
     """Get the Coinbase data directory path."""
