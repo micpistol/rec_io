@@ -78,7 +78,7 @@ def update_existing_csv(symbol: str = 'BTC/USD', csv_path: str = None) -> Tuple[
         # Default to backend/data/live_data/price_history/{symbol_lower}/{symbol_clean}_1m_master_5y.csv
         symbol_lower = symbol.replace('/', '').lower()
         symbol_clean = symbol.replace('/', '').lower()
-        csv_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'live_data', 'price_history', symbol_lower, f"{symbol_clean}_1m_master_5y.csv")
+        csv_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'historical_data', f"{symbol_lower}_historical", f"{symbol_clean}_1m_master_5y.csv")
     
     print(f"Looking for CSV file: {csv_path}")
     if not os.path.exists(csv_path):
@@ -371,13 +371,13 @@ def get_symbol_data_path(symbol: str) -> str:
     Returns:
         Expected path for the symbol's CSV file
     """
-    from backend.util.paths import get_price_history_dir
+    from backend.util.paths import get_data_dir
     
     # Default to backend/data/price_history/{symbol_lower}/{symbol_clean}_1m_master_5y.csv
     symbol_lower = symbol.lower()
     symbol_clean = symbol.replace('-', '_').replace('/', '_')
     
-    return os.path.join(get_price_history_dir(), symbol_lower, f"{symbol_clean}_1m_master_5y.csv")
+    return os.path.join(get_data_dir(), "historical_data", f"{symbol_lower}_historical", f"{symbol_clean}_1m_master_5y.csv")
 
 # Legacy function for backward compatibility
 def fetch_btc_data():

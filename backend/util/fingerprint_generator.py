@@ -102,7 +102,7 @@ def generate_directional_fingerprint(df, momentum_value=None, description=""):
 
 def get_fingerprint_dir(symbol):
     """Return the directory for a given symbol's fingerprints."""
-    base_dir = os.path.join(get_data_dir(), "symbol_fingerprints")
+    base_dir = os.path.join(get_data_dir(), "historical_data", f"{symbol.lower()}_historical", "symbol_fingerprints")
     return os.path.join(base_dir, symbol.lower())
 
 def get_fingerprint_filename(symbol, bucket):
@@ -167,7 +167,7 @@ Examples:
 
     # Create symbol-specific output directory using centralized paths
     symbol = os.path.basename(args.csv_path).split('_')[0].lower()
-    output_dir = os.path.join(get_data_dir(), "symbol_fingerprints", symbol)
+    output_dir = os.path.join(get_data_dir(), "historical_data", f"{symbol}_historical", "symbol_fingerprints")
     os.makedirs(output_dir, exist_ok=True)
 
     # Determine what to generate

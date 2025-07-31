@@ -83,7 +83,8 @@ def main():
     output_df.index = [f"{t}m TTC" for t in range(1, max_lookahead + 1)]
 
     # Create output directory using centralized paths
-    output_dir = os.path.join(get_data_dir(), "symbol_fingerprints", os.path.basename(csv_path).split('_')[0].lower())
+    symbol = os.path.basename(csv_path).split('_')[0].lower()
+    output_dir = os.path.join(get_data_dir(), "historical_data", f"{symbol}_historical", "symbol_fingerprints")
     os.makedirs(output_dir, exist_ok=True)
     date_str = datetime.now().strftime('%Y%m%d')
     output_filename = f"{os.path.basename(csv_path).split('_')[0].lower()}_fingerprint_{date_str}_EXT.csv"

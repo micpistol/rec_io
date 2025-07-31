@@ -188,7 +188,7 @@ def archive_existing_fingerprints(logger, symbols):
             logger.info(f"Archiving {symbol.upper()} fingerprint files...")
             
             # Find fingerprint files
-            fingerprint_dir = f"../data/symbol_fingerprints/{symbol}"
+            fingerprint_dir = f"../data/historical_data/{symbol}_historical/symbol_fingerprints"
             fingerprint_files = find_fingerprint_files(fingerprint_dir)
             
             if fingerprint_files:
@@ -223,7 +223,7 @@ def generate_new_fingerprints(logger, symbols):
             logger.info(f"Generating fingerprints for {symbol.upper()}...")
             
             # Construct the master file path
-            master_file = f"../data/price_history/{symbol}/{symbol}_1m_master_5y.csv"
+            master_file = f"../data/historical_data/{symbol}_historical/{symbol}_1m_master_5y.csv"
             
             # Run fingerprint generation using subprocess
             result = subprocess.run([sys.executable, "fingerprint_generator.py", master_file], 
