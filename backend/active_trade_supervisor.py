@@ -1543,7 +1543,7 @@ def is_auto_stop_enabled():
     """Check if AUTO STOP is enabled in trade_preferences.json"""
     from backend.util.paths import get_data_dir
     import json
-    prefs_path = os.path.join(get_data_dir(), "preferences", "trade_preferences.json")
+    prefs_path = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "trade_preferences.json")
     if os.path.exists(prefs_path):
         try:
             with open(prefs_path, "r") as f:
@@ -1626,7 +1626,7 @@ def trigger_auto_stop_close(trade):
 import os
 import json
 
-AUTO_STOP_SETTINGS_PATH = os.path.join(get_data_dir(), "preferences", "auto_stop_settings.json")
+AUTO_STOP_SETTINGS_PATH = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_stop_settings.json")
 
 def get_auto_stop_threshold():
     try:

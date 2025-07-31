@@ -377,7 +377,7 @@ def get_unified_ttc(symbol: str = "btc") -> Dict[str, Any]:
 
 def load_auto_entry_settings() -> Dict[str, Any]:
     """Load auto entry settings from JSON file"""
-    settings_path = os.path.join(get_data_dir(), "preferences", "auto_entry_settings.json")
+    settings_path = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_entry_settings.json")
     default_settings = {
         "min_probability": 37,
         "min_differential": -5,

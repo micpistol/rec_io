@@ -45,7 +45,7 @@ connected_clients = set()
 db_change_clients = set()
 
 # Global auto_stop state
-PREFERENCES_PATH = os.path.join(get_data_dir(), "preferences", "trade_preferences.json")
+PREFERENCES_PATH = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "trade_preferences.json")
 
 # Global preferences cache
 _preferences_cache = None
@@ -1029,7 +1029,7 @@ async def get_preferences():
     return load_preferences()
 
 # TRADE HISTORY PREFERENCES
-TRADE_HISTORY_PREFERENCES_PATH = os.path.join(get_data_dir(), "preferences", "trade_history_preferences.json")
+TRADE_HISTORY_PREFERENCES_PATH = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "trade_history_preferences.json")
 
 def load_trade_history_preferences():
     """Load trade history preferences from file"""
@@ -1128,7 +1128,7 @@ async def get_auto_stop():
 
 import os
 import json
-AUTO_STOP_SETTINGS_PATH = os.path.join(get_data_dir(), "preferences", "auto_stop_settings.json")
+AUTO_STOP_SETTINGS_PATH = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_stop_settings.json")
 
 def load_auto_stop_settings():
     if os.path.exists(AUTO_STOP_SETTINGS_PATH):
@@ -1171,7 +1171,7 @@ async def set_auto_stop_settings(request: Request):
     return {"status": "ok", "current_probability": settings["current_probability"], "min_ttc_seconds": settings["min_ttc_seconds"]}
 
 # AUTO ENTRY SETTINGS
-AUTO_ENTRY_SETTINGS_PATH = os.path.join(get_data_dir(), "preferences", "auto_entry_settings.json")
+AUTO_ENTRY_SETTINGS_PATH = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_entry_settings.json")
 
 def load_auto_entry_settings():
     """Load auto entry settings from file"""

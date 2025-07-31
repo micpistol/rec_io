@@ -96,7 +96,7 @@ def get_current_momentum():
 def get_position_size():
     """Get position size from preferences"""
     try:
-        prefs_path = os.path.join(get_data_dir(), "preferences", "trade_preferences.json")
+        prefs_path = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "trade_preferences.json")
         if os.path.exists(prefs_path):
             with open(prefs_path, "r") as f:
                 prefs = json.load(f)

@@ -109,7 +109,7 @@ def broadcast_auto_entry_indicator_change():
 
 def is_auto_entry_enabled():
     """Check if AUTO ENTRY is enabled in trade_preferences.json"""
-    prefs_path = os.path.join(get_data_dir(), "preferences", "trade_preferences.json")
+    prefs_path = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "trade_preferences.json")
     if os.path.exists(prefs_path):
         try:
             with open(prefs_path, "r") as f:
@@ -122,7 +122,7 @@ def is_auto_entry_enabled():
 
 def get_auto_entry_settings():
     """Get auto entry settings from auto_entry_settings.json"""
-    settings_path = os.path.join(get_data_dir(), "preferences", "auto_entry_settings.json")
+    settings_path = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_entry_settings.json")
     if os.path.exists(settings_path):
         try:
             with open(settings_path, "r") as f:
@@ -178,7 +178,7 @@ def get_watchlist_data():
 def get_position_size():
     """Get position size from trade preferences including multiplier"""
     try:
-        preferences_file = os.path.join(get_data_dir(), "preferences", "trade_preferences.json")
+        preferences_file = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "trade_preferences.json")
         if os.path.exists(preferences_file):
             with open(preferences_file, 'r') as f:
                 data = json.load(f)
