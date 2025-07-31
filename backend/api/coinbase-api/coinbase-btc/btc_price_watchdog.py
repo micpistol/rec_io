@@ -23,13 +23,13 @@ from backend.util.paths import get_coinbase_data_dir, get_btc_price_history_dir,
 # Ensure all data directories exist
 ensure_data_dirs()
 
-BTC_HEARTBEAT_PATH = os.path.join(get_coinbase_data_dir(), "btc_logger_heartbeat.txt")
+BTC_HEARTBEAT_PATH = os.path.join(get_btc_price_history_dir(), "btc_logger_heartbeat.txt")
 BTC_PRICE_HISTORY_DB = os.path.join(get_btc_price_history_dir(), "btc_price_history.db")
 COINBASE_WS_URL = "wss://ws-feed.exchange.coinbase.com"
 
 last_logged_second = None
 
-BTC_PRICE_CHANGE_PATH = os.path.join(get_coinbase_data_dir(), "btc_price_change.json")
+BTC_PRICE_CHANGE_PATH = os.path.join(get_btc_price_history_dir(), "btc_price_change.json")
 
 def insert_tick(timestamp: str, price: float):
     """
