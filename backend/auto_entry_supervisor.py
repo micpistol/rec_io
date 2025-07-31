@@ -44,6 +44,8 @@ TRADE_COOLDOWN = 10
 auto_entry_indicator_state = {
     "enabled": False,
     "ttc_within_window": False,
+    "scanning_active": False,  # NEW: True system-wide scanning status
+    "service_healthy": False,  # NEW: Service health status
     "current_ttc": 0,
     "min_time": 0,
     "max_time": 3600,
@@ -77,7 +79,9 @@ def broadcast_auto_entry_indicator_change():
         # Check if state has actually changed
         current_state = {
             "enabled": auto_entry_indicator_state["enabled"],
-            "ttc_within_window": auto_entry_indicator_state["ttc_within_window"]
+            "ttc_within_window": auto_entry_indicator_state["ttc_within_window"],
+            "scanning_active": auto_entry_indicator_state["scanning_active"],
+            "service_healthy": auto_entry_indicator_state["service_healthy"]
         }
         
         log(f"[AUTO ENTRY DEBUG] 🔍 Checking indicator state change:")
@@ -386,10 +390,15 @@ def check_auto_entry_conditions():
         # Check if AUTO ENTRY is enabled
         auto_entry_enabled = is_auto_entry_enabled()
         
+        # Check if service is healthy (monitoring thread is running)
+        service_healthy = monitoring_thread is not None and monitoring_thread.is_alive()
+        
         if not auto_entry_enabled:
             auto_entry_indicator_state.update({
                 "enabled": False,
                 "ttc_within_window": False,
+                "scanning_active": False,
+                "service_healthy": service_healthy,
                 "current_ttc": 0,
                 "last_updated": datetime.now().isoformat()
             })
@@ -410,10 +419,18 @@ def check_auto_entry_conditions():
         # Check if TTC is within the time window
         ttc_within_window = min_time <= current_ttc <= max_time
         
+        # Determine if scanning is actually active
+        # Scanning is active if: enabled + service healthy + TTC in window + no blocking conditions
+        scanning_active = (auto_entry_enabled and 
+                          service_healthy and 
+                          ttc_within_window)
+        
         # Update indicator state for frontend
         auto_entry_indicator_state.update({
             "enabled": True,
             "ttc_within_window": ttc_within_window,
+            "scanning_active": scanning_active,
+            "service_healthy": service_healthy,
             "current_ttc": current_ttc,
             "min_time": min_time,
             "max_time": max_time,
@@ -573,13 +590,27 @@ def start_monitoring_loop():
 @app.route("/health")
 def health_check():
     """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "service": "auto_entry_supervisor",
-        "port": AUTO_ENTRY_SUPERVISOR_PORT,
-        "timestamp": datetime.now().isoformat(),
-        "port_system": "centralized"
-    }
+    try:
+        service_healthy = monitoring_thread is not None and monitoring_thread.is_alive()
+        enabled = is_auto_entry_enabled()
+        
+        return {
+            "status": "healthy" if service_healthy else "unhealthy",
+            "service": "auto_entry_supervisor",
+            "port": AUTO_ENTRY_SUPERVISOR_PORT,
+            "timestamp": datetime.now().isoformat(),
+            "port_system": "centralized",
+            "monitoring_thread_alive": service_healthy,
+            "auto_entry_enabled": enabled,
+            "scanning_active": auto_entry_indicator_state.get("scanning_active", False)
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "service": "auto_entry_supervisor",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
 
 # Auto entry status endpoint
 @app.route("/api/auto_entry_status")
@@ -605,6 +636,34 @@ def get_auto_entry_status():
 def get_auto_entry_indicator():
     """Get current auto entry indicator state"""
     return jsonify(auto_entry_indicator_state)
+
+# Detailed scanning status endpoint (for debugging/monitoring)
+@app.route("/api/auto_entry_scanning_status")
+def get_auto_entry_scanning_status():
+    """Get detailed scanning status information"""
+    try:
+        enabled = is_auto_entry_enabled()
+        settings = get_auto_entry_settings()
+        current_ttc = get_current_ttc()
+        service_healthy = monitoring_thread is not None and monitoring_thread.is_alive()
+        
+        # Calculate scanning status
+        ttc_within_window = settings["min_time"] <= current_ttc <= settings["max_time"]
+        scanning_active = enabled and service_healthy and ttc_within_window
+        
+        return jsonify({
+            "enabled": enabled,
+            "service_healthy": service_healthy,
+            "ttc_within_window": ttc_within_window,
+            "scanning_active": scanning_active,
+            "current_ttc": current_ttc,
+            "settings": settings,
+            "cooldown_entries_count": len(last_trade_times),
+            "monitoring_thread_alive": service_healthy,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # Automated trade notification endpoint
 @app.route("/api/notify_automated_trade", methods=['POST'])

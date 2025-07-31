@@ -3407,12 +3407,25 @@ function updateAutoEntryIndicator(data) {
         return;
     }
     
-    if (data.enabled && data.ttc_within_window) {
-        // Show the indicator when AUTO ENTRY is ON and TTC is within window
+    // Use the new scanning_active field as the primary condition
+    // This provides the true system-wide scanning status
+    if (data.scanning_active) {
+        // Show the indicator when scanning is actually active
         indicator.style.display = 'flex';
+        console.log('🔔 AUTOMATED TRADING ON: Scanning is active');
     } else {
-        // Hide the indicator when conditions are not met
+        // Hide the indicator when scanning is not active
         indicator.style.display = 'none';
+        console.log('🔔 AUTOMATED TRADING OFF: Scanning is not active');
+        
+        // Log additional debug info
+        if (data.enabled && !data.service_healthy) {
+            console.log('⚠️ Auto entry enabled but service not healthy');
+        } else if (data.enabled && data.service_healthy && !data.ttc_within_window) {
+            console.log('⚠️ Auto entry enabled and service healthy but TTC not in window');
+        } else if (!data.enabled) {
+            console.log('⚠️ Auto entry not enabled');
+        }
     }
 }
 
