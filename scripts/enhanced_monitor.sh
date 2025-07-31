@@ -38,7 +38,7 @@ echo "🔍 CRITICAL FILES STATUS:"
 critical_files=(
     "backend/core/config/config.json"
     "backend/core/config/MASTER_PORT_MANIFEST.json"
-    "backend/data/trade_history/trades.db"
+    "backend/data/users/user_0001/trade_history/trades.db"
     "backend/data/active_trades/active_trades.db"
 )
 

@@ -31,6 +31,12 @@ def get_btc_price_history_dir():
 
 def get_trade_history_dir():
     """Get the trade history directory path."""
+    # Check for user-specific trade history first
+    user_trade_history = os.path.join(get_data_dir(), "users", "user_0001", "trade_history")
+    if os.path.exists(user_trade_history):
+        return user_trade_history
+    
+    # Fallback to legacy location
     return os.path.join(get_data_dir(), "trade_history")
 
 def get_logs_dir():

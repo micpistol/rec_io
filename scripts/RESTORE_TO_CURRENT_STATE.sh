@@ -106,8 +106,8 @@ echo "💾 Restoring database files..."
 
 # Restore trade history database
 if [ -f "backup/databases/trades.db.backup" ]; then
-    mkdir -p backend/data/trade_history
-    cp backup/databases/trades.db.backup backend/data/trade_history/trades.db
+    mkdir -p backend/data/users/user_0001/trade_history
+    cp backup/databases/trades.db.backup backend/data/users/user_0001/trade_history/trades.db
     echo "✅ Restored trades.db"
 fi
 

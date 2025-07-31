@@ -96,7 +96,8 @@ def log_event(ticket_id, message):
         log_filename = f"trade_flow_{ticket_id[-5:]}.log"
 
         # Log directory (backend/data/trade_history/tickets/)
-        log_dir = Path(__file__).resolve().parents[1] / "backend" / "data" / "trade_history" / "tickets"
+        from backend.util.paths import get_trade_history_dir
+        log_dir = Path(get_trade_history_dir()) / "tickets"
         log_dir.mkdir(parents=True, exist_ok=True)
 
         # Full path for this ticket's log file

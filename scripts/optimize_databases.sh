@@ -4,7 +4,7 @@ echo "🔧 OPTIMIZING DATABASES..."
 
 # Optimize trades.db
 echo "  Optimizing trades.db..."
-sqlite3 backend/data/trade_history/trades.db << 'SQL'
+sqlite3 backend/data/users/user_0001/trade_history/trades.db << 'SQL'
 CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(date);
 CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol);
 CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status);

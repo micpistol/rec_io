@@ -1460,7 +1460,7 @@ async def log_event(request: Request):
 
         log_line = f"[{timestamp}] Ticket {ticket_id}: {message}\n"
         # Directory for trade flow logs
-        log_dir = os.path.join(get_data_dir(), "trade_history", "tickets")
+        log_dir = os.path.join(get_trade_history_dir(), "tickets")
         # Use last 5 characters of ticket_id for log file name, fallback to full ticket_id if too short
         log_path = os.path.join(log_dir, f"trade_flow_{ticket_id[-5:] if len(ticket_id) >= 5 else ticket_id}.log")
 

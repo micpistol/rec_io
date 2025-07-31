@@ -77,8 +77,8 @@ echo "📊 Capturing database state..."
 mkdir -p backup/databases
 
 # Backup trade history database
-if [ -f backend/data/trade_history/trades.db ]; then
-    cp backend/data/trade_history/trades.db backup/databases/trades.db.backup
+if [ -f backend/data/users/user_0001/trade_history/trades.db ]; then
+    cp backend/data/users/user_0001/trade_history/trades.db backup/databases/trades.db.backup
 fi
 
 # Backup active trades database
