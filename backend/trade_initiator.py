@@ -66,8 +66,10 @@ def get_current_btc_price():
             btc_data = response.json()
             price = btc_data.get('price')
             if price:
-                log(f"Got BTC price from unified endpoint: {price}")
-                return price
+                # Format to 2 decimal places
+                formatted_price = round(float(price), 2)
+                log(f"Got BTC price from unified endpoint: {formatted_price}")
+                return formatted_price
             else:
                 log(f"Warning: No price data in unified endpoint response")
                 return None
@@ -129,8 +131,8 @@ def create_open_trade_ticket(trade_data: Dict[str, Any]) -> Dict[str, Any]:
     eastern_date = now.strftime('%Y-%m-%d')
     eastern_time = now.strftime('%H:%M:%S')
     
-    # Get current data
-    symbol_open = trade_data.get('symbol_open') or get_current_btc_price()
+    # Get current data - ALWAYS use unified endpoint for symbol_open
+    symbol_open = get_current_btc_price()
     momentum = trade_data.get('momentum')  # NO FALLBACK - must come from frontend
     position = trade_data.get('position')  # Use position from trade data, no fallback
     

@@ -23,6 +23,10 @@ from backend.util.paths import get_accounts_data_dir
 TRADE_MANAGER_PORT = get_port("trade_manager")
 print(f"[TRADE_MANAGER] 🚀 Using centralized port: {TRADE_MANAGER_PORT}")
 
+# Thread-safe set to track trades being processed
+processing_trades = set()
+processing_lock = threading.Lock()
+
 def get_executor_port():
     return get_port("trade_executor")
 
@@ -222,18 +226,13 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
     
     # Check position once - positions change notification should handle timing
     try:
-        log(f"[DEBUG] Checking position for ticker: {expected_ticker} in database: {POSITIONS_DB_PATH}")
         conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
         cursor_pos = conn_pos.cursor()
         cursor_pos.execute("SELECT position FROM positions WHERE ticker = ?", (expected_ticker,))
         row = cursor_pos.fetchone()
         conn_pos.close()
         
-        log(f"[DEBUG] Position query result: {row}")
-        log(f"[DEBUG] Checking if position is zero: row={row}, row[0]={row[0] if row else 'None'}")
-        
         if row and row[0] == 0:
-            log(f"[DEBUG] Position is zero - proceeding to confirm close for trade {id}")
             log_event(ticket_id, f"MANAGER: POSITION ZEROED OUT for {expected_ticker}")
             
             now_est = datetime.now(ZoneInfo("America/New_York"))
@@ -333,18 +332,29 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                 close_method = close_method_row[0] if close_method_row else "manual"
                 conn.close()
                 
-                update_trade_status(id, "closed", closed_at, sell_price, symbol_close, win_loss, pnl, close_method)
-                
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("UPDATE trades SET fees = ? WHERE id = ?", (total_fees_paid, id))
-                conn.commit()
-                conn.close()
-                
-                log_event(ticket_id, f"MANAGER: CLOSE TRADE CONFIRMED - PnL: {pnl}, W/L: {win_loss}, Fees: {total_fees_paid}")
-                log(f"[✅ CLOSE TRADE CONFIRMED] id={id}, ticker={expected_ticker}, PnL={pnl}, W/L={win_loss}, Fees={total_fees_paid}")
-                notify_active_trade_supervisor_direct(id, ticket_id, "closed")
-                return
+                try:
+                    update_trade_status(id, "closed", closed_at, sell_price, symbol_close, win_loss, pnl, close_method)
+                    
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("UPDATE trades SET fees = ? WHERE id = ?", (total_fees_paid, id))
+                    conn.commit()
+                    conn.close()
+                    
+                    log_event(ticket_id, f"MANAGER: CLOSE TRADE CONFIRMED - PnL: {pnl}, W/L: {win_loss}, Fees: {total_fees_paid}")
+                    log(f"[✅ CLOSE TRADE CONFIRMED] id={id}, ticker={expected_ticker}, PnL={pnl}, W/L={win_loss}, Fees={total_fees_paid}")
+                    
+                    # Try to notify active trade supervisor, but don't fail if it doesn't work
+                    try:
+                        notify_active_trade_supervisor_direct(id, ticket_id, "closed")
+                    except Exception as e:
+                        log(f"⚠️ Notification failed but trade finalized: {e}")
+                    
+                    return
+                except Exception as e:
+                    log_event(ticket_id, f"MANAGER: Error in finalization: {e}")
+                    log(f"❌ Trade finalization failed for {id}: {e}")
+                    return
             else:
                 log_event(ticket_id, f"MANAGER: Could not get trade data for PnL calculation")
                 return
@@ -694,14 +704,7 @@ async def add_trade(request: Request):
     now_est = datetime.now(ZoneInfo("America/New_York"))
     data["time"] = now_est.strftime("%H:%M:%S")
 
-    # Ensure the trade is inserted with 'pending' status
-    data['status'] = 'pending'
-    trade_id = insert_trade(data)
-    log_event(data["ticket_id"], "MANAGER: SENT TO EXECUTOR — CONFIRMED")
-    
-    # Notify active trade supervisor about the new pending trade
-    notify_active_trade_supervisor_direct(trade_id, data["ticket_id"], "pending")
-
+    # IMMEDIATELY send to executor first
     try:
         import requests
         executor_port = get_executor_port()
@@ -712,6 +715,14 @@ async def add_trade(request: Request):
     except Exception as e:
         log(f"[❌ EXECUTOR ERROR] Failed to send trade to executor: {e}")
         log_event(data["ticket_id"], f"❌ EXECUTOR ERROR: {e}")
+
+    # Ensure the trade is inserted with 'pending' status
+    data['status'] = 'pending'
+    trade_id = insert_trade(data)
+    log_event(data["ticket_id"], "MANAGER: SENT TO EXECUTOR — CONFIRMED")
+    
+    # Notify active trade supervisor about the new pending trade
+    notify_active_trade_supervisor_direct(trade_id, data["ticket_id"], "pending")
 
     return {"id": trade_id}
 
@@ -798,7 +809,8 @@ async def positions_change_api(request: Request):
                 conn.close()
                 
                 if current_status and current_status[0] == 'closing':
-                    threading.Thread(target=confirm_close_trade, args=(id, ticket_id), daemon=True).start()
+                    # Process closing trade directly - no threading needed for single trades
+                    confirm_close_trade(id, ticket_id)
         
         return {"message": "positions_change received"}
     except Exception as e:
