@@ -25,11 +25,13 @@ logs/
 !backend/data/live_data/price_history/eth/
 !backend/data/live_data/live_probabilities/
 
-# Large CSV files (excluding historical data)
+# Large CSV files (excluding historical data and large master files)
 *.csv
 !backend/data/historical_data/
 !backend/data/historical_data/**
 !backend/data/historical_data/**/*.csv
+# Exclude large master files that exceed GitHub limits
+backend/data/historical_data/*_historical/*_master_*.csv
 
 # Data files - EXCLUDE live data files but INCLUDE folder structure for portability
 backend/data/live_data/
