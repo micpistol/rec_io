@@ -1,0 +1,12 @@
+{
+  "symbol": "BTC",
+  "current_price": 118082.01,
+  "ttc": 3580,
+  "broker": "Kalshi",
+  "event_ticker": "KXBTCD-25JUL2615",
+  "market_title": "Bitcoin price on Jul 26, 2025 at 3pm EDT?",
+  "strike_tier": 250,
+  "market_status": "active",
+  "last_updated": "2025-07-26T11:00:20.550416",
+  "strikes": []
+}
