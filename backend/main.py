@@ -1028,6 +1028,99 @@ async def update_preferences(request: Request):
 async def get_preferences():
     return load_preferences()
 
+# TRADE HISTORY PREFERENCES
+TRADE_HISTORY_PREFERENCES_PATH = os.path.join(get_data_dir(), "preferences", "trade_history_preferences.json")
+
+def load_trade_history_preferences():
+    """Load trade history preferences from file"""
+    try:
+        if os.path.exists(TRADE_HISTORY_PREFERENCES_PATH):
+            with open(TRADE_HISTORY_PREFERENCES_PATH, "r") as f:
+                preferences = json.load(f)
+        else:
+            preferences = {
+                "date_filter": "TODAY",
+                "custom_date_start": None,
+                "custom_date_end": None,
+                "win_filter": True,
+                "loss_filter": True,
+                "sort_key": None,
+                "sort_asc": True,
+                "page_size": 50,
+                "last_search_timestamp": time.time()
+            }
+        return preferences
+    except Exception as e:
+        print(f"[Trade History Preferences Load Error] {e}")
+        return {
+            "date_filter": "TODAY",
+            "custom_date_start": None,
+            "custom_date_end": None,
+            "win_filter": True,
+            "loss_filter": True,
+            "sort_key": None,
+            "sort_asc": True,
+            "page_size": 50,
+            "last_search_timestamp": time.time()
+        }
+
+def save_trade_history_preferences(preferences):
+    """Save trade history preferences to file"""
+    try:
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(TRADE_HISTORY_PREFERENCES_PATH), exist_ok=True)
+        # Set defaults if missing
+        if "date_filter" not in preferences:
+            preferences["date_filter"] = "TODAY"
+        if "custom_date_start" not in preferences:
+            preferences["custom_date_start"] = None
+        if "custom_date_end" not in preferences:
+            preferences["custom_date_end"] = None
+        if "win_filter" not in preferences:
+            preferences["win_filter"] = True
+        if "loss_filter" not in preferences:
+            preferences["loss_filter"] = True
+        if "sort_key" not in preferences:
+            preferences["sort_key"] = None
+        if "sort_asc" not in preferences:
+            preferences["sort_asc"] = True
+        if "page_size" not in preferences:
+            preferences["page_size"] = 50
+        if "last_search_timestamp" not in preferences:
+            preferences["last_search_timestamp"] = time.time()
+        
+        with open(TRADE_HISTORY_PREFERENCES_PATH, "w") as f:
+            json.dump(preferences, f, indent=2)
+    except Exception as e:
+        print(f"[Trade History Preferences Save Error] {e}")
+
+@app.get("/api/get_trade_history_preferences")
+async def get_trade_history_preferences():
+    """Get trade history preferences"""
+    return load_trade_history_preferences()
+
+@app.post("/api/set_trade_history_preferences")
+async def set_trade_history_preferences(request: Request):
+    """Set trade history preferences"""
+    try:
+        data = await request.json()
+        preferences = load_trade_history_preferences()
+        
+        # Update preferences with new data
+        for key, value in data.items():
+            preferences[key] = value
+        
+        # Update timestamp
+        preferences["last_search_timestamp"] = time.time()
+        
+        # Save preferences
+        save_trade_history_preferences(preferences)
+        
+        return {"status": "ok", "preferences": preferences}
+    except Exception as e:
+        print(f"[Trade History Preferences Set Error] {e}")
+        return {"status": "error", "message": str(e)}
+
 @app.get("/api/get_auto_stop")
 async def get_auto_stop():
     prefs = load_preferences()
