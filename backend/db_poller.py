@@ -34,10 +34,8 @@ class DatabasePoller:
         
         # Get service URLs using centralized port system
         main_app_port = get_port("main_app")
-        trade_manager_port = get_port("trade_manager")
         
         self.main_app_url = f"http://{get_host()}:{main_app_port}"
-        self.trade_manager_url = f"http://{get_host()}:{trade_manager_port}"
         
         self.setup_database_paths()
         
@@ -144,10 +142,6 @@ class DatabasePoller:
         # Notify main app about the change
         self.notify_main_app(db_name, change_data)
         
-        # If positions.db changed, also notify trade manager
-        if db_name == "positions":
-            self.notify_trade_manager(db_name, change_data)
-        
         if "error" in old_info or "error" in new_info:
             print(f"⚠️  Error reading database: {old_info.get('error', new_info.get('error'))}")
             return
@@ -208,22 +202,7 @@ class DatabasePoller:
             # WebSocket notification removed - method doesn't exist
             pass
     
-    def notify_trade_manager(self, db_name: str, change_data: Dict[str, Any]):
-        """Notify trade manager about database changes via HTTP"""
-        try:
-            url = f"{self.trade_manager_url}/api/positions_change"
-            # Send minimal notification - just the database name
-            payload = {
-                "database": db_name
-            }
-            # Use shorter timeout and fire-and-forget for speed
-            response = requests.post(url, json=payload, timeout=1)
-            if response.status_code == 200:
-                print(f"✅ Notified trade manager about {db_name} change")
-            else:
-                print(f"⚠️  Failed to notify trade manager: {response.status_code}")
-        except Exception as e:
-            print(f"❌ Error notifying trade manager: {e}")
+
     
 
     def poll_databases(self):

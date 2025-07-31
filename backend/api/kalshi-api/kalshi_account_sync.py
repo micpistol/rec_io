@@ -85,6 +85,7 @@ from backend.util.paths import get_project_root
 sys.path.insert(0, get_project_root())
 
 from backend.util.paths import get_kalshi_data_dir, get_accounts_data_dir, ensure_data_dirs
+from backend.core.port_config import get_port
 
 # Ensure all data directories exist
 ensure_data_dirs()
@@ -439,6 +440,21 @@ def sync_positions():
         print(f"❌ Failed to write positions.json: {e}")
 
     notify_frontend_db_change("positions", {"market_positions": len(all_market_positions), "event_positions": len(all_event_positions)})
+    
+    # Notify trade_manager about positions update
+    try:
+        trade_manager_port = get_port("trade_manager")
+        response = requests.post(
+            f"http://localhost:{trade_manager_port}/api/positions_updated",
+            json={"database": "positions"},
+            timeout=5
+        )
+        if response.status_code == 200:
+            print(f"✅ Notified trade_manager about positions update")
+        else:
+            print(f"⚠️ Failed to notify trade_manager: {response.status_code}")
+    except Exception as e:
+        print(f"❌ Error notifying trade_manager: {e}")
 
 
 def sync_fills():

@@ -183,6 +183,8 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
                     log_event(ticket_id, f"MANAGER: OPEN TRADE CONFIRMED — pos={pos}, price={price}, fees={fees}, diff={diff_formatted}")
                     notify_active_trade_supervisor_direct(id, ticket_id, "open")
                     notify_frontend_trade_change()
+                    # Notify strike table for display update (lowest priority)
+                    notify_strike_table_trade_change(id, "open")
                     break
                     
         except Exception as e:
@@ -350,6 +352,9 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                     except Exception as e:
                         log(f"⚠️ Notification failed but trade finalized: {e}")
                     
+                    # Notify strike table for display update (lowest priority)
+                    notify_strike_table_trade_change(id, "closed")
+                    
                     return
                 except Exception as e:
                     log_event(ticket_id, f"MANAGER: Error in finalization: {e}")
@@ -440,6 +445,26 @@ def notify_frontend_trade_change() -> None:
             log(f"⚠️ Failed to notify frontend about trade change: {response.status_code}")
     except Exception as e:
         # Don't log errors for frontend notifications - they're not critical
+        pass
+
+def notify_strike_table_trade_change(trade_id: int, status: str) -> None:
+    """Notify strike table about trade status changes for display updates"""
+    try:
+        import requests
+        notification_url = f"http://localhost:{get_port('main_app')}/api/notify_db_change"
+        payload = {
+            "db_name": "trades",
+            "timestamp": time.time(),
+            "change_data": {"trade_id": trade_id, "status": status}
+        }
+        
+        response = requests.post(notification_url, json=payload, timeout=1)
+        if response.status_code == 200:
+            log(f"✅ Strike table notification sent for trade {trade_id} status: {status}")
+        else:
+            log(f"⚠️ Strike table notification failed: {response.status_code}")
+    except Exception as e:
+        # Don't log errors for strike table notifications - they're not critical
         pass
 
 def truncate_contract_name(contract_name):
@@ -671,7 +696,8 @@ async def add_trade(request: Request):
                     "time_in_force": "IOC",
                     "buy_price": sell_price,
                     "symbol_close": symbol_close,
-                    "intent": "close"
+                    "intent": "close",
+                    "id": trade_id
                 }
                 response = requests.post(f"http://localhost:{executor_port}/trigger_trade", json=close_payload, timeout=5)
                 log(f"[CLOSE EXECUTOR] Executor responded with {response.status_code}: {response.text}")
@@ -759,7 +785,7 @@ async def update_trade_status_api(request: Request):
 
     if new_status == "accepted":
         log(f"[✅ TRADE ACCEPTED BY EXECUTOR] id={id}, ticket_id={ticket_id}")
-        log(f"[⏳ WAITING FOR POSITION CONFIRMATION FROM DB_POLLER]")
+        log(f"[⏳ WAITING FOR POSITION CONFIRMATION]")
         return {"message": "Trade accepted – waiting for position confirmation", "id": id}
 
     elif new_status == "error":
@@ -774,13 +800,13 @@ async def update_trade_status_api(request: Request):
     else:
         raise HTTPException(status_code=400, detail=f"Unrecognized status value: '{new_status}'")
 
-@router.post("/api/positions_change")
-async def positions_change_api(request: Request):
-    """Endpoint for db_poller to notify about positions.db changes"""
+@router.post("/api/positions_updated")
+async def positions_updated_api(request: Request):
+    """Endpoint for kalshi_account_sync to notify about positions.db updates"""
     try:
         data = await request.json()
-        db_name = data.get("database")
-        log(f"[🔔 POSITIONS CHANGE] Database: {db_name} - checking for pending/closing trades")
+        db_name = data.get("database", "positions")
+        log(f"[🔔 POSITIONS UPDATED] Database: {db_name} - checking for pending/closing trades")
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -789,7 +815,7 @@ async def positions_change_api(request: Request):
         conn.close()
         
         if pending_trades:
-            log(f"[🔔 POSITIONS CHANGE] Found {len(pending_trades)} pending trades to confirm")
+            log(f"[🔔 POSITIONS UPDATED] Found {len(pending_trades)} pending trades to confirm")
             for id, ticket_id in pending_trades:
                 threading.Thread(target=confirm_open_trade, args=(id, ticket_id), daemon=True).start()
         
@@ -800,7 +826,7 @@ async def positions_change_api(request: Request):
         conn.close()
         
         if closing_trades:
-            log(f"[🔔 POSITIONS CHANGE] Found {len(closing_trades)} closing trades to confirm")
+            log(f"[🔔 POSITIONS UPDATED] Found {len(closing_trades)} closing trades to confirm")
             for id, ticket_id in closing_trades:
                 conn = get_db_connection()
                 cursor = conn.cursor()
@@ -812,9 +838,9 @@ async def positions_change_api(request: Request):
                     # Process closing trade directly - no threading needed for single trades
                     confirm_close_trade(id, ticket_id)
         
-        return {"message": "positions_change received"}
+        return {"message": "positions_updated received"}
     except Exception as e:
-        log(f"[ERROR /api/positions_change] {e}")
+        log(f"[ERROR /api/positions_updated] {e}")
         return {"error": str(e)}
 
 # ---------- EXPIRATION FUNCTIONS ----------------------------------------------------

@@ -62,7 +62,6 @@ class CascadingFailureDetectorV2:
             "trade_initiator",
             "kalshi_api_watchdog",
             "btc_price_watchdog",
-            "db_poller",
             "kalshi_account_sync"
         ]
         

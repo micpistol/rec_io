@@ -2550,6 +2550,55 @@
         // Set up WebSocket connection for database change notifications
         setupDatabaseChangeListener();
         
+        // WebSocket connection for real-time database change notifications
+        let dbChangeWebSocket = null;
+        
+        function setupDatabaseChangeListener() {
+            if (dbChangeWebSocket && dbChangeWebSocket.readyState === WebSocket.OPEN) {
+                console.log("[MOBILE WEBSOCKET] Already connected");
+                return; // Already connected
+            }
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/db_changes`;
+            console.log("[MOBILE WEBSOCKET] Connecting to:", wsUrl);
+            
+            dbChangeWebSocket = new WebSocket(wsUrl);
+            
+            dbChangeWebSocket.onopen = function() {
+                console.log("[MOBILE WEBSOCKET] ✅ Connection opened successfully");
+            };
+            
+            dbChangeWebSocket.onmessage = function(event) {
+                try {
+                    console.log("[MOBILE WEBSOCKET] Received message:", event.data);
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'db_change' && data.database === 'trades') {
+                        console.log("[MOBILE WEBSOCKET] ✅ Trades DB change detected, updating mobile strike table");
+                        // Update mobile strike table when trades.db changes
+                        if (typeof updateMobileStrikeTable === 'function') {
+                            updateMobileStrikeTable();
+                        }
+                    }
+                } catch (error) {
+                    console.error("[MOBILE WEBSOCKET] Error processing message:", error);
+                }
+            };
+            
+            dbChangeWebSocket.onclose = function(event) {
+                console.log("[MOBILE WEBSOCKET] ❌ Connection closed:", event.code, event.reason);
+                // Try to reconnect after 5 seconds
+                setTimeout(() => {
+                    console.log("[MOBILE WEBSOCKET] Attempting to reconnect...");
+                    setupDatabaseChangeListener();
+                }, 5000);
+            };
+            
+            dbChangeWebSocket.onerror = function(error) {
+                console.error("[MOBILE WEBSOCKET] ❌ Connection error:", error);
+            };
+        }
+        
         // Mobile iframe coordination message handling
         window.addEventListener('message', function(event) {
             if (event.data && event.data.type === 'refresh_data') {

@@ -202,7 +202,12 @@ def trigger_trade():
         if response.status_code >= 400:
             log_event(ticket_id, "EXECUTOR: TRADE REJECTED — ERROR")
             log_event(ticket_id, f"EXECUTOR: TRADE REJECTED — {response.text.strip()}")
-            status_payload = {"ticket_id": ticket_id, "status": "error"}
+            # Use the trade ID if provided, otherwise use ticket_id
+            trade_id = data.get("id")
+            if trade_id:
+                status_payload = {"id": trade_id, "status": "error"}
+            else:
+                status_payload = {"ticket_id": ticket_id, "status": "error"}
             manager_port = get_manager_port()
             status_url = f"http://{get_host()}:{manager_port}/api/update_trade_status"
             def notify_error():
@@ -217,8 +222,12 @@ def trigger_trade():
             log_event(ticket_id, "EXECUTOR: TRADE SENT TO MARKET — CONFIRMED")
             log_event(ticket_id, "EXECUTOR: TRADE ACCEPTED — KALSHI CONFIRMED")
             log_event(ticket_id, "EXECUTOR: TRADE ACCEPTED — OK")
-            # Use the normalized ticket_id
-            status_payload = {"ticket_id": ticket_id, "status": "accepted"}
+            # Use the trade ID if provided, otherwise use ticket_id
+            trade_id = data.get("id")
+            if trade_id:
+                status_payload = {"id": trade_id, "status": "accepted"}
+            else:
+                status_payload = {"ticket_id": ticket_id, "status": "accepted"}
             manager_port = get_manager_port()
             status_url = f"http://{get_host()}:{manager_port}/api/update_trade_status"
             def notify_accepted():

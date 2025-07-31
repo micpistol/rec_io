@@ -210,7 +210,6 @@ def broadcast_active_trades_change():
 def check_for_open_trades():
     """
     Check trades.db for any OPEN trades and add them to active monitoring.
-    Called when db_poller detects changes to trades.db.
     """
     try:
         log("🔍 CHECKING: Checking trades.db for OPEN trades...")
@@ -276,7 +275,6 @@ def check_for_open_trades():
 def check_for_closed_trades():
     """
     Check if any active trades have been closed in trades.db.
-    Called when db_poller detects changes to trades.db.
     """
     try:
         log("🔍 CHECKING: Checking for closed trades...")
@@ -314,28 +312,7 @@ def check_for_closed_trades():
         log(f"❌ Error checking for closed trades: {e}")
 
 # HTTP endpoints for receiving notifications
-@app.route('/api/trades_db_change', methods=['POST'])
-def handle_trades_db_change():
-    """Handle notification from db_poller when trades.db changes"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "No data received"}), 400
-        
-        log(f"📡 NOTIFICATION: Received trades.db change notification")
-        log(f"📡 NOTIFICATION: Change data: {data}")
-        
-        # Check for new open trades
-        check_for_open_trades()
-        
-        # Check for closed trades
-        check_for_closed_trades()
-        
-        return jsonify({"status": "success", "message": "Trade database change processed"}), 200
-        
-    except Exception as e:
-        log(f"❌ Error handling trades.db change notification: {e}")
-        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/api/trade_manager_notification', methods=['POST'])
 def handle_trade_manager_notification():
