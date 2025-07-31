@@ -49,9 +49,9 @@ def fetch_full_5year_data(symbol: str = 'BTC/USD', output_dir: str = None) -> Tu
         Tuple of (output_file_path, number_of_rows_fetched)
     """
     if output_dir is None:
-        # Default to backend/data/price_history/{symbol_lower}
+        # Default to backend/data/live_data/price_history/{symbol_lower}
         symbol_lower = symbol.replace('/', '').lower()
-        output_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'price_history', symbol_lower)
+        output_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'live_data', 'price_history', symbol_lower)
     
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
@@ -75,10 +75,10 @@ def update_existing_csv(symbol: str = 'BTC/USD', csv_path: str = None) -> Tuple[
         Tuple of (output_file_path, number_of_rows_fetched)
     """
     if csv_path is None:
-        # Default to backend/data/price_history/{symbol_lower}/{symbol_clean}_1m_master_5y.csv
+        # Default to backend/data/live_data/price_history/{symbol_lower}/{symbol_clean}_1m_master_5y.csv
         symbol_lower = symbol.replace('/', '').lower()
         symbol_clean = symbol.replace('/', '').lower()
-        csv_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'price_history', symbol_lower, f"{symbol_clean}_1m_master_5y.csv")
+        csv_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'live_data', 'price_history', symbol_lower, f"{symbol_clean}_1m_master_5y.csv")
     
     print(f"Looking for CSV file: {csv_path}")
     if not os.path.exists(csv_path):

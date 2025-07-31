@@ -94,8 +94,8 @@ fi
 
 # Backup price history data
 mkdir -p backup/databases/price_history
-if [ -d backend/data/price_history ]; then
-    cp -r backend/data/price_history/* backup/databases/price_history/ 2>/dev/null || true
+if [ -d backend/data/live_data/price_history ]; then
+cp -r backend/data/live_data/price_history/* backup/databases/price_history/ 2>/dev/null || true
 fi
 
 # Test service connectivity using centralized port management

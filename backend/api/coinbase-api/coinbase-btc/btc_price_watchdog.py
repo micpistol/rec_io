@@ -18,7 +18,7 @@ print('DEBUG sys.path:', sys.path)
 # Now import everything else
 from backend.core.config.settings import config
 from backend.core.port_config import get_port
-from backend.util.paths import get_coinbase_data_dir, get_btc_price_history_dir, ensure_data_dirs
+from backend.util.paths import get_btc_price_history_dir, ensure_data_dirs
 
 # Ensure all data directories exist
 ensure_data_dirs()

@@ -29,7 +29,7 @@ def get_accounts_data_dir():
 
 def get_price_history_dir():
     """Get the price history directory path."""
-    return os.path.join(get_data_dir(), "price_history")
+    return os.path.join(get_data_dir(), "live_data", "price_history")
 
 def get_btc_price_history_dir():
     """Get the BTC price history directory path."""
@@ -92,7 +92,6 @@ def ensure_data_dirs():
     dirs = [
         get_data_dir(),
         get_kalshi_data_dir(),
-        get_coinbase_data_dir(),
         get_accounts_data_dir(),
         get_price_history_dir(),
         get_btc_price_history_dir(),

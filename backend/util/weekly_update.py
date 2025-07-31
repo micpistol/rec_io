@@ -61,7 +61,7 @@ def log_step(logger, step_name, start_time=None):
 
 def get_symbols():
     """Get list of symbols to process."""
-    data_dir = Path(__file__).parent.parent / "data" / "price_history"
+    data_dir = Path(__file__).parent.parent / "data" / "live_data" / "price_history"
     symbols = []
     
     if data_dir.exists():
@@ -84,7 +84,7 @@ def update_symbol_datasets(logger):
             logger.info(f"Updating {symbol.upper()} dataset...")
             
             # Construct the master file path
-            master_file = f"../data/price_history/{symbol}/{symbol}_1m_master_5y.csv"
+            master_file = f"../data/live_data/price_history/{symbol}/{symbol}_1m_master_5y.csv"
             
             # Update the dataset
             result = update_existing_csv(f"{symbol.upper()}/USD", master_file)
@@ -111,7 +111,7 @@ def run_momentum_generation(logger, symbols):
             logger.info(f"Generating momentum for {symbol.upper()}...")
             
             # Construct the master file path
-            master_file = f"../data/price_history/{symbol}/{symbol}_1m_master_5y.csv"
+            master_file = f"../data/live_data/price_history/{symbol}/{symbol}_1m_master_5y.csv"
             
             # Run momentum generation
             fill_missing_momentum_inplace(master_file)
@@ -136,7 +136,7 @@ def verify_data_completeness(logger, symbols):
             logger.info(f"Verifying {symbol.upper()} dataset...")
             
             # Load the dataset
-            master_file = f"../data/price_history/{symbol}/{symbol}_1m_master_5y.csv"
+            master_file = f"../data/live_data/price_history/{symbol}/{symbol}_1m_master_5y.csv"
             df = pd.read_csv(master_file)
             
             # Check data completeness

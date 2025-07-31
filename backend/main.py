@@ -706,10 +706,10 @@ async def create_trade(trade_data: dict):
 async def get_btc_changes():
     """Get BTC price changes from btc_price_change.json if available, else fallback."""
     try:
-        from backend.util.paths import get_coinbase_data_dir
+        from backend.util.paths import get_btc_price_history_dir
         import json as _json
         import os as _os
-        change_path = _os.path.join(get_coinbase_data_dir(), "btc_price_change.json")
+        change_path = _os.path.join(get_btc_price_history_dir(), "btc_price_change.json")
         if _os.path.exists(change_path):
             with open(change_path, "r") as f:
                 data = _json.load(f)

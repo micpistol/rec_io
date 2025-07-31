@@ -24,7 +24,7 @@ SQL
 
 # Optimize price history
 echo "  Optimizing btc_price_history.db..."
-sqlite3 backend/data/price_history/btc_price_history.db << 'SQL'
+sqlite3 backend/data/live_data/price_history/btc_price_history.db << 'SQL'
 CREATE INDEX IF NOT EXISTS idx_price_timestamp ON price_history(timestamp);
 CREATE INDEX IF NOT EXISTS idx_price_symbol ON price_history(symbol);
 ANALYZE;

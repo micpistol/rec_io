@@ -127,8 +127,8 @@ fi
 
 # Restore price history data
 if [ -d "backup/databases/price_history" ]; then
-    mkdir -p backend/data/price_history
-    cp -r backup/databases/price_history/* backend/data/price_history/ 2>/dev/null || true
+    mkdir -p backend/data/live_data/price_history
+cp -r backup/databases/price_history/* backend/data/live_data/price_history/ 2>/dev/null || true
     echo "✅ Restored price history data"
 fi
 
