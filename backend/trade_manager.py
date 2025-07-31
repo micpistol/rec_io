@@ -384,7 +384,7 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
 def log(msg):
     """Log messages with timestamp"""
     timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%H:%M:%S")
-    print(f"[TRADE_MANAGER {timestamp}] {msg}")
+    print(f"[TRADE_MANAGER {timestamp}] {msg}", flush=True)
 
 def log_event(ticket_id, message):
     try:
@@ -626,65 +626,12 @@ async def add_trade(request: Request):
         log(f"CLOSE TICKET RECEIVED")
         ticker = data.get("ticker")
         if ticker:
-            symbol_close = None
-            # Remove the BTC price request that causes unnecessary delay
-            # The symbol_close will be set to None and updated later if needed
-            
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            sell_price = data.get("buy_price")
-            close_method = data.get("close_method", "manual")
-            cursor.execute("UPDATE trades SET status = 'closing', symbol_close = ?, close_method = ? WHERE ticker = ?", (symbol_close, close_method, ticker))
-            conn.commit()
-            conn.close()
-            # log(f"[DEBUG] Trade status set to 'closing' for ticker: {ticker}")
-            
-            notify_frontend_trade_change()
-            
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT id FROM trades WHERE ticker = ?", (ticker,))
-            row = cursor.fetchone()
-            conn.close()
-            
-            if row:
-                trade_id = row[0]
-                notify_active_trade_supervisor_direct(trade_id, data.get('ticket_id'), "closing")
-            
-            try:
-                mode = get_account_mode()
-                POSITIONS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "positions.db")
-
-                if os.path.exists(POSITIONS_DB_PATH):
-                    conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
-                    cursor_pos = conn_pos.cursor()
-                    cursor_pos.execute("SELECT position FROM positions WHERE ticker = ?", (ticker,))
-                    row = cursor_pos.fetchone()
-                    conn_pos.close()
-
-                    if row:
-                        pos_db = abs(row[0])
-                        conn = get_db_connection()
-                        cursor = conn.cursor()
-                        cursor.execute("SELECT position FROM trades WHERE ticker = ?", (ticker,))
-                        trade_row = cursor.fetchone()
-                        conn.close()
-
-                        if trade_row and abs(trade_row[0]) == pos_db:
-                            log(f"CLOSE POSITION CONFIRMED: {ticker}")
-                        else:
-                            log(f"CLOSE CHECK MISMATCH")
-                    else:
-                        log(f"NO MATCHING ENTRY IN POSITIONS.DB")
-                else:
-                    log(f"POSITIONS.DB NOT FOUND")
-            except Exception as e:
-                log(f"CLOSE CHECK ERROR: {e}")
-
+            # IMMEDIATELY send to executor FIRST
             try:
                 import requests
                 executor_port = get_executor_port()
                 log(f"SENDING CLOSE TO EXECUTOR")
+                sell_price = data.get("buy_price")
                 close_payload = {
                     "ticker": ticker,
                     "side": data.get("side"),
@@ -693,26 +640,68 @@ async def add_trade(request: Request):
                     "type": "market",
                     "time_in_force": "IOC",
                     "buy_price": sell_price,
-                    "symbol_close": symbol_close,
-                    "intent": "close",
-                    "id": trade_id
+                    "symbol_close": None,
+                    "intent": "close"
                 }
                 response = requests.post(f"http://localhost:{executor_port}/trigger_trade", json=close_payload, timeout=5)
                 log(f"EXECUTOR RESPONSE: {response.status_code}")
             except Exception as e:
                 log(f"CLOSE EXECUTOR ERROR: {e}")
-
-            ticker = data.get("ticker")
+            
+            # Get trade_id for notifications
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT id FROM trades WHERE ticker = ?", (ticker,))
             row = cursor.fetchone()
             conn.close()
-
+            
             if row:
                 trade_id = row[0]
+                # Update database status
+                symbol_close = None
+                sell_price = data.get("buy_price")
+                close_method = data.get("close_method", "manual")
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("UPDATE trades SET status = 'closing', symbol_close = ?, close_method = ? WHERE ticker = ?", (symbol_close, close_method, ticker))
+                conn.commit()
+                conn.close()
+                
+                # Notify active trade supervisor
+                notify_active_trade_supervisor_direct(trade_id, data.get('ticket_id'), "closing")
+                
+                # Check positions
+                try:
+                    mode = get_account_mode()
+                    POSITIONS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "positions.db")
+
+                    if os.path.exists(POSITIONS_DB_PATH):
+                        conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
+                        cursor_pos = conn_pos.cursor()
+                        cursor_pos.execute("SELECT position FROM positions WHERE ticker = ?", (ticker,))
+                        row = conn_pos.fetchone()
+                        conn_pos.close()
+
+                        if row:
+                            pos_db = abs(row[0])
+                            conn = get_db_connection()
+                            cursor = conn.cursor()
+                            cursor.execute("SELECT position FROM trades WHERE ticker = ?", (ticker,))
+                            trade_row = cursor.fetchone()
+                            conn.close()
+
+                            if trade_row and abs(trade_row[0]) == pos_db:
+                                log(f"CLOSE POSITION CONFIRMED: {ticker}")
+                            else:
+                                log(f"CLOSE CHECK MISMATCH")
+                        else:
+                            log(f"NO MATCHING ENTRY IN POSITIONS.DB")
+                    else:
+                        log(f"POSITIONS.DB NOT FOUND")
+                except Exception as e:
+                    log(f"CLOSE CHECK ERROR: {e}")
+
                 log(f"CLOSE TICKET SENT - WAITING FOR CONFIRMATION")
-                # Removed timer-based confirm_close_trade thread - positions change notification will handle confirmation
             else:
                 log(f"COULD NOT FIND TRADE ID FOR TICKER")
 
@@ -733,9 +722,13 @@ async def add_trade(request: Request):
         executor_port = get_executor_port()
         log(f"SENDING TO EXECUTOR")
         response = requests.post(f"http://localhost:{executor_port}/trigger_trade", json=data, timeout=5)
+        log(f"EXECUTOR RESPONSE: {response.status_code}")
     except Exception as e:
         log(f"EXECUTOR ERROR: {e}")
         log_event(data["ticket_id"], f"EXECUTOR ERROR: {e}")
+
+    # Log immediately after executor call, before heavy database operations
+    log(f"TRADE SENT TO EXECUTOR - PROCESSING DATABASE")
 
     # Ensure the trade is inserted with 'pending' status
     data['status'] = 'pending'
