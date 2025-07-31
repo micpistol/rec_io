@@ -88,8 +88,8 @@ fi
 
 # Backup account data
 mkdir -p backup/databases/accounts
-if [ -d backend/data/accounts ]; then
-    cp -r backend/data/accounts/* backup/databases/accounts/ 2>/dev/null || true
+if [ -d backend/data/users/user_0001/accounts ]; then
+    cp -r backend/data/users/user_0001/accounts/* backup/databases/accounts/ 2>/dev/null || true
 fi
 
 # Backup price history data

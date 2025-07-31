@@ -19,6 +19,12 @@ def get_coinbase_data_dir():
 
 def get_accounts_data_dir():
     """Get the accounts data directory path."""
+    # Check for user-specific accounts first
+    user_accounts = os.path.join(get_data_dir(), "users", "user_0001", "accounts")
+    if os.path.exists(user_accounts):
+        return user_accounts
+    
+    # Fallback to legacy location
     return os.path.join(get_data_dir(), "accounts")
 
 def get_price_history_dir():

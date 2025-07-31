@@ -120,8 +120,8 @@ fi
 
 # Restore account data
 if [ -d "backup/databases/accounts" ]; then
-    mkdir -p backend/data/accounts
-    cp -r backup/databases/accounts/* backend/data/accounts/ 2>/dev/null || true
+    mkdir -p backend/data/users/user_0001/accounts
+    cp -r backup/databases/accounts/* backend/data/users/user_0001/accounts/ 2>/dev/null || true
     echo "✅ Restored account data"
 fi
 

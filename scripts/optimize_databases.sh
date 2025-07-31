@@ -33,7 +33,7 @@ SQL
 
 # Optimize account databases
 echo "  Optimizing account databases..."
-for db in backend/data/accounts/kalshi/*/*.db; do
+for db in backend/data/users/user_0001/accounts/kalshi/*/*.db; do
     if [ -f "$db" ]; then
         echo "    Optimizing $(basename $db)..."
         sqlite3 "$db" << 'SQL'
