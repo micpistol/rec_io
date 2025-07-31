@@ -1,6 +1,6 @@
 # Global file ignore
 
-# Database files
+# Database files (excluding historical data)
 *.db
 *.sqlite
 *.sqlite3
@@ -11,16 +11,32 @@
 logs/
 **/logs/
 
-# Data files
-**/data/
-backend/data/
+# INCLUDE historical data for system portability (MUST COME FIRST)
+!backend/data/historical_data/
+!backend/data/historical_data/**
+
+# INCLUDE live_data folder structure for system portability (MUST COME FIRST)
+!backend/data/live_data/
+!backend/data/live_data/markets/
+!backend/data/live_data/markets/kalshi/
+!backend/data/live_data/markets/kalshi/strike_tables/
+!backend/data/live_data/price_history/
+!backend/data/live_data/price_history/btc/
+!backend/data/live_data/price_history/eth/
+!backend/data/live_data/live_probabilities/
+
+# Large CSV files (excluding historical data)
+*.csv
+!backend/data/historical_data/
+!backend/data/historical_data/**
+!backend/data/historical_data/**/*.csv
+
+# Data files - EXCLUDE live data files but INCLUDE folder structure for portability
+backend/data/live_data/
 backend/data/live_data/markets/kalshi/
 backend/data/live_data/price_history/
 backend/data/live_data/live_probabilities/
 backend/data/markets/
-
-# Large CSV files
-*.csv
 
 # Virtual environments
 venv/
@@ -52,3 +68,23 @@ logs/main_app.out.log.1
 *.tmp
 *.temp
 changes.patch
+
+# User-specific data (credentials, accounts, etc.)
+backend/data/users/
+
+# Backup and swap files
+*.bak
+*.backup
+*~
+*.swp
+*.swo
+
+# Process and lock files
+*.pid
+*.lock
+logs/supervisord.pid
+backend/supervisord.conf.backup
+
+# IDE and editor files
+.idea/
+*.xcodeproj/xcuserdata/
