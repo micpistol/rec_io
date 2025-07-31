@@ -1220,7 +1220,7 @@ async def set_auto_entry_settings(request: Request):
     if "min_probability" in data:
         settings["min_probability"] = int(data["min_probability"])
     if "min_differential" in data:
-        settings["min_differential"] = int(data["min_differential"])
+        settings["min_differential"] = float(data["min_differential"])
     if "min_ttc_seconds" in data:
         settings["min_ttc_seconds"] = int(data["min_ttc_seconds"])
     if "min_time" in data:

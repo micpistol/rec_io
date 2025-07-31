@@ -219,30 +219,57 @@ function maintainWatchlistProbabilityOrder(strikes) {
   const watchlistTableBody = document.querySelector('#watchlist-table tbody');
   if (!watchlistTableBody || !window.watchlistRowsMap) return;
   
-  // Create a map of strike to probability for quick lookup
-  const strikeProbabilityMap = new Map();
+  // Create maps for quick lookup
+  const strikeDataMap = new Map();
   strikes.forEach(strikeData => {
-    strikeProbabilityMap.set(strikeData.strike, strikeData.probability);
+    strikeDataMap.set(strikeData.strike, strikeData);
   });
   
   // Get all visible rows (strikes that are in the watchlist)
   const visibleRows = [];
   window.watchlistRowsMap.forEach((cells, strike) => {
     if (cells.row.style.display !== 'none') {
-      const probability = strikeProbabilityMap.get(strike) || 0;
-      visibleRows.push({
-        strike,
-        probability,
-        row: cells.row
-      });
+      const strikeData = strikeDataMap.get(strike);
+      if (strikeData) {
+        const probability = strikeData.probability;
+        const activeSide = strikeData.active_side;
+        const yesDiff = strikeData.yes_diff;
+        const noDiff = strikeData.no_diff;
+        
+        // Determine the differential based on active side
+        let differential = 0;
+        if (activeSide === 'yes') {
+          differential = yesDiff;
+        } else if (activeSide === 'no') {
+          differential = noDiff;
+        } else {
+          // If no active side, use the higher differential
+          differential = Math.max(yesDiff, noDiff);
+        }
+        
+        visibleRows.push({
+          strike,
+          probability,
+          differential,
+          row: cells.row
+        });
+      }
     }
   });
   
-  // Sort by probability (highest to lowest)
-  visibleRows.sort((a, b) => b.probability - a.probability);
+  // Sort into two categories: above 95% and under 95% probability
+  const above95 = visibleRows.filter(row => row.probability >= 95);
+  const under95 = visibleRows.filter(row => row.probability < 95);
+  
+  // Sort each category by differential (highest to lowest)
+  above95.sort((a, b) => b.differential - a.differential);
+  under95.sort((a, b) => b.differential - a.differential);
+  
+  // Combine the sorted categories (above 95% first, then under 95%)
+  const sortedRows = [...above95, ...under95];
   
   // Reorder rows in the DOM to match the sorted order
-  visibleRows.forEach(({ row }) => {
+  sortedRows.forEach(({ row }) => {
     watchlistTableBody.appendChild(row);
   });
 }
@@ -262,8 +289,26 @@ function initializeWatchlistTableRows(strikes) {
   watchlistTableBody.innerHTML = '';
   window.watchlistRowsMap.clear();
   
-  // Sort strikes by probability (highest to lowest) before creating rows
-  const sortedStrikes = [...strikes].sort((a, b) => b.probability - a.probability);
+  // Sort strikes into two categories: above 95% and under 95% probability
+  // Within each category, sort by differential (highest to lowest)
+  const above95 = strikes.filter(strike => strike.probability >= 95);
+  const under95 = strikes.filter(strike => strike.probability < 95);
+  
+  // Sort each category by differential (highest to lowest)
+  above95.sort((a, b) => {
+    const aDiff = a.active_side === 'yes' ? a.yes_diff : (a.active_side === 'no' ? a.no_diff : Math.max(a.yes_diff, a.no_diff));
+    const bDiff = b.active_side === 'yes' ? b.yes_diff : (b.active_side === 'no' ? b.no_diff : Math.max(b.yes_diff, b.no_diff));
+    return bDiff - aDiff;
+  });
+  
+  under95.sort((a, b) => {
+    const aDiff = a.active_side === 'yes' ? a.yes_diff : (a.active_side === 'no' ? a.no_diff : Math.max(a.yes_diff, a.no_diff));
+    const bDiff = b.active_side === 'yes' ? b.yes_diff : (b.active_side === 'no' ? b.no_diff : Math.max(b.yes_diff, b.no_diff));
+    return bDiff - aDiff;
+  });
+  
+  // Combine the sorted categories (above 95% first, then under 95%)
+  const sortedStrikes = [...above95, ...under95];
   
   sortedStrikes.forEach((strikeData) => {
     const row = document.createElement('tr');

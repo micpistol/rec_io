@@ -178,7 +178,7 @@
   </div>
 
   <script>
-    let currentSort = { key: null, asc: true };
+    let currentSort = { key: 'id', asc: false };
     let trades = [];
     let filteredTrades = [];
 
@@ -532,12 +532,8 @@
       let filtered = filterTradesByDate(trades, dateFilterPicker ? dateFilterPicker.value : 'TODAY');
       filtered = filterTradesByWinLoss(filtered);
       
-      if (currentSort.key !== null) {
-        filteredTrades = [...filtered];
-        applyCurrentSort();
-      } else {
-        filteredTrades = filtered;
-      }
+      filteredTrades = [...filtered];
+      applyCurrentSort();
       renderTrades(filteredTrades);
     }
 
@@ -769,41 +765,40 @@
 
     // On initial load, show filtered trades
     window.addEventListener('DOMContentLoaded', async () => {
-      // Load preferences and apply to UI
-      fetch(window.location.origin + '/api/get_trade_history_preferences')
-        .then(res => res.json())
-        .then(data => {
-          // Apply date filter
-          const dateFilterPicker = document.getElementById('date-filter-picker');
-          if (dateFilterPicker && data.date_filter) {
-            dateFilterPicker.value = data.date_filter;
-          }
-          
-          // Apply win/loss filters
-          const filterWin = document.getElementById('filter-win');
-          const filterLoss = document.getElementById('filter-loss');
-          if (filterWin && data.win_filter !== undefined) {
-            filterWin.checked = data.win_filter;
-          }
-          if (filterLoss && data.loss_filter !== undefined) {
-            filterLoss.checked = data.loss_filter;
-          }
-          
-          // Apply sort settings
-          if (data.sort_key) {
-            currentSort.key = data.sort_key;
-            currentSort.asc = data.sort_asc !== undefined ? data.sort_asc : true;
-          }
-          
-          // Update date range display
-          updateDateRangeDisplay();
-        })
-        .catch(error => {
-          console.error('Error loading preferences:', error);
-        });
+      try {
+        // Load preferences and apply to UI first
+        const res = await fetch(window.location.origin + '/api/get_trade_history_preferences');
+        const data = await res.json();
+        
+        // Apply date filter
+        const dateFilterPicker = document.getElementById('date-filter-picker');
+        if (dateFilterPicker && data.date_filter) {
+          dateFilterPicker.value = data.date_filter;
+        }
+        
+        // Apply win/loss filters
+        const filterWin = document.getElementById('filter-win');
+        const filterLoss = document.getElementById('filter-loss');
+        if (filterWin && data.win_filter !== undefined) {
+          filterWin.checked = data.win_filter;
+        }
+        if (filterLoss && data.loss_filter !== undefined) {
+          filterLoss.checked = data.loss_filter;
+        }
+        
+        // Apply sort settings
+        if (data.sort_key) {
+          currentSort.key = data.sort_key;
+          currentSort.asc = data.sort_asc !== undefined ? data.sort_asc : true;
+        }
+        
+        // Update date range display
+        await updateDateRangeDisplay();
+      } catch (error) {
+        console.error('Error loading preferences:', error);
+      }
 
-      // updateDayNames(); // Update day names
-      await updateDateRangeDisplay(); // Update date range display
+      // Now fetch trades after preferences are loaded
       fetchAllTrades();
       
       // Set up event listeners
