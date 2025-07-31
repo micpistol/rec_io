@@ -834,6 +834,48 @@ async def positions_updated_api(request: Request):
         log(f"[ERROR /api/positions_updated] {e}")
         return {"error": str(e)}
 
+@router.post("/api/manual_expiration_check")
+async def manual_expiration_check():
+    """Manually trigger the expiration check - marks all open trades as expired"""
+    try:
+        log("[MANUAL] Manual expiration check triggered")
+        
+        # Run the expiration check in a separate thread to avoid blocking
+        threading.Thread(target=check_expired_trades, daemon=True).start()
+        
+        return {"message": "Manual expiration check triggered"}
+    except Exception as e:
+        log(f"[ERROR /api/manual_expiration_check] {e}")
+        return {"error": str(e)}
+
+@router.post("/api/manual_settlement_poll")
+async def manual_settlement_poll():
+    """Manually trigger settlement polling for expired trades"""
+    try:
+        log("[MANUAL] Manual settlement polling triggered")
+        
+        # Get expired trades that need settlement
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT ticker FROM trades WHERE status = 'expired'")
+        expired_trades = cursor.fetchall()
+        conn.close()
+        
+        if expired_trades:
+            expired_tickers = [trade[0] for trade in expired_trades]
+            log(f"[MANUAL] Found {len(expired_tickers)} expired trades to poll settlements for")
+            
+            # Run settlement polling in a separate thread
+            threading.Thread(target=poll_settlements_for_matches, args=(expired_tickers,), daemon=True).start()
+            
+            return {"message": f"Manual settlement polling triggered for {len(expired_tickers)} expired trades"}
+        else:
+            return {"message": "No expired trades found to poll settlements for"}
+            
+    except Exception as e:
+        log(f"[ERROR /api/manual_settlement_poll] {e}")
+        return {"error": str(e)}
+
 # ---------- EXPIRATION FUNCTIONS ----------------------------------------------------
 
 def check_expired_trades():

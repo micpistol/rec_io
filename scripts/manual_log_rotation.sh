@@ -6,6 +6,9 @@
 echo "🔄 MANUAL LOG ROTATION SYSTEM"
 echo "=============================="
 
+# Change to project directory (required for cron execution)
+cd "$(dirname "$0")/.." || exit 1
+
 # Configuration
 LOG_DIR="logs"
 MAX_SIZE_MB=10
