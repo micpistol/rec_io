@@ -16,6 +16,7 @@ logs/
 backend/data/
 backend/data/kalshi/
 backend/data/live_data/price_history/
+backend/data/live_data/live_probabilities/
 backend/data/markets/
 
 # Large CSV files

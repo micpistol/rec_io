@@ -1080,7 +1080,7 @@ def get_current_probability(strike: float, current_price: float, ttc_seconds: fl
     import json
     from backend.util.paths import get_data_dir
     try:
-        live_json_path = os.path.join(get_data_dir(), "live_probabilities", "btc_live_probabilities.json")
+        live_json_path = os.path.join(get_data_dir(), "live_data", "live_probabilities", "btc_live_probabilities.json")
         if os.path.exists(live_json_path):
             with open(live_json_path, "r") as f:
                 data = json.load(f)

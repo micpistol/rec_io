@@ -480,7 +480,7 @@ def generate_btc_live_probabilities_json(
         "fingerprint_csv": fingerprint_csv
     }
     if output_dir is None:
-        output_dir = os.path.join(get_data_dir(), "live_probabilities")
+        output_dir = os.path.join(get_data_dir(), "live_data", "live_probabilities")
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, "btc_live_probabilities.json")
     safe_write_json(output, output_path)

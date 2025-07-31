@@ -172,7 +172,7 @@ def get_kalshi_market_snapshot() -> Dict[str, Any]:
 def get_live_probabilities() -> Dict[str, float]:
     """Get live probabilities from the live probabilities JSON file"""
     try:
-        live_prob_file = os.path.join(get_data_dir(), "live_probabilities", "btc_live_probabilities.json")
+        live_prob_file = os.path.join(get_data_dir(), "live_data", "live_probabilities", "btc_live_probabilities.json")
         
         if not os.path.exists(live_prob_file):
             raise FileNotFoundError(f"Live probabilities file not found: {live_prob_file}")
@@ -436,7 +436,7 @@ class UnifiedProductionCoordinator:
         self.price_history_dir = get_price_history_dir()
         
         # Output paths
-        self.live_probabilities_path = os.path.join(self.data_dir, "live_probabilities", "btc_live_probabilities.json")
+        self.live_probabilities_path = os.path.join(self.data_dir, "live_data", "live_probabilities", "btc_live_probabilities.json")
         self.strike_table_path = os.path.join(self.data_dir, "strike_tables", "btc_strike_table.json")
         self.watchlist_path = os.path.join(self.data_dir, "strike_tables", "btc_watchlist.json")
         
@@ -781,7 +781,7 @@ class UnifiedProductionCoordinator:
             try:
                 from util.paths import get_data_dir
                 import os
-                live_probabilities_path = os.path.join(get_data_dir(), "live_probabilities", "btc_live_probabilities.json")
+                live_probabilities_path = os.path.join(get_data_dir(), "live_data", "live_probabilities", "btc_live_probabilities.json")
                 if os.path.exists(live_probabilities_path):
                     live_prob_data = safe_read_json(live_probabilities_path)
                     if live_prob_data and "fingerprint_csv" in live_prob_data:

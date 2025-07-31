@@ -1345,7 +1345,7 @@ def frontend_changes():
 async def get_live_probabilities():
     """Get live probabilities from the unified probability endpoint"""
     try:
-        live_prob_file = os.path.join(get_data_dir(), "live_probabilities", "btc_live_probabilities.json")
+        live_prob_file = os.path.join(get_data_dir(), "live_data", "live_probabilities", "btc_live_probabilities.json")
         
         if os.path.exists(live_prob_file):
             with open(live_prob_file, 'r') as f:
