@@ -21,7 +21,6 @@ from backend.util.paths import get_accounts_data_dir
 
 # Get port from centralized system
 TRADE_MANAGER_PORT = get_port("trade_manager")
-print(f"[TRADE_MANAGER] 🚀 Using centralized port: {TRADE_MANAGER_PORT}")
 
 # Thread-safe set to track trades being processed
 processing_trades = set()
@@ -35,7 +34,6 @@ def get_executor_port():
 def insert_trade(trade):
     """Insert a new trade with BTC price from unified endpoint"""
     log(f"[DEBUG] TRADES DB PATH (insert_trade): {DB_TRADES_PATH}")
-    print("[DEBUG] Inserting trade data:", trade)
     
     # Get current BTC price directly from database - INSTANT
     try:
@@ -51,15 +49,11 @@ def insert_trade(trade):
 
             if result and result[0] is not None:
                 symbol_open = int(float(result[0]))
-                print(f"[TRADE_MANAGER] Got symbol_open from database: {symbol_open}")
             else:
-                print(f"[TRADE_MANAGER] Warning: No BTC price found in database")
                 symbol_open = None
         else:
-            print(f"[TRADE_MANAGER] Warning: BTC price database not found: {btc_price_db}")
             symbol_open = None
     except Exception as e:
-        print(f"[TRADE_MANAGER] Error getting BTC price from database: {e}")
         symbol_open = None
     
     # Get current momentum from API and format it correctly for database
@@ -74,10 +68,7 @@ def insert_trade(trade):
             momentum_for_db = f"{'+' if momentum_whole > 0 else ''}{momentum_whole}"
         else:
             momentum_for_db = "0"
-            
-        print(f"[MOMENTUM] Raw: {momentum_score}, Formatted for DB: {momentum_for_db}")
     except Exception as e:
-        print(f"[MOMENTUM] Error getting momentum: {e}")
         momentum_for_db = "0"
     
     conn = get_db_connection()
@@ -659,8 +650,6 @@ async def add_trade(request: Request):
     intent = data.get("intent", "open").lower()
     
     if intent == "close":
-        print("[TRADE_MANAGER] 🔴 CLOSE TICKET RECEIVED")
-        print("[TRADE_MANAGER] Close Payload:", data)
         log(f"[TRADE_MANAGER] 🔴 CLOSE TICKET RECEIVED — Payload: {data}")
         ticker = data.get("ticker")
         if ticker:
@@ -758,7 +747,6 @@ async def add_trade(request: Request):
     
     # OPEN TRADE
     log("✅ /trades POST route triggered successfully")
-    print("✅ TRADE MANAGER received POST")
     required_fields = {"date", "time", "strike", "side", "buy_price", "position"}
     if not required_fields.issubset(data.keys()):
         raise HTTPException(status_code=400, detail="Missing required trade fields")
@@ -773,7 +761,6 @@ async def add_trade(request: Request):
         log(f"📤 SENDING TO EXECUTOR on port {executor_port}")
         log(f"📤 FULL URL: http://localhost:{executor_port}/trigger_trade")
         response = requests.post(f"http://localhost:{executor_port}/trigger_trade", json=data, timeout=5)
-        print(f"[EXECUTOR RESPONSE] {response.status_code} — {response.text}")
     except Exception as e:
         log(f"[❌ EXECUTOR ERROR] Failed to send trade to executor: {e}")
         log_event(data["ticket_id"], f"❌ EXECUTOR ERROR: {e}")
@@ -796,8 +783,7 @@ async def update_trade_status_api(request: Request):
     id = data.get("id")
     ticket_id = data.get("ticket_id")
     new_status = data.get("status", "").strip().lower()
-    print(f"[🔥 STATUS UPDATE API HIT] ticket_id={ticket_id} | id={id} | new_status={new_status}")
-
+        
     if not new_status or (not id and not ticket_id):
         raise HTTPException(status_code=400, detail="Missing id or ticket_id or status")
 
@@ -895,10 +881,7 @@ def check_expired_trades():
         conn.close()
         
         if not open_trades:
-            print("[EXPIRATION] No open trades to check")
             return
-            
-        print(f"[EXPIRATION] Found {len(open_trades)} open trades to expire")
         
         now_est = datetime.now(ZoneInfo("America/New_York"))
         closed_at = now_est.strftime("%H:%M:%S")
@@ -911,15 +894,12 @@ def check_expired_trades():
                 btc_data = response.json()
                 symbol_close = btc_data.get('price')
                 if symbol_close:
-                    print(f"[EXPIRATION] Got BTC price from unified endpoint: {symbol_close}")
+                    pass
                 else:
-                    print(f"[EXPIRATION] Warning: No price data in unified endpoint response")
                     symbol_close = None
             else:
-                print(f"[EXPIRATION] Warning: Unified BTC price endpoint returned status {response.status_code}")
                 symbol_close = None
         except Exception as e:
-            print(f"[EXPIRATION] Failed to get BTC price from unified endpoint: {e}")
             symbol_close = None
         
         conn = get_db_connection()
@@ -935,8 +915,6 @@ def check_expired_trades():
         conn.commit()
         conn.close()
         
-        print(f"[EXPIRATION] Marked {len(open_trades)} trades as expired")
-        
         notify_frontend_trade_change()
         
         for id, ticker in open_trades:
@@ -946,7 +924,7 @@ def check_expired_trades():
         poll_settlements_for_matches(expired_tickers)
         
     except Exception as e:
-        print(f"[EXPIRATION] Error: {e}")
+        pass
 
 def poll_settlements_for_matches(expired_tickers):
     """Poll settlements.db for matches to expired trades"""
@@ -954,7 +932,6 @@ def poll_settlements_for_matches(expired_tickers):
     SETTLEMENTS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "settlements.db")
     
     if not os.path.exists(SETTLEMENTS_DB_PATH):
-        print(f"[SETTLEMENTS] Settlements DB not found: {SETTLEMENTS_DB_PATH}")
         return
     
     found_tickers = set()
@@ -963,8 +940,6 @@ def poll_settlements_for_matches(expired_tickers):
     
     while len(found_tickers) < len(expired_tickers):
         if time.time() - start_time > timeout_seconds:
-            print(f"[SETTLEMENTS] Timeout reached after {timeout_seconds/60:.1f} minutes. Found {len(found_tickers)}/{len(expired_tickers)} settlements.")
-            print(f"[SETTLEMENTS] Remaining tickers: {set(expired_tickers) - found_tickers}")
             break
             
         try:
@@ -1021,19 +996,13 @@ def poll_settlements_for_matches(expired_tickers):
                     notify_frontend_trade_change()
                     
                     found_tickers.add(ticker)
-                    print(f"[SETTLEMENTS] Closed trade for {ticker} with sell_price={sell_price}")
-            
-            conn.close()
-            
+                    
             if len(found_tickers) < len(expired_tickers):
-                print(f"[SETTLEMENTS] Found {len(found_tickers)}/{len(expired_tickers)} settlements, continuing to poll...")
                 time.sleep(2)
             else:
-                print(f"[SETTLEMENTS] All {len(expired_tickers)} expired trades have been closed")
                 break
-                
+            
         except Exception as e:
-            print(f"[SETTLEMENTS] Error polling settlements: {e}")
             time.sleep(2)
 
 # ---------- APScheduler Setup ----------------------------------------------------
@@ -1052,16 +1021,13 @@ async def lifespan(app: FastAPI):
     """Start APScheduler when FastAPI app starts"""
     try:
         _scheduler.start()
-        print("[SCHEDULER] APScheduler started successfully")
-        print(f"[TRADE_MANAGER] 🚀 Trade manager started on centralized port {get_port('trade_manager')}")
     except Exception as e:
-        print(f"[SCHEDULER ERROR] Failed to start APScheduler: {e}")
+        pass
     yield
     try:
         _scheduler.shutdown()
-        print("[SCHEDULER] APScheduler shutdown successfully")
     except Exception as e:
-        print(f"[SCHEDULER ERROR] Failed to shutdown APScheduler: {e}")
+        pass
 
 app = FastAPI(lifespan=lifespan)
 
@@ -1072,5 +1038,4 @@ if __name__ == "__main__":
     import os
 
     port = get_port("trade_manager")
-    print(f"[INFO] Trade Manager running on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)

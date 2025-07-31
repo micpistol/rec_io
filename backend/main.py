@@ -1303,8 +1303,6 @@ async def trigger_close_trade(request: Request):
         trade_id = data.get("trade_id")
         sell_price = data.get("sell_price")
         
-        print(f"[TRIGGER CLOSE TRADE] Received request: trade_id={trade_id}, sell_price={sell_price}")
-        
         # Forward the request to the trade_initiator service
         trade_initiator_port = get_port("trade_initiator")
         from backend.util.paths import get_host
@@ -1322,14 +1320,12 @@ async def trigger_close_trade(request: Request):
         
         if response.status_code == 200:
             result = response.json()
-            print(f"[TRIGGER CLOSE TRADE] Trade closed successfully: {result}")
             return {
                 "status": "success",
                 "message": "Trade closed successfully",
                 "close_data": result
             }
         else:
-            print(f"[TRIGGER CLOSE TRADE] Trade closure failed: {response.status_code} - {response.text}")
             return {
                 "status": "error",
                 "message": f"Trade closure failed: {response.status_code}",
@@ -1337,7 +1333,6 @@ async def trigger_close_trade(request: Request):
             }
         
     except Exception as e:
-        print(f"[TRIGGER CLOSE TRADE] Error: {e}")
         return {"status": "error", "message": str(e)}
 
 @app.get("/frontend-changes")

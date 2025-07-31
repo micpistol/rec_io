@@ -103,28 +103,37 @@ def log_event(ticket_id, message):
         log_path = log_dir / log_filename
 
         # Compose and append the log entry
-        timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
-        entry = f"[{timestamp}] Ticket {ticket_id[-5:]}: {message}\n"
+        timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%H:%M:%S")
+        log_message = f"[EXECUTOR {timestamp}] {message}"
+        
+        # Write to console with flush
+        print(log_message, flush=True)
+        
+        # Write to file
         with open(log_path, "a") as f:
-            f.write(entry)
+            f.write(f"{datetime.now().isoformat()} | {message}\n")
 
-        # Echo to stdout for immediate visibility
-        print(f"[TRADE_EXECUTOR] {entry.strip()}")
+        # Clean up old log files (keep only 20 most recent)
+        cleanup_old_logs(log_dir, 20)
 
-        # --- Retention: keep only the 20 most‑recent logs ---
-        logs = sorted(
-            log_dir.glob("trade_flow_*.log"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True
-        )
-        for old in logs[20:]:
-            try:
-                old.unlink()
-            except Exception:
-                # If deletion fails, continue silently
-                pass
     except Exception as e:
-        print(f"❌ Failed to write to log: {e}")
+        print(f"Error in log_event: {e}")
+
+def cleanup_old_logs(log_dir, keep_count):
+    """
+    Cleans up old log files to keep only the most recent 'keep_count' files.
+    """
+    logs = sorted(
+        log_dir.glob("trade_flow_*.log"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True
+    )
+    for old in logs[keep_count:]:
+        try:
+            old.unlink()
+        except Exception:
+            # If deletion fails, continue silently
+            pass
 
 def get_manager_port():
     return get_port("trade_manager")
@@ -153,13 +162,12 @@ def trigger_trade():
     """Execute a trade."""
     try:
         data = request.get_json()
-        print(f"[TRADE_EXECUTOR] 🔍 RECEIVED TRADE DATA: {data}", flush=True)
         ticket_id = data.get("ticket_id", "UNKNOWN")
         # Normalize ticket_id to avoid double "TICKET-" prefixing
         if ticket_id.count("TICKET-") > 1:
             ticket_id = ticket_id.split("TICKET-")[-1]
             ticket_id = f"TICKET-{ticket_id}"
-        log_event(ticket_id, "EXECUTOR: TICKET RECEIVED — CONFIRMED")
+        log_event(ticket_id, "📥 RECEIVED TICKET")
 
         ticker = data.get("ticker")
         raw_side = data.get("side", "yes")
@@ -192,16 +200,11 @@ def trigger_trade():
         }
 
         url = f"{get_base_url()}{path}"
-        print(f"🚀 SENDING TRADE PAYLOAD TO KALSHI:\n{json.dumps(order_payload, indent=2)}", flush=True)
-        print(f"📡 HEADERS:\n{json.dumps(headers, indent=2)}", flush=True)
-        print(f"🌐 URL: {url}", flush=True)
+        log_event(ticket_id, "📤 SENDING TO KALSHI")
         response = requests.post(url, headers=headers, json=order_payload, timeout=10)
-        print(f"📬 RESPONSE STATUS: {response.status_code}", flush=True)
-        print(f"📨 RESPONSE BODY: {response.text}", flush=True)
 
         if response.status_code >= 400:
-            log_event(ticket_id, "EXECUTOR: TRADE REJECTED — ERROR")
-            log_event(ticket_id, f"EXECUTOR: TRADE REJECTED — {response.text.strip()}")
+            log_event(ticket_id, "❌ TRADE REJECTED")
             # Use the trade ID if provided, otherwise use ticket_id
             trade_id = data.get("id")
             if trade_id:
@@ -216,12 +219,9 @@ def trigger_trade():
                 except Exception as e:
                     pass
             threading.Thread(target=notify_error, daemon=True).start()
-            print(f"❌ TRADE FAILED: {response.status_code} — {response.text.strip()}")
             return jsonify({"status": "rejected", "error": response.text}), response.status_code
         elif response.status_code in [200, 201]:
-            log_event(ticket_id, "EXECUTOR: TRADE SENT TO MARKET — CONFIRMED")
-            log_event(ticket_id, "EXECUTOR: TRADE ACCEPTED — KALSHI CONFIRMED")
-            log_event(ticket_id, "EXECUTOR: TRADE ACCEPTED — OK")
+            log_event(ticket_id, "✅ TRADE SUCCESS")
             # Use the trade ID if provided, otherwise use ticket_id
             trade_id = data.get("id")
             if trade_id:
@@ -233,15 +233,13 @@ def trigger_trade():
             def notify_accepted():
                 try:
                     resp = requests.post(status_url, json=status_payload, timeout=5)
-                    print(f"📤 STATUS UPDATE SENT TO MANAGER: {resp.status_code}")
                 except Exception as e:
-                    print(f"❌ STATUS UPDATE FAILED: {e}")
+                    pass
             threading.Thread(target=notify_accepted, daemon=True).start()
-            print("[TRADE_EXECUTOR] ✅ ✅ ✅ TRADE EXECUTED SUCCESSFULLY ✅ ✅ ✅")
             return jsonify({"status": "sent", "message": "Trade sent successfully"}), 200
 
     except Exception as e:
-        print(f"❌ Error in trade execution: {e}")
+        log_event(ticket_id, f"❌ ERROR: {e}")
         return jsonify({"error": str(e)}), 500
 
 # Account sync endpoint

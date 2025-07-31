@@ -27,7 +27,10 @@ from backend.util.paths import get_host, get_data_dir, get_service_url
 
 # Get port from centralized system
 TRADE_INITIATOR_PORT = get_port("trade_initiator")
-print(f"[TRADE_INITIATOR] 🚀 Using centralized port: {TRADE_INITIATOR_PORT}")
+
+# Thread-safe set to track trades being processed
+processing_trades = set()
+processing_lock = threading.Lock()
 
 # Create Flask app
 app = Flask(__name__)
@@ -35,8 +38,9 @@ CORS(app)  # Enable CORS for all routes
 
 def log(message: str):
     """Log messages with timestamp"""
-    timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[TRADE_INITIATOR {timestamp}] {message}")
+    timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%H:%M:%S")
+    log_message = f"[INITIATOR {timestamp}] {message}"
+    print(log_message, flush=True)
     
     # Also write to a dedicated log file for easy tailing
     try:
@@ -45,9 +49,9 @@ def log(message: str):
         os.makedirs(log_dir, exist_ok=True)
         log_file = os.path.join(log_dir, "trade_initiator.log")
         with open(log_file, "a") as f:
-            f.write(f"[{timestamp}] {message}\n")
+            f.write(f"{datetime.now().isoformat()} | {message}\n")
     except Exception as e:
-        print(f"Error writing to log file: {e}")
+        pass  # Silently fail file writes
 
 def generate_ticket_id():
     """Generate unique ticket ID like the frontend does"""
@@ -322,7 +326,7 @@ def close_trade():
     """
     try:
         data = request.get_json()
-        log(f"Received close trade request: {data}")
+        log(f"📥 RECEIVED CLOSE TICKET")
         
         # Validate required fields
         if "trade_id" not in data:
@@ -333,22 +337,24 @@ def close_trade():
         trade_id = data["trade_id"]
         sell_price = data["sell_price"]
         
-        # Create close trade ticket
+        log(f"🔍 FETCHING TRADE: {trade_id}")
+        
+        # Create the close trade ticket
         trade_ticket = create_close_trade_ticket(trade_id, sell_price)
-        log(f"Created close trade ticket: {trade_ticket}")
+        log(f"✅ CLOSE TICKET CREATED: {trade_ticket['ticket_id']}")
         
         # Send to trade_manager
         result = send_trade_to_manager(trade_ticket)
         
-        if result["success"]:
-            log(f"✅ Trade closed successfully: {result}")
+        if result.get("success"):
+            log(f"📤 SENT CLOSE TO MANAGER: {trade_ticket['ticker']}")
             return result
         else:
-            log(f"❌ Trade close failed: {result}")
-            return result, 400
+            log(f"❌ MANAGER ERROR: {result}")
+            return result, 500
             
     except Exception as e:
-        log(f"❌ Error closing trade: {e}")
+        log(f"❌ ERROR: {e}")
         return {"success": False, "error": str(e)}, 500
 
 def start_trade_initiator():
