@@ -72,7 +72,7 @@ def get_current_btc_price():
             if price:
                 # Format to 2 decimal places
                 formatted_price = round(float(price), 2)
-                log(f"Got BTC price from unified endpoint: {formatted_price}")
+                # log(f"Got BTC price from unified endpoint: {formatted_price}")
                 return formatted_price
             else:
                 log(f"Warning: No price data in unified endpoint response")
@@ -239,28 +239,27 @@ def send_trade_to_manager(trade_ticket: Dict[str, Any]) -> Dict[str, Any]:
         trade_manager_port = get_port("trade_manager")
         trade_manager_url = f"http://{get_host()}:{trade_manager_port}/trades"
         
-        log(f"📡 SENDING TO TRADE_MANAGER: {trade_manager_url}")
-        log(f"📦 TRADE_MANAGER PAYLOAD: {trade_ticket}")
+        log(f"SENDING TO TRADE_MANAGER")
         
         response = requests.post(trade_manager_url, json=trade_ticket, timeout=10)
         
         if response.status_code == 201:
             result = response.json()
-            log(f"✅ TRADE_MANAGER RESPONSE (201): {result}")
+            log(f"TRADE_MANAGER RESPONSE: SUCCESS")
             return {
                 "success": True,
                 "result": result,
                 "ticket_id": trade_ticket["ticket_id"]
             }
         else:
-            log(f"❌ TRADE_MANAGER ERROR ({response.status_code}): {response.text}")
+            log(f"TRADE_MANAGER ERROR: {response.status_code}")
             return {
                 "success": False,
                 "error": f"Trade manager returned {response.status_code}: {response.text}"
             }
             
     except Exception as e:
-        log(f"❌ ERROR SENDING TO TRADE_MANAGER: {e}")
+        log(f"ERROR SENDING TO TRADE_MANAGER: {e}")
         return {"success": False, "error": str(e)}
 
 @app.route("/health")
@@ -278,38 +277,35 @@ def initiate_trade():
     """Initiate a new trade via the trade_initiator service."""
     try:
         data = request.json
-        log(f"🔍 RECEIVED OPEN TICKET REQUEST")
-        log(f"📦 PAYLOAD: {data}")
+        log(f"RECEIVED OPEN TICKET")
         
         # Validate required fields
         required_fields = ["strike", "side", "ticker", "buy_price", "prob"]
         for field in required_fields:
             if field not in data:
-                log(f"❌ MISSING REQUIRED FIELD: {field}")
+                log(f"MISSING REQUIRED FIELD: {field}")
                 return {"success": False, "error": f"Missing required field: {field}"}, 400
         
-        log(f"✅ VALIDATION PASSED - All required fields present")
+        log(f"VALIDATION PASSED")
         
         # Create the trade ticket
-        log(f"🏗️ CREATING TRADE TICKET...")
+        log(f"CREATING TRADE TICKET...")
         trade_ticket = create_open_trade_ticket(data)
-        log(f"✅ TRADE TICKET CREATED: {trade_ticket['ticket_id']}")
-        log(f"📋 TICKET DETAILS: strike={trade_ticket['strike']}, side={trade_ticket['side']}, ticker={trade_ticket['ticker']}, buy_price={trade_ticket['buy_price']}, prob={trade_ticket['prob']}, symbol_open={trade_ticket['symbol_open']}, momentum={trade_ticket['momentum']}")
+        log(f"TRADE TICKET CREATED: {trade_ticket['ticket_id']}")
         
         # Send to trade_manager
-        log(f"📤 SENDING TICKET TO TRADE_MANAGER...")
+        log(f"SENDING TICKET TO TRADE_MANAGER...")
         result = send_trade_to_manager(trade_ticket)
         
         if result.get("success"):
-            log(f"✅ TICKET SENT TO TRADE_MANAGER SUCCESSFULLY")
-            log(f"📊 TRADE_MANAGER RESPONSE: {result}")
+            log(f"TICKET SENT TO TRADE_MANAGER SUCCESSFULLY")
             return result
         else:
-            log(f"❌ FAILED TO SEND TICKET TO TRADE_MANAGER: {result}")
+            log(f"FAILED TO SEND TICKET TO TRADE_MANAGER: {result}")
             return result, 500
             
     except Exception as e:
-        log(f"❌ ERROR IN INITIATE_TRADE: {e}")
+        log(f"ERROR IN INITIATE_TRADE: {e}")
         return {"success": False, "error": str(e)}, 500
 
 @app.post("/api/close_trade")
@@ -326,7 +322,7 @@ def close_trade():
     """
     try:
         data = request.get_json()
-        log(f"📥 RECEIVED CLOSE TICKET")
+        log(f"RECEIVED CLOSE TICKET")
         
         # Validate required fields
         if "trade_id" not in data:
@@ -337,29 +333,29 @@ def close_trade():
         trade_id = data["trade_id"]
         sell_price = data["sell_price"]
         
-        log(f"🔍 FETCHING TRADE: {trade_id}")
+        log(f"FETCHING TRADE: {trade_id}")
         
         # Create the close trade ticket
         trade_ticket = create_close_trade_ticket(trade_id, sell_price)
-        log(f"✅ CLOSE TICKET CREATED: {trade_ticket['ticket_id']}")
+        log(f"CLOSE TICKET CREATED: {trade_ticket['ticket_id']}")
         
         # Send to trade_manager
         result = send_trade_to_manager(trade_ticket)
         
         if result.get("success"):
-            log(f"📤 SENT CLOSE TO MANAGER: {trade_ticket['ticker']}")
+            log(f"SENT CLOSE TO MANAGER: {trade_ticket['ticker']}")
             return result
         else:
-            log(f"❌ MANAGER ERROR: {result}")
+            log(f"MANAGER ERROR: {result}")
             return result, 500
             
     except Exception as e:
-        log(f"❌ ERROR: {e}")
+        log(f"ERROR: {e}")
         return {"success": False, "error": str(e)}, 500
 
 def start_trade_initiator():
     """Start the trade initiator service"""
-    log("🚀 Starting Trade Initiator service...")
+    log("Starting Trade Initiator service...")
     app.run(host="0.0.0.0", port=TRADE_INITIATOR_PORT, debug=False)
 
 if __name__ == "__main__":

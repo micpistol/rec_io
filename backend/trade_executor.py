@@ -28,7 +28,7 @@ from backend.core.port_config import get_port, get_port_info
 
 # Get port from centralized system
 TRADE_EXECUTOR_PORT = get_port("trade_executor")
-print(f"[TRADE_EXECUTOR] 🚀 Using centralized port: {TRADE_EXECUTOR_PORT}")
+# print(f"[TRADE_EXECUTOR] 🚀 Using centralized port: {TRADE_EXECUTOR_PORT}")
 
 # Import centralized path utilities
 from backend.util.paths import get_accounts_data_dir, get_host
@@ -44,7 +44,7 @@ def get_base_url():
     }
     return BASE_URLS.get(get_account_mode(), BASE_URLS["prod"])
 
-print(f"Using base URL: {get_base_url()} for mode: {get_account_mode()}")
+# print(f"Using base URL: {get_base_url()} for mode: {get_account_mode()}")
 
 # --- Credentials loading ---
 def load_credentials():
@@ -329,6 +329,6 @@ def get_system_status():
 
 # Main entry point
 if __name__ == "__main__":
-    print(f"[TRADE_EXECUTOR] 🚀 Launching trade executor on static port {TRADE_EXECUTOR_PORT}")
+    # print(f"[TRADE_EXECUTOR] 🚀 Launching trade executor on static port {TRADE_EXECUTOR_PORT}")
     app.run(host="0.0.0.0", port=TRADE_EXECUTOR_PORT, debug=False)
 

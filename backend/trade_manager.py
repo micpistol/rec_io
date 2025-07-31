@@ -33,7 +33,7 @@ def get_executor_port():
 
 def insert_trade(trade):
     """Insert a new trade with BTC price from unified endpoint"""
-    log(f"[DEBUG] TRADES DB PATH (insert_trade): {DB_TRADES_PATH}")
+    # log(f"[DEBUG] TRADES DB PATH (insert_trade): {DB_TRADES_PATH}")
     
     # Get current BTC price directly from database - INSTANT
     try:
@@ -199,7 +199,7 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
 
 def confirm_close_trade(id: int, ticket_id: str) -> None:
     """Confirms a CLOSING trade has been closed in the market account"""
-    log(f"[CONFIRM_CLOSE] Starting confirm_close_trade for id={id}, ticket_id={ticket_id}")
+    log(f"CONFIRMING CLOSE TRADE: {id}")
     
     try:
         conn = get_db_connection()
@@ -210,35 +210,30 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
         
         if not row:
             log_event(ticket_id, f"MANAGER: No trade found for ID {id}")
-            log(f"[CONFIRM_CLOSE] ❌ No trade found for ID {id}")
+            log(f"NO TRADE FOUND FOR ID: {id}")
             return
         
         expected_ticker = row[0]
-        log(f"[CONFIRM_CLOSE] Found trade with ticker: {expected_ticker}")
         
         mode = get_account_mode()
         POSITIONS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "positions.db")
-        log(f"[CONFIRM_CLOSE] Using positions.db path: {POSITIONS_DB_PATH}")
         
         if not os.path.exists(POSITIONS_DB_PATH):
             log_event(ticket_id, f"MANAGER: positions.db not found at {POSITIONS_DB_PATH}")
-            log(f"[CONFIRM_CLOSE] ❌ positions.db not found at {POSITIONS_DB_PATH}")
+            log(f"POSITIONS.DB NOT FOUND")
             return
         
         # Check position once - positions change notification should handle timing
         try:
-            log(f"[CONFIRM_CLOSE] Checking position for ticker: {expected_ticker}")
             conn_pos = sqlite3.connect(POSITIONS_DB_PATH, timeout=0.25)
             cursor_pos = conn_pos.cursor()
             cursor_pos.execute("SELECT position FROM positions WHERE ticker = ?", (expected_ticker,))
             row = cursor_pos.fetchone()
             conn_pos.close()
             
-            log(f"[CONFIRM_CLOSE] Position query result: {row}")
-            
             if row and row[0] == 0:
                 log_event(ticket_id, f"MANAGER: POSITION ZEROED OUT for {expected_ticker}")
-                log(f"[CONFIRM_CLOSE] ✅ Position zeroed out for {expected_ticker}")
+                log(f"POSITION ZEROED OUT: {expected_ticker}")
                 
                 now_est = datetime.now(ZoneInfo("America/New_York"))
                 closed_at = now_est.strftime("%H:%M:%S")
@@ -259,20 +254,17 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                 conn.close()
                 
                 original_side = side_row[0] if side_row else None
-                log(f"[CONFIRM_CLOSE] Original side: {original_side}")
                 
                 FILLS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "fills.db")
-                log(f"[CONFIRM_CLOSE] Using fills.db path: {FILLS_DB_PATH}")
                 
                 if not os.path.exists(FILLS_DB_PATH):
                     log_event(ticket_id, f"MANAGER: fills.db not found at {FILLS_DB_PATH}")
-                    log(f"[CONFIRM_CLOSE] ❌ fills.db not found at {FILLS_DB_PATH}")
+                    log(f"FILLS.DB NOT FOUND")
                     return
                 
                 conn_fills = sqlite3.connect(FILLS_DB_PATH, timeout=0.25)
                 cursor_fills = conn_fills.cursor()
                 opposite_side = 'no' if original_side == 'Y' else 'yes'
-                log(f"[CONFIRM_CLOSE] Opposite side: {opposite_side}")
                 
                 cursor_fills.execute("""
                     SELECT yes_price, no_price, created_time, side 
@@ -284,11 +276,9 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                 fill_row = cursor_fills.fetchone()
                 conn_fills.close()
                 
-                log(f"[CONFIRM_CLOSE] Fill row result: {fill_row}")
-                
                 if not fill_row or not original_side:
                     log_event(ticket_id, f"MANAGER: No closing fill found for {opposite_side} side - cannot calculate sell price")
-                    log(f"[CONFIRM_CLOSE] ❌ No closing fill found for {opposite_side} side")
+                    log(f"NO CLOSING FILL FOUND")
                     return
                 
                 yes_price, no_price, fill_time, fill_side = fill_row
@@ -301,10 +291,8 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                     sell_price = 1 - float(yes_price)  # Keep as decimal
                 else:
                     log_event(ticket_id, f"MANAGER: Invalid original side: {original_side}")
-                    log(f"[CONFIRM_CLOSE] ❌ Invalid original side: {original_side}")
+                    log(f"INVALID ORIGINAL SIDE")
                     return
-                
-                log(f"[CONFIRM_CLOSE] Found closing fill at {fill_time} - side={fill_side}, yes_price={yes_price}, no_price={no_price}, using sell_price={sell_price}")
                 
                 symbol_close = None
                 try:
@@ -316,18 +304,14 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                         symbol_close = btc_data.get('price')
                         if symbol_close:
                             log_event(ticket_id, f"MANAGER: Retrieved current symbol price for close: {symbol_close}")
-                            log(f"[CONFIRM_CLOSE] Retrieved current BTC price: {symbol_close}")
                         else:
                             log_event(ticket_id, f"MANAGER: No price data in unified endpoint response")
-                            log(f"[CONFIRM_CLOSE] No price data in unified endpoint response")
                             symbol_close = None
                     else:
                         log_event(ticket_id, f"MANAGER: Unified BTC price endpoint returned status {response.status_code}")
-                        log(f"[CONFIRM_CLOSE] Unified BTC price endpoint returned status {response.status_code}")
                         symbol_close = None
                 except Exception as e:
                     log_event(ticket_id, f"MANAGER: Failed to get current symbol price from unified endpoint: {e}")
-                    log(f"[CONFIRM_CLOSE] Failed to get current symbol price: {e}")
                     symbol_close = None
                 
                 conn = get_db_connection()
@@ -344,8 +328,6 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                     pnl = round(sell_value - buy_value - fees, 2)
                     win_loss = "W" if pnl > 0 else "L" if pnl < 0 else "D"
                     
-                    log(f"[CONFIRM_CLOSE] PnL calculation: buy_value={buy_value}, sell_value={sell_value}, fees={fees}, pnl={pnl}")
-                    
                     conn = get_db_connection()
                     cursor = conn.cursor()
                     cursor.execute("SELECT close_method FROM trades WHERE id = ?", (id,))
@@ -354,7 +336,6 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                     conn.close()
                     
                     try:
-                        log(f"[CONFIRM_CLOSE] Calling update_trade_status for id={id}")
                         update_trade_status(id, "closed", closed_at, sell_price, symbol_close, win_loss, pnl, close_method)
                         
                         conn = get_db_connection()
@@ -364,13 +345,13 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                         conn.close()
                         
                         log_event(ticket_id, f"MANAGER: CLOSE TRADE CONFIRMED - PnL: {pnl}, W/L: {win_loss}, Fees: {total_fees_paid}")
-                        log(f"[✅ CLOSE TRADE CONFIRMED] id={id}, ticker={expected_ticker}, PnL={pnl}, W/L={win_loss}, Fees={total_fees_paid}")
+                        log(f"CLOSE TRADE CONFIRMED: {expected_ticker}, PnL={pnl}, W/L={win_loss}")
                         
                         # Try to notify active trade supervisor, but don't fail if it doesn't work
                         try:
                             notify_active_trade_supervisor_direct(id, ticket_id, "closed")
                         except Exception as e:
-                            log(f"⚠️ Notification failed but trade finalized: {e}")
+                            log(f"NOTIFICATION FAILED BUT TRADE FINALIZED")
                         
                         # Notify strike table for display update (lowest priority)
                         notify_strike_table_trade_change(id, "closed")
@@ -378,32 +359,31 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                         return
                     except Exception as e:
                         log_event(ticket_id, f"MANAGER: Error in finalization: {e}")
-                        log(f"❌ Trade finalization failed for {id}: {e}")
+                        log(f"TRADE FINALIZATION FAILED")
                         return
                 else:
                     log_event(ticket_id, f"MANAGER: Could not get trade data for PnL calculation")
-                    log(f"[CONFIRM_CLOSE] ❌ Could not get trade data for PnL calculation")
+                    log(f"COULD NOT GET TRADE DATA FOR PNL")
                     return
             else:
                 position_value = row[0] if row else "None"
-                log(f"[DEBUG] Position not zeroed out - Current: {position_value}, Expected: 0")
                 log_event(ticket_id, f"MANAGER: Position not zeroed out yet - Current: {position_value}")
-                log(f"[CONFIRM_CLOSE] ❌ Position not zeroed out - Current: {position_value}")
+                log(f"POSITION NOT ZEROED OUT - Current: {position_value}")
                 return
         except Exception as e:
             log_event(ticket_id, f"MANAGER: Error checking position: {e}")
-            log(f"[CONFIRM_CLOSE] ❌ Error checking position: {e}")
+            log(f"ERROR CHECKING POSITION: {e}")
             return
     except Exception as e:
         log_event(ticket_id, f"MANAGER: Error in confirm_close_trade: {e}")
-        log(f"[CONFIRM_CLOSE] ❌ Error in confirm_close_trade: {e}")
+        log(f"ERROR IN CONFIRM_CLOSE_TRADE: {e}")
         return
 
 # ---------- UTILITY FUNCTIONS ----------------------------------------------------
 
 def log(msg):
     """Log messages with timestamp"""
-    timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%H:%M:%S")
     print(f"[TRADE_MANAGER {timestamp}] {msg}")
     
     try:
@@ -443,16 +423,16 @@ def notify_active_trade_supervisor_direct(trade_id: int, ticket_id: str, status:
         if response.status_code == 200:
             result = response.json()
             if result.get("success", False):
-                log(f"✅ Direct notification sent to active trade supervisor: id={trade_id}, status={status}")
+                log(f"NOTIFIED ACTIVE TRADE SUPERVISOR")
             else:
-                log(f"⚠️ Active trade supervisor returned error: {result.get('message', 'Unknown error')}")
+                log(f"ACTIVE TRADE SUPERVISOR ERROR")
         else:
-            log(f"⚠️ Failed to send direct notification to active trade supervisor: {response.status_code}")
+            log(f"ACTIVE TRADE SUPERVISOR ERROR")
             
     except ImportError:
-        log(f"⚠️ requests not available - falling back to direct import for trade: id={trade_id}")
+        log(f"REQUESTS NOT AVAILABLE")
     except Exception as e:
-        log(f"❌ Error sending direct notification to active trade supervisor: {e}")
+        log(f"ERROR SENDING NOTIFICATION")
 
 def notify_frontend_trade_change() -> None:
     """Send notification to frontend when trades.db is updated"""
@@ -467,9 +447,9 @@ def notify_frontend_trade_change() -> None:
         
         response = requests.post(notification_url, json=payload, timeout=2)
         if response.status_code == 200:
-            log("✅ Notified frontend about trade database change")
+            log("NOTIFIED FRONTEND")
         else:
-            log(f"⚠️ Failed to notify frontend about trade change: {response.status_code}")
+            log(f"FRONTEND NOTIFICATION FAILED")
     except Exception as e:
         # Don't log errors for frontend notifications - they're not critical
         pass
@@ -487,9 +467,9 @@ def notify_strike_table_trade_change(trade_id: int, status: str) -> None:
         
         response = requests.post(notification_url, json=payload, timeout=1)
         if response.status_code == 200:
-            log(f"✅ Strike table notification sent for trade {trade_id} status: {status}")
+            log(f"NOTIFIED STRIKE TABLE")
         else:
-            log(f"⚠️ Strike table notification failed: {response.status_code}")
+            log(f"STRIKE TABLE NOTIFICATION FAILED")
     except Exception as e:
         # Don't log errors for strike table notifications - they're not critical
         pass
@@ -650,7 +630,7 @@ async def add_trade(request: Request):
     intent = data.get("intent", "open").lower()
     
     if intent == "close":
-        log(f"[TRADE_MANAGER] 🔴 CLOSE TICKET RECEIVED — Payload: {data}")
+        log(f"CLOSE TICKET RECEIVED")
         ticker = data.get("ticker")
         if ticker:
             symbol_close = None
@@ -664,7 +644,7 @@ async def add_trade(request: Request):
             cursor.execute("UPDATE trades SET status = 'closing', symbol_close = ?, close_method = ? WHERE ticker = ?", (symbol_close, close_method, ticker))
             conn.commit()
             conn.close()
-            log(f"[DEBUG] Trade status set to 'closing' for ticker: {ticker}")
+            # log(f"[DEBUG] Trade status set to 'closing' for ticker: {ticker}")
             
             notify_frontend_trade_change()
             
@@ -698,20 +678,20 @@ async def add_trade(request: Request):
                         conn.close()
 
                         if trade_row and abs(trade_row[0]) == pos_db:
-                            log(f"[CLOSE CHECK] ✅ Confirmed matching position for {ticker} — abs(pos) = {pos_db}")
+                            log(f"CLOSE POSITION CONFIRMED: {ticker}")
                         else:
-                            log(f"[CLOSE CHECK] ❌ Mismatch for {ticker}: trades.db = {abs(trade_row[0]) if trade_row else 'None'}, positions.db = {pos_db}")
+                            log(f"CLOSE CHECK MISMATCH")
                     else:
-                        log(f"[CLOSE CHECK] ⚠️ No matching entry in positions.db for ticker: {ticker}")
+                        log(f"NO MATCHING ENTRY IN POSITIONS.DB")
                 else:
-                    log(f"[CLOSE CHECK] ❌ positions.db not found: {POSITIONS_DB_PATH}")
+                    log(f"POSITIONS.DB NOT FOUND")
             except Exception as e:
-                log(f"[CLOSE CHECK ERROR] Exception while checking close match for {ticker}: {e}")
+                log(f"CLOSE CHECK ERROR: {e}")
 
             try:
                 import requests
                 executor_port = get_executor_port()
-                log(f"[CLOSE EXECUTOR] Sending close trade to executor on port {executor_port}")
+                log(f"SENDING CLOSE TO EXECUTOR")
                 close_payload = {
                     "ticker": ticker,
                     "side": data.get("side"),
@@ -725,9 +705,9 @@ async def add_trade(request: Request):
                     "id": trade_id
                 }
                 response = requests.post(f"http://localhost:{executor_port}/trigger_trade", json=close_payload, timeout=5)
-                log(f"[CLOSE EXECUTOR] Executor responded with {response.status_code}: {response.text}")
+                log(f"EXECUTOR RESPONSE: {response.status_code}")
             except Exception as e:
-                log(f"[CLOSE EXECUTOR ERROR] Failed to send close trade to executor: {e}")
+                log(f"CLOSE EXECUTOR ERROR: {e}")
 
             ticker = data.get("ticker")
             conn = get_db_connection()
@@ -738,15 +718,15 @@ async def add_trade(request: Request):
 
             if row:
                 trade_id = row[0]
-                log(f"[✅ CLOSE TICKET RECEIVED - WAITING FOR POSITIONS CHANGE] id={trade_id}, ticket_id={data.get('ticket_id')}")
+                log(f"CLOSE TICKET SENT - WAITING FOR CONFIRMATION")
                 # Removed timer-based confirm_close_trade thread - positions change notification will handle confirmation
             else:
-                log(f"[CONFIRM CLOSE THREAD ERROR] Could not find trade id for ticker: {ticker}")
+                log(f"COULD NOT FIND TRADE ID FOR TICKER")
 
         return {"message": "Close ticket received and processed"}
     
     # OPEN TRADE
-    log("✅ /trades POST route triggered successfully")
+    log("OPEN TICKET RECEIVED")
     required_fields = {"date", "time", "strike", "side", "buy_price", "position"}
     if not required_fields.issubset(data.keys()):
         raise HTTPException(status_code=400, detail="Missing required trade fields")
@@ -758,12 +738,11 @@ async def add_trade(request: Request):
     try:
         import requests
         executor_port = get_executor_port()
-        log(f"📤 SENDING TO EXECUTOR on port {executor_port}")
-        log(f"📤 FULL URL: http://localhost:{executor_port}/trigger_trade")
+        log(f"SENDING TO EXECUTOR")
         response = requests.post(f"http://localhost:{executor_port}/trigger_trade", json=data, timeout=5)
     except Exception as e:
-        log(f"[❌ EXECUTOR ERROR] Failed to send trade to executor: {e}")
-        log_event(data["ticket_id"], f"❌ EXECUTOR ERROR: {e}")
+        log(f"EXECUTOR ERROR: {e}")
+        log_event(data["ticket_id"], f"EXECUTOR ERROR: {e}")
 
     # Ensure the trade is inserted with 'pending' status
     data['status'] = 'pending'
@@ -778,7 +757,7 @@ async def add_trade(request: Request):
 @router.post("/api/update_trade_status")
 async def update_trade_status_api(request: Request):
     """Handle status updates from executor"""
-    log(f"📩 RECEIVED STATUS UPDATE PAYLOAD: {await request.body()}")
+    log(f"STATUS UPDATE RECEIVED")
     data = await request.json()
     id = data.get("id")
     ticket_id = data.get("ticket_id")
@@ -806,8 +785,8 @@ async def update_trade_status_api(request: Request):
         ticket_id = row[0] if row else None
 
     if new_status == "accepted":
-        log(f"[✅ TRADE ACCEPTED BY EXECUTOR] id={id}, ticket_id={ticket_id}")
-        log(f"[⏳ WAITING FOR POSITION CONFIRMATION]")
+        log(f"TRADE ACCEPTED BY EXECUTOR")
+        log(f"WAITING FOR POSITION CONFIRMATION")
         return {"message": "Trade accepted – waiting for position confirmation", "id": id}
 
     elif new_status == "error":
@@ -828,7 +807,7 @@ async def positions_updated_api(request: Request):
     try:
         data = await request.json()
         db_name = data.get("database", "positions")
-        log(f"[🔔 POSITIONS UPDATED] Database: {db_name} - checking for pending/closing trades")
+        # log(f"[🔔 POSITIONS UPDATED] Database: {db_name} - checking for pending/closing trades")
         
         # Handle pending trades (only when positions database is updated)
         if db_name == "positions":
@@ -839,7 +818,7 @@ async def positions_updated_api(request: Request):
             conn.close()
             
             if pending_trades:
-                log(f"[🔔 POSITIONS UPDATED] Found {len(pending_trades)} pending trades to confirm")
+                # log(f"[🔔 POSITIONS UPDATED] Found {len(pending_trades)} pending trades to confirm")
                 for id, ticket_id in pending_trades:
                     threading.Thread(target=confirm_open_trade, args=(id, ticket_id), daemon=True).start()
         
@@ -852,7 +831,7 @@ async def positions_updated_api(request: Request):
             conn.close()
             
             if closing_trades:
-                log(f"[🔔 POSITIONS UPDATED] Found {len(closing_trades)} closing trades to confirm")
+                # log(f"[🔔 POSITIONS UPDATED] Found {len(closing_trades)} closing trades to confirm")
                 for id, ticket_id in closing_trades:
                     conn = get_db_connection()
                     cursor = conn.cursor()
