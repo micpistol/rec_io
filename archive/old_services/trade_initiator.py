@@ -37,7 +37,7 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
 def log(message: str):
-    """Log messages TRADE_INITATith timestamp"""
+    """Log messages with timestamp"""
     timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%H:%M:%S")
     log_message = f"[INITIATOR {timestamp}] {message}"
     print(log_message, flush=True)

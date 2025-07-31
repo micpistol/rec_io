@@ -1234,7 +1234,7 @@ async def set_auto_entry_settings(request: Request):
 
 @app.post("/api/trigger_open_trade")
 async def trigger_open_trade(request: Request):
-    """Trigger trade initiation via the trade_initiator service - exactly like a human user clicking a buy button."""
+    """Trigger trade opening directly via the trade_manager service."""
     try:
         data = await request.json()
         strike = data.get("strike")
@@ -1251,31 +1251,59 @@ async def trigger_open_trade(request: Request):
         
         print(f"[TRIGGER OPEN TRADE] Received request: strike={strike}, side={side}, ticker={ticker}, buy_price={buy_price}, prob={prob}, symbol_open={symbol_open}, momentum={momentum}")
         
-        # Forward the request to the trade_initiator service
-        trade_initiator_port = get_port("trade_initiator")
+        # Forward the request directly to the trade_manager service
+        trade_manager_port = get_port("trade_manager")
         from backend.util.paths import get_host
-        trade_initiator_host = get_host()
-        trade_initiator_url = f"http://{trade_initiator_host}:{trade_initiator_port}/api/initiate_trade"
+        trade_manager_host = get_host()
+        trade_manager_url = f"http://{trade_manager_host}:{trade_manager_port}/trades"
         
-        # Prepare the trade data for the trade_initiator
+        # Create the exact same payload that trade_initiator would create
+        import uuid
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        
+        # Generate unique ticket ID (same format as trade_initiator)
+        ticket_id = f"TICKET-{uuid.uuid4().hex[:9]}-{int(datetime.now().timestamp() * 1000)}"
+        
+        # Get current time in Eastern Time (same as trade_initiator)
+        now = datetime.now(ZoneInfo("America/New_York"))
+        eastern_date = now.strftime('%Y-%m-%d')
+        eastern_time = now.strftime('%H:%M:%S')
+        
+        # Convert side format (yes/no to Y/N) - same as trade_initiator
+        converted_side = side
+        if side == "yes":
+            converted_side = "Y"
+        elif side == "no":
+            converted_side = "N"
+        
+        # Prepare the trade data exactly like trade_initiator does
         trade_data = {
+            "ticket_id": ticket_id,
+            "status": "pending",
+            "date": eastern_date,
+            "time": eastern_time,
             "symbol": symbol or "BTC",
+            "market": "Kalshi",
+            "trade_strategy": trade_strategy or "Hourly HTC",
+            "contract": contract or "BTC Market",
             "strike": strike,
-            "side": side,
+            "side": converted_side,
             "ticker": ticker,
             "buy_price": buy_price,
-            "prob": prob,
-            "trade_strategy": trade_strategy or "*** TEST ***",
-            "contract": contract or "BTC 12pm",
+            "position": position or 1,
             "symbol_open": symbol_open,
+            "symbol_close": None,
             "momentum": momentum,
-            "position": position or 1
+            "prob": prob,
+            "win_loss": None,
+            "entry_method": data.get("entry_method", "manual")
         }
         
-        # Send request to trade_initiator
-        response = requests.post(trade_initiator_url, json=trade_data, timeout=10)
+        # Send request directly to trade_manager
+        response = requests.post(trade_manager_url, json=trade_data, timeout=10)
         
-        if response.status_code == 200:
+        if response.status_code == 201:
             result = response.json()
             print(f"[TRIGGER OPEN TRADE] Trade initiated successfully: {result}")
             return {
@@ -1295,45 +1323,7 @@ async def trigger_open_trade(request: Request):
         print(f"[TRIGGER OPEN TRADE] Error: {e}")
         return {"status": "error", "message": str(e)}
 
-@app.post("/api/trigger_close_trade")
-async def trigger_close_trade(request: Request):
-    """Trigger trade closure via the trade_initiator service."""
-    try:
-        data = await request.json()
-        trade_id = data.get("trade_id")
-        sell_price = data.get("sell_price")
-        
-        # Forward the request to the trade_initiator service
-        trade_initiator_port = get_port("trade_initiator")
-        from backend.util.paths import get_host
-        trade_initiator_host = get_host()
-        trade_initiator_url = f"http://{trade_initiator_host}:{trade_initiator_port}/api/close_trade"
-        
-        # Prepare the close trade data
-        close_data = {
-            "trade_id": trade_id,
-            "sell_price": sell_price
-        }
-        
-        # Send request to trade_initiator
-        response = requests.post(trade_initiator_url, json=close_data, timeout=10)
-        
-        if response.status_code == 200:
-            result = response.json()
-            return {
-                "status": "success",
-                "message": "Trade closed successfully",
-                "close_data": result
-            }
-        else:
-            return {
-                "status": "error",
-                "message": f"Trade closure failed: {response.status_code}",
-                "details": response.text
-            }
-        
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+
 
 @app.get("/frontend-changes")
 def frontend_changes():

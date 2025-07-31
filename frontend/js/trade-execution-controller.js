@@ -144,7 +144,7 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
 
 // === CENTRALIZED TRADE DATA PREPARATION ===
 // This function extracts all necessary trade data from a button element
-// and prepares it for sending to the trade_initiator service
+// and prepares it for sending to the trade_manager service
 
 window.prepareTradeData = async function(target) {
   // 🎧 Sound confirmation - IMMEDIATE

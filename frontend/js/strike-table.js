@@ -657,7 +657,7 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
 
   if (isActive) {
     spanEl.onclick = debounce(async function(event) {
-      // Use centralized trade execution controller via trade_initiator
+      // Use centralized trade execution controller via trade_manager
       try {
         const tradeData = await prepareTradeData(spanEl); // Use the centralized function
         
@@ -666,7 +666,7 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
           return;
         }
         
-        // Call the new trade_initiator endpoint with complete data
+        // Call the new trade_manager endpoint with complete data
         const response = await fetch('/api/trigger_open_trade', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

@@ -32,9 +32,8 @@
     "kalshi_account_sync": 8004,
     "kalshi_api_watchdog": 8005,
     "active_trade_supervisor": 8007,
-    "auto_entry_supervisor": 8009,
-    "unified_production_coordinator": 8010,
-    "trade_initiator": 8011
+          "auto_entry_supervisor": 8009,
+      "unified_production_coordinator": 8010
   },
   "notes": {
     "principles": [

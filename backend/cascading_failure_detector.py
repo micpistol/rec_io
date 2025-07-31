@@ -58,7 +58,7 @@ class CascadingFailureDetector:
             "auto_entry_supervisor",
             "unified_production_coordinator",
             "active_trade_supervisor",
-            "trade_initiator",
+        
             "kalshi_api_watchdog",
             "btc_price_watchdog"
         ]

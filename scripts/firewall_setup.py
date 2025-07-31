@@ -56,7 +56,7 @@ TRADING_PORTS = [
     8007,  # active_trade_supervisor
     8009,  # auto_entry_supervisor
     8010,  # unified_production_coordinator
-    8011,  # trade_initiator
+
 ]
 
 # Standard web ports

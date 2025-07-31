@@ -194,14 +194,17 @@ def get_position_size():
         return None
 
 def trigger_auto_entry_trade(strike_data):
-    """Trigger a buy trade by calling the trade_initiator service"""
+    """Trigger a buy trade by calling the trade_manager service directly"""
     import requests
+    import uuid
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
     
     log(f"[AUTO ENTRY] 🟢 Triggered AUTO ENTRY for strike: {strike_data.get('strike')} {strike_data.get('side')}")
     
     try:
-        port = get_port("trade_initiator")
-        url = f"http://localhost:{port}/api/initiate_trade"
+        port = get_port("trade_manager")
+        url = f"http://localhost:{port}/trades"
         
         # Get contract name from watchlist market_title
         watchlist_data = get_watchlist_data()
@@ -213,27 +216,67 @@ def trigger_auto_entry_trade(strike_data):
             log(f"[AUTO ENTRY] ❌ Cannot trigger trade - no valid position size found")
             return False
         
-        # Prepare the trade data exactly like prepareTradeData does
+        # Create the exact same payload that trade_initiator would create
+        # Generate unique ticket ID (same format as trade_initiator)
+        ticket_id = f"TICKET-{uuid.uuid4().hex[:9]}-{int(datetime.now().timestamp() * 1000)}"
+        
+        # Get current time in Eastern Time (same as trade_initiator)
+        now = datetime.now(ZoneInfo("America/New_York"))
+        eastern_date = now.strftime('%Y-%m-%d')
+        eastern_time = now.strftime('%H:%M:%S')
+        
+        # Convert side format (yes/no to Y/N) - same as trade_initiator
+        side = strike_data.get("side")
+        converted_side = side
+        if side == "yes":
+            converted_side = "Y"
+        elif side == "no":
+            converted_side = "N"
+        
+        # Get current BTC price for symbol_open
+        try:
+            btc_port = get_port("btc_price_watchdog")
+            btc_url = f"http://localhost:{btc_port}/api/btc_price"
+            btc_response = requests.get(btc_url, timeout=2)
+            if btc_response.ok:
+                btc_data = btc_response.json()
+                symbol_open = btc_data.get("price")
+            else:
+                symbol_open = None
+        except Exception as e:
+            log(f"[AUTO ENTRY] ⚠️ Could not get BTC price: {e}")
+            symbol_open = None
+        
+        # Prepare the trade data exactly like trade_initiator does
         trade_payload = {
+            "ticket_id": ticket_id,
+            "status": "pending",
+            "date": eastern_date,
+            "time": eastern_time,
             "symbol": "BTC",
+            "market": "Kalshi",
+            "trade_strategy": "Hourly HTC",
+            "contract": contract_name,
             "strike": strike_data.get("strike"),
-            "side": strike_data.get("side"),
+            "side": converted_side,
             "ticker": strike_data.get("ticker"),
             "buy_price": strike_data.get("buy_price"),
-            "prob": strike_data.get("probability"),
-            "contract": contract_name,
             "position": position_size,
-            "momentum": None,  # Will be filled by trade_initiator
+            "symbol_open": symbol_open,
+            "symbol_close": None,
+            "momentum": None,  # Will be filled by trade_manager
+            "prob": strike_data.get("probability"),
+            "win_loss": None,
             "entry_method": "auto"
         }
         
-        log(f"[AUTO ENTRY] 📤 Sending trade to trade_initiator: {trade_payload}")
+        log(f"[AUTO ENTRY] 📤 Sending trade to trade_manager: {trade_payload}")
         
         response = requests.post(url, json=trade_payload, timeout=10)
         
-        if response.ok:
+        if response.status_code == 201:
             result = response.json()
-            log(f"[AUTO ENTRY] ✅ Trade initiated successfully via trade_initiator: {result}")
+            log(f"[AUTO ENTRY] ✅ Trade initiated successfully via trade_manager: {result}")
             
             # Log to master autotrade log
             with open(os.path.join(get_data_dir(), "trade_history", "autotrade_log.txt"), "a") as f:
@@ -267,7 +310,7 @@ def trigger_auto_entry_trade(strike_data):
             return False
         
     except Exception as e:
-        log(f"[AUTO ENTRY] ❌ Error initiating trade via trade_initiator: {e}")
+        log(f"[AUTO ENTRY] ❌ Error initiating trade via trade_manager: {e}")
         return False
 
 def can_trade_strike(strike_key):

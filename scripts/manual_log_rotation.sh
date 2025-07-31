@@ -68,8 +68,7 @@ log_files=(
     "logs/trade_manager.err.log"
     "logs/trade_executor.out.log"
     "logs/trade_executor.err.log"
-    "logs/trade_initiator.out.log"
-    "logs/trade_initiator.err.log"
+
     "logs/active_trade_supervisor.out.log"
     "logs/active_trade_supervisor.err.log"
     "logs/auto_entry_supervisor.out.log"
