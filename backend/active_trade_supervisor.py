@@ -1012,7 +1012,7 @@ def get_current_btc_price() -> Optional[float]:
 def get_kalshi_market_snapshot() -> Optional[Dict[str, Any]]:
     """Get the latest Kalshi market snapshot data"""
     try:
-        snapshot_path = os.path.join(get_project_root(), "backend", "data", "kalshi", "latest_market_snapshot.json")
+        snapshot_path = os.path.join(get_kalshi_data_dir(), "latest_market_snapshot.json")
         if not os.path.exists(snapshot_path):
             log("⚠️ Kalshi market snapshot file not found")
             return None
