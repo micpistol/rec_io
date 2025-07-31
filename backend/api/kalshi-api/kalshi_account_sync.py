@@ -40,7 +40,8 @@ def get_base_url():
 
 print(f"Using base URL: {get_base_url()} for mode: {get_account_mode()}")
 
-CREDENTIALS_DIR = Path(__file__).resolve().parent / "kalshi-credentials" / get_account_mode()
+from backend.util.paths import get_kalshi_credentials_dir
+CREDENTIALS_DIR = Path(get_kalshi_credentials_dir()) / get_account_mode()
 ENV_VARS = dotenv_values(CREDENTIALS_DIR / ".env")
 
 KEY_ID = ENV_VARS.get("KALSHI_API_KEY_ID")

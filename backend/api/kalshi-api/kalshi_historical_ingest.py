@@ -20,7 +20,8 @@ from backend.core.config.settings import config
 
 # mode = sys.argv[1] if len(sys.argv) > 1 else "prod"
 mode = account_mode.get_account_mode()
-CREDENTIALS_DIR = Path(__file__).resolve().parent / "kalshi-credentials" / mode
+from backend.util.paths import get_kalshi_credentials_dir
+CREDENTIALS_DIR = Path(get_kalshi_credentials_dir()) / mode
 ENV_VARS = dotenv_values(CREDENTIALS_DIR / ".env")
 
 KEY_ID = ENV_VARS.get("KALSHI_API_KEY_ID")

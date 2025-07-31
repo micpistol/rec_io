@@ -19,10 +19,12 @@ from dotenv import load_dotenv
 class RawOrderbookData:
     def __init__(self):
         # Load production credentials
-        load_dotenv('kalshi-credentials/prod/.env')
+        from backend.util.paths import get_kalshi_credentials_dir
+        cred_dir = Path(get_kalshi_credentials_dir()) / "prod"
+        load_dotenv(cred_dir / '.env')
         
         self.api_key_id = os.getenv('KALSHI_API_KEY_ID')
-        self.private_key_path = 'kalshi-credentials/prod/kalshi.pem'
+        self.private_key_path = cred_dir / "kalshi.pem"
         self.ws_url = "wss://api.elections.kalshi.com/trade-api/ws/v2"
         
         # Use current near-the-money BTC markets (BTC is at ~$118,450)

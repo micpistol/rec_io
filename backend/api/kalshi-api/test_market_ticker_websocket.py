@@ -32,7 +32,8 @@ class KalshiMarketTickerTest:
         print(f"🔐 Account Mode: {self.account_mode}")
         
         # Load credentials based on account mode
-        creds_dir = Path(f"kalshi-credentials/{self.account_mode}")
+        from backend.util.paths import get_kalshi_credentials_dir
+        creds_dir = Path(get_kalshi_credentials_dir()) / self.account_mode
         env_file = creds_dir / ".env"
         
         if not env_file.exists():

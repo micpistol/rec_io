@@ -11,7 +11,8 @@ from backend.util.paths import get_project_root
 sys.path.append(get_project_root())
 from load_credentials import read_kalshi_credentials
 
-pem_path = os.path.join(os.path.dirname(__file__), "kalshi-credentials", "kalshi-auth.txt")
+from backend.util.paths import get_kalshi_credentials_dir
+pem_path = os.path.join(get_kalshi_credentials_dir(), "kalshi-auth.txt")
 email, api_key = read_kalshi_credentials(pem_path)
 
 # === CONFIG ===

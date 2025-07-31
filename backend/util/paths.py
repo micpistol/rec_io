@@ -59,6 +59,23 @@ def get_logs_dir():
     """Get the logs directory path."""
     return os.path.join(get_project_root(), "logs")
 
+def get_kalshi_credentials_dir():
+    """Get the Kalshi credentials directory path."""
+    # Credentials ONLY live in user-based location for security
+    return os.path.join(get_data_dir(), "users", "user_0001", "credentials", "kalshi-credentials")
+
+def get_supervisor_config_path():
+    """Get the supervisor configuration file path."""
+    return os.path.join(get_project_root(), "backend", "supervisord.conf")
+
+def get_frontend_dir():
+    """Get the frontend directory path."""
+    return os.path.join(get_project_root(), "frontend")
+
+def get_venv_python_path():
+    """Get the virtual environment Python executable path."""
+    return os.path.join(get_project_root(), "venv", "bin", "python")
+
 def get_host():
     """Get the host configuration for the current environment."""
     # Check for environment variable first
@@ -98,6 +115,10 @@ def ensure_data_dirs():
         get_trade_history_dir(),
         os.path.join(get_accounts_data_dir(), "kalshi", "prod"),
         os.path.join(get_accounts_data_dir(), "kalshi", "demo"),
+        get_logs_dir(),
+        # User credentials directories
+        os.path.join(get_data_dir(), "users", "user_0001", "credentials", "kalshi-credentials", "prod"),
+        os.path.join(get_data_dir(), "users", "user_0001", "credentials", "kalshi-credentials", "demo"),
     ]
     for dir_path in dirs:
         os.makedirs(dir_path, exist_ok=True) 

@@ -17,7 +17,8 @@ def get_project_root():
 
 def create_credentials_directory(env):
     """Create the credentials directory for the specified environment."""
-    base_path = get_project_root() / "backend" / "api" / "kalshi-api" / "kalshi-credentials" / env
+    from backend.util.paths import get_kalshi_credentials_dir
+    base_path = Path(get_kalshi_credentials_dir()) / env
     base_path.mkdir(parents=True, exist_ok=True)
     return base_path
 
@@ -258,8 +259,10 @@ def main():
         create_credentials_for_env(env, email, api_key, pem_content, env_content)
     
     print(f"\n✅ Credentials generation completed!")
-    print(f"📁 Files created in: {get_project_root()}/backend/api/kalshi-api/kalshi-credentials/")
-    print("\n🔒 Security Note: Ensure PEM files have restricted permissions (600)")
+    from backend.util.paths import get_kalshi_credentials_dir
+    print(f"📁 Files created in: {get_kalshi_credentials_dir()}/")
+    print("\n🔒 SECURITY: Credentials stored ONLY in user-based location")
+    print("🔒 Security Note: Ensure PEM files have restricted permissions (600)")
 
 
 if __name__ == "__main__":

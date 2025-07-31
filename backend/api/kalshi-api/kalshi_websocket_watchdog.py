@@ -60,7 +60,8 @@ class KalshiWebSocketWatchdog:
     def load_kalshi_credentials(self):
         """Load Kalshi API credentials"""
         account_mode = get_account_mode()
-        cred_dir = Path(__file__).resolve().parent / "kalshi-credentials" / account_mode
+        from backend.util.paths import get_kalshi_credentials_dir
+        cred_dir = Path(get_kalshi_credentials_dir()) / account_mode
         
         if not cred_dir.exists():
             print(f"❌ No {account_mode} credentials found at {cred_dir}")

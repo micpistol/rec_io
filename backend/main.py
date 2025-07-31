@@ -216,12 +216,15 @@ class CacheBustingStaticFiles(StaticFiles):
         await super().__call__(scope, receive, send_with_cache_busting)
 
 # Mount static files
-app.mount("/tabs", CacheBustingStaticFiles(directory="frontend/tabs"), name="tabs")
-app.mount("/audio", CacheBustingStaticFiles(directory="frontend/audio"), name="audio")
-app.mount("/js", CacheBustingStaticFiles(directory="frontend/js"), name="js")
-app.mount("/images", CacheBustingStaticFiles(directory="frontend/images"), name="images")
-app.mount("/styles", CacheBustingStaticFiles(directory="frontend/styles"), name="styles")
-app.mount("/mobile", CacheBustingStaticFiles(directory="frontend/mobile"), name="mobile")
+from backend.util.paths import get_frontend_dir
+frontend_dir = get_frontend_dir()
+
+app.mount("/tabs", CacheBustingStaticFiles(directory=f"{frontend_dir}/tabs"), name="tabs")
+app.mount("/audio", CacheBustingStaticFiles(directory=f"{frontend_dir}/audio"), name="audio")
+app.mount("/js", CacheBustingStaticFiles(directory=f"{frontend_dir}/js"), name="js")
+app.mount("/images", CacheBustingStaticFiles(directory=f"{frontend_dir}/images"), name="images")
+app.mount("/styles", CacheBustingStaticFiles(directory=f"{frontend_dir}/styles"), name="styles")
+app.mount("/mobile", CacheBustingStaticFiles(directory=f"{frontend_dir}/mobile"), name="mobile")
 
 # Health check endpoint
 @app.get("/health")
@@ -330,7 +333,7 @@ async def serve_favicon():
 @app.get("/styles/{filename:path}")
 async def serve_css(filename: str):
     """Serve CSS files with cache busting headers."""
-    file_path = f"frontend/styles/{filename}"
+    file_path = f"{frontend_dir}/styles/{filename}"
     if os.path.exists(file_path):
         with open(file_path, "r") as f:
             content = f.read()
@@ -350,7 +353,7 @@ async def serve_css(filename: str):
 @app.get("/js/{filename:path}")
 async def serve_js(filename: str):
     """Serve JS files with cache busting headers."""
-    file_path = f"frontend/js/{filename}"
+    file_path = f"{frontend_dir}/js/{filename}"
     if os.path.exists(file_path):
         with open(file_path, "r") as f:
             content = f.read()
@@ -370,7 +373,7 @@ async def serve_js(filename: str):
 @app.get("/mobile/trade_monitor", response_class=HTMLResponse)
 async def serve_mobile_trade_monitor():
     """Serve mobile trade monitor with cache busting headers."""
-    file_path = "frontend/mobile/trade_monitor_mobile.html"
+    file_path = f"{frontend_dir}/mobile/trade_monitor_mobile.html"
     if os.path.exists(file_path):
         with open(file_path, "r") as f:
             content = f.read()
@@ -389,7 +392,7 @@ async def serve_mobile_trade_monitor():
 @app.get("/mobile/account_manager", response_class=HTMLResponse)
 async def serve_mobile_account_manager():
     """Serve mobile account manager with cache busting headers."""
-    file_path = "frontend/mobile/account_manager_mobile.html"
+    file_path = f"{frontend_dir}/mobile/account_manager_mobile.html"
     if os.path.exists(file_path):
         with open(file_path, "r") as f:
             content = f.read()
@@ -408,7 +411,7 @@ async def serve_mobile_account_manager():
 @app.get("/mobile", response_class=HTMLResponse)
 async def serve_mobile_index():
     """Serve mobile index with cache busting headers."""
-    file_path = "frontend/mobile/index.html"
+    file_path = f"{frontend_dir}/mobile/index.html"
     if os.path.exists(file_path):
         with open(file_path, "r") as f:
             content = f.read()
