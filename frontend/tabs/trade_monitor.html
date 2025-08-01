@@ -1278,13 +1278,27 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <!-- New TTC field -->
             <label for="autoStopMinTTCInput" style="font-size:14px; color:#333; margin-bottom:12px; font-weight:500;">Minimum Time to Close:</label>
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 24px;">
               <div style="display: flex; align-items: center; border: 1px solid #ddd; border-radius: 4px; background: white;">
                 <button id="autoStopMinTTCDown" style="padding: 8px 12px; border: none; background: #f8f9fa; cursor: pointer; border-right: 1px solid #ddd; border-radius: 4px 0 0 4px; font-size:12px;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">▼</button>
                 <span id="autoStopMinTTCDisplay" style="padding: 8px 16px; font-size: 13px; color: #333; min-width: 60px; text-align: center; font-weight:500;">01:00</span>
                 <button id="autoStopMinTTCUp" style="padding: 8px 12px; border: none; background: #f8f9fa; cursor: pointer; border-left: 1px solid #ddd; border-radius: 0 4px 4px 0; font-size:12px;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">▲</button>
               </div>
               <input type="hidden" id="autoStopMinTTCInput" value="60" />
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 24px 0;">
+            
+            <!-- Momentum Spike Settings Section -->
+            <div style="position:relative; margin-bottom:24px; width:100%;">
+              <input type="checkbox" id="momentumSpikeEnabled" style="width:16px; height:16px; margin-right:8px; accent-color:#007bff;" />
+              <span style="font-size:13px; color:#666;">Auto-close trades during momentum spikes</span>
+            </div>
+            
+            <label for="momentumSpikeThresholdSlider" style="font-size:14px; color:#333; margin-bottom:34px; font-weight:500;">Momentum Spike Threshold (±):</label>
+            <div style="position:relative; margin-bottom:8px; width:100%;">
+              <input type="range" id="momentumSpikeThresholdSlider" min="10" max="100" value="35" style="width:100%; height:6px; z-index:1; position:relative; background:#e0e0e0; border-radius:3px; outline:none;" />
+              <div id="momentumSpikeThresholdValueDisplay" style="position:absolute; top:-32px; left:0; font-size:12px; color:#222; background:white; padding:4px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0;">±35</div>
             </div>
           </div>
           <div style="display:flex; gap:12px; justify-content:flex-end; align-items:center; margin-top:20px;">
@@ -2956,35 +2970,69 @@ document.addEventListener('DOMContentLoaded', function() {
       sliderValueDisplay.style.left = `${offset}px`;
     }
   }
+  
+  function updateMomentumSpikeThresholdDisplay(value) {
+    const display = document.getElementById('momentumSpikeThresholdValueDisplay');
+    const slider = document.getElementById('momentumSpikeThresholdSlider');
+    if (display && slider) {
+      display.textContent = `±${value}`;
+      // Calculate thumb position in px
+      const min = parseInt(slider.min, 10);
+      const max = parseInt(slider.max, 10);
+      const percent = (value - min) / (max - min);
+      const sliderWidth = slider.offsetWidth;
+      const thumbWidth = 16;
+      const offset = percent * (sliderWidth - thumbWidth) + thumbWidth / 2;
+      display.style.left = `${offset}px`;
+    }
+  }
 
   async function fetchAutoStopSettings() {
     try {
       const resp = await fetch('/api/get_auto_stop_settings');
       if (resp.ok) {
         const data = await resp.json();
-        return data.current_probability ?? 25;
+        return data;
       }
     } catch {}
-    return 25;
+    return { current_probability: 25, min_ttc_seconds: 60, momentum_spike_enabled: true, momentum_spike_threshold: 35 };
   }
 
   function showAutoStopSettingsModal() {
     if (autoStopSettingsModal) {
       autoStopSettingsModal.style.display = 'block';
       document.body.style.overflow = 'hidden';
-      fetchAutoStopSettings().then(prob => {
-        lastSavedProbability = prob;
-        autoStopProbabilitySlider.value = prob;
-        updateSliderDisplay(prob);
-      });
-      // Fetch min_ttc_seconds
-      fetch('/api/get_auto_stop_settings').then(r => r.json()).then(data => {
+      fetchAutoStopSettings().then(data => {
+        // Set probability slider
+        lastSavedProbability = data.current_probability ?? 25;
+        autoStopProbabilitySlider.value = lastSavedProbability;
+        updateSliderDisplay(lastSavedProbability);
+        
+        // Set TTC input
         const minTTC = data.min_ttc_seconds !== undefined ? data.min_ttc_seconds : 60;
         const minTTCInput = document.getElementById('autoStopMinTTCInput');
         const minTTCDisplay = document.getElementById('autoStopMinTTCDisplay');
         minTTCInput.value = minTTC;
         minTTCDisplay.textContent = formatSecondsToMMSS(minTTC);
         window.lastSavedMinTTC = minTTC;
+        
+        // Set momentum spike settings
+        const momentumSpikeEnabled = data.momentum_spike_enabled !== undefined ? data.momentum_spike_enabled : true;
+        const momentumSpikeThreshold = data.momentum_spike_threshold !== undefined ? data.momentum_spike_threshold : 35;
+        
+        const momentumSpikeEnabledCheckbox = document.getElementById('momentumSpikeEnabled');
+        const momentumSpikeThresholdSlider = document.getElementById('momentumSpikeThresholdSlider');
+        
+        if (momentumSpikeEnabledCheckbox) {
+          momentumSpikeEnabledCheckbox.checked = momentumSpikeEnabled;
+          window.lastSavedMomentumSpikeEnabled = momentumSpikeEnabled;
+        }
+        
+        if (momentumSpikeThresholdSlider) {
+          momentumSpikeThresholdSlider.value = momentumSpikeThreshold;
+          updateMomentumSpikeThresholdDisplay(momentumSpikeThreshold);
+          window.lastSavedMomentumSpikeThreshold = momentumSpikeThreshold;
+        }
       });
     }
   }
@@ -3011,6 +3059,18 @@ document.addEventListener('DOMContentLoaded', function() {
         minTTCInput.value = window.lastSavedMinTTC;
         minTTCDisplay.textContent = formatSecondsToMMSS(window.lastSavedMinTTC);
       }
+      // Reset momentum spike settings to last saved values
+      const momentumSpikeEnabledCheckbox = document.getElementById('momentumSpikeEnabled');
+      const momentumSpikeThresholdSlider = document.getElementById('momentumSpikeThresholdSlider');
+      
+      if (momentumSpikeEnabledCheckbox && window.lastSavedMomentumSpikeEnabled !== undefined) {
+        momentumSpikeEnabledCheckbox.checked = window.lastSavedMomentumSpikeEnabled;
+      }
+      
+      if (momentumSpikeThresholdSlider && window.lastSavedMomentumSpikeThreshold !== undefined) {
+        momentumSpikeThresholdSlider.value = window.lastSavedMomentumSpikeThreshold;
+        updateMomentumSpikeThresholdDisplay(window.lastSavedMomentumSpikeThreshold);
+      }
       hideAutoStopSettingsModal();
     });
   }
@@ -3019,17 +3079,33 @@ document.addEventListener('DOMContentLoaded', function() {
       const newProb = parseInt(autoStopProbabilitySlider.value, 10);
       const minTTCInput = document.getElementById('autoStopMinTTCInput');
       const minTTC = parseInt(minTTCInput.value, 10);
+      
+      // Get momentum spike settings
+      const momentumSpikeEnabledCheckbox = document.getElementById('momentumSpikeEnabled');
+      const momentumSpikeThresholdSlider = document.getElementById('momentumSpikeThresholdSlider');
+      
+      const momentumSpikeEnabled = momentumSpikeEnabledCheckbox ? momentumSpikeEnabledCheckbox.checked : true;
+      const momentumSpikeThreshold = momentumSpikeThresholdSlider ? parseInt(momentumSpikeThresholdSlider.value) : 35;
+      
       if (!isNaN(newProb)) {
         try {
           const response = await fetch('/api/set_auto_stop_settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ enabled: true, current_probability: newProb, min_ttc_seconds: minTTC })
+            body: JSON.stringify({ 
+              enabled: true, 
+              current_probability: newProb, 
+              min_ttc_seconds: minTTC,
+              momentum_spike_enabled: momentumSpikeEnabled,
+              momentum_spike_threshold: momentumSpikeThreshold
+            })
           });
           if (response.ok) {
             console.log('Auto stop settings saved successfully');
             lastSavedProbability = newProb;
             window.lastSavedMinTTC = minTTC;
+            window.lastSavedMomentumSpikeEnabled = momentumSpikeEnabled;
+            window.lastSavedMomentumSpikeThreshold = momentumSpikeThreshold;
           } else {
             console.error('Failed to save auto stop settings:', response.status);
           }
@@ -3050,6 +3126,17 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     // Initial position
     updateSliderDisplay(autoStopProbabilitySlider.value);
+  }
+  
+  // Momentum Spike Threshold Slider Event Listeners
+  const momentumSpikeThresholdSlider = document.getElementById('momentumSpikeThresholdSlider');
+  if (momentumSpikeThresholdSlider) {
+    momentumSpikeThresholdSlider.addEventListener('input', function() {
+      updateMomentumSpikeThresholdDisplay(this.value);
+    });
+    window.addEventListener('resize', function() {
+      updateMomentumSpikeThresholdDisplay(momentumSpikeThresholdSlider.value);
+    });
   }
   // Remove click-to-close on dimmed area
   if (autoStopSettingsDim) {

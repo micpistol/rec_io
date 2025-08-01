@@ -1305,6 +1305,11 @@ def start_monitoring_loop():
                     log(f"📊 MONITORING: Checking {len(active_trades)} active trades")
                     monitoring_worker.last_status_log = current_time
                 
+                # Add heartbeat log every 30 seconds to track monitoring health
+                if not hasattr(monitoring_worker, 'last_heartbeat') or current_time - monitoring_worker.last_heartbeat > 30:
+                    log(f"💓 MONITORING HEARTBEAT: Monitoring loop healthy, {len(active_trades)} active trades")
+                    monitoring_worker.last_heartbeat = current_time
+                
                 # Run failsafe check every 60 seconds
                 if not hasattr(monitoring_worker, 'last_failsafe_check') or current_time - monitoring_worker.last_failsafe_check > 60:
                     check_monitoring_failsafe()
@@ -1342,11 +1347,80 @@ def start_monitoring_loop():
                         ):
                             log(f"[AUTO STOP] Skipping auto stop for trade {trade_id} - TTC ({ttc_seconds}s) below minimum ({min_ttc_seconds}s)")
                 
+                # === MOMENTUM SPIKE AUTO-STOPOUT LOGIC ===
+                # Get momentum spike settings from auto_stop_settings.json
+                try:
+                    import json
+                    auto_stop_settings_path = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_stop_settings.json")
+                    if os.path.exists(auto_stop_settings_path):
+                        with open(auto_stop_settings_path, "r") as f:
+                            momentum_settings = json.load(f)
+                            momentum_spike_enabled = momentum_settings.get("momentum_spike_enabled", True)
+                            momentum_spike_threshold = momentum_settings.get("momentum_spike_threshold", 35)
+                    else:
+                        momentum_spike_enabled = True
+                        momentum_spike_threshold = 35
+                    
+                    # Only proceed if momentum spike is enabled
+                    if momentum_spike_enabled:
+                        # Get current momentum from auto_entry_supervisor (which has live momentum data)
+                        momentum_response = requests.get(f"http://localhost:{get_port('auto_entry_supervisor')}/api/auto_entry_scanning_status", timeout=2)
+                        if momentum_response.ok:
+                            momentum_data = momentum_response.json()
+                            current_momentum = momentum_data.get('current_momentum')
+                            
+                            if current_momentum is not None:
+                                # Check for momentum spike conditions
+                                momentum_spike_triggered = False
+                                
+                                if current_momentum >= momentum_spike_threshold:  # Positive spike - close all NO trades
+                                    log(f"[MOMENTUM SPIKE] 🚨 POSITIVE SPIKE DETECTED: {current_momentum:.2f} >= +{momentum_spike_threshold}")
+                                    log(f"[MOMENTUM SPIKE] Closing all NO trades due to positive momentum spike")
+                                    
+                                    for trade in active_trades:
+                                        if (trade.get('status') == 'active' and 
+                                            trade.get('side', '').upper() in ['N', 'NO'] and
+                                            trade.get('trade_id') not in auto_stop_triggered_trades):
+                                            
+                                            log(f"[MOMENTUM SPIKE] Triggering close for NO trade {trade.get('trade_id')} (momentum: {current_momentum:.2f})")
+                                            trigger_auto_stop_close(trade)
+                                            auto_stop_triggered_trades.add(trade.get('trade_id'))
+                                            momentum_spike_triggered = True
+                                    
+                                    if momentum_spike_triggered:
+                                        log(f"[MOMENTUM SPIKE] ✅ Closed {len([t for t in active_trades if t.get('side', '').upper() in ['N', 'NO'] and t.get('status') == 'active'])} NO trades due to positive momentum spike")
+                                    
+                                elif current_momentum <= -momentum_spike_threshold:  # Negative spike - close all YES trades
+                                    log(f"[MOMENTUM SPIKE] 🚨 NEGATIVE SPIKE DETECTED: {current_momentum:.2f} <= -{momentum_spike_threshold}")
+                                    log(f"[MOMENTUM SPIKE] Closing all YES trades due to negative momentum spike")
+                                    
+                                    for trade in active_trades:
+                                        if (trade.get('status') == 'active' and 
+                                            trade.get('side', '').upper() in ['Y', 'YES'] and
+                                            trade.get('trade_id') not in auto_stop_triggered_trades):
+                                            
+                                            log(f"[MOMENTUM SPIKE] Triggering close for YES trade {trade.get('trade_id')} (momentum: {current_momentum:.2f})")
+                                            trigger_auto_stop_close(trade)
+                                            auto_stop_triggered_trades.add(trade.get('trade_id'))
+                                            momentum_spike_triggered = True
+                                    
+                                    if momentum_spike_triggered:
+                                        log(f"[MOMENTUM SPIKE] ✅ Closed {len([t for t in active_trades if t.get('side', '').upper() in ['Y', 'YES'] and t.get('status') == 'active'])} YES trades due to negative momentum spike")
+                                
+                                # Log momentum monitoring (every 30 seconds to reduce noise)
+                                if not hasattr(monitoring_worker, 'last_momentum_log') or current_time - monitoring_worker.last_momentum_log > 30:
+                                    log(f"[MOMENTUM SPIKE] Monitoring momentum: {current_momentum:.2f} (threshold: ±{momentum_spike_threshold})")
+                                    monitoring_worker.last_momentum_log = current_time
+                                    
+                except Exception as e:
+                    log(f"[MOMENTUM SPIKE] Error in momentum spike logic: {e}")
+                
                 # Sleep for 1 second
                 time.sleep(1)
         
         except Exception as e:
             log(f"🚨 CRITICAL: Monitoring loop crashed with error: {e}")
+            log(f"🚨 CRITICAL: Stack trace: {e.__class__.__name__}: {str(e)}")
             
             # Check if there are still active trades that need monitoring
             try:
@@ -1372,6 +1446,7 @@ def start_monitoring_loop():
                     log("📊 MONITORING: No active trades, monitoring loop can safely stop")
             except Exception as restart_error:
                 log(f"🚨 CRITICAL: Failed to check for active trades during restart: {restart_error}")
+                log(f"🚨 CRITICAL: Restart stack trace: {restart_error.__class__.__name__}: {str(restart_error)}")
         
         # Export final JSON after monitoring stops
         export_active_trades_to_json()
@@ -1536,14 +1611,50 @@ def start_event_driven_supervisor():
     http_thread = threading.Thread(target=start_http_server, daemon=True)
     http_thread.start()
     
-    # Keep the process alive but don't loop
+    # Keep the process alive with brute force failsafe
     try:
         while True:
-            # Just keep the process running, no active polling
-            time.sleep(60)  # Sleep for 1 minute, just to keep alive
+            # BRUTE FORCE FAILSAFE: Check database every 10 seconds for active trades
+            # If there are active trades but no monitoring thread, restart it
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
+            active_count = cursor.fetchone()[0]
+            conn.close()
             
-            # Run failsafe check periodically
-            check_monitoring_failsafe()
+            # Check if monitoring thread is alive
+            monitoring_thread_alive = False
+            with monitoring_thread_lock:
+                if monitoring_thread is not None and monitoring_thread.is_alive():
+                    monitoring_thread_alive = True
+            
+            # If there are active trades but no monitoring thread, restart it
+            if active_count > 0 and not monitoring_thread_alive:
+                log(f"🚨 BRUTE FORCE FAILSAFE: Found {active_count} active trades but monitoring thread is dead!")
+                log("🔄 BRUTE FORCE FAILSAFE: Restarting monitoring loop...")
+                start_monitoring_loop()
+            
+            # Log failsafe status every 5 minutes (30 iterations)
+            if not hasattr(start_event_driven_supervisor, 'failsafe_log_counter'):
+                start_event_driven_supervisor.failsafe_log_counter = 0
+            start_event_driven_supervisor.failsafe_log_counter += 1
+            
+            if start_event_driven_supervisor.failsafe_log_counter >= 30:  # Every 5 minutes
+                log(f"🛡️ BRUTE FORCE FAILSAFE: Health check - {active_count} active trades, monitoring thread alive: {monitoring_thread_alive}")
+                start_event_driven_supervisor.failsafe_log_counter = 0
+            
+            # Sleep for 10 seconds (much more frequent than the old 60 seconds)
+            time.sleep(10)
+            
+            # Run existing failsafe check every 60 seconds (6 iterations)
+            if not hasattr(start_event_driven_supervisor, 'failsafe_counter'):
+                start_event_driven_supervisor.failsafe_counter = 0
+            start_event_driven_supervisor.failsafe_counter += 1
+            
+            if start_event_driven_supervisor.failsafe_counter >= 6:  # Every 60 seconds
+                check_monitoring_failsafe()
+                start_event_driven_supervisor.failsafe_counter = 0
+                
     except KeyboardInterrupt:
         log("🛑 Active trade supervisor stopped by user")
     except Exception as e:

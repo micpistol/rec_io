@@ -1155,21 +1155,29 @@ def load_auto_stop_settings():
         try:
             with open(AUTO_STOP_SETTINGS_PATH, "r") as f:
                 data = json.load(f)
-                # Ensure min_ttc_seconds is present
+                # Ensure all required fields are present
                 if "min_ttc_seconds" not in data:
                     data["min_ttc_seconds"] = 60
+                if "momentum_spike_enabled" not in data:
+                    data["momentum_spike_enabled"] = True
+                if "momentum_spike_threshold" not in data:
+                    data["momentum_spike_threshold"] = 35
                 return data
         except Exception:
             pass
-    return {"current_probability": 25, "min_ttc_seconds": 60}
+    return {"current_probability": 25, "min_ttc_seconds": 60, "momentum_spike_enabled": True, "momentum_spike_threshold": 35}
 
 def save_auto_stop_settings(settings):
     try:
-        # Always write both fields
+        # Always write all fields
         if "current_probability" not in settings:
             settings["current_probability"] = 25
         if "min_ttc_seconds" not in settings:
             settings["min_ttc_seconds"] = 60
+        if "momentum_spike_enabled" not in settings:
+            settings["momentum_spike_enabled"] = True
+        if "momentum_spike_threshold" not in settings:
+            settings["momentum_spike_threshold"] = 35
         with open(AUTO_STOP_SETTINGS_PATH, "w") as f:
             json.dump(settings, f)
     except Exception as e:
@@ -1187,8 +1195,12 @@ async def set_auto_stop_settings(request: Request):
         settings["current_probability"] = int(data["current_probability"])
     if "min_ttc_seconds" in data:
         settings["min_ttc_seconds"] = int(data["min_ttc_seconds"])
+    if "momentum_spike_enabled" in data:
+        settings["momentum_spike_enabled"] = bool(data["momentum_spike_enabled"])
+    if "momentum_spike_threshold" in data:
+        settings["momentum_spike_threshold"] = int(data["momentum_spike_threshold"])
     save_auto_stop_settings(settings)
-    return {"status": "ok", "current_probability": settings["current_probability"], "min_ttc_seconds": settings["min_ttc_seconds"]}
+    return {"status": "ok", "current_probability": settings["current_probability"], "min_ttc_seconds": settings["min_ttc_seconds"], "momentum_spike_enabled": settings.get("momentum_spike_enabled", True), "momentum_spike_threshold": settings.get("momentum_spike_threshold", 35)}
 
 # AUTO ENTRY SETTINGS
 AUTO_ENTRY_SETTINGS_PATH = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_entry_settings.json")
