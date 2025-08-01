@@ -96,12 +96,55 @@ function updateAutoEntryIndicator(data) {
     return;
   }
   
-  if (data.enabled && data.ttc_within_window) {
-    // Show the indicator when AUTO ENTRY is ON and TTC is within window
+  // Get the indicator elements
+  const indicatorDot = indicator.querySelector('div');
+  const indicatorText = indicator.querySelector('span');
+  
+  // Check for SPIKE ALERT state first
+  if (data.spike_alert_active) {
+    // SPIKE ALERT MODE - Show red indicator
     indicator.style.display = 'flex';
+    indicator.style.backgroundColor = '#dc3545'; // Red background
+    indicator.style.border = '1px solid #c82333';
+    
+    if (indicatorDot) {
+      indicatorDot.style.background = '#ff6b6b'; // Red dot
+    }
+    
+    if (indicatorText) {
+      const recoveryCountdown = data.spike_alert_recovery_countdown;
+      if (recoveryCountdown !== null && recoveryCountdown > 0) {
+        indicatorText.textContent = `SPIKE ALERT - AUTO TRADING PAUSED (${recoveryCountdown.toFixed(1)}m)`;
+      } else {
+        indicatorText.textContent = 'SPIKE ALERT - AUTO TRADING PAUSED';
+      }
+    }
+    
+    console.log('🚨 SPIKE ALERT: Auto trading paused due to market spike');
+    return;
+  }
+  
+  // Use the new scanning_active field as the primary condition
+  // This provides the true system-wide scanning status
+  if (data.scanning_active) {
+    // Show the indicator when scanning is actually active
+    indicator.style.display = 'flex';
+    indicator.style.backgroundColor = ''; // Reset background
+    indicator.style.border = ''; // Reset border
+    
+    if (indicatorDot) {
+      indicatorDot.style.background = '#00ff2f'; // Green dot
+    }
+    
+    if (indicatorText) {
+      indicatorText.textContent = 'Automated Trading ON';
+    }
+    
+    console.log('🔔 AUTOMATED TRADING ON: Scanning is active');
   } else {
-    // Hide the indicator when conditions are not met
+    // Hide the indicator when scanning is not active
     indicator.style.display = 'none';
+    console.log('🔔 AUTOMATED TRADING OFF: Scanning is not active');
   }
 }
 

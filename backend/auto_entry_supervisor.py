@@ -46,6 +46,11 @@ auto_entry_indicator_state = {
     "ttc_within_window": False,
     "scanning_active": False,  # NEW: True system-wide scanning status
     "service_healthy": False,  # NEW: Service health status
+    "spike_alert_active": False,  # NEW: SPIKE ALERT state
+    "spike_alert_start_time": None,  # NEW: When spike was detected
+    "spike_alert_momentum_value": None,  # NEW: Momentum value when spike detected
+    "spike_alert_recovery_countdown": None,  # NEW: Minutes until recovery
+    "current_momentum": None,  # NEW: Current momentum value
     "current_ttc": 0,
     "min_time": 0,
     "max_time": 3600,
@@ -54,6 +59,13 @@ auto_entry_indicator_state = {
 
 # Track previous state to detect changes
 previous_indicator_state = None
+
+# SPIKE ALERT constants (defaults - will be overridden by settings)
+SPIKE_THRESHOLD_HIGH = 40
+SPIKE_THRESHOLD_LOW = -40
+RECOVERY_THRESHOLD_HIGH = 30
+RECOVERY_THRESHOLD_LOW = -30
+RECOVERY_DURATION_MINUTES = 15
 
 def log(message: str):
     """Log messages with timestamp"""
@@ -71,6 +83,195 @@ def log(message: str):
     except Exception as e:
         print(f"Error writing to log file: {e}")
 
+def get_auto_entry_state_path():
+    """Get the path to the monitor-specific auto entry state file"""
+    return os.path.join(get_data_dir(), "users", "user_0001", "monitors", "auto_entry_state.json")
+
+def load_auto_entry_state():
+    """Load monitor-specific auto entry state from JSON file"""
+    try:
+        state_path = get_auto_entry_state_path()
+        if os.path.exists(state_path):
+            with open(state_path, "r") as f:
+                state = json.load(f)
+                log(f"[AUTO ENTRY STATE] Loaded state from {state_path}")
+                return state
+        else:
+            log(f"[AUTO ENTRY STATE] State file not found at {state_path}, using defaults")
+            return None
+    except Exception as e:
+        log(f"[AUTO ENTRY STATE] Error loading state: {e}")
+        return None
+
+def save_auto_entry_state(state):
+    """Save monitor-specific auto entry state to JSON file"""
+    try:
+        state_path = get_auto_entry_state_path()
+        os.makedirs(os.path.dirname(state_path), exist_ok=True)
+        
+        # Ensure timestamp is updated
+        state["last_updated"] = datetime.now(ZoneInfo("America/New_York")).isoformat()
+        
+        with open(state_path, "w") as f:
+            json.dump(state, f, indent=2)
+        
+        log(f"[AUTO ENTRY STATE] Saved state to {state_path}")
+        return True
+    except Exception as e:
+        log(f"[AUTO ENTRY STATE] Error saving state: {e}")
+        return False
+
+def get_current_momentum():
+    """Get current BTC momentum using live_data_analysis"""
+    try:
+        from backend.live_data_analysis import LiveDataAnalyzer
+        analyzer = LiveDataAnalyzer()
+        momentum_analysis = analyzer.get_momentum_analysis()
+        momentum_score = momentum_analysis.get('weighted_momentum_score')
+        
+        if momentum_score is not None:
+            log(f"[AUTO ENTRY MOMENTUM] Current momentum: {momentum_score:.2f}")
+            return momentum_score
+        else:
+            log(f"[AUTO ENTRY MOMENTUM] No momentum data available")
+            return None
+    except Exception as e:
+        log(f"[AUTO ENTRY MOMENTUM] Error getting momentum: {e}")
+        return None
+
+def check_spike_alert_conditions():
+    """Check if spike alert conditions are met and update state accordingly"""
+    global auto_entry_indicator_state
+    
+    try:
+        # Get current momentum
+        current_momentum = get_current_momentum()
+        if current_momentum is None:
+            return
+        
+        # Update current momentum in state
+        auto_entry_indicator_state["current_momentum"] = current_momentum
+        
+        # Load current state from file
+        state = load_auto_entry_state()
+        if state is None:
+            # Initialize default state
+            state = {
+                "user_id": "user_0001",
+                "monitor_id": "default",
+                "enabled": False,
+                "scanning_active": False,
+                "spike_alert_active": False,
+                "spike_alert_start_time": None,
+                "spike_alert_momentum_value": None,
+                "spike_alert_recovery_countdown": None,
+                "current_momentum": current_momentum,
+                "current_ttc": 0,
+                "min_time": 0,
+                "max_time": 3600,
+                "last_updated": None
+            }
+        
+        # Update current momentum in loaded state
+        state["current_momentum"] = current_momentum
+        
+        # Get spike alert settings from auto entry settings
+        settings = get_auto_entry_settings()
+        spike_alert_enabled = settings.get("spike_alert_enabled", True)
+        spike_threshold = settings.get("spike_alert_momentum_threshold", 40)
+        cooldown_threshold = settings.get("spike_alert_cooldown_threshold", 30)
+        cooldown_minutes = settings.get("spike_alert_cooldown_minutes", 15)
+        
+        # Skip spike alert if disabled
+        if not spike_alert_enabled:
+            # Reset any active spike alert
+            if state["spike_alert_active"]:
+                state["spike_alert_active"] = False
+                state["spike_alert_start_time"] = None
+                state["spike_alert_momentum_value"] = None
+                state["spike_alert_recovery_countdown"] = None
+                log(f"[SPIKE ALERT] Disabled - clearing any active spike alert")
+            
+            # Update global state for frontend
+            auto_entry_indicator_state.update({
+                "spike_alert_active": False,
+                "spike_alert_start_time": None,
+                "spike_alert_momentum_value": None,
+                "spike_alert_recovery_countdown": None,
+                "current_momentum": state["current_momentum"]
+            })
+            
+            # Save updated state
+            save_auto_entry_state(state)
+            return
+        
+        # Check for spike detection using settings
+        spike_detected = (current_momentum >= spike_threshold or 
+                         current_momentum <= -spike_threshold)
+        
+        # Check for recovery conditions using settings
+        recovery_conditions_met = (current_momentum < cooldown_threshold and 
+                                  current_momentum > -cooldown_threshold)
+        
+        now = datetime.now(ZoneInfo("America/New_York"))
+        
+        if spike_detected and not state["spike_alert_active"]:
+            # SPIKE DETECTED - Enter spike alert mode
+            state["spike_alert_active"] = True
+            state["spike_alert_start_time"] = now.isoformat()
+            state["spike_alert_momentum_value"] = current_momentum
+            state["spike_alert_recovery_countdown"] = cooldown_minutes
+            
+            log(f"[SPIKE ALERT] 🚨 SPIKE DETECTED! Momentum: {current_momentum:.2f} (threshold: ±{spike_threshold})")
+            log(f"[SPIKE ALERT] Auto entry PAUSED for {cooldown_minutes} minutes")
+            
+        elif state["spike_alert_active"]:
+            if recovery_conditions_met:
+                # Check if recovery duration has passed
+                if state["spike_alert_start_time"]:
+                    spike_start = datetime.fromisoformat(state["spike_alert_start_time"])
+                    time_in_recovery = (now - spike_start).total_seconds() / 60
+                    
+                    if time_in_recovery >= cooldown_minutes:
+                        # RECOVERY COMPLETE - Exit spike alert mode
+                        state["spike_alert_active"] = False
+                        state["spike_alert_start_time"] = None
+                        state["spike_alert_momentum_value"] = None
+                        state["spike_alert_recovery_countdown"] = None
+                        
+                        log(f"[SPIKE ALERT] ✅ RECOVERY COMPLETE! Auto entry RESUMED")
+                        log(f"[SPIKE ALERT] Recovery time: {time_in_recovery:.1f} minutes")
+                    else:
+                        # Still in recovery period
+                        remaining_time = cooldown_minutes - time_in_recovery
+                        state["spike_alert_recovery_countdown"] = max(0, remaining_time)
+                        
+                        log(f"[SPIKE ALERT] ⏳ Recovery in progress: {remaining_time:.1f} minutes remaining")
+                else:
+                    # Reset recovery countdown if start time is missing
+                    state["spike_alert_recovery_countdown"] = cooldown_minutes
+            else:
+                # Still in spike conditions - reset recovery timer
+                state["spike_alert_start_time"] = now.isoformat()
+                state["spike_alert_recovery_countdown"] = cooldown_minutes
+                
+                log(f"[SPIKE ALERT] ⚠️ Still in spike conditions: {current_momentum:.2f}")
+        
+        # Update global state for frontend
+        auto_entry_indicator_state.update({
+            "spike_alert_active": state["spike_alert_active"],
+            "spike_alert_start_time": state["spike_alert_start_time"],
+            "spike_alert_momentum_value": state["spike_alert_momentum_value"],
+            "spike_alert_recovery_countdown": state["spike_alert_recovery_countdown"],
+            "current_momentum": state["current_momentum"]
+        })
+        
+        # Save updated state
+        save_auto_entry_state(state)
+        
+    except Exception as e:
+        log(f"[SPIKE ALERT] Error checking spike conditions: {e}")
+
 def broadcast_auto_entry_indicator_change():
     """Broadcast auto entry indicator state change via WebSocket to main app"""
     global auto_entry_indicator_state, previous_indicator_state
@@ -81,7 +282,12 @@ def broadcast_auto_entry_indicator_change():
             "enabled": auto_entry_indicator_state["enabled"],
             "ttc_within_window": auto_entry_indicator_state["ttc_within_window"],
             "scanning_active": auto_entry_indicator_state["scanning_active"],
-            "service_healthy": auto_entry_indicator_state["service_healthy"]
+            "service_healthy": auto_entry_indicator_state["service_healthy"],
+            "spike_alert_active": auto_entry_indicator_state["spike_alert_active"],
+            "spike_alert_start_time": auto_entry_indicator_state["spike_alert_start_time"],
+            "spike_alert_momentum_value": auto_entry_indicator_state["spike_alert_momentum_value"],
+            "spike_alert_recovery_countdown": auto_entry_indicator_state["spike_alert_recovery_countdown"],
+            "current_momentum": auto_entry_indicator_state["current_momentum"]
         }
         
         log(f"[AUTO ENTRY DEBUG] 🔍 Checking indicator state change:")
@@ -387,11 +593,17 @@ def check_auto_entry_conditions():
     global auto_entry_indicator_state
     
     try:
+        # Check spike alert conditions first
+        check_spike_alert_conditions()
+        
         # Check if AUTO ENTRY is enabled
         auto_entry_enabled = is_auto_entry_enabled()
         
         # Check if service is healthy (monitoring thread is running)
         service_healthy = monitoring_thread is not None and monitoring_thread.is_alive()
+        
+        # Check if spike alert is active (blocks all trades)
+        spike_alert_active = auto_entry_indicator_state.get("spike_alert_active", False)
         
         if not auto_entry_enabled:
             auto_entry_indicator_state.update({
@@ -399,6 +611,7 @@ def check_auto_entry_conditions():
                 "ttc_within_window": False,
                 "scanning_active": False,
                 "service_healthy": service_healthy,
+                "spike_alert_active": spike_alert_active,
                 "current_ttc": 0,
                 "last_updated": datetime.now().isoformat()
             })
@@ -420,10 +633,11 @@ def check_auto_entry_conditions():
         ttc_within_window = min_time <= current_ttc <= max_time
         
         # Determine if scanning is actually active
-        # Scanning is active if: enabled + service healthy + TTC in window + no blocking conditions
+        # Scanning is active if: enabled + service healthy + TTC in window + no blocking conditions (including spike alert)
         scanning_active = (auto_entry_enabled and 
                           service_healthy and 
-                          ttc_within_window)
+                          ttc_within_window and
+                          not spike_alert_active)  # SPIKE ALERT blocks scanning
         
         # Update indicator state for frontend
         auto_entry_indicator_state.update({
@@ -431,6 +645,7 @@ def check_auto_entry_conditions():
             "ttc_within_window": ttc_within_window,
             "scanning_active": scanning_active,
             "service_healthy": service_healthy,
+            "spike_alert_active": spike_alert_active,
             "current_ttc": current_ttc,
             "min_time": min_time,
             "max_time": max_time,
@@ -441,6 +656,11 @@ def check_auto_entry_conditions():
         broadcast_auto_entry_indicator_change()
         
         if not ttc_within_window:
+            return
+        
+        # SPIKE ALERT CHECK - Block all trades if spike alert is active
+        if spike_alert_active:
+            log(f"[AUTO ENTRY] ⏸️ SPIKE ALERT ACTIVE - Skipping all trade processing")
             return
         
         # Get watchlist data
@@ -602,7 +822,9 @@ def health_check():
             "port_system": "centralized",
             "monitoring_thread_alive": service_healthy,
             "auto_entry_enabled": enabled,
-            "scanning_active": auto_entry_indicator_state.get("scanning_active", False)
+            "scanning_active": auto_entry_indicator_state.get("scanning_active", False),
+            "spike_alert_active": auto_entry_indicator_state.get("spike_alert_active", False),
+            "current_momentum": auto_entry_indicator_state.get("current_momentum", None)
         }
     except Exception as e:
         return {
@@ -649,15 +871,25 @@ def get_auto_entry_scanning_status():
         
         # Calculate scanning status
         ttc_within_window = settings["min_time"] <= current_ttc <= settings["max_time"]
-        scanning_active = enabled and service_healthy and ttc_within_window
+        spike_alert_active = auto_entry_indicator_state.get("spike_alert_active", False)
+        scanning_active = enabled and service_healthy and ttc_within_window and not spike_alert_active
         
         return jsonify({
             "enabled": enabled,
             "service_healthy": service_healthy,
             "ttc_within_window": ttc_within_window,
             "scanning_active": scanning_active,
+            "spike_alert_active": spike_alert_active,
+            "current_momentum": auto_entry_indicator_state.get("current_momentum", None),
+            "spike_alert_recovery_countdown": auto_entry_indicator_state.get("spike_alert_recovery_countdown", None),
             "current_ttc": current_ttc,
             "settings": settings,
+            "spike_alert_settings": {
+                "enabled": settings.get("spike_alert_enabled", True),
+                "momentum_threshold": settings.get("spike_alert_momentum_threshold", 40),
+                "cooldown_threshold": settings.get("spike_alert_cooldown_threshold", 30),
+                "cooldown_minutes": settings.get("spike_alert_cooldown_minutes", 15)
+            },
             "cooldown_entries_count": len(last_trade_times),
             "monitoring_thread_alive": service_healthy,
             "timestamp": datetime.now().isoformat()
@@ -696,6 +928,52 @@ def get_ports():
     """Get all port assignments from centralized system."""
     from backend.core.port_config import get_port_info
     return get_port_info()
+
+# Spike alert settings endpoint
+@app.route("/api/spike_alert_settings", methods=['GET', 'POST'])
+def spike_alert_settings():
+    """Get or update spike alert settings"""
+    try:
+        if request.method == 'GET':
+            settings = get_auto_entry_settings()
+            return jsonify({
+                "spike_alert_enabled": settings.get("spike_alert_enabled", True),
+                "spike_alert_momentum_threshold": settings.get("spike_alert_momentum_threshold", 40),
+                "spike_alert_cooldown_threshold": settings.get("spike_alert_cooldown_threshold", 30),
+                "spike_alert_cooldown_minutes": settings.get("spike_alert_cooldown_minutes", 15)
+            })
+        else:
+            # POST - Update settings
+            data = request.json
+            settings_path = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_entry_settings.json")
+            
+            # Load current settings
+            if os.path.exists(settings_path):
+                with open(settings_path, "r") as f:
+                    settings = json.load(f)
+            else:
+                settings = {}
+            
+            # Update with new values
+            if "spike_alert_enabled" in data:
+                settings["spike_alert_enabled"] = data["spike_alert_enabled"]
+            if "spike_alert_momentum_threshold" in data:
+                settings["spike_alert_momentum_threshold"] = data["spike_alert_momentum_threshold"]
+            if "spike_alert_cooldown_threshold" in data:
+                settings["spike_alert_cooldown_threshold"] = data["spike_alert_cooldown_threshold"]
+            if "spike_alert_cooldown_minutes" in data:
+                settings["spike_alert_cooldown_minutes"] = data["spike_alert_cooldown_minutes"]
+            
+            # Save updated settings
+            with open(settings_path, "w") as f:
+                json.dump(settings, f, indent=2)
+            
+            log(f"[SPIKE ALERT SETTINGS] Updated: {data}")
+            return jsonify({"success": True, "message": "Spike alert settings updated"})
+            
+    except Exception as e:
+        log(f"[SPIKE ALERT SETTINGS] Error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 def start_event_driven_supervisor():
     """Start the event-driven auto entry supervisor"""

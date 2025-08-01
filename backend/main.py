@@ -1249,8 +1249,16 @@ async def set_auto_entry_settings(request: Request):
         settings["max_time"] = int(data["max_time"])
     if "allow_re_entry" in data:
         settings["allow_re_entry"] = bool(data["allow_re_entry"])
+    if "spike_alert_enabled" in data:
+        settings["spike_alert_enabled"] = bool(data["spike_alert_enabled"])
+    if "spike_alert_momentum_threshold" in data:
+        settings["spike_alert_momentum_threshold"] = int(data["spike_alert_momentum_threshold"])
+    if "spike_alert_cooldown_threshold" in data:
+        settings["spike_alert_cooldown_threshold"] = int(data["spike_alert_cooldown_threshold"])
+    if "spike_alert_cooldown_minutes" in data:
+        settings["spike_alert_cooldown_minutes"] = int(data["spike_alert_cooldown_minutes"])
     save_auto_entry_settings(settings)
-    return {"status": "ok", "min_probability": settings["min_probability"], "min_differential": settings["min_differential"], "min_ttc_seconds": settings["min_ttc_seconds"], "min_time": settings["min_time"], "max_time": settings["max_time"], "allow_re_entry": settings["allow_re_entry"]}
+    return {"status": "ok", "min_probability": settings["min_probability"], "min_differential": settings["min_differential"], "min_ttc_seconds": settings["min_ttc_seconds"], "min_time": settings["min_time"], "max_time": settings["max_time"], "allow_re_entry": settings["allow_re_entry"], "spike_alert_enabled": settings.get("spike_alert_enabled", True), "spike_alert_momentum_threshold": settings.get("spike_alert_momentum_threshold", 40), "spike_alert_cooldown_threshold": settings.get("spike_alert_cooldown_threshold", 30), "spike_alert_cooldown_minutes": settings.get("spike_alert_cooldown_minutes", 15)}
 
 @app.post("/api/trigger_open_trade")
 async def trigger_open_trade(request: Request):

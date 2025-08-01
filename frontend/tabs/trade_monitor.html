@@ -1334,6 +1334,36 @@ document.addEventListener('DOMContentLoaded', () => {
               <input type="checkbox" id="autoEntryAllowReEntry" style=" width:16px; height:16px; margin-right:8px; accent-color:#007bff;" />
               <span style="font-size:13px; color:#666;">Allow re-entry on the same strike</span>
             </div>
+            
+            <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 24px 0;">
+            
+            <!-- Spike Alert Settings Section -->
+
+              
+              
+              <div style="position:relative; margin-bottom:24px; width:100%;">
+                <input type="checkbox" id="spikeAlertEnabled" style="width:16px; height:16px; margin-right:8px; accent-color:#007bff;" />
+                <span style="font-size:13px; color:#666;">Pause auto entry during market spikes</span>
+              </div>
+              
+              <label for="spikeAlertMomentumSlider" style="font-size:14px; color:#333; margin-bottom:34px; font-weight:500;">Momentum Spike Level (±):</label>
+              <div style="position:relative; margin-bottom:24px; width:100%;">
+                <input type="range" id="spikeAlertMomentumSlider" min="10" max="100" value="40" style="width:100%; height:6px; z-index:1; position:relative; background:#e0e0e0; border-radius:3px; outline:none;" />
+                <div id="spikeAlertMomentumValueDisplay" style="position:absolute; top:-32px; left:0; font-size:12px; color:#222; background:white; padding:4px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0;">±40</div>
+              </div>
+              
+              <label for="spikeAlertCooldownSlider" style="font-size:14px; color:#333; margin-bottom:34px; font-weight:500;">Cooldown Level (±):</label>
+              <div style="position:relative; margin-bottom:24px; width:100%;">
+                <input type="range" id="spikeAlertCooldownSlider" min="5" max="50" value="30" style="width:100%; height:6px; z-index:1; position:relative; background:#e0e0e0; border-radius:3px; outline:none;" />
+                <div id="spikeAlertCooldownValueDisplay" style="position:absolute; top:-32px; left:0; font-size:12px; color:#222; background:white; padding:4px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0;">±30</div>
+              </div>
+              
+              <label for="spikeAlertTimeSlider" style="font-size:14px; color:#333; margin-bottom:34px; font-weight:500;">Cooldown Time (minutes):</label>
+              <div style="position:relative; margin-bottom:8px; width:100%;">
+                <input type="range" id="spikeAlertTimeSlider" min="1" max="60" value="15" style="width:100%; height:6px; z-index:1; position:relative; background:#e0e0e0; border-radius:3px; outline:none;" />
+                <div id="spikeAlertTimeValueDisplay" style="position:absolute; top:-32px; left:0; font-size:12px; color:#222; background:white; padding:4px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0;">15 min</div>
+              </div>
+            
           </div>
           <div style="display:flex; gap:12px; justify-content:flex-end; align-items:center; margin-top:20px;">
             <button id="autoEntrySettingsCancel" style="padding:8px 16px; border-radius:4px; border:1px solid #ddd; background:#f8f9fa; color:#333; font-size:13px; cursor:pointer; font-weight:500;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">Cancel</button>
@@ -3107,6 +3137,54 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
+  function updateSpikeAlertMomentumDisplay(value) {
+    const display = document.getElementById('spikeAlertMomentumValueDisplay');
+    const slider = document.getElementById('spikeAlertMomentumSlider');
+    if (display && slider) {
+      display.textContent = `±${value}`;
+      // Calculate thumb position in px
+      const min = parseInt(slider.min, 10);
+      const max = parseInt(slider.max, 10);
+      const percent = (value - min) / (max - min);
+      const sliderWidth = slider.offsetWidth;
+      const thumbWidth = 16;
+      const offset = percent * (sliderWidth - thumbWidth) + thumbWidth / 2;
+      display.style.left = `${offset}px`;
+    }
+  }
+
+  function updateSpikeAlertCooldownDisplay(value) {
+    const display = document.getElementById('spikeAlertCooldownValueDisplay');
+    const slider = document.getElementById('spikeAlertCooldownSlider');
+    if (display && slider) {
+      display.textContent = `±${value}`;
+      // Calculate thumb position in px
+      const min = parseInt(slider.min, 10);
+      const max = parseInt(slider.max, 10);
+      const percent = (value - min) / (max - min);
+      const sliderWidth = slider.offsetWidth;
+      const thumbWidth = 16;
+      const offset = percent * (sliderWidth - thumbWidth) + thumbWidth / 2;
+      display.style.left = `${offset}px`;
+    }
+  }
+
+  function updateSpikeAlertTimeDisplay(value) {
+    const display = document.getElementById('spikeAlertTimeValueDisplay');
+    const slider = document.getElementById('spikeAlertTimeSlider');
+    if (display && slider) {
+      display.textContent = `${value} min`;
+      // Calculate thumb position in px
+      const min = parseInt(slider.min, 10);
+      const max = parseInt(slider.max, 10);
+      const percent = (value - min) / (max - min);
+      const sliderWidth = slider.offsetWidth;
+      const thumbWidth = 16;
+      const offset = percent * (sliderWidth - thumbWidth) + thumbWidth / 2;
+      display.style.left = `${offset}px`;
+    }
+  }
+
   async function fetchAutoEntrySettings() {
     try {
       const resp = await fetch('/api/get_auto_entry_settings');
@@ -3159,6 +3237,41 @@ document.addEventListener('DOMContentLoaded', function() {
         // Store last saved values for cancel functionality
         window.lastSavedAutoEntryMinTime = minTime;
         window.lastSavedAutoEntryMaxTime = maxTime;
+        
+        // Load spike alert settings
+        const spikeAlertEnabled = data.spike_alert_enabled !== undefined ? data.spike_alert_enabled : true;
+        const spikeAlertMomentum = data.spike_alert_momentum_threshold !== undefined ? data.spike_alert_momentum_threshold : 40;
+        const spikeAlertCooldown = data.spike_alert_cooldown_threshold !== undefined ? data.spike_alert_cooldown_threshold : 30;
+        const spikeAlertTime = data.spike_alert_cooldown_minutes !== undefined ? data.spike_alert_cooldown_minutes : 15;
+        
+        // Set spike alert controls
+        const spikeAlertEnabledCheckbox = document.getElementById('spikeAlertEnabled');
+        const spikeAlertMomentumSlider = document.getElementById('spikeAlertMomentumSlider');
+        const spikeAlertCooldownSlider = document.getElementById('spikeAlertCooldownSlider');
+        const spikeAlertTimeSlider = document.getElementById('spikeAlertTimeSlider');
+        
+        if (spikeAlertEnabledCheckbox) {
+          spikeAlertEnabledCheckbox.checked = spikeAlertEnabled;
+          window.lastSavedSpikeAlertEnabled = spikeAlertEnabled;
+        }
+        
+        if (spikeAlertMomentumSlider) {
+          spikeAlertMomentumSlider.value = spikeAlertMomentum;
+          updateSpikeAlertMomentumDisplay(spikeAlertMomentum);
+          window.lastSavedSpikeAlertMomentum = spikeAlertMomentum;
+        }
+        
+        if (spikeAlertCooldownSlider) {
+          spikeAlertCooldownSlider.value = spikeAlertCooldown;
+          updateSpikeAlertCooldownDisplay(spikeAlertCooldown);
+          window.lastSavedSpikeAlertCooldown = spikeAlertCooldown;
+        }
+        
+        if (spikeAlertTimeSlider) {
+          spikeAlertTimeSlider.value = spikeAlertTime;
+          updateSpikeAlertTimeDisplay(spikeAlertTime);
+          window.lastSavedSpikeAlertTime = spikeAlertTime;
+        }
       });
     }
   }
@@ -3194,6 +3307,31 @@ document.addEventListener('DOMContentLoaded', function() {
         allowReEntryCheckbox.checked = window.lastSavedAutoEntryAllowReEntry;
       }
       
+      // Reset spike alert settings to last saved values
+      const spikeAlertEnabledCheckbox = document.getElementById('spikeAlertEnabled');
+      const spikeAlertMomentumSlider = document.getElementById('spikeAlertMomentumSlider');
+      const spikeAlertCooldownSlider = document.getElementById('spikeAlertCooldownSlider');
+      const spikeAlertTimeSlider = document.getElementById('spikeAlertTimeSlider');
+      
+      if (spikeAlertEnabledCheckbox && window.lastSavedSpikeAlertEnabled !== undefined) {
+        spikeAlertEnabledCheckbox.checked = window.lastSavedSpikeAlertEnabled;
+      }
+      
+      if (spikeAlertMomentumSlider && window.lastSavedSpikeAlertMomentum !== undefined) {
+        spikeAlertMomentumSlider.value = window.lastSavedSpikeAlertMomentum;
+        updateSpikeAlertMomentumDisplay(window.lastSavedSpikeAlertMomentum);
+      }
+      
+      if (spikeAlertCooldownSlider && window.lastSavedSpikeAlertCooldown !== undefined) {
+        spikeAlertCooldownSlider.value = window.lastSavedSpikeAlertCooldown;
+        updateSpikeAlertCooldownDisplay(window.lastSavedSpikeAlertCooldown);
+      }
+      
+      if (spikeAlertTimeSlider && window.lastSavedSpikeAlertTime !== undefined) {
+        spikeAlertTimeSlider.value = window.lastSavedSpikeAlertTime;
+        updateSpikeAlertTimeDisplay(window.lastSavedSpikeAlertTime);
+      }
+      
       autoEntrySettingsModal.style.display = 'none';
       document.body.style.overflow = 'auto';
     });
@@ -3208,6 +3346,17 @@ document.addEventListener('DOMContentLoaded', function() {
           const allowReEntryCheckbox = document.getElementById('autoEntryAllowReEntry');
           const allowReEntry = allowReEntryCheckbox ? allowReEntryCheckbox.checked : false;
           
+          // Get spike alert settings
+          const spikeAlertEnabledCheckbox = document.getElementById('spikeAlertEnabled');
+          const spikeAlertMomentumSlider = document.getElementById('spikeAlertMomentumSlider');
+          const spikeAlertCooldownSlider = document.getElementById('spikeAlertCooldownSlider');
+          const spikeAlertTimeSlider = document.getElementById('spikeAlertTimeSlider');
+          
+          const spikeAlertEnabled = spikeAlertEnabledCheckbox ? spikeAlertEnabledCheckbox.checked : true;
+          const spikeAlertMomentum = spikeAlertMomentumSlider ? parseInt(spikeAlertMomentumSlider.value) : 40;
+          const spikeAlertCooldown = spikeAlertCooldownSlider ? parseInt(spikeAlertCooldownSlider.value) : 30;
+          const spikeAlertTime = spikeAlertTimeSlider ? parseInt(spikeAlertTimeSlider.value) : 15;
+          
           const response = await fetch('/api/set_auto_entry_settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -3217,7 +3366,11 @@ document.addEventListener('DOMContentLoaded', function() {
               min_ttc_seconds: 60, // Keep default TTC for now
               min_time: minTimeSeconds,
               max_time: maxTimeSeconds,
-              allow_re_entry: allowReEntry
+              allow_re_entry: allowReEntry,
+              spike_alert_enabled: spikeAlertEnabled,
+              spike_alert_momentum_threshold: spikeAlertMomentum,
+              spike_alert_cooldown_threshold: spikeAlertCooldown,
+              spike_alert_cooldown_minutes: spikeAlertTime
             })
           });
           
@@ -3227,6 +3380,10 @@ document.addEventListener('DOMContentLoaded', function() {
             window.lastSavedAutoEntryMinTime = minTimeSeconds;
             window.lastSavedAutoEntryMaxTime = maxTimeSeconds;
             window.lastSavedAutoEntryAllowReEntry = allowReEntry;
+            window.lastSavedSpikeAlertEnabled = spikeAlertEnabled;
+            window.lastSavedSpikeAlertMomentum = spikeAlertMomentum;
+            window.lastSavedSpikeAlertCooldown = spikeAlertCooldown;
+            window.lastSavedSpikeAlertTime = spikeAlertTime;
             autoEntrySettingsModal.style.display = 'none';
             document.body.style.overflow = 'auto';
           } else {
@@ -3260,6 +3417,38 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     // Initial position
     updateAutoEntryDifferentialDisplay(autoEntryDifferentialSlider.value);
+  }
+  
+  // Spike Alert Slider Event Listeners
+  const spikeAlertMomentumSlider = document.getElementById('spikeAlertMomentumSlider');
+  const spikeAlertCooldownSlider = document.getElementById('spikeAlertCooldownSlider');
+  const spikeAlertTimeSlider = document.getElementById('spikeAlertTimeSlider');
+  
+  if (spikeAlertMomentumSlider) {
+    spikeAlertMomentumSlider.addEventListener('input', function() {
+      updateSpikeAlertMomentumDisplay(this.value);
+    });
+    window.addEventListener('resize', function() {
+      updateSpikeAlertMomentumDisplay(spikeAlertMomentumSlider.value);
+    });
+  }
+  
+  if (spikeAlertCooldownSlider) {
+    spikeAlertCooldownSlider.addEventListener('input', function() {
+      updateSpikeAlertCooldownDisplay(this.value);
+    });
+    window.addEventListener('resize', function() {
+      updateSpikeAlertCooldownDisplay(spikeAlertCooldownSlider.value);
+    });
+  }
+  
+  if (spikeAlertTimeSlider) {
+    spikeAlertTimeSlider.addEventListener('input', function() {
+      updateSpikeAlertTimeDisplay(this.value);
+    });
+    window.addEventListener('resize', function() {
+      updateSpikeAlertTimeDisplay(spikeAlertTimeSlider.value);
+    });
   }
   // Remove click-to-close on dimmed area
   if (autoEntrySettingsDim) {
@@ -3424,11 +3613,50 @@ function updateAutoEntryIndicator(data) {
         return;
     }
     
+    // Get the indicator elements
+    const indicatorDot = indicator.querySelector('div');
+    const indicatorText = indicator.querySelector('span');
+    
+    // Check for SPIKE ALERT state first
+    if (data.spike_alert_active) {
+        // SPIKE ALERT MODE - Show red indicator
+        indicator.style.display = 'flex';
+        indicator.style.backgroundColor = '#dc3545'; // Red background
+        indicator.style.border = '1px solid #c82333';
+        
+        if (indicatorDot) {
+            indicatorDot.style.background = '#ff6b6b'; // Red dot
+        }
+        
+        if (indicatorText) {
+            const recoveryCountdown = data.spike_alert_recovery_countdown;
+            if (recoveryCountdown !== null && recoveryCountdown > 0) {
+                indicatorText.textContent = `SPIKE ALERT - AUTO TRADING PAUSED (${recoveryCountdown.toFixed(1)}m)`;
+            } else {
+                indicatorText.textContent = 'SPIKE ALERT - AUTO TRADING PAUSED';
+            }
+        }
+        
+        console.log('🚨 SPIKE ALERT: Auto trading paused due to market spike');
+        return;
+    }
+    
     // Use the new scanning_active field as the primary condition
     // This provides the true system-wide scanning status
     if (data.scanning_active) {
         // Show the indicator when scanning is actually active
         indicator.style.display = 'flex';
+        indicator.style.backgroundColor = ''; // Reset background
+        indicator.style.border = ''; // Reset border
+        
+        if (indicatorDot) {
+            indicatorDot.style.background = '#00ff2f'; // Green dot
+        }
+        
+        if (indicatorText) {
+            indicatorText.textContent = 'Automated Trading ON';
+        }
+        
         console.log('🔔 AUTOMATED TRADING ON: Scanning is active');
     } else {
         // Hide the indicator when scanning is not active
