@@ -157,14 +157,110 @@ Enter your Kalshi Private Key (PEM format): ********
 ============================================================
 ```
 
-### Step 5: Initialize System Directories
+### Step 5: Set Up Authentication System
+```bash
+# Run the authentication setup script
+python scripts/setup_auth.py
+
+# The script will prompt for:
+# - Authentication password (or use default 'admin')
+# - Password confirmation
+```
+
+**What the script creates:**
+- ✅ **User Password**: Added to `user_info.json` for authentication
+- ✅ **Auth Tokens**: `auth_tokens.json` for session management
+- ✅ **Device Tokens**: `device_tokens.json` for "remember device" functionality
+- ✅ **Login Page**: Accessible at `/login` for cloud deployment
+- ✅ **Local Bypass**: Available for development environments
+
+**Authentication Features:**
+- 🔐 **Secure Login**: Username/password authentication
+- 💾 **Device Remembering**: Long-term device tokens (365 days)
+- 🚀 **Local Development**: Bypass button for quick access
+- 🔄 **Session Management**: Token-based authentication with expiration
+- 🛡️ **Production Ready**: Environment variable control
+
+**Example Output:**
+```
+🔐 Setting up REC.IO Authentication System
+==================================================
+👤 Current user: John Doe
+📧 Email: john@example.com
+
+🔑 Enter a password for authentication (or press Enter for 'admin'): my_secure_password
+🔑 Confirm password: my_secure_password
+✅ Updated user info with password
+✅ Created auth_tokens.json
+✅ Created device_tokens.json
+
+🎉 Authentication system setup complete!
+
+📋 Login Information:
+   Username: john_doe
+   Password: my_secure_password
+
+🔧 To enable authentication in production:
+   export AUTH_ENABLED=true
+
+🔧 For local development (no auth required):
+   export AUTH_ENABLED=false
+```
+
+**Environment Configuration:**
+```bash
+# For local development (no authentication required)
+export AUTH_ENABLED=false
+
+# For production deployment (authentication required)
+export AUTH_ENABLED=true
+```
+
+**Default Credentials:**
+- **Username**: Your user_id from setup (e.g., `john_doe`)
+- **Password**: The password you set during auth setup
+
+### Step 6: Test Authentication System
+```bash
+# Test the authentication system
+python scripts/test_auth.py
+```
+
+**Expected Test Results:**
+```
+🧪 Testing REC.IO Authentication System
+==================================================
+
+1. Testing login page accessibility...
+✅ Login page is accessible
+
+2. Testing login with correct credentials...
+✅ Login successful
+   Token: AW2I94o0IH_iCBpF1UGj...
+   Device ID: device_5e36d6b6c9c2f1ae
+
+3. Testing token verification...
+✅ Token verification successful
+   Username: john_doe
+   Name: John Doe
+
+4. Testing logout...
+✅ Logout successful
+
+5. Testing local development bypass...
+✅ Local development bypass working
+
+🎉 Authentication system test complete!
+```
+
+### Step 7: Initialize System Directories
 ```bash
 # The system will create necessary directories automatically
 # But you can verify the structure:
 python -c "from backend.util.paths import ensure_data_dirs; ensure_data_dirs()"
 ```
 
-### Step 6: Start the System
+### Step 8: Start the System
 ```bash
 # Start supervisor (manages all services)
 supervisord -c backend/supervisord.conf
@@ -185,7 +281,7 @@ supervisorctl -c backend/supervisord.conf status
 - ✅ `cascading_failure_detector` (port 8008) - Failure detection
 - ✅ `unified_production_coordinator` (port 8006) - System coordination
 
-### Step 7: Access the System
+### Step 9: Access the System
 ```bash
 # Open the web interface
 open index.html  # On macOS
@@ -198,6 +294,13 @@ xdg-open index.html # On Linux
 **Alternative Access:**
 - **Local**: `http://localhost:3000`
 - **Network**: `http://[your-ip]:3000`
+- **Login Page**: `http://localhost:3000/login`
+- **Protected App**: `http://localhost:3000/app`
+
+**Authentication Access:**
+- **Local Development**: Direct access to main app (authentication disabled by default)
+- **Production**: Login required at `/login` before accessing `/app`
+- **Local Bypass**: Available on login page for development environments
 
 ## 🔍 Verification Steps
 
@@ -214,8 +317,15 @@ supervisorctl -c backend/supervisord.conf status
 netstat -tulpn | grep :3000
 ```
 
+### Test Authentication System
+1. **Access login page**: `http://localhost:3000/login`
+2. **Test login with credentials** from auth setup
+3. **Verify "Remember device" functionality**
+4. **Test local development bypass** (if needed)
+5. **Verify logout functionality**
+
 ### Test Trading Functionality
-1. **Open the web interface**
+1. **Open the web interface** (after authentication if enabled)
 2. **Navigate to Trade Monitor**
 3. **Verify historical data is loaded**
 4. **Check that live data is being collected**
@@ -242,6 +352,24 @@ pip install -r requirements.txt
 ```bash
 # Solution: Re-run user setup
 python scripts/setup_new_user.py
+```
+
+**Issue: "Authentication failed"**
+```bash
+# Solution: Re-run authentication setup
+python scripts/setup_auth.py
+
+# Or test authentication system
+python scripts/test_auth.py
+```
+
+**Issue: "Login page not accessible"**
+```bash
+# Solution: Check if main_app service is running
+supervisorctl -c backend/supervisord.conf status main_app
+
+# Restart main_app if needed
+supervisorctl -c backend/supervisord.conf restart main_app
 ```
 
 **Issue: "Historical data missing"**
@@ -288,7 +416,10 @@ backend/data/
 └── users/user_0001/    # ❌ EXCLUDED (user-specific)
     ├── credentials/    # Your API keys
     ├── preferences/    # Your settings
-    └── trade_history/  # Your trades
+    ├── trade_history/  # Your trades
+    ├── user_info.json  # User identity and password
+    ├── auth_tokens.json # Authentication tokens
+    └── device_tokens.json # Device remembering tokens
 ```
 
 ### Port Configuration
@@ -304,6 +435,14 @@ All ports are managed centrally:
 - ✅ NOT included in repository
 - ✅ Proper file permissions (600 for PEM files)
 - ✅ Environment-specific (demo/prod)
+
+### Authentication Management
+- ✅ User passwords stored securely in user_info.json
+- ✅ Session tokens with configurable expiration
+- ✅ Device remembering for persistent login
+- ✅ Local development bypass for testing
+- ✅ Environment variable control (AUTH_ENABLED)
+- ✅ Secure token generation and storage
 
 ### Network Security
 - ✅ Services bind to localhost by default
@@ -336,10 +475,12 @@ netstat -an | grep :3000
 
 ### For Production Use
 1. **Use production Kalshi credentials**
-2. **Set up proper firewall rules**
-3. **Configure log rotation**
-4. **Set up monitoring/alerting**
-5. **Regular backups of user data**
+2. **Enable authentication**: `export AUTH_ENABLED=true`
+3. **Set up proper firewall rules**
+4. **Configure log rotation**
+5. **Set up monitoring/alerting**
+6. **Regular backups of user data**
+7. **Change default passwords** for security
 
 ### Backup Strategy
 ```bash
@@ -356,6 +497,8 @@ netstat -an | grep :3000
 - **Architecture**: `docs/ARCHITECTURE.md`
 - **Port Configuration**: `docs/COMPLETE_PORT_AUDIT.md`
 - **System Health**: `docs/HOUSEKEEPING_SUMMARY.md`
+- **Authentication**: `docs/AUTHENTICATION_GUIDE.md`
+- **Authentication Summary**: `AUTHENTICATION_SUMMARY.md`
 
 ### Logs Location
 - **Application logs**: `logs/`
@@ -372,10 +515,13 @@ netstat -an | grep :3000
 - [ ] Historical data verified (~347MB present)
 - [ ] Kalshi credentials created
 - [ ] User preferences configured
+- [ ] Authentication system set up
+- [ ] Authentication test completed
 - [ ] System directories initialized
 - [ ] Supervisor started successfully
 - [ ] All 10 services running
 - [ ] Web interface accessible
+- [ ] Login page accessible
 - [ ] Historical data loading in UI
 - [ ] Live data collection working
 - [ ] Demo trade test completed

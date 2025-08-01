@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>REC.IO Trading Platform - Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Tektur:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles/global.css">
+  <style>
+    /* Login page specific styles using global CSS colors */
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'IBM Plex Sans', sans-serif;
+      background-color: #101018;
+      color: white;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .login-container {
+      background-color: #323c4e;
+      border: 1px solid #3c495e;
+      border-radius: 12px;
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    
+    .login-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    
+    .login-logo {
+      width: 60px;
+      height: 60px;
+      margin-bottom: 15px;
+    }
+    
+    .login-title {
+      font-family: 'Tektur', sans-serif;
+      font-size: 28px;
+      font-weight: 600;
+      margin: 0 0 5px 0;
+      color: white;
+    }
+    
+    .login-subtitle {
+      font-size: 14px;
+      color: #c4c4c4;
+      margin: 0;
+    }
+    
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .form-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: white;
+    }
+    
+    .form-input {
+      padding: 12px 16px;
+      border: 1px solid #3c495e;
+      border-radius: 8px;
+      background-color: #3c495e;
+      color: white;
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color 0.2s ease;
+    }
+    
+    .form-input:focus {
+      outline: none;
+      border-color: #4a90e2;
+    }
+    
+    .login-button {
+      background-color: #4a90e2;
+      color: white;
+      border: none;
+      padding: 14px 20px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      margin-top: 10px;
+    }
+    
+    .login-button:hover {
+      background-color: #357abd;
+    }
+    
+    .login-button:disabled {
+      background-color: #666;
+      cursor: not-allowed;
+    }
+    
+    .error-message {
+      color: #e74c3c;
+      font-size: 14px;
+      text-align: center;
+      margin-top: 10px;
+      display: none;
+    }
+    
+    .success-message {
+      color: #27ae60;
+      font-size: 14px;
+      text-align: center;
+      margin-top: 10px;
+      display: none;
+    }
+    
+    .remember-device {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    
+    .remember-device input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+    }
+    
+    .remember-device label {
+      font-size: 14px;
+      color: white;
+    }
+    
+    .local-bypass {
+      text-align: center;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #3c495e;
+    }
+    
+    .local-bypass button {
+      background: none;
+      border: 1px solid #3c495e;
+      color: #c4c4c4;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .local-bypass button:hover {
+      background-color: #323c4e;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-header">
+      <img src="/images/rec_logo_1.png" alt="REC.IO" class="login-logo">
+      <h1 class="login-title">rec.io</h1>
+      <p class="login-subtitle">Trading Platform</p>
+    </div>
+    
+    <form class="login-form" id="loginForm">
+      <div class="form-group">
+        <label for="username" class="form-label">Username</label>
+        <input type="text" id="username" name="username" class="form-input" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="password" class="form-label">Password</label>
+        <input type="password" id="password" name="password" class="form-input" required>
+      </div>
+      
+      <div class="remember-device">
+        <input type="checkbox" id="rememberDevice" name="rememberDevice">
+        <label for="rememberDevice">Remember this device</label>
+      </div>
+      
+      <button type="submit" class="login-button" id="loginButton">
+        <span id="loginButtonText">Sign In</span>
+      </button>
+      
+      <div class="error-message" id="errorMessage"></div>
+      <div class="success-message" id="successMessage"></div>
+    </form>
+    
+    <div class="local-bypass">
+      <button type="button" id="localBypass" onclick="bypassLogin()">
+        Local Development Bypass
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Check if we're already authenticated
+    function checkAuthStatus() {
+      const token = localStorage.getItem('rec_auth_token');
+      const deviceId = localStorage.getItem('rec_device_id');
+      
+      if (token && deviceId) {
+        // Verify token is still valid
+        fetch('/api/auth/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token, deviceId })
+        })
+        .then(response => response.json())
+        .then(data => {
+                  if (data.authenticated) {
+          window.location.href = '/app';
+        }
+        })
+        .catch(() => {
+          // Token invalid, stay on login page
+        });
+      }
+    }
+    
+    // Handle login form submission
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const rememberDevice = document.getElementById('rememberDevice').checked;
+      
+      const loginButton = document.getElementById('loginButton');
+      const loginButtonText = document.getElementById('loginButtonText');
+      const errorMessage = document.getElementById('errorMessage');
+      const successMessage = document.getElementById('successMessage');
+      
+      // Show loading state
+      loginButton.disabled = true;
+      loginButtonText.textContent = 'Signing In...';
+      errorMessage.style.display = 'none';
+      successMessage.style.display = 'none';
+      
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username,
+            password,
+            rememberDevice
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          // Store authentication token and device ID
+          localStorage.setItem('rec_auth_token', data.token);
+          localStorage.setItem('rec_device_id', data.deviceId);
+          
+          successMessage.textContent = 'Authentication successful! Redirecting...';
+          successMessage.style.display = 'block';
+          
+          // Redirect to main app
+          setTimeout(() => {
+            window.location.href = '/app';
+          }, 1000);
+        } else {
+          errorMessage.textContent = data.error || 'Authentication failed';
+          errorMessage.style.display = 'block';
+        }
+      } catch (error) {
+        errorMessage.textContent = 'Network error. Please try again.';
+        errorMessage.style.display = 'block';
+      } finally {
+        loginButton.disabled = false;
+        loginButtonText.textContent = 'Sign In';
+      }
+    });
+    
+    // Local development bypass
+    function bypassLogin() {
+      // Generate a simple local token
+      const localToken = 'local_dev_' + Date.now();
+      localStorage.setItem('rec_auth_token', localToken);
+      localStorage.setItem('rec_device_id', 'local_development');
+      localStorage.setItem('rec_local_bypass', 'true');
+      
+      window.location.href = '/app';
+    }
+    
+    // Check auth status on page load
+    checkAuthStatus();
+  </script>
+</body>
+</html> 

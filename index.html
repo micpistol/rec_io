@@ -328,6 +328,10 @@
           </span>
           <span class="nav-label">User ID</span>
         </a>
+        <button class="nav-item" id="logoutButton" data-tooltip="Logout" style="background: none; border: none; cursor: pointer; width: 100%; text-align: left;">
+          <span class="nav-icon">🚪</span>
+          <span class="nav-label">Logout</span>
+        </button>
       </div>
       
       <!-- Collapse/Expand Button -->
@@ -405,6 +409,34 @@
     window.addEventListener('DOMContentLoaded', () => {
       // All frames are preloaded, trade monitor is already active
       console.log('All tabs preloaded and ready');
+    });
+    
+    // Logout functionality
+    document.getElementById('logoutButton').addEventListener('click', async () => {
+      const token = localStorage.getItem('rec_auth_token');
+      const deviceId = localStorage.getItem('rec_device_id');
+      
+      if (token && deviceId) {
+        try {
+          await fetch('/api/auth/logout', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token, deviceId })
+          });
+        } catch (e) {
+          console.log('Logout request failed:', e);
+        }
+      }
+      
+      // Clear local storage
+      localStorage.removeItem('rec_auth_token');
+      localStorage.removeItem('rec_device_id');
+      localStorage.removeItem('rec_local_bypass');
+      
+      // Redirect to login page
+      window.location.href = '/login';
     });
   </script>
 

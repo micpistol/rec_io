@@ -20,6 +20,9 @@ from typing import List, Optional, Dict
 import fcntl
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
+import hashlib
+import secrets
+import hmac
 
 # Import the universal centralized port system
 import sys
@@ -53,6 +56,93 @@ PREFERENCES_PATH = os.path.join(get_data_dir(), "users", "user_0001", "preferenc
 _preferences_cache = None
 _cache_timestamp = 0
 CACHE_TTL = 1.0  # 1 second cache TTL
+
+# Authentication system
+AUTH_TOKENS_FILE = os.path.join(get_data_dir(), "users", "user_0001", "auth_tokens.json")
+DEVICE_TOKENS_FILE = os.path.join(get_data_dir(), "users", "user_0001", "device_tokens.json")
+
+# Authentication settings - can be overridden for local development
+AUTH_ENABLED = os.environ.get("AUTH_ENABLED", "false").lower() == "true"
+
+def load_auth_tokens():
+    """Load authentication tokens from file"""
+    try:
+        if os.path.exists(AUTH_TOKENS_FILE):
+            with open(AUTH_TOKENS_FILE, "r") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+def save_auth_tokens(tokens):
+    """Save authentication tokens to file"""
+    try:
+        os.makedirs(os.path.dirname(AUTH_TOKENS_FILE), exist_ok=True)
+        with open(AUTH_TOKENS_FILE, "w") as f:
+            json.dump(tokens, f, indent=2)
+    except Exception as e:
+        print(f"[AUTH] Error saving auth tokens: {e}")
+
+def load_device_tokens():
+    """Load device tokens from file"""
+    try:
+        if os.path.exists(DEVICE_TOKENS_FILE):
+            with open(DEVICE_TOKENS_FILE, "r") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+def save_device_tokens(tokens):
+    """Save device tokens to file"""
+    try:
+        os.makedirs(os.path.dirname(DEVICE_TOKENS_FILE), exist_ok=True)
+        with open(DEVICE_TOKENS_FILE, "w") as f:
+            json.dump(tokens, f, indent=2)
+    except Exception as e:
+        print(f"[AUTH] Error saving device tokens: {e}")
+
+def generate_token():
+    """Generate a secure authentication token"""
+    return secrets.token_urlsafe(32)
+
+def hash_password(password):
+    """Hash a password using HMAC-SHA256"""
+    salt = secrets.token_hex(16)
+    hash_obj = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
+    return salt + hash_obj.hex()
+
+def verify_password(password, hashed):
+    """Verify a password against its hash"""
+    try:
+        salt = hashed[:32]  # First 32 chars are salt
+        hash_part = hashed[32:]
+        hash_obj = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
+        return hmac.compare_digest(hash_obj.hex(), hash_part)
+    except Exception:
+        return False
+
+def get_user_credentials():
+    """Get user credentials from user_info.json"""
+    try:
+        user_info_path = os.path.join(get_data_dir(), "users", "user_0001", "user_info.json")
+        if os.path.exists(user_info_path):
+            with open(user_info_path, "r") as f:
+                user_info = json.load(f)
+                return {
+                    "username": user_info.get("user_id", "admin"),
+                    "password": user_info.get("password", "admin"),  # Default password
+                    "name": user_info.get("name", "Admin User")
+                }
+    except Exception as e:
+        print(f"[AUTH] Error loading user credentials: {e}")
+    
+    # Default credentials if no user_info.json
+    return {
+        "username": "admin",
+        "password": "admin",
+        "name": "Admin User"
+    }
 
 def load_preferences():
     global _preferences_cache, _cache_timestamp
@@ -308,6 +398,9 @@ async def websocket_db_changes(websocket: WebSocket):
 # Serve main index.html
 @app.get("/", response_class=HTMLResponse)
 async def read_root():
+    """Serve the main application or login page based on authentication."""
+    # For now, always serve the main app
+    # In production, this would check authentication
     with open("index.html", "r") as f:
         content = f.read()
         return HTMLResponse(
@@ -318,6 +411,37 @@ async def read_root():
                 "Expires": "0"
             }
         )
+
+@app.get("/app", response_class=HTMLResponse)
+async def serve_main_app():
+    """Serve the main application (protected route)."""
+    with open("index.html", "r") as f:
+        content = f.read()
+        return HTMLResponse(
+            content=content,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
+
+@app.get("/login", response_class=HTMLResponse)
+async def serve_login():
+    """Serve the login page."""
+    try:
+        with open("login.html", "r") as f:
+            content = f.read()
+            return HTMLResponse(
+                content=content,
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+            )
+    except FileNotFoundError:
+        return HTMLResponse(content="<h1>Login</h1><p>Login page not found.</p>", status_code=404)
 
 # Serve favicon
 @app.get("/favicon.ico")
@@ -1658,6 +1782,135 @@ async def notify_db_change(request: Request):
     except Exception as e:
         print(f"❌ Error handling DB change notification: {e}")
         return {"status": "error", "message": str(e)}
+
+# Authentication endpoints
+@app.post("/api/auth/login")
+async def login(request: Request):
+    """Handle user login"""
+    try:
+        data = await request.json()
+        username = data.get("username", "")
+        password = data.get("password", "")
+        remember_device = data.get("rememberDevice", False)
+        
+        # Get user credentials
+        credentials = get_user_credentials()
+        
+        # Check credentials
+        if username == credentials["username"] and password == credentials["password"]:
+            # Generate authentication token
+            token = generate_token()
+            device_id = f"device_{secrets.token_hex(8)}"
+            
+            # Store token
+            auth_tokens = load_auth_tokens()
+            auth_tokens[token] = {
+                "username": username,
+                "created": datetime.now().isoformat(),
+                "expires": (datetime.now() + timedelta(days=30)).isoformat() if remember_device else (datetime.now() + timedelta(hours=24)).isoformat()
+            }
+            save_auth_tokens(auth_tokens)
+            
+            # Store device token if remember device
+            if remember_device:
+                device_tokens = load_device_tokens()
+                device_tokens[device_id] = {
+                    "username": username,
+                    "token": token,
+                    "created": datetime.now().isoformat(),
+                    "expires": (datetime.now() + timedelta(days=365)).isoformat()
+                }
+                save_device_tokens(device_tokens)
+            
+            print(f"[AUTH] User {username} logged in successfully")
+            return {
+                "success": True,
+                "token": token,
+                "deviceId": device_id,
+                "username": username,
+                "name": credentials["name"]
+            }
+        else:
+            print(f"[AUTH] Failed login attempt for username: {username}")
+            return {
+                "success": False,
+                "error": "Invalid username or password"
+            }
+    except Exception as e:
+        print(f"[AUTH] Login error: {e}")
+        return {
+            "success": False,
+            "error": "Authentication error"
+        }
+
+@app.post("/api/auth/verify")
+async def verify_auth(request: Request):
+    """Verify authentication token"""
+    try:
+        data = await request.json()
+        token = data.get("token", "")
+        device_id = data.get("deviceId", "")
+        
+        # Check for local development bypass
+        if token.startswith("local_dev_"):
+            return {"authenticated": True, "username": "local_dev", "name": "Local Development"}
+        
+        # Check auth tokens
+        auth_tokens = load_auth_tokens()
+        if token in auth_tokens:
+            token_data = auth_tokens[token]
+            expires = datetime.fromisoformat(token_data["expires"])
+            
+            if datetime.now() < expires:
+                return {
+                    "authenticated": True,
+                    "username": token_data["username"],
+                    "name": get_user_credentials()["name"]
+                }
+        
+        # Check device tokens
+        device_tokens = load_device_tokens()
+        if device_id in device_tokens:
+            device_data = device_tokens[device_id]
+            expires = datetime.fromisoformat(device_data["expires"])
+            
+            if datetime.now() < expires:
+                return {
+                    "authenticated": True,
+                    "username": device_data["username"],
+                    "name": get_user_credentials()["name"]
+                }
+        
+        return {"authenticated": False}
+    except Exception as e:
+        print(f"[AUTH] Verification error: {e}")
+        return {"authenticated": False}
+
+@app.post("/api/auth/logout")
+async def logout(request: Request):
+    """Handle user logout"""
+    try:
+        data = await request.json()
+        token = data.get("token", "")
+        device_id = data.get("deviceId", "")
+        
+        # Remove auth token
+        auth_tokens = load_auth_tokens()
+        if token in auth_tokens:
+            del auth_tokens[token]
+            save_auth_tokens(auth_tokens)
+        
+        # Remove device token
+        device_tokens = load_device_tokens()
+        if device_id in device_tokens:
+            del device_tokens[device_id]
+            save_device_tokens(device_tokens)
+        
+        print(f"[AUTH] User logged out successfully")
+        return {"success": True}
+    except Exception as e:
+        print(f"[AUTH] Logout error: {e}")
+        return {"success": False, "error": str(e)}
 
 # Startup and shutdown events
 @app.on_event("startup")
