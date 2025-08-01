@@ -620,9 +620,9 @@ async def get_trades(status: Optional[str] = None):
         cursor = conn.cursor()
         
         if status:
-            cursor.execute("SELECT * FROM trades WHERE status = ? ORDER BY date DESC, time DESC LIMIT 100", (status,))
+            cursor.execute("SELECT * FROM trades WHERE status = ? ORDER BY date DESC, time DESC", (status,))
         else:
-            cursor.execute("SELECT * FROM trades ORDER BY date DESC, time DESC LIMIT 100")
+            cursor.execute("SELECT * FROM trades ORDER BY date DESC, time DESC")
         
         trades = cursor.fetchall()
         conn.close()
