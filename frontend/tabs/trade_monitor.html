@@ -2489,6 +2489,18 @@ function initializeTabSwitching() {
 
 }
 
+// Function to update Open Positions tab count
+function updateOpenPositionsTabCount(count) {
+  const openPositionsTab = document.getElementById('open-positions-tab');
+  if (openPositionsTab) {
+    if (count > 0) {
+      openPositionsTab.textContent = `Open Positions (${count})`;
+    } else {
+      openPositionsTab.textContent = 'Open Positions';
+    }
+  }
+}
+
 // === Positions Data Fetching and Rendering ===
 async function fetchAndRenderPositions() {
   try {
@@ -2511,12 +2523,18 @@ async function fetchAndRenderPositions() {
       const noPositionsRow = document.createElement('tr');
       noPositionsRow.innerHTML = '<td colspan="5" style="text-align: center; color: #ccc; padding: 20px;">No Open Positions</td>';
       openPositionsTableBody.appendChild(noPositionsRow);
+      updateOpenPositionsTabCount(0);
       return;
     }
     
+    // Filter positions with non-zero positions
+    const activePositions = positions.filter(p => p.position !== 0);
+    
+    // Update the tab count
+    updateOpenPositionsTabCount(activePositions.length);
+    
     // Render positions data using the same logic as account_manager.html
-    openPositionsTableBody.innerHTML = positions
-      .filter(p => p.position !== 0)
+    openPositionsTableBody.innerHTML = activePositions
       .map(p => `
         <tr>
           <td>${p.ticker}</td>

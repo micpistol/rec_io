@@ -1236,6 +1236,31 @@ def update_active_trade_monitoring_data():
     except Exception as e:
         log(f"Error in update_active_trade_monitoring_data: {e}")
 
+def check_monitoring_failsafe():
+    """
+    Simple failsafe: Check if monitoring should be running and restart if needed.
+    This runs periodically to catch any monitoring loop failures.
+    """
+    global monitoring_thread
+    
+    try:
+        # Check if there are active trades
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
+        active_count = cursor.fetchone()[0]
+        conn.close()
+        
+        # If there are active trades but no monitoring thread, restart it
+        if active_count > 0:
+            with monitoring_thread_lock:
+                if monitoring_thread is None or not monitoring_thread.is_alive():
+                    log(f"🔄 FAILSAFE: Found {active_count} active trades but monitoring not running, restarting...")
+                    start_monitoring_loop()
+        
+    except Exception as e:
+        log(f"❌ Error in monitoring failsafe check: {e}")
+
 def start_monitoring_loop():
     """
     Start monitoring loop when there are active trades.
@@ -1279,6 +1304,11 @@ def start_monitoring_loop():
                 if not hasattr(monitoring_worker, 'last_status_log') or current_time - monitoring_worker.last_status_log > 60:
                     log(f"📊 MONITORING: Checking {len(active_trades)} active trades")
                     monitoring_worker.last_status_log = current_time
+                
+                # Run failsafe check every 60 seconds
+                if not hasattr(monitoring_worker, 'last_failsafe_check') or current_time - monitoring_worker.last_failsafe_check > 60:
+                    check_monitoring_failsafe()
+                    monitoring_worker.last_failsafe_check = current_time
                 
                 # === AUTO STOP LOGIC ===
                 if is_auto_stop_enabled():
@@ -1511,6 +1541,9 @@ def start_event_driven_supervisor():
         while True:
             # Just keep the process running, no active polling
             time.sleep(60)  # Sleep for 1 minute, just to keep alive
+            
+            # Run failsafe check periodically
+            check_monitoring_failsafe()
     except KeyboardInterrupt:
         log("🛑 Active trade supervisor stopped by user")
     except Exception as e:
