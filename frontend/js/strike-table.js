@@ -731,6 +731,16 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
           const result = await response.json();
           console.log('Strike table trade initiated successfully:', result);
           
+          // Play audio alert for trade opening
+          if (typeof playSound === 'function') {
+            playSound('open');
+          }
+          
+          // Show visual popup
+          if (typeof showTradeOpenedPopup === 'function') {
+            showTradeOpenedPopup();
+          }
+          
           // Refresh panels to show new trade
           if (typeof fetchAndRenderTrades === 'function') {
             fetchAndRenderTrades();

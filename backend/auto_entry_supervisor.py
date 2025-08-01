@@ -20,7 +20,7 @@ from flask_cors import CORS
 
 # Import the universal centralized port system
 from backend.core.port_config import get_port
-from backend.util.paths import get_host, get_data_dir, get_service_url
+from backend.util.paths import get_host, get_data_dir, get_service_url, get_trade_history_dir
 
 # Get port from centralized system
 AUTO_ENTRY_SUPERVISOR_PORT = get_port("auto_entry_supervisor")

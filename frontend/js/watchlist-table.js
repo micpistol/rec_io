@@ -268,9 +268,17 @@ function maintainWatchlistProbabilityOrder(strikes) {
   // Combine the sorted categories (above 95% first, then under 95%)
   const sortedRows = [...above95, ...under95];
   
-  // Reorder rows in the DOM to match the sorted order
-  sortedRows.forEach(({ row }) => {
+  // Limit to top 5 results
+  const top5Rows = sortedRows.slice(0, 5);
+  
+  // Reorder rows in the DOM to match the sorted order (top 5 only)
+  top5Rows.forEach(({ row }) => {
     watchlistTableBody.appendChild(row);
+  });
+  
+  // Hide any rows beyond the top 5
+  sortedRows.slice(5).forEach(({ row }) => {
+    row.style.display = 'none';
   });
 }
 
@@ -310,7 +318,10 @@ function initializeWatchlistTableRows(strikes) {
   // Combine the sorted categories (above 95% first, then under 95%)
   const sortedStrikes = [...above95, ...under95];
   
-  sortedStrikes.forEach((strikeData) => {
+  // Limit to top 5 results
+  const top5Strikes = sortedStrikes.slice(0, 5);
+  
+  top5Strikes.forEach((strikeData) => {
     const row = document.createElement('tr');
     const strike = strikeData.strike;
     
@@ -460,6 +471,16 @@ function updateWatchlistBuyButton(spanEl, strike, side, askPrice, isActive, tick
         if (response.ok) {
           const result = await response.json();
           console.log('Watchlist trade initiated successfully:', result);
+          
+          // Play audio alert for trade opening
+          if (typeof playSound === 'function') {
+            playSound('open');
+          }
+          
+          // Show visual popup
+          if (typeof showTradeOpenedPopup === 'function') {
+            showTradeOpenedPopup();
+          }
           
           // Refresh panels to show new trade
           if (typeof fetchAndRenderTrades === 'function') {
