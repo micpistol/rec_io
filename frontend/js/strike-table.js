@@ -550,34 +550,76 @@ async function updateStrikeTable() {
 
 // === POSITION INDICATOR ===
 
+// Test function to manually check active trades
+window.testActiveTrades = async function() {
+  try {
+    console.log('[TEST] Testing active trades API...');
+    const tradesRes = await fetch('/api/active_trades', { cache: 'no-store' });
+    if (!tradesRes.ok) {
+      console.error('[TEST] API request failed:', tradesRes.status);
+      return;
+    }
+    
+    const data = await tradesRes.json();
+    const activeTrades = data.active_trades || [];
+    console.log('[TEST] Active trades found:', activeTrades.length);
+    
+    activeTrades.forEach(trade => {
+      const tradeStrike = parseFloat(trade.strike.replace(/[^\d.-]/g, ''));
+      console.log(`[TEST] Trade: ${trade.ticker}, Strike: ${trade.strike} -> parsed: ${tradeStrike}`);
+    });
+    
+    // Test specific strikes
+    const testStrikes = [115500, 114250, 115750];
+    testStrikes.forEach(strike => {
+      const hasPosition = activeTrades.some(trade => {
+        const tradeStrike = parseFloat(trade.strike.replace(/[^\d.-]/g, ''));
+        return tradeStrike === strike;
+      });
+      console.log(`[TEST] Strike ${strike} has position: ${hasPosition}`);
+    });
+    
+  } catch (e) {
+    console.error('[TEST] Error testing active trades:', e);
+  }
+};
+
 async function updatePositionIndicator(strikeCell, strike) {
   try {
-    // Fetch active trades to check for positions at this strike
-    const tradesRes = await fetch('/trades', { cache: 'no-store' });
+    // Fetch active trades from the active_trade_supervisor API endpoint
+    const tradesRes = await fetch('/api/active_trades', { cache: 'no-store' });
     if (!tradesRes.ok) return;
     
-    const trades = await tradesRes.json();
-    const activeTrades = trades.filter(trade => 
-      trade.status !== "closed" && 
-      trade.status !== "expired" &&
-      trade.status !== "error"
-    );
+    const data = await tradesRes.json();
+    const activeTrades = data.active_trades || [];
+    
+    // Debug logging
+    console.log(`[POSITION INDICATOR] Checking strike ${strike} against ${activeTrades.length} active trades`);
     
     // Check if any active trade has this strike
     const hasPosition = activeTrades.some(trade => {
       const tradeStrike = parseFloat(trade.strike.replace(/[^\d.-]/g, ''));
-      return tradeStrike === strike;
+      const matches = tradeStrike === strike;
+      if (matches) {
+        console.log(`[POSITION INDICATOR] ✅ Found match: trade strike ${tradeStrike} matches table strike ${strike}`);
+      }
+      return matches;
     });
+    
+    // Debug logging
+    console.log(`[POSITION INDICATOR] Strike ${strike} has position: ${hasPosition}`);
     
     // Update visual indicator
     if (hasPosition) {
       strikeCell.style.backgroundColor = '#1a2a1a'; // Very subtle green tint
       strikeCell.style.borderLeft = '3px solid #45d34a'; // Green left border
+      console.log(`[POSITION INDICATOR] ✅ Applied indicator to strike ${strike}`);
     } else {
       strikeCell.style.backgroundColor = '';
       strikeCell.style.borderLeft = '';
     }
   } catch (e) {
+    console.error(`[POSITION INDICATOR] Error checking position for strike ${strike}:`, e);
     strikeCell.style.backgroundColor = '';
     strikeCell.style.borderLeft = '';
   }

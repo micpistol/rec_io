@@ -1923,16 +1923,12 @@
         // Separate function to update only position indicators without redrawing table
         async function updatePositionIndicatorsOnly() {
             try {
-                // Fetch active trades to check for positions
-                const tradesRes = await fetch('/trades', { cache: 'no-store' });
+                // Fetch active trades from the active_trade_supervisor API endpoint
+                const tradesRes = await fetch('/api/active_trades', { cache: 'no-store' });
                 if (!tradesRes.ok) return;
                 
-                const trades = await tradesRes.json();
-                const activeTrades = trades.filter(trade => 
-                    trade.status !== "closed" && 
-                    trade.status !== "expired" &&
-                    trade.status !== "error"
-                );
+                const data = await tradesRes.json();
+                const activeTrades = data.active_trades || [];
                 
                 // Create a set of current active trade strikes
                 const currentActiveStrikes = new Set();
@@ -1982,16 +1978,12 @@
         
         async function updatePositionIndicator(strikeCell, strike) {
             try {
-                // Fetch active trades to check for positions at this strike
-                const tradesRes = await fetch('/trades', { cache: 'no-store' });
+                // Fetch active trades from the active_trade_supervisor API endpoint
+                const tradesRes = await fetch('/api/active_trades', { cache: 'no-store' });
                 if (!tradesRes.ok) return;
                 
-                const trades = await tradesRes.json();
-                const activeTrades = trades.filter(trade => 
-                    trade.status !== "closed" && 
-                    trade.status !== "expired" &&
-                    trade.status !== "error"
-                );
+                const data = await tradesRes.json();
+                const activeTrades = data.active_trades || [];
                 
                 // Create a set of current active trade strikes for comparison
                 const currentActiveStrikes = new Set();

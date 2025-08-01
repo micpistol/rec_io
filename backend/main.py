@@ -32,7 +32,9 @@ from backend.core.port_config import get_port, get_port_info
 
 # Get port from centralized system
 MAIN_APP_PORT = get_port("main_app")
+ACTIVE_TRADE_SUPERVISOR_PORT = get_port("active_trade_supervisor")
 print(f"[MAIN] 🚀 Using centralized port: {MAIN_APP_PORT}")
+print(f"[MAIN] 🚀 Active Trade Supervisor port: {ACTIVE_TRADE_SUPERVISOR_PORT}")
 
 # Import centralized path utilities
 from backend.util.paths import get_data_dir, get_trade_history_dir, get_accounts_data_dir
@@ -1029,7 +1031,22 @@ async def update_preferences(request: Request):
 
 @app.get("/api/get_preferences")
 async def get_preferences():
+    """Get current preferences"""
     return load_preferences()
+
+# === ACTIVE TRADES PROXY ROUTE ===
+@app.get("/api/active_trades")
+async def proxy_active_trades():
+    """Proxy route to forward active trades requests to the active trade supervisor"""
+    try:
+        # Forward request to active trade supervisor
+        response = requests.get(f"http://localhost:{ACTIVE_TRADE_SUPERVISOR_PORT}/api/active_trades", timeout=5)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return {"error": f"Active trade supervisor returned status {response.status_code}"}, response.status_code
+    except requests.exceptions.RequestException as e:
+        return {"error": f"Failed to connect to active trade supervisor: {str(e)}"}, 503
 
 # TRADE HISTORY PREFERENCES
 TRADE_HISTORY_PREFERENCES_PATH = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "trade_history_preferences.json")
