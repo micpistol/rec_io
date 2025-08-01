@@ -18,6 +18,28 @@ This guide walks you through deploying the REC.IO trading system on a completely
 
 ## 🔧 Step-by-Step Deployment
 
+### Option A: Single-Command Installation (Recommended)
+```bash
+# Complete installation with one command
+python scripts/INSTALL_SYSTEM.py
+
+# Or import existing user data
+python scripts/INSTALL_SYSTEM.py --import-user /path/to/user_data
+```
+
+**What the single install script does:**
+- ✅ Checks system requirements
+- ✅ Sets up Python virtual environment
+- ✅ Installs all dependencies
+- ✅ Creates data directories
+- ✅ Sets up new user or imports existing
+- ✅ Configures authentication system
+- ✅ Starts all services
+- ✅ Verifies system health
+- ✅ Launches frontend
+
+### Option B: Manual Step-by-Step Installation
+
 ### Step 1: Clone the Repository
 ```bash
 # Clone the repository
