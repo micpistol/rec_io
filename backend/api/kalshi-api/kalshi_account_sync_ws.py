@@ -140,31 +140,26 @@ LAST_SETTLEMENTS_HASH = None
 def notify_frontend_db_change(db_name: str, change_data: dict = None):
     """Send WebSocket notification to frontend about database changes"""
     try:
-        # Use aiohttp to send HTTP request to the main server's notification endpoint
-        async def send_notification():
-            async with aiohttp.ClientSession() as session:
-                from backend.util.paths import get_host
-                notification_url = f"http://{get_host()}:{config.get('main_app_port', 3000)}/api/notify_db_change"
-                payload = {
-                    "db_name": db_name,
-                    "timestamp": time.time(),
-                    "change_data": change_data or {}
-                }
-                async with session.post(notification_url, json=payload) as response:
-                    if response.status == 200:
-                        print(f"✅ Frontend notified of {db_name} change")
-                    else:
-                        print(f"⚠️ Failed to notify frontend: {response.status}")
+        # Use requests instead of aiohttp to avoid event loop conflicts
+        import requests
+        from backend.util.paths import get_host
+        from backend.core.config.settings import config
         
-        # Run the async function in a new event loop
-        try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(send_notification())
-        except Exception as e:
-            print(f"❌ Error notifying frontend: {e}")
+        notification_url = f"http://{get_host()}:{config.get('main_app_port', 3000)}/api/notify_db_change"
+        payload = {
+            "db_name": db_name,
+            "timestamp": time.time(),
+            "change_data": change_data or {}
+        }
+        
+        response = requests.post(notification_url, json=payload, timeout=5)
+        if response.status_code == 200:
+            print(f"✅ Frontend notified of {db_name} change")
+        else:
+            print(f"⚠️ Failed to notify frontend: {response.status_code}")
+            
     except Exception as e:
-        print(f"❌ Failed to send notification for {db_name}: {e}")
+        print(f"❌ Error notifying frontend: {e}")
 
 
 def get_current_event_ticker():

@@ -201,13 +201,24 @@ class KalshiMarketLifecycleWatchdog:
                 with open(self.lifecycle_data_file, 'r') as f:
                     existing_data = json.load(f)
             else:
-                existing_data = {"events": []}
+                existing_data = {"created_events": [], "events": []}
             
             # Add timestamp to the event
             event_with_timestamp = {
                 "received_at": datetime.now(EST).isoformat(),
                 "data": lifecycle_data
             }
+            
+            # Check if this is a "created" event and add to top list
+            if lifecycle_data.get("event_type") == "created":
+                # Add to created_events list at the top
+                existing_data["created_events"].append(event_with_timestamp)
+                
+                # Keep only last 50 created events to prevent list from growing too large
+                if len(existing_data["created_events"]) > 50:
+                    existing_data["created_events"] = existing_data["created_events"][-50:]
+                
+                print(f"[{datetime.now(EST)}] 🆕 CREATED EVENT ADDED TO TOP LIST!")
             
             # Add to events list
             existing_data["events"].append(event_with_timestamp)
@@ -232,21 +243,27 @@ class KalshiMarketLifecycleWatchdog:
             
             if data.get("type") == "market_lifecycle_v2":
                 lifecycle_data = data.get("msg", {})
+                market_ticker = lifecycle_data.get('market_ticker', '')
                 
-                print(f"\n[{datetime.now(EST)}] 🔄 MARKET LIFECYCLE RECEIVED!")
-                print(f"   Market Ticker: {lifecycle_data.get('market_ticker')}")
-                print(f"   Event Type: {lifecycle_data.get('event_type')}")
-                print(f"   Open TS: {lifecycle_data.get('open_ts')}")
-                print(f"   Close TS: {lifecycle_data.get('close_ts')}")
-                if lifecycle_data.get('additional_metadata'):
-                    metadata = lifecycle_data.get('additional_metadata', {})
-                    print(f"   Name: {metadata.get('name')}")
-                    print(f"   Title: {metadata.get('title')}")
-                    print(f"   Can Close Early: {metadata.get('can_close_early')}")
-                print("=" * 50)
-                
-                # Write to JSON file
-                await self.write_lifecycle_to_json(lifecycle_data)
+                # Only process KXBTC entries
+                if "KXBTC" in market_ticker:
+                    print(f"\n[{datetime.now(EST)}] 🔄 KXBTC MARKET LIFECYCLE RECEIVED!")
+                    print(f"   Market Ticker: {market_ticker}")
+                    print(f"   Event Type: {lifecycle_data.get('event_type')}")
+                    print(f"   Open TS: {lifecycle_data.get('open_ts')}")
+                    print(f"   Close TS: {lifecycle_data.get('close_ts')}")
+                    if lifecycle_data.get('additional_metadata'):
+                        metadata = lifecycle_data.get('additional_metadata', {})
+                        print(f"   Name: {metadata.get('name')}")
+                        print(f"   Title: {metadata.get('title')}")
+                        print(f"   Can Close Early: {metadata.get('can_close_early')}")
+                    print("=" * 50)
+                    
+                    # Write to JSON file
+                    await self.write_lifecycle_to_json(lifecycle_data)
+                else:
+                    # Log non-KXBTC entries but don't write them
+                    print(f"[{datetime.now(EST)}] ⚠️ Non-KXBTC lifecycle ignored: {market_ticker}")
                 
             elif data.get("type") == "subscribed":
                 print(f"[{datetime.now(EST)}] ✅ Subscription confirmed: {data}")
