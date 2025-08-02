@@ -371,6 +371,21 @@ async function updateStrikeTable() {
       await initializeStrikeTable(base);
     }
 
+    // Check if we need to re-center the table due to price drift
+    if (window.strikeRowsMap && window.strikeRowsMap.size > 0) {
+      const currentCenterStrike = [...window.strikeRowsMap.keys()].sort((a, b) => a - b)[Math.floor(window.strikeRowsMap.size / 2)];
+      const strikeTier = strikeTableData.strike_tier || 250;
+      const priceDrift = Math.abs(currentPrice - currentCenterStrike);
+
+      if (priceDrift > 2 * strikeTier) {
+        console.log('🔄 Price drift detected. Re-centering strike table...');
+        const newBase = Math.round(currentPrice / strikeTier) * strikeTier;
+        await initializeStrikeTable(newBase);
+        setTimeout(updateStrikeTable, 50);
+        return;
+      }
+    }
+
     // Update each strike row with pre-calculated data
     window.strikeRowsMap.forEach((cells, strike) => {
       const { row, bufferTd, bmTd, probTd, yesSpan, noSpan } = cells;
