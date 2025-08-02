@@ -1,1 +1,32 @@
-
+{
+  "created_events": [],
+  "events": [
+    {
+      "received_at": "2025-08-01T22:01:11.364911-04:00",
+      "data": {
+        "market_ticker": "KXBTCD-25AUG0122-T122999.99",
+        "determination_ts": 1754100071,
+        "result": "no",
+        "event_type": "determined"
+      }
+    },
+    {
+      "received_at": "2025-08-01T22:01:11.365237-04:00",
+      "data": {
+        "market_ticker": "KXBTCD-25AUG0122-T110999.99",
+        "determination_ts": 1754100071,
+        "result": "yes",
+        "event_type": "determined"
+      }
+    },
+    {
+      "received_at": "2025-08-01T22:01:11.365404-04:00",
+      "data": {
+        "market_ticker": "KXBTCD-25AUG0122-T124499.99",
+        "determination_ts": 1754100071,
+        "result": "no",
+        "event_type": "determined"
+      }
+    }
+  ]
+}}

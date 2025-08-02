@@ -123,12 +123,16 @@
           <div id="trade-count" style="font-size: 18px; font-weight: bold; color: white;">0</div>
         </div>
         <div style="text-align: center;">
+          <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">W/L %</div>
+          <div id="win-loss-percentage" style="font-size: 18px; font-weight: bold; color: white;">0%</div>
+        </div>
+        <div style="text-align: center;">
           <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">Avg Prob</div>
           <div id="avg-prob" style="font-size: 18px; font-weight: bold; color: white;">0.00</div>
         </div>
         <div style="text-align: center;">
-          <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">W/L %</div>
-          <div id="win-loss-percentage" style="font-size: 18px; font-weight: bold; color: white;">0%</div>
+          <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">Avg Buy</div>
+          <div id="avg-buy" style="font-size: 18px; font-weight: bold; color: white;">0.00</div>
         </div>
         <div style="text-align: center;">
           <div style="font-size: 12px; color: #ccc; margin-bottom: 5px;">Avg Diff</div>
@@ -371,6 +375,7 @@
       const tradeCountEl = document.getElementById('trade-count');
       const avgProbEl = document.getElementById('avg-prob');
       const winLossEl = document.getElementById('win-loss-percentage');
+      const avgBuyEl = document.getElementById('avg-buy');
       const avgDiffEl = document.getElementById('avg-diff');
       const retPercentageEl = document.getElementById('ret-percentage');
       const totalPnlEl = document.getElementById('total-pnl');
@@ -379,6 +384,7 @@
         tradeCountEl.textContent = '0';
         avgProbEl.textContent = '0.00';
         winLossEl.textContent = '0%';
+        avgBuyEl.textContent = '0.00';
         avgDiffEl.textContent = '0.00';
         retPercentageEl.textContent = '0.00%';
         totalPnlEl.textContent = '$0.00';
@@ -432,6 +438,20 @@
       });
       const avgDiff = diffCount > 0 ? (totalDiff / diffCount) : 0;
       
+      // Calculate average buy price
+      let totalBuy = 0;
+      let buyCount = 0;
+      trades.forEach(trade => {
+        if (trade.buy_price !== null && trade.buy_price !== undefined && trade.buy_price !== '') {
+          const buyPrice = Number(trade.buy_price);
+          if (!isNaN(buyPrice)) {
+            totalBuy += buyPrice;
+            buyCount++;
+          }
+        }
+      });
+      const avgBuy = buyCount > 0 ? (totalBuy / buyCount) : 0;
+      
       // Calculate Ret %: total PNL + FEES PAID, display as percent (e.g., $5.00 is 5.00%)
       let totalPnl = 0;
       let totalFees = 0;
@@ -467,6 +487,7 @@
       tradeCountEl.textContent = tradeCount.toString();
       avgProbEl.textContent = `${avgProb.toFixed(1)}%`;
       winLossEl.textContent = `${winPercentage.toFixed(1)}%`;
+      avgBuyEl.textContent = `${avgBuy.toFixed(2)}`;
       avgDiffEl.textContent = `${avgDiff > 0 ? '+' : ''}${avgDiff.toFixed(1)}`;
       retPercentageEl.textContent = retPercentage;
       totalPnlEl.textContent = `$${totalPnlDisplay.toFixed(2)}`;
