@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-System Monitor
-Monitors system health and performance metrics.
+System Monitor - Simplified Version
+Monitors system health and performance metrics without aggressive restart logic.
 """
 
 import os
@@ -28,9 +28,9 @@ from backend.util.paths import get_data_dir, get_trade_history_dir, get_price_hi
 
 class SystemMonitor:
     def __init__(self):
-        self.monitoring_interval = 30  # seconds
+        self.monitoring_interval = 120  # seconds (increased to 2 minutes)
         self.health_history = []
-        self.max_history = 100
+        self.max_history = 50  # reduced history size
         
         # Get service URLs using bulletproof port manager
         self.service_urls = {
@@ -173,87 +173,6 @@ class SystemMonitor:
         except Exception as e:
             return {"status": "error", "error": str(e)}
     
-    def check_duplicate_services(self) -> Dict[str, Any]:
-        """Check for duplicate services running outside of supervisor."""
-        critical_services = [
-            # Core trading system
-            "main_app",
-            "trade_manager", 
-            "trade_executor",
-            "auto_entry_supervisor",
-            "active_trade_supervisor",
-            
-            # Price and data services
-            "btc_price_watchdog",
-            
-            # Kalshi API services
-            "kalshi_account_sync",
-            "kalshi_api_watchdog",
-            
-            # System management (EXCLUDING system_monitor to prevent self-destruction)
-            "cascading_failure_detector",
-            "unified_production_coordinator"
-            # "system_monitor" - REMOVED to prevent self-destruction
-        ]
-        
-        duplicates_found = {}
-        
-        for service in critical_services:
-            try:
-                # Check for processes by name
-                processes = []
-                for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                    try:
-                        if proc.info['cmdline']:
-                            cmdline = ' '.join(proc.info['cmdline'])
-                            if service in cmdline and 'python' in cmdline:
-                                processes.append({
-                                    'pid': proc.info['pid'],
-                                    'cmdline': cmdline
-                                })
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        continue
-                
-                if len(processes) > 1:
-                    duplicates_found[service] = {
-                        "count": len(processes),
-                        "processes": processes,
-                        "warning": f"Found {len(processes)} instances of {service}"
-                    }
-                elif len(processes) == 1:
-                    # Check if this single process is managed by supervisor
-                    try:
-                        supervisor_result = subprocess.run(
-                            ["supervisorctl", "-c", "backend/supervisord.conf", "status", service],
-                            capture_output=True, text=True, timeout=5
-                        )
-                        
-                        if "RUNNING" not in supervisor_result.stdout:
-                            duplicates_found[service] = {
-                                "count": 1,
-                                "processes": processes,
-                                "warning": f"Found {service} running outside supervisor"
-                            }
-                    except Exception:
-                        # If supervisor check fails, assume it's a duplicate
-                        duplicates_found[service] = {
-                            "count": 1,
-                            "processes": processes,
-                            "warning": f"Found {service} running (supervisor check failed)"
-                        }
-                        
-            except Exception as e:
-                duplicates_found[service] = {
-                    "error": str(e),
-                    "warning": f"Error checking {service}"
-                }
-        
-        return {
-            "status": "healthy" if not duplicates_found else "warning",
-            "duplicates": duplicates_found,
-            "timestamp": datetime.now().isoformat()
-        }
-    
     def check_all_services_status(self) -> Dict[str, Any]:
         """Check status of ALL core services via supervisor."""
         all_services = [
@@ -271,10 +190,10 @@ class SystemMonitor:
             "kalshi_account_sync",
             "kalshi_api_watchdog",
             
-            # System management (EXCLUDING system_monitor to prevent self-destruction)
+            # System management
             "cascading_failure_detector",
-            "unified_production_coordinator"
-            # "system_monitor" - REMOVED to prevent self-destruction
+            "unified_production_coordinator",
+            "system_monitor"
         ]
         
         service_status = {}
@@ -322,131 +241,6 @@ class SystemMonitor:
             "timestamp": datetime.now().isoformat()
         }
     
-    def kill_duplicate_processes(self, service_name: str, processes: List[Dict]) -> bool:
-        """Kill all duplicate processes for a service."""
-        try:
-            print(f"🔫 Killing {len(processes)} duplicate processes for {service_name}")
-            
-            for process_info in processes:
-                pid = process_info['pid']
-                try:
-                    proc = psutil.Process(pid)
-                    proc.terminate()
-                    print(f"  ✅ Terminated process {pid}")
-                except psutil.NoSuchProcess:
-                    print(f"  ⚠️ Process {pid} already terminated")
-                except Exception as e:
-                    print(f"  ❌ Failed to terminate process {pid}: {e}")
-                    return False
-            
-            # Wait a moment for processes to terminate
-            time.sleep(2)
-            
-            # Force kill any remaining processes
-            for process_info in processes:
-                pid = process_info['pid']
-                try:
-                    proc = psutil.Process(pid)
-                    if proc.is_running():
-                        proc.kill()
-                        print(f"  🔥 Force killed process {pid}")
-                except psutil.NoSuchProcess:
-                    pass
-                except Exception as e:
-                    print(f"  ❌ Failed to force kill process {pid}: {e}")
-                    return False
-            
-            return True
-        except Exception as e:
-            print(f"❌ Error killing duplicate processes for {service_name}: {e}")
-            return False
-    
-    def restart_service_via_supervisor(self, service_name: str) -> bool:
-        """Restart a service via supervisor."""
-        try:
-            print(f"🔄 Restarting {service_name} via supervisor")
-            
-            # Stop the service
-            stop_result = subprocess.run(
-                ["supervisorctl", "-c", "backend/supervisord.conf", "stop", service_name],
-                capture_output=True, text=True, timeout=10
-            )
-            
-            if stop_result.returncode != 0:
-                print(f"  ⚠️ Warning: Failed to stop {service_name}: {stop_result.stderr}")
-            
-            # Wait a moment
-            time.sleep(2)
-            
-            # Start the service
-            start_result = subprocess.run(
-                ["supervisorctl", "-c", "backend/supervisord.conf", "start", service_name],
-                capture_output=True, text=True, timeout=10
-            )
-            
-            if start_result.returncode == 0:
-                print(f"  ✅ Successfully restarted {service_name}")
-                return True
-            else:
-                print(f"  ❌ Failed to restart {service_name}: {start_result.stderr}")
-                return False
-                
-        except Exception as e:
-            print(f"❌ Error restarting {service_name}: {e}")
-            return False
-    
-    def perform_master_restart(self) -> bool:
-        """Perform a master restart of the entire system."""
-        try:
-            print("🚨 PERFORMING MASTER RESTART - This will restart all services")
-            
-            # Run the master restart script
-            restart_result = subprocess.run(
-                ["./scripts/MASTER_RESTART.sh"],
-                capture_output=True, text=True, timeout=60
-            )
-            
-            if restart_result.returncode == 0:
-                print("✅ Master restart completed successfully")
-                return True
-            else:
-                print(f"❌ Master restart failed: {restart_result.stderr}")
-                return False
-                
-        except Exception as e:
-            print(f"❌ Error during master restart: {e}")
-            return False
-    
-    def handle_duplicate_service(self, service_name: str, duplicate_info: Dict) -> bool:
-        """Handle a duplicate service by killing duplicates and restarting properly."""
-        try:
-            print(f"🚨 HANDLING DUPLICATE SERVICE: {service_name}")
-            print(f"   {duplicate_info['warning']}")
-            
-            # Step 1: Kill all duplicate processes
-            processes = duplicate_info.get('processes', [])
-            if not self.kill_duplicate_processes(service_name, processes):
-                print(f"❌ Failed to kill duplicate processes for {service_name}")
-                return False
-            
-            # Step 2: Wait a moment for cleanup
-            time.sleep(3)
-            
-            # Step 3: Try to restart the service via supervisor
-            if self.restart_service_via_supervisor(service_name):
-                print(f"✅ Successfully handled duplicate {service_name}")
-                return True
-            else:
-                print(f"❌ Failed to restart {service_name} via supervisor")
-                
-                # Step 4: If restart fails, perform master restart
-                print(f"🚨 Initiating master restart due to {service_name} restart failure")
-                return self.perform_master_restart()
-                
-        except Exception as e:
-            print(f"❌ Error handling duplicate service {service_name}: {e}")
-            return False
-    
     def generate_health_report(self) -> Dict[str, Any]:
         """Generate comprehensive health report."""
         report = {
@@ -454,7 +248,6 @@ class SystemMonitor:
             "system_resources": self.check_system_resources(),
             "database_health": self.check_database_health(),
             "supervisor_status": self.check_supervisor_status(),
-            "duplicate_services": self.check_duplicate_services(),
             "all_services_status": self.check_all_services_status(),
             "services": {},
             "port_assignments": list_all_ports()
@@ -489,9 +282,9 @@ class SystemMonitor:
     
     def run_monitoring_loop(self):
         """Run continuous monitoring loop."""
-        print("🚀 Starting Trading System Monitor...")
+        print("🚀 Starting Trading System Monitor (Simplified)...")
         sys.stdout.flush()
-        print(f"Monitoring {len(self.service_urls)} services")
+        print(f"Monitoring {len(self.service_urls)} services every {self.monitoring_interval} seconds")
         sys.stdout.flush()
         print()
         sys.stdout.flush()
@@ -534,8 +327,7 @@ class SystemMonitor:
                     "Core Trading": ["main_app", "trade_manager", "trade_executor", "auto_entry_supervisor", "active_trade_supervisor"],
                     "Data Services": ["btc_price_watchdog"],
                     "Kalshi API": ["kalshi_account_sync", "kalshi_api_watchdog"],
-                    "System Management": ["cascading_failure_detector", "unified_production_coordinator"]
-                    # "system_monitor" - REMOVED to prevent self-destruction
+                    "System Management": ["cascading_failure_detector", "unified_production_coordinator", "system_monitor"]
                 }
                 
                 for category, services in service_categories.items():
@@ -567,60 +359,6 @@ class SystemMonitor:
                     print(f"  {status_icon} {service_name} (port {port}): {service_status['status']}")
                     sys.stdout.flush()
                 
-                # Duplicate service warnings and handling
-                duplicate_check = report["duplicate_services"]
-                if duplicate_check["status"] == "warning":
-                    print("\n⚠️  DUPLICATE SERVICE WARNINGS:")
-                    sys.stdout.flush()
-                    for service, details in duplicate_check["duplicates"].items():
-                        print(f"  🚨 {service}: {details['warning']}")
-                        sys.stdout.flush()
-                        if "processes" in details:
-                            for proc in details["processes"]:
-                                print(f"      PID {proc['pid']}: {proc['cmdline'][:80]}...")
-                                sys.stdout.flush()
-                    
-                    # Handle duplicates automatically
-                    print("\n🔧 AUTOMATICALLY HANDLING DUPLICATE SERVICES...")
-                    sys.stdout.flush()
-                    for service, details in duplicate_check["duplicates"].items():
-                        if self.handle_duplicate_service(service, details):
-                            print(f"✅ Successfully resolved duplicate {service}")
-                            sys.stdout.flush()
-                        else:
-                            print(f"❌ Failed to resolve duplicate {service}")
-                            sys.stdout.flush()
-                    
-                    # Wait longer after handling duplicates
-                    print("⏳ Waiting 10 seconds after duplicate handling...")
-                    sys.stdout.flush()
-                    time.sleep(10)
-                else:
-                    print("\n✅ No duplicate services detected")
-                    sys.stdout.flush()
-                
-                # Check trade preferences safety
-                safety_status = self.check_trade_preferences_safety(report)
-                print(f"\n🛡️ TRADE PREFERENCES SAFETY STATUS:")
-                print(f"   Automated Trading Enabled: {safety_status['automated_trading_enabled']}")
-                print(f"   Safety Triggered: {safety_status['safety_triggered']}")
-                print(f"   Disabled Features: {', '.join(safety_status['disabled_features'])}")
-                print(f"   Reason: {safety_status['reason']}")
-                
-                if safety_status['recovery_attempted']:
-                    recovery = safety_status['recovery_status']
-                    print(f"   Recovery Attempted: ✅")
-                    print(f"   Services Restarted: {', '.join(recovery['successful_restarts'])}")
-                    if recovery['failed_restarts']:
-                        print(f"   Failed Restarts: {', '.join(recovery['failed_restarts'])}")
-                    if recovery['sms_sent']:
-                        print(f"   SMS Alert: ✅ Sent")
-                    else:
-                        print(f"   SMS Alert: ❌ Not sent")
-                
-                print(f"   Timestamp: {safety_status['timestamp']}")
-                sys.stdout.flush()
-                
                 print("\n" + "=" * 60)
                 sys.stdout.flush()
                 time.sleep(self.monitoring_interval)
@@ -632,295 +370,6 @@ class SystemMonitor:
             print(f"❌ Monitoring error: {e}")
             sys.stdout.flush()
             sys.stderr.flush()
-
-    def check_trade_preferences_safety(self, report: Dict[str, Any]) -> Dict[str, Any]:
-        """Check if automated trading should be disabled due to system issues."""
-        safety_status = {
-            "automated_trading_enabled": True,
-            "safety_triggered": False,
-            "disabled_features": [],
-            "reason": None,
-            "recovery_attempted": False,
-            "recovery_status": None,
-            "timestamp": datetime.now().isoformat()
-        }
-        
-        # Check if any critical services are down
-        critical_services_down = []
-        all_services = report.get("all_services_status", {})
-        services = all_services.get("services", {})
-        
-        # Define critical services that must be running for safe automated trading
-        critical_services = [
-            "main_app",           # Core web interface
-            "trade_manager",       # Trade management
-            "trade_executor",      # Trade execution
-            "active_trade_supervisor",  # Active trade monitoring
-            "btc_price_watchdog", # Price data
-            "kalshi_account_sync", # Kalshi API sync
-            "kalshi_api_watchdog" # Kalshi API monitoring
-        ]
-        
-        for service in critical_services:
-            if service in services:
-                service_status = services[service]
-                if service_status.get("status") != "running":
-                    critical_services_down.append(service)
-            else:
-                critical_services_down.append(service)
-        
-        # Check database health
-        db_health = report.get("database_health", {})
-        trades_db_unhealthy = db_health.get("trades_db", {}).get("status") != "healthy"
-        price_db_unhealthy = db_health.get("price_db", {}).get("status") != "healthy"
-        
-        # Determine if safety measures should be triggered
-        if critical_services_down or trades_db_unhealthy or price_db_unhealthy:
-            safety_status["safety_triggered"] = True
-            safety_status["automated_trading_enabled"] = False
-            
-            if critical_services_down:
-                safety_status["disabled_features"] = ["auto_entry", "auto_stop"]
-                safety_status["reason"] = f"Critical services down: {', '.join(critical_services_down)}"
-                
-                # Disable automated trading immediately
-                self.disable_automated_trading(safety_status["disabled_features"])
-                
-                # Attempt to restart failed services
-                print(f"🔄 ATTEMPTING SERVICE RECOVERY for: {', '.join(critical_services_down)}")
-                sys.stdout.flush()
-                
-                recovery_status = self.attempt_service_recovery(critical_services_down)
-                safety_status["recovery_attempted"] = True
-                safety_status["recovery_status"] = recovery_status
-                
-                # If all services recovered successfully, re-enable trading
-                if not recovery_status["failed_restarts"] and recovery_status["successful_restarts"]:
-                    print("✅ All critical services recovered successfully")
-                    sys.stdout.flush()
-                    self.enable_automated_trading_if_safe()
-                    safety_status["automated_trading_enabled"] = True
-                    safety_status["safety_triggered"] = False
-                
-            elif trades_db_unhealthy:
-                safety_status["disabled_features"] = ["auto_entry", "auto_stop"]
-                safety_status["reason"] = "Trades database unhealthy"
-                self.disable_automated_trading(safety_status["disabled_features"])
-                
-            elif price_db_unhealthy:
-                safety_status["disabled_features"] = ["auto_entry", "auto_stop"]
-                safety_status["reason"] = "Price database unhealthy"
-                self.disable_automated_trading(safety_status["disabled_features"])
-        else:
-            # All systems are healthy - check if we need to re-enable trading
-            self.enable_automated_trading_if_safe()
-        
-        return safety_status
-    
-    def enable_automated_trading_if_safe(self) -> bool:
-        """Re-enable automated trading if it was previously disabled for safety."""
-        try:
-            import json
-            
-            # Path to trade preferences
-            prefs_path = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "trade_preferences.json")
-            
-            # Read current preferences
-            if os.path.exists(prefs_path):
-                with open(prefs_path, 'r') as f:
-                    prefs = json.load(f)
-            else:
-                return False
-            
-            # Check if auto_entry or auto_stop are disabled
-            changes_made = False
-            if prefs.get("auto_entry") is False:
-                prefs["auto_entry"] = True
-                changes_made = True
-                print("✅ RE-ENABLED auto_entry - all systems healthy")
-                sys.stdout.flush()
-            
-            if prefs.get("auto_stop") is False:
-                prefs["auto_stop"] = True
-                changes_made = True
-                print("✅ RE-ENABLED auto_stop - all systems healthy")
-                sys.stdout.flush()
-            
-            # Write back to file if changes were made
-            if changes_made:
-                # Create backup first
-                backup_path = f"{prefs_path}.backup.{int(time.time())}"
-                with open(backup_path, 'w') as f:
-                    json.dump(prefs, f, indent=2)
-                
-                # Write updated preferences
-                with open(prefs_path, 'w') as f:
-                    json.dump(prefs, f, indent=2)
-                
-                print(f"✅ Re-enabled automated trading (backup: {backup_path})")
-                sys.stdout.flush()
-                return True
-                
-        except Exception as e:
-            print(f"❌ Error re-enabling automated trading: {e}")
-            sys.stdout.flush()
-            return False
-    
-    def disable_automated_trading(self, features_to_disable: List[str]) -> bool:
-        """Disable automated trading features in trade_preferences.json."""
-        try:
-            import json
-            
-            # Path to trade preferences
-            prefs_path = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "trade_preferences.json")
-            
-            # Read current preferences
-            if os.path.exists(prefs_path):
-                with open(prefs_path, 'r') as f:
-                    prefs = json.load(f)
-            else:
-                print(f"⚠️ Trade preferences file not found: {prefs_path}")
-                return False
-            
-            # Check if changes are needed
-            changes_made = False
-            for feature in features_to_disable:
-                if feature in prefs and prefs[feature] is True:
-                    prefs[feature] = False
-                    changes_made = True
-                    print(f"🛡️ DISABLED {feature} due to system safety concerns")
-                    sys.stdout.flush()
-            
-            # Write back to file if changes were made
-            if changes_made:
-                # Create backup first
-                backup_path = f"{prefs_path}.backup.{int(time.time())}"
-                with open(backup_path, 'w') as f:
-                    json.dump(prefs, f, indent=2)
-                
-                # Write updated preferences
-                with open(prefs_path, 'w') as f:
-                    json.dump(prefs, f, indent=2)
-                
-                print(f"✅ Updated trade preferences (backup: {backup_path})")
-                sys.stdout.flush()
-                return True
-            else:
-                print("ℹ️ No changes needed to trade preferences")
-                sys.stdout.flush()
-                return True
-                
-        except Exception as e:
-            print(f"❌ Error disabling automated trading: {e}")
-            sys.stdout.flush()
-            return False
-
-    def send_sms_alert(self, message: str) -> bool:
-        """Send SMS alert to the phone number in user settings using Verizon email-to-SMS gateway."""
-        try:
-            import json
-            import smtplib
-            from email.mime.text import MIMEText
-            from email.mime.multipart import MIMEMultipart
-            
-            # Get user settings to find phone number
-            user_settings_path = os.path.join(get_data_dir(), "users", "user_0001", "user_info.json")
-            
-            if not os.path.exists(user_settings_path):
-                print(f"⚠️ User settings file not found: {user_settings_path}")
-                return False
-            
-            with open(user_settings_path, 'r') as f:
-                user_settings = json.load(f)
-            
-            phone_number = user_settings.get("phone")
-            if not phone_number:
-                print("⚠️ No phone number found in user settings")
-                return False
-            
-            # Clean phone number (remove spaces, parentheses, etc.)
-            clean_phone = ''.join(filter(str.isdigit, phone_number))
-            
-            # Ensure it's a 10-digit number
-            if len(clean_phone) == 11 and clean_phone.startswith('1'):
-                clean_phone = clean_phone[1:]
-            elif len(clean_phone) != 10:
-                print(f"❌ Invalid phone number format: {phone_number}")
-                return False
-            
-            # Verizon email-to-SMS gateway
-            verizon_email = f"{clean_phone}@vtext.com"
-            
-            print(f"📱 Sending SMS via Verizon gateway: {verizon_email}")
-            print(f"📤 Message: {message}")
-            
-            # Create message
-            msg = MIMEMultipart()
-            msg['From'] = "rec_io_system@localhost"
-            msg['To'] = verizon_email
-            msg['Subject'] = "REC IO System Alert"
-            
-            # Add body
-            body = f"REC IO System Alert:\n\n{message}\n\nSent at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            msg.attach(MIMEText(body, 'plain'))
-            
-            # Try to send the email using local SMTP
-            try:
-                server = smtplib.SMTP('localhost', 25)
-                server.send_message(msg)
-                server.quit()
-                print("✅ SMS sent successfully via Verizon email gateway")
-                return True
-            except Exception as e:
-                print(f"⚠️ Could not send via SMTP: {e}")
-                print("📧 Email gateway configured but requires SMTP setup")
-                print(f"📧 Would send to: {verizon_email}")
-                print(f"📧 Subject: {msg['Subject']}")
-                print(f"📧 Body: {body}")
-                return False
-                
-        except Exception as e:
-            print(f"❌ Error sending SMS alert: {e}")
-            return False
-    
-    def attempt_service_recovery(self, failed_services: List[str]) -> Dict[str, Any]:
-        """Attempt to restart failed services and return recovery status."""
-        recovery_status = {
-            "attempted_restarts": [],
-            "successful_restarts": [],
-            "failed_restarts": [],
-            "sms_sent": False
-        }
-        
-        for service in failed_services:
-            print(f"🔄 Attempting to restart {service}...")
-            sys.stdout.flush()
-            
-            recovery_status["attempted_restarts"].append(service)
-            
-            if self.restart_service_via_supervisor(service):
-                recovery_status["successful_restarts"].append(service)
-                print(f"✅ Successfully restarted {service}")
-                sys.stdout.flush()
-            else:
-                recovery_status["failed_restarts"].append(service)
-                print(f"❌ Failed to restart {service}")
-                sys.stdout.flush()
-        
-        # If any services failed to restart, send SMS alert
-        if recovery_status["failed_restarts"]:
-            failed_services_str = ", ".join(recovery_status["failed_restarts"])
-            sms_message = f"🚨 TRADING SYSTEM ALERT: Critical services failed to restart: {failed_services_str}. Automated trading has been disabled for safety."
-            
-            if self.send_sms_alert(sms_message):
-                recovery_status["sms_sent"] = True
-                print("📱 SMS alert sent successfully")
-                sys.stdout.flush()
-            else:
-                print("❌ Failed to send SMS alert")
-                sys.stdout.flush()
-        
-        return recovery_status
 
 if __name__ == "__main__":
     monitor = SystemMonitor()
