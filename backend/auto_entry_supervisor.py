@@ -60,12 +60,8 @@ auto_entry_indicator_state = {
 # Track previous state to detect changes
 previous_indicator_state = None
 
-# SPIKE ALERT constants (defaults - will be overridden by settings)
-SPIKE_THRESHOLD_HIGH = 40
-SPIKE_THRESHOLD_LOW = -40
-RECOVERY_THRESHOLD_HIGH = 30
-RECOVERY_THRESHOLD_LOW = -30
-RECOVERY_DURATION_MINUTES = 15
+# SPIKE ALERT constants - NO DEFAULTS, must get from settings
+# These will be loaded from auto_entry_settings.json
 
 def log(message: str):
     """Log messages with timestamp"""
@@ -175,12 +171,27 @@ def check_spike_alert_conditions():
         # Update current momentum in loaded state
         state["current_momentum"] = current_momentum
         
-        # Get spike alert settings from auto entry settings
+        # Get spike alert settings from auto entry settings - NO DEFAULTS
         settings = get_auto_entry_settings()
-        spike_alert_enabled = settings.get("spike_alert_enabled", True)
-        spike_threshold = settings.get("spike_alert_momentum_threshold", 40)
-        cooldown_threshold = settings.get("spike_alert_cooldown_threshold", 30)
-        cooldown_minutes = settings.get("spike_alert_cooldown_minutes", 15)
+        
+        # Check if all required spike alert settings exist
+        required_settings = [
+            "spike_alert_enabled",
+            "spike_alert_momentum_threshold", 
+            "spike_alert_cooldown_threshold",
+            "spike_alert_cooldown_minutes"
+        ]
+        
+        missing_settings = [setting for setting in required_settings if setting not in settings]
+        if missing_settings:
+            log(f"[SPIKE ALERT] ❌ Missing required settings: {missing_settings}")
+            log(f"[SPIKE ALERT] Cannot proceed without complete settings configuration")
+            return
+        
+        spike_alert_enabled = settings["spike_alert_enabled"]
+        spike_threshold = settings["spike_alert_momentum_threshold"]
+        cooldown_threshold = settings["spike_alert_cooldown_threshold"]
+        cooldown_minutes = settings["spike_alert_cooldown_minutes"]
         
         # Skip spike alert if disabled
         if not spike_alert_enabled:
@@ -331,29 +342,20 @@ def is_auto_entry_enabled():
     return False
 
 def get_auto_entry_settings():
-    """Get auto entry settings from auto_entry_settings.json"""
+    """Get auto entry settings from auto_entry_settings.json - NO DEFAULTS"""
     settings_path = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_entry_settings.json")
     if os.path.exists(settings_path):
         try:
             with open(settings_path, "r") as f:
                 settings = json.load(f)
-                result = {
-                    "min_time": settings.get("min_time", 0),
-                    "max_time": settings.get("max_time", 3600),
-                    "min_probability": settings.get("min_probability", 25),
-                    "min_differential": settings.get("min_differential", 0),
-                    "allow_re_entry": settings.get("allow_re_entry", False)
-                }
-                return result
+                log(f"[AUTO ENTRY] Loaded settings from {settings_path}")
+                return settings
         except Exception as e:
             log(f"[AUTO ENTRY] Error reading settings: {e}")
-    return {
-        "min_time": 0,
-        "max_time": 3600,
-        "min_probability": 25,
-        "min_differential": 0,
-        "allow_re_entry": False
-    }
+            return {}
+    else:
+        log(f"[AUTO ENTRY] Settings file not found at {settings_path}")
+        return {}
 
 def get_current_ttc():
     """Get current TTC from unified TTC endpoint"""
@@ -619,8 +621,17 @@ def check_auto_entry_conditions():
             broadcast_auto_entry_indicator_change()
             return
         
-        # Get auto entry settings
+        # Get auto entry settings - NO DEFAULTS
         settings = get_auto_entry_settings()
+        
+        # Check if all required settings exist
+        required_settings = ["min_time", "max_time", "min_probability", "min_differential"]
+        missing_settings = [setting for setting in required_settings if setting not in settings]
+        if missing_settings:
+            log(f"[AUTO ENTRY] ❌ Missing required settings: {missing_settings}")
+            log(f"[AUTO ENTRY] Cannot proceed without complete settings configuration")
+            return
+        
         min_time = settings["min_time"]
         max_time = settings["max_time"]
         min_probability = settings["min_probability"]
@@ -885,10 +896,10 @@ def get_auto_entry_scanning_status():
             "current_ttc": current_ttc,
             "settings": settings,
             "spike_alert_settings": {
-                "enabled": settings.get("spike_alert_enabled", True),
-                "momentum_threshold": settings.get("spike_alert_momentum_threshold", 40),
-                "cooldown_threshold": settings.get("spike_alert_cooldown_threshold", 30),
-                "cooldown_minutes": settings.get("spike_alert_cooldown_minutes", 15)
+                "enabled": settings.get("spike_alert_enabled"),
+                "momentum_threshold": settings.get("spike_alert_momentum_threshold"),
+                "cooldown_threshold": settings.get("spike_alert_cooldown_threshold"),
+                "cooldown_minutes": settings.get("spike_alert_cooldown_minutes")
             },
             "cooldown_entries_count": len(last_trade_times),
             "monitoring_thread_alive": service_healthy,
@@ -937,10 +948,10 @@ def spike_alert_settings():
         if request.method == 'GET':
             settings = get_auto_entry_settings()
             return jsonify({
-                "spike_alert_enabled": settings.get("spike_alert_enabled", True),
-                "spike_alert_momentum_threshold": settings.get("spike_alert_momentum_threshold", 40),
-                "spike_alert_cooldown_threshold": settings.get("spike_alert_cooldown_threshold", 30),
-                "spike_alert_cooldown_minutes": settings.get("spike_alert_cooldown_minutes", 15)
+                "spike_alert_enabled": settings.get("spike_alert_enabled"),
+                "spike_alert_momentum_threshold": settings.get("spike_alert_momentum_threshold"),
+                "spike_alert_cooldown_threshold": settings.get("spike_alert_cooldown_threshold"),
+                "spike_alert_cooldown_minutes": settings.get("spike_alert_cooldown_minutes")
             })
         else:
             # POST - Update settings
