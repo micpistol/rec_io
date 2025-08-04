@@ -1,0 +1,162 @@
+{
+  "timestamp": "2025-07-19T08:52:05.388773",
+  "improvements_implemented": {
+    "port_validation": true,
+    "config_validation": true,
+    "health_endpoints": true,
+    "monitoring_tools": true,
+    "error_recovery": true
+  },
+  "port_validation": {
+    "main_app": {
+      "port": 5002,
+      "available": true,
+      "conflict_resolved": true
+    },
+    "trade_manager": {
+      "port": 5004,
+      "available": true,
+      "conflict_resolved": true
+    },
+    "trade_executor": {
+      "port": 5051,
+      "available": true,
+      "conflict_resolved": true
+    },
+    "active_trade_supervisor": {
+      "port": 5008,
+      "available": true,
+      "conflict_resolved": true
+    },
+    "market_watchdog": {
+      "port": 5090,
+      "available": true,
+      "conflict_resolved": false
+    }
+  },
+  "config_validation": {
+    "config_loaded": true,
+    "required_sections": {
+      "system": true,
+      "agents": true,
+      "data": true
+    },
+    "agent_configs": {
+      "main": {
+        "enabled": true,
+        "has_port": true,
+        "port_valid": true
+      },
+      "symbol_watchdog": {
+        "enabled": true,
+        "has_port": false,
+        "port_valid": true
+      },
+      "market_watchdog": {
+        "enabled": true,
+        "has_port": true,
+        "port_valid": true
+      },
+      "trade_monitor": {
+        "enabled": true,
+        "has_port": true,
+        "port_valid": true
+      },
+      "trade_manager": {
+        "enabled": true,
+        "has_port": true,
+        "port_valid": true
+      },
+      "trade_executor": {
+        "enabled": true,
+        "has_port": true,
+        "port_valid": true
+      },
+      "active_trade_supervisor": {
+        "enabled": true,
+        "has_port": true,
+        "port_valid": true
+      },
+      "account_sync": {
+        "enabled": true,
+        "has_port": false,
+        "port_valid": true
+      },
+      "data_updater": {
+        "enabled": true,
+        "has_port": false,
+        "port_valid": true
+      }
+    },
+    "overall_valid": true
+  },
+  "health_endpoints": {
+    "main_app": {
+      "status": "unreachable",
+      "error": "Connection refused"
+    },
+    "trade_manager": {
+      "status": "unreachable",
+      "error": "Connection refused"
+    },
+    "trade_executor": {
+      "status": "unreachable",
+      "error": "Connection refused"
+    },
+    "active_trade_supervisor": {
+      "status": "unreachable",
+      "error": "Connection refused"
+    },
+    "market_watchdog": {
+      "status": "unreachable",
+      "error": "Connection refused"
+    }
+  },
+  "supervisor_status": {
+    "supervisor_responding": true,
+    "services": {
+      "active_trade_supervisor": {
+        "status": "RUNNING",
+        "running": true
+      },
+      "btc_price_watchdog": {
+        "status": "RUNNING",
+        "running": true
+      },
+      "db_poller": {
+        "status": "RUNNING",
+        "running": true
+      },
+      "kalshi_account_sync": {
+        "status": "RUNNING",
+        "running": true
+      },
+      "kalshi_api_watchdog": {
+        "status": "RUNNING",
+        "running": true
+      },
+      "kalshi_trade_executor": {
+        "status": "RUNNING",
+        "running": true
+      },
+      "main_app": {
+        "status": "RUNNING",
+        "running": true
+      },
+      "trade_manager": {
+        "status": "RUNNING",
+        "running": true
+      }
+    },
+    "total_services": 8,
+    "running_services": 8
+  },
+  "monitoring_tools": {
+    "system_monitor": true,
+    "error_recovery": true,
+    "port_test": true,
+    "system_monitor_importable": true,
+    "error_recovery_importable": true
+  },
+  "overall_status": "critical"
+}

@@ -1,0 +1,79 @@
+{
+  "timestamp": "2025-07-19T08:46:51.152192",
+  "system_info": {
+    "platform": "macOS-15.5-arm64-arm-64bit-Mach-O",
+    "python_version": "3.13.4",
+    "cpu_count": 10,
+    "memory_total": 68719476736
+  },
+  "services": {
+    "main_app": {
+      "service": "main_app",
+      "port": 5002,
+      "timestamp": "2025-07-19T08:46:51.389909",
+      "status": "unreachable",
+      "error": "Connection refused"
+    },
+    "trade_manager": {
+      "service": "trade_manager",
+      "port": 5004,
+      "timestamp": "2025-07-19T08:46:51.396008",
+      "status": "unreachable",
+      "error": "Connection refused"
+    },
+    "trade_executor": {
+      "service": "trade_executor",
+      "port": 5051,
+      "timestamp": "2025-07-19T08:46:51.397188",
+      "status": "unreachable",
+      "error": "Connection refused"
+    },
+    "active_trade_supervisor": {
+      "service": "active_trade_supervisor",
+      "port": 5008,
+      "timestamp": "2025-07-19T08:46:51.398297",
+      "status": "unreachable",
+      "error": "Connection refused"
+    },
+    "market_watchdog": {
+      "service": "market_watchdog",
+      "port": 5090,
+      "timestamp": "2025-07-19T08:46:51.399291",
+      "status": "unreachable",
+      "error": "Connection refused"
+    }
+  },
+  "resources": {
+    "cpu_percent": 36.8,
+    "memory_percent": 52.4,
+    "disk_percent": 2.5,
+    "memory_available": 32737312768,
+    "disk_free": 432637460480
+  },
+  "databases": {
+    "trades_db": {
+      "status": "healthy",
+      "record_count": 65
+    },
+    "price_db": {
+      "status": "healthy",
+      "record_count": 1740301
+    }
+  },
+  "supervisor": {
+    "supervisor_running": true,
+    "processes": [
+      {
+        "pid": 17937,
+        "name": "Python",
+        "status": "running"
+      },
+      {
+        "pid": 69973,
+        "name": "Python",
+        "status": "running"
+      }
+    ]
+  },
+  "overall_status": "degraded"
+}
