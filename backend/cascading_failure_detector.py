@@ -21,6 +21,9 @@ sys.stderr.reconfigure(line_buffering=True)
 from backend.util.paths import get_project_root
 sys.path.insert(0, get_project_root())
 
+# Add scripts directory for user_notifications
+sys.path.insert(0, os.path.join(get_project_root(), 'scripts'))
+
 class FailureLevel:
     NONE = "none"
     WARNING = "warning"
@@ -56,6 +59,10 @@ class CascadingFailureDetector:
         self.service_health = {}
         self.failure_history = []
         self.max_history = 50
+        
+        # MASTER RESTART notification tracking
+        self.master_restart_triggered = False
+        self.restart_completion_checked = False
         
         # Critical files that must exist
         self.critical_files = [
@@ -231,13 +238,20 @@ class CascadingFailureDetector:
         return True
     
     def trigger_master_restart(self):
-        """Trigger a MASTER RESTART."""
+        """Trigger a MASTER RESTART and send notification."""
         if not self.can_trigger_restart():
             self._log_event("RESTART BLOCKED: Rate limit exceeded")
             return False
             
         try:
+            # Import user_notifications here to avoid circular imports
+            import user_notifications
+            
             self._log_event("🚨 TRIGGERING MASTER RESTART - Catastrophic failure detected")
+            
+            # Send notification
+            message = "SYSTEM-TRIGGERED MASTER RESTART: Cascading failure detector detected catastrophic failure. MASTER RESTART initiated."
+            user_notifications.send_user_notification(message, "MASTER_RESTART")
             
             # Execute MASTER RESTART with full path to bash
             restart_script = "scripts/MASTER_RESTART.sh"
@@ -265,6 +279,7 @@ class CascadingFailureDetector:
                 self._log_event("✅ MASTER RESTART executed successfully")
                 self.last_restart_time = time.time()
                 self.restart_count += 1
+                self.master_restart_triggered = True
                 return True
             else:
                 self._log_event(f"❌ MASTER RESTART failed: {result.stderr}")
@@ -273,6 +288,49 @@ class CascadingFailureDetector:
         except Exception as e:
             self._log_event(f"❌ Error triggering MASTER RESTART: {e}")
             return False
+    
+    def check_restart_completion(self):
+        """Check if MASTER RESTART completed successfully."""
+        if not self.master_restart_triggered or self.restart_completion_checked:
+            return
+        
+        try:
+            # Import user_notifications here to avoid circular imports
+            import user_notifications
+            
+            # Check supervisor status for all critical services
+            critical_services = [
+                "main_app", "trade_manager", "trade_executor", 
+                "active_trade_supervisor", "btc_price_watchdog"
+            ]
+            
+            all_running = True
+            failed_services = []
+            
+            for service in critical_services:
+                result = subprocess.run(
+                    ["supervisorctl", "-c", "backend/supervisord.conf", "status", service],
+                    capture_output=True, text=True, timeout=5
+                )
+                if "RUNNING" not in result.stdout:
+                    all_running = False
+                    failed_services.append(service)
+            
+            if all_running:
+                # Success - send notification
+                message = "SYSTEM RESTARTED SUCCESSFULLY: All critical services are running."
+                user_notifications.send_user_notification(message, "RESTART_SUCCESS")
+                self._log_event("✅ System fully recovered")
+            else:
+                # Failure - send notification
+                message = f"SYSTEM RESTART FAILED: Critical services still down: {', '.join(failed_services)}. System needs immediate attention."
+                user_notifications.send_user_notification(message, "RESTART_FAILURE")
+                self._log_event(f"❌ System restart failed - services still down: {', '.join(failed_services)}")
+            
+            self.restart_completion_checked = True
+            
+        except Exception as e:
+            self._log_event(f"❌ Error checking restart completion: {e}")
     
     def run_detection_loop(self):
         """Run continuous failure detection loop."""
@@ -313,6 +371,10 @@ class CascadingFailureDetector:
                         self._log_event("✅ Catastrophic failure handled")
                     else:
                         self._log_event("❌ Failed to handle catastrophic failure")
+                
+                # Check restart completion if MASTER RESTART was triggered
+                if self.master_restart_triggered and not self.restart_completion_checked:
+                    self.check_restart_completion()
                 
                 # Wait before next check
                 time.sleep(self.check_interval)

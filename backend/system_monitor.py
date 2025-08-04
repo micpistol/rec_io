@@ -23,14 +23,28 @@ sys.stderr.reconfigure(line_buffering=True)
 from backend.util.paths import get_project_root
 sys.path.insert(0, get_project_root())
 
+# Add scripts directory for user_notifications
+sys.path.insert(0, os.path.join(get_project_root(), 'scripts'))
+
 from backend.core.port_config import get_port, get_port_info, list_all_ports
 from backend.util.paths import get_data_dir, get_trade_history_dir, get_price_history_dir
 
 class SystemMonitor:
     def __init__(self):
-        self.monitoring_interval = 120  # seconds (increased to 2 minutes)
+        self.monitoring_interval = 15  # seconds (critical system monitoring)
         self.health_history = []
         self.max_history = 50  # reduced history size
+        
+        # MASTER RESTART notification tracking
+        self.restart_attempts = 0
+        self.max_restart_attempts = 3
+        self.trading_suspended = False
+        self.master_restart_triggered = False
+        self.restart_completion_checked = False
+        
+        # Trading state tracking - remember original states before suspension
+        self.original_auto_entry_state = None
+        self.original_auto_stop_state = None
         
         # Get service URLs using bulletproof port manager
         self.service_urls = {
@@ -280,6 +294,93 @@ class SystemMonitor:
         
         return report
     
+    def trigger_master_restart(self):
+        """Trigger a MASTER RESTART and send notification."""
+        try:
+            # Import user_notifications here to avoid circular imports
+            import user_notifications
+            
+            print("🚨 TRIGGERING MASTER RESTART")
+            sys.stdout.flush()
+            
+            # Send notification
+            message = "SYSTEM-TRIGGERED MASTER RESTART: System monitor detected critical failures. MASTER RESTART initiated."
+            user_notifications.send_user_notification(message, "MASTER_RESTART")
+            
+            # Execute MASTER RESTART
+            restart_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts", "MASTER_RESTART.sh")
+            if not os.path.exists(restart_script):
+                print(f"❌ ERROR: Restart script not found: {restart_script}")
+                return False
+            
+            # Change to project root directory and run the script exactly like manual execution
+            project_root = os.path.dirname(os.path.dirname(__file__))
+            
+            # Call the script exactly like manual execution - use shell=True to run in proper shell environment
+            result = subprocess.run(
+                f"cd {project_root} && ./scripts/MASTER_RESTART.sh",
+                shell=True, capture_output=True, text=True, timeout=60, cwd=project_root
+            )
+            
+            if result.returncode == 0:
+                print("✅ MASTER RESTART executed successfully")
+                self.master_restart_triggered = True
+                return True
+            else:
+                print(f"❌ MASTER RESTART failed: {result.stderr}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error triggering MASTER RESTART: {e}")
+            return False
+    
+    def check_restart_completion(self):
+        """Check if MASTER RESTART completed successfully."""
+        if not self.master_restart_triggered or self.restart_completion_checked:
+            return
+        
+        try:
+            # Import user_notifications here to avoid circular imports
+            import user_notifications
+            
+            # Check supervisor status for all critical services
+            critical_services = [
+                "main_app", "trade_manager", "trade_executor", 
+                "active_trade_supervisor", "btc_price_watchdog"
+            ]
+            
+            all_running = True
+            failed_services = []
+            
+            for service in critical_services:
+                result = subprocess.run(
+                    ["supervisorctl", "-c", "backend/supervisord.conf", "status", service],
+                    capture_output=True, text=True, timeout=5
+                )
+                if "RUNNING" not in result.stdout:
+                    all_running = False
+                    failed_services.append(service)
+            
+            if all_running:
+                # Success - send notification and resume trading
+                message = "SYSTEM RESTARTED SUCCESSFULLY: All critical services are running. Automated trading functions have resumed."
+                user_notifications.send_user_notification(message, "RESTART_SUCCESS")
+                self.trading_suspended = False
+                print("✅ System fully recovered - automated trading resumed")
+                sys.stdout.flush()
+            else:
+                # Failure - send notification
+                message = f"SYSTEM RESTART FAILED: Critical services still down: {', '.join(failed_services)}. System needs immediate attention."
+                user_notifications.send_user_notification(message, "RESTART_FAILURE")
+                print(f"❌ System restart failed - services still down: {', '.join(failed_services)}")
+                sys.stdout.flush()
+            
+            self.restart_completion_checked = True
+            
+        except Exception as e:
+            print(f"❌ Error checking restart completion: {e}")
+            sys.stdout.flush()
+    
     def run_monitoring_loop(self):
         """Run continuous monitoring loop."""
         print("🚀 Starting Trading System Monitor (Simplified)...")
@@ -358,6 +459,214 @@ class SystemMonitor:
                     port = service_status.get("port", "N/A")
                     print(f"  {status_icon} {service_name} (port {port}): {service_status['status']}")
                     sys.stdout.flush()
+                
+                # Check for failed services and handle MASTER RESTART logic
+                failed_services = []
+                for service_name, service_status in report["services"].items():
+                    if service_status["status"] == "unhealthy":
+                        failed_services.append(service_name)
+                
+                # Handle MASTER RESTART logic
+                if failed_services:
+                    print(f"\n🚨 Found {len(failed_services)} failed services: {', '.join(failed_services)}")
+                    sys.stdout.flush()
+                    
+                    # Suspend trading immediately
+                    if not self.trading_suspended:
+                        self.trading_suspended = True
+                        print("🚨 CRITICAL: Services down - automated trading suspended")
+                        sys.stdout.flush()
+                        
+                        # First, check and store current trading states before disabling
+                        try:
+                            import requests
+                            
+                            # Get current auto_entry state
+                            response = requests.get(
+                                f"http://localhost:{get_port('main_app')}/api/get_preferences",
+                                timeout=5
+                            )
+                            if response.status_code == 200:
+                                prefs = response.json()
+                                self.original_auto_entry_state = prefs.get('auto_entry', False)
+                                self.original_auto_stop_state = prefs.get('auto_stop', False)
+                                print(f"📊 Stored original states - auto_entry: {self.original_auto_entry_state}, auto_stop: {self.original_auto_stop_state}")
+                            else:
+                                print(f"⚠️ Failed to get current trading preferences: {response.status_code}")
+                                # Default to False if we can't get current state
+                                self.original_auto_entry_state = False
+                                self.original_auto_stop_state = False
+                                
+                        except Exception as e:
+                            print(f"⚠️ Error getting current trading preferences: {e}")
+                            # Default to False if we can't get current state
+                            self.original_auto_entry_state = False
+                            self.original_auto_stop_state = False
+                        
+                        # Now disable auto_entry and auto_stop in trade preferences
+                        try:
+                            import requests
+                            
+                            # Disable auto_entry
+                            response = requests.post(
+                                f"http://localhost:{get_port('main_app')}/api/set_auto_entry",
+                                json={"enabled": False},
+                                timeout=5
+                            )
+                            if response.status_code == 200:
+                                print("✅ Successfully disabled automated trading in preferences")
+                            else:
+                                print(f"⚠️ Failed to disable automated trading: {response.status_code}")
+                            
+                            # Disable auto_stop
+                            response = requests.post(
+                                f"http://localhost:{get_port('main_app')}/api/set_auto_stop",
+                                json={"enabled": False},
+                                timeout=5
+                            )
+                            if response.status_code == 200:
+                                print("✅ Successfully disabled auto_stop in preferences")
+                            else:
+                                print(f"⚠️ Failed to disable auto_stop: {response.status_code}")
+                                
+                        except Exception as e:
+                            print(f"⚠️ Error disabling trading preferences: {e}")
+                        sys.stdout.flush()
+                    
+                    # Try individual restarts first
+                    self.restart_attempts += 1
+                    print(f"🔄 Attempting service recovery (attempt {self.restart_attempts}/{self.max_restart_attempts})")
+                    sys.stdout.flush()
+                    
+                    # Actually attempt to restart failed services
+                    for service_name in failed_services:
+                        print(f"🔄 Attempting to restart {service_name}...")
+                        sys.stdout.flush()
+                        
+                        try:
+                            result = subprocess.run(
+                                ["supervisorctl", "-c", "backend/supervisord.conf", "restart", service_name],
+                                capture_output=True, text=True, timeout=30
+                            )
+                            
+                            if result.returncode == 0:
+                                print(f"✅ Successfully restarted {service_name}")
+                                sys.stdout.flush()
+                                
+                                # Immediately check if system has recovered after restart
+                                print("🔄 Checking system recovery after restart...")
+                                time.sleep(2)  # Brief pause to let service start
+                                
+                                # Check if all services are now healthy
+                                all_healthy = True
+                                for check_service in self.service_urls.keys():
+                                    try:
+                                        result = subprocess.run(
+                                            ["supervisorctl", "-c", "backend/supervisord.conf", "status", check_service],
+                                            capture_output=True,
+                                            text=True,
+                                            timeout=10
+                                        )
+                                        if "RUNNING" not in result.stdout:
+                                            all_healthy = False
+                                            break
+                                    except Exception as e:
+                                        print(f"⚠️ Error checking {check_service} status: {e}")
+                                        all_healthy = False
+                                        break
+                                
+                                if all_healthy:
+                                    print("✅ All services recovered - checking if trading should be re-enabled...")
+                                    # Check if we were previously suspended
+                                    if self.trading_suspended:
+                                        print("✅ System recovered - automated trading resumed")
+                                        self.trading_suspended = False
+                                        
+                                        # Restore original auto_entry and auto_stop states
+                                        try:
+                                            import requests
+                                            
+                                            # Restore auto_entry to original state
+                                            response = requests.post(
+                                                f"http://localhost:{get_port('main_app')}/api/set_auto_entry",
+                                                json={"enabled": self.original_auto_entry_state},
+                                                timeout=5
+                                            )
+                                            if response.status_code == 200:
+                                                print(f"✅ Successfully restored auto_entry to original state: {self.original_auto_entry_state}")
+                                            else:
+                                                print(f"⚠️ Failed to restore auto_entry: {response.status_code}")
+                                            
+                                            # Restore auto_stop to original state
+                                            response = requests.post(
+                                                f"http://localhost:{get_port('main_app')}/api/set_auto_stop",
+                                                json={"enabled": self.original_auto_stop_state},
+                                                timeout=5
+                                            )
+                                            if response.status_code == 200:
+                                                print(f"✅ Successfully restored auto_stop to original state: {self.original_auto_stop_state}")
+                                            else:
+                                                print(f"⚠️ Failed to restore auto_stop: {response.status_code}")
+                                                
+                                        except Exception as e:
+                                            print(f"⚠️ Error restoring trading preferences: {e}")
+                                        sys.stdout.flush()
+                                        break  # Exit the loop since system is recovered
+                            else:
+                                print(f"❌ Failed to restart {service_name}: {result.stderr}")
+                                sys.stdout.flush()
+                                
+                        except Exception as e:
+                            print(f"❌ Error restarting {service_name}: {e}")
+                            sys.stdout.flush()
+                    
+                    # If max attempts reached, trigger MASTER RESTART
+                    if self.restart_attempts >= self.max_restart_attempts:
+                        print("🚨 Maximum restart attempts reached - triggering MASTER RESTART")
+                        sys.stdout.flush()
+                        self.trigger_master_restart()
+                        self.restart_attempts = 0  # Reset for next cycle
+                else:
+                    # System recovered
+                    if self.trading_suspended:
+                        self.trading_suspended = False
+                        self.restart_attempts = 0
+                        print("✅ System recovered - automated trading resumed")
+                        sys.stdout.flush()
+                        
+                        # Re-enable auto_entry and auto_stop in trade preferences
+                        try:
+                            import requests
+                            
+                            # Re-enable auto_entry
+                            response = requests.post(
+                                f"http://localhost:{get_port('main_app')}/api/set_auto_entry",
+                                json={"enabled": True},
+                                timeout=5
+                            )
+                            if response.status_code == 200:
+                                print("✅ Successfully re-enabled automated trading in preferences")
+                            else:
+                                print(f"⚠️ Failed to re-enable automated trading: {response.status_code}")
+                            
+                            # Re-enable auto_stop
+                            response = requests.post(
+                                f"http://localhost:{get_port('main_app')}/api/set_auto_stop",
+                                json={"enabled": True},
+                                timeout=5
+                            )
+                            if response.status_code == 200:
+                                print("✅ Successfully re-enabled auto_stop in preferences")
+                            else:
+                                print(f"⚠️ Failed to re-enable auto_stop: {response.status_code}")
+                                
+                        except Exception as e:
+                            print(f"⚠️ Error re-enabling trading preferences: {e}")
+                        sys.stdout.flush()
+                
+                # Check restart completion if MASTER RESTART was triggered
+                if self.master_restart_triggered and not self.restart_completion_checked:
+                    self.check_restart_completion()
                 
                 print("\n" + "=" * 60)
                 sys.stdout.flush()

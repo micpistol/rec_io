@@ -3,6 +3,9 @@ TRADE EXECUTOR - UNIVERSAL CENTRALIZED PORT SYSTEM
 Uses the single centralized port configuration system.
 """
 
+# TEST FAILURE - REMOVE AFTER TESTING
+# Syntax error removed for normal operation
+
 from flask import Flask, request, jsonify
 import os
 import json

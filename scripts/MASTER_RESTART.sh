@@ -20,7 +20,14 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration - Use portable paths
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(pwd)"
+# If we're in the project root, use current directory
+# If we're in the scripts directory, go up one level
+if [ -f "scripts/MASTER_RESTART.sh" ]; then
+    PROJECT_ROOT="$(pwd)"
+else
+    PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
 SUPERVISOR_CONFIG="$PROJECT_ROOT/backend/supervisord.conf"
 SUPERVISOR_SOCKET="/tmp/supervisord.sock"
 SUPERVISOR_PID="/tmp/supervisord.pid"
@@ -94,14 +101,14 @@ kill_port() {
             
             # Kill the processes
             echo "$pids" | xargs kill -9 2>/dev/null || true
-            sleep 2
+            /bin/sleep 2
             
             # Try again if still in use
             if check_port $port; then
                 print_warning "Port $port still in use, trying again..."
-                sleep 2
+                /bin/sleep 2
                 lsof -ti :$port | xargs kill -9 2>/dev/null || true
-                sleep 2
+                /bin/sleep 2
             fi
             
             # Final verification
@@ -138,7 +145,7 @@ stop_supervisor() {
     
     if [ -S "$SUPERVISOR_SOCKET" ]; then
         supervisorctl -c "$SUPERVISOR_CONFIG" shutdown 2>/dev/null || true
-        sleep 2
+        /bin/sleep 2
     fi
     
     # Kill supervisor process if still running
@@ -170,7 +177,7 @@ start_supervisor() {
         if [ -S "$SUPERVISOR_SOCKET" ]; then
             break
         fi
-        sleep 1
+        /bin/sleep 1
         attempts=$((attempts + 1))
     done
     
@@ -187,7 +194,7 @@ restart_all_services() {
     print_status "Restarting all services..."
     
     # Wait a moment for supervisor to fully initialize
-    sleep 2
+    /bin/sleep 2
     
     # Get list of all programs
     local programs=$(supervisorctl -c "$SUPERVISOR_CONFIG" status | awk '{print $1}' | grep -v "supervisorctl")
@@ -195,7 +202,7 @@ restart_all_services() {
     for program in $programs; do
         print_status "Restarting $program..."
         supervisorctl -c "$SUPERVISOR_CONFIG" restart $program
-        sleep 1
+        /bin/sleep 1
     done
     
     print_success "All services restarted"
@@ -314,7 +321,7 @@ master_restart() {
     ps aux | grep python | grep -E "(backend|trade|kalshi|btc)" | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null || true
     
     # Wait for processes to fully terminate
-    sleep 5
+    /bin/sleep 5
     echo ""
     
     # Step 3: Flush all ports
@@ -367,12 +374,12 @@ emergency_restart() {
     print_warning "Stopping supervisor..."
     if [ -S "$SUPERVISOR_SOCKET" ]; then
         supervisorctl -c "$SUPERVISOR_CONFIG" shutdown 2>/dev/null || true
-        sleep 3
+        /bin/sleep 3
     fi
     
     # Kill supervisor process if still running
     pkill -f "supervisord" || true
-    sleep 2
+    /bin/sleep 2
     
     # Kill all screen sessions that might be running our processes
     print_warning "Killing all screen sessions..."
@@ -413,13 +420,13 @@ emergency_restart() {
     rm -f /tmp/supervisord.sock /tmp/supervisord.pid
     
     # Wait a moment for processes to fully terminate
-    sleep 5
+    /bin/sleep 5
     
     # Flush all ports
     flush_all_ports
     
     # Wait a moment
-    sleep 2
+    /bin/sleep 2
     
     # Start fresh
     start_supervisor
