@@ -189,9 +189,13 @@ def trigger_trade():
         timestamp = str(int(time.time() * 1000))
         path = "/portfolio/orders"
         full_path = f"/trade-api/v2{path}"
+        
         # Refresh credentials at trade time
         KEY_ID, KEY_PATH = get_current_credentials()
+        log_event(ticket_id, f"🔑 CREDENTIALS: KEY_ID={KEY_ID[:8]}..., KEY_PATH={KEY_PATH}")
+        
         signature = generate_kalshi_signature("POST", full_path, timestamp, str(KEY_PATH))
+        log_event(ticket_id, f"🔐 SIGNATURE: timestamp={timestamp}, path={full_path}")
         headers = {
             "Accept": "application/json",
             "User-Agent": "KalshiTradeExec/1.0",
@@ -202,11 +206,25 @@ def trigger_trade():
         }
 
         url = f"{get_base_url()}{path}"
-        log_event(ticket_id, "SENDING TO KALSHI")
-        response = requests.post(url, headers=headers, json=order_payload, timeout=10)
+        
+        # Log the complete request details
+        log_event(ticket_id, f"🌐 SENDING TO KALSHI: {url}")
+        log_event(ticket_id, f"📤 REQUEST HEADERS: {json.dumps(headers, indent=2)}")
+        log_event(ticket_id, f"📤 REQUEST PAYLOAD: {json.dumps(order_payload, indent=2)}")
+        
+        try:
+            response = requests.post(url, headers=headers, json=order_payload, timeout=10)
+            
+            # Log the complete response details
+            log_event(ticket_id, f"📥 RESPONSE STATUS: {response.status_code}")
+            log_event(ticket_id, f"📥 RESPONSE HEADERS: {dict(response.headers)}")
+            log_event(ticket_id, f"📥 RESPONSE BODY: {response.text}")
+        except requests.exceptions.RequestException as e:
+            log_event(ticket_id, f"❌ REQUEST FAILED: {type(e).__name__}: {str(e)}")
+            raise
 
         if response.status_code >= 400:
-            log_event(ticket_id, "❌ TRADE REJECTED")
+            log_event(ticket_id, f"❌ TRADE REJECTED - Status: {response.status_code}, Response: {response.text}")
             # Use the trade ID if provided, otherwise use ticket_id
             trade_id = data.get("id")
             if trade_id:
@@ -223,7 +241,7 @@ def trigger_trade():
             threading.Thread(target=notify_error, daemon=True).start()
             return jsonify({"status": "rejected", "error": response.text}), response.status_code
         elif response.status_code in [200, 201]:
-            log_event(ticket_id, "TRADE SUCCESS")
+            log_event(ticket_id, f"✅ TRADE SUCCESS - Status: {response.status_code}, Response: {response.text}")
             # Use the trade ID if provided, otherwise use ticket_id
             trade_id = data.get("id")
             if trade_id:
