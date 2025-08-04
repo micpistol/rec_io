@@ -58,6 +58,7 @@ class CascadingFailureDetector:
             "auto_entry_supervisor",
             "unified_production_coordinator",
             "active_trade_supervisor",
+            "system_monitor",  # Added: Monitor the monitor
         
             "kalshi_api_watchdog",
             "btc_price_watchdog"
@@ -232,6 +233,27 @@ class CascadingFailureDetector:
                 return False
         return True
 
+    def check_system_monitor_health(self) -> bool:
+        """Check if system monitor is running and responsive."""
+        try:
+            # Check if system_monitor process is running via supervisor
+            result = subprocess.run(
+                ["supervisorctl", "-c", "backend/supervisord.conf", "status", "system_monitor"],
+                capture_output=True, text=True, timeout=10
+            )
+            
+            if result.returncode == 0 and "RUNNING" in result.stdout:
+                # Additional check: try to access system monitor's health endpoint if it has one
+                # For now, just check if the process is running
+                return True
+            else:
+                self._log_event(f"SYSTEM MONITOR STATUS CHECK FAILED: {result.stdout}")
+                return False
+                
+        except Exception as e:
+            self._log_event(f"ERROR CHECKING SYSTEM MONITOR HEALTH: {e}")
+            return False
+
     def assess_failure_level(self) -> FailureLevel:
         """Assess the current failure level based on all checks."""
         # Check service failures
@@ -377,6 +399,33 @@ class CascadingFailureDetector:
                 # Check all services
                 for service_name in self.critical_services:
                     self.check_service_health(service_name)
+                
+                # Special handling for system_monitor - restart immediately if down
+                system_monitor_health = self.service_health.get("system_monitor")
+                if system_monitor_health and system_monitor_health.consecutive_failures >= 1:
+                    print(f"🚨 SYSTEM MONITOR DOWN! Attempting immediate restart...")
+                    self._log_event("SYSTEM MONITOR DOWN - Attempting immediate restart")
+                    
+                    try:
+                        # Try to restart system_monitor via supervisor
+                        result = subprocess.run(
+                            ["supervisorctl", "-c", "backend/supervisord.conf", "restart", "system_monitor"],
+                            capture_output=True, text=True, timeout=30
+                        )
+                        
+                        if result.returncode == 0:
+                            print(f"✅ System monitor restarted successfully")
+                            self._log_event("SYSTEM MONITOR RESTARTED SUCCESSFULLY")
+                            # Reset the failure count
+                            system_monitor_health.consecutive_failures = 0
+                            system_monitor_health.status = "running"
+                        else:
+                            print(f"❌ Failed to restart system monitor: {result.stderr}")
+                            self._log_event(f"FAILED TO RESTART SYSTEM MONITOR: {result.stderr}")
+                            
+                    except Exception as e:
+                        print(f"❌ Error restarting system monitor: {e}")
+                        self._log_event(f"ERROR RESTARTING SYSTEM MONITOR: {e}")
                 
                 # Assess overall failure level
                 failure_level = self.assess_failure_level()
