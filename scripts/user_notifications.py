@@ -122,8 +122,8 @@ def send_sms_via_email(phone_number, message, carrier="verizon", notification_ty
                 smtp_server = "smtp.gmail.com"
                 smtp_port = 587
                 
-                gmail_user = "rec.io.alerts@gmail.com"
-                gmail_password = "jfnc adxj ubfz lrtw"  # App Password (without spaces)
+                gmail_user = os.getenv('GMAIL_USER', 'rec.io.alerts@gmail.com')
+                gmail_password = os.getenv('GMAIL_PASSWORD', 'jfnc adxj ubfz lrtw')
                 
                 msg['From'] = gmail_user
                 
@@ -163,8 +163,8 @@ def send_email_notification(email_address, message, notification_type="SYSTEM"):
         smtp_server = "smtp.gmail.com"
         smtp_port = 587
         
-        gmail_user = "rec.io.alerts@gmail.com"
-        gmail_password = "jfnc adxj ubfz lrtw"  # App Password (without spaces)
+        gmail_user = os.getenv('GMAIL_USER', 'rec.io.alerts@gmail.com')
+        gmail_password = os.getenv('GMAIL_PASSWORD', 'jfnc adxj ubfz lrtw')
         
         server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()

@@ -27,12 +27,17 @@ The installation script automatically handles:
    - Sets up Kalshi API credentials
    - Creates user preferences
 
-4. **Authentication Setup**
+4. **SMTP Configuration**
+   - Sets up email notification system
+   - Configures Gmail SMTP credentials
+   - Tests notification delivery
+
+5. **Authentication Setup**
    - Configures login system
    - Sets up password protection
    - Tests authentication
 
-5. **System Startup**
+6. **System Startup**
    - Starts all trading services
    - Verifies system health
    - Launches web interface
@@ -63,6 +68,25 @@ After installation, access the system at:
 - **Username**: Your user ID (e.g., `ewais`)
 - **Password**: The password you set during installation
 - **Local Bypass**: Available for development testing
+
+## SMTP Configuration
+
+For system notifications to work, set up SMTP environment variables:
+
+```bash
+# Set SMTP credentials
+export GMAIL_USER="rec.io.alerts@gmail.com"
+export GMAIL_PASSWORD="jfnc adxj ubfz lrtw"
+
+# Or create .env file
+echo "GMAIL_USER=rec.io.alerts@gmail.com" > .env
+echo "GMAIL_PASSWORD=jfnc adxj ubfz lrtw" >> .env
+```
+
+**For Remote Deployment:**
+- Set these environment variables on your server
+- Or add them to your system's environment configuration
+- The system will use these for all email notifications
 
 ## Management Commands
 

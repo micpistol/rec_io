@@ -204,6 +204,15 @@ nano /opt/trading_system/backend/core/config/config.json
 # - API credentials
 # - Database paths
 # - Port configurations
+
+# Configure SMTP for notifications
+export GMAIL_USER="rec.io.alerts@gmail.com"
+export GMAIL_PASSWORD="jfnc adxj ubfz lrtw"
+
+# Or add to system environment
+echo "export GMAIL_USER=rec.io.alerts@gmail.com" >> ~/.bashrc
+echo "export GMAIL_PASSWORD=jfnc adxj ubfz lrtw" >> ~/.bashrc
+source ~/.bashrc
 ```
 
 ### Firewall Configuration

@@ -179,7 +179,29 @@ Enter your Kalshi Private Key (PEM format): ********
 ============================================================
 ```
 
-### Step 5: Set Up Authentication System
+### Step 5: Configure SMTP for Notifications
+```bash
+# Set up SMTP environment variables for system notifications
+export GMAIL_USER="rec.io.alerts@gmail.com"
+export GMAIL_PASSWORD="jfnc adxj ubfz lrtw"
+
+# Or create a .env file for persistent configuration
+echo "GMAIL_USER=rec.io.alerts@gmail.com" > .env
+echo "GMAIL_PASSWORD=jfnc adxj ubfz lrtw" >> .env
+```
+
+**SMTP Configuration:**
+- ✅ **Email Alerts**: System notifications sent via Gmail SMTP
+- ✅ **SMS Gateway**: Notifications sent to phone via email-to-text
+- ✅ **Environment Variables**: Credentials loaded from environment
+- ✅ **Security**: No hardcoded credentials in repository
+
+**For Remote Deployment:**
+- 🔧 Set `GMAIL_USER` and `GMAIL_PASSWORD` environment variables
+- 🔧 Or create `.env` file with credentials
+- 🔧 System will use these for all notification services
+
+### Step 6: Set Up Authentication System
 ```bash
 # Run the authentication setup script
 python scripts/setup_auth.py
@@ -242,7 +264,7 @@ export AUTH_ENABLED=true
 - **Username**: Your user_id from setup (e.g., `john_doe`)
 - **Password**: The password you set during auth setup
 
-### Step 6: Test Authentication System
+### Step 7: Test Authentication System
 ```bash
 # Test the authentication system
 python scripts/test_auth.py
@@ -275,14 +297,14 @@ python scripts/test_auth.py
 🎉 Authentication system test complete!
 ```
 
-### Step 7: Initialize System Directories
+### Step 8: Initialize System Directories
 ```bash
 # The system will create necessary directories automatically
 # But you can verify the structure:
 python -c "from backend.util.paths import ensure_data_dirs; ensure_data_dirs()"
 ```
 
-### Step 8: Start the System
+### Step 9: Start the System
 ```bash
 # Start supervisor (manages all services)
 supervisord -c backend/supervisord.conf
@@ -303,7 +325,7 @@ supervisorctl -c backend/supervisord.conf status
 - ✅ `cascading_failure_detector` (port 8008) - Failure detection
 - ✅ `unified_production_coordinator` (port 8006) - System coordination
 
-### Step 9: Access the System
+### Step 10: Access the System
 ```bash
 # Open the web interface
 open index.html  # On macOS
@@ -537,6 +559,7 @@ netstat -an | grep :3000
 - [ ] Historical data verified (~347MB present)
 - [ ] Kalshi credentials created
 - [ ] User preferences configured
+- [ ] SMTP environment variables configured
 - [ ] Authentication system set up
 - [ ] Authentication test completed
 - [ ] System directories initialized
