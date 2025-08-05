@@ -112,6 +112,10 @@
             </label>
           </div>
         </div>
+        <div>
+          <div style="margin-bottom: 5px; font-size: 12px; color: #ccc;">TTC Filter (minutes)</div>
+          <input type="number" id="ttc-filter" min="0" max="60" value="60" style="width: 80px; padding: 4px; font-size: 12px; background: #2a3441; border: 1px solid #4a5568; color: white; border-radius: 3px;">
+        </div>
       </div>
     </div>
 
@@ -309,6 +313,57 @@
         }
         // If win_loss is null/undefined/empty, show it regardless of filters
         return true;
+      });
+    }
+    
+    // === TTC FILTER LOGIC ===
+    function filterTradesByTTC(trades) {
+      const ttcFilter = document.getElementById('ttc-filter');
+      if (!ttcFilter) return trades;
+      
+      const maxTTC = parseInt(ttcFilter.value);
+      if (isNaN(maxTTC) || maxTTC < 0 || maxTTC > 60) return trades;
+      
+      return trades.filter(trade => {
+        // Check if trade has required data for TTC calculation
+        if (!trade.time) {
+          return true; // Show trades without time data
+        }
+        
+        try {
+          // Parse the trade time (format like "12:50:07")
+          const timeParts = trade.time.split(':');
+          if (timeParts.length !== 3) return true;
+          
+          const tradeHour = parseInt(timeParts[0]);
+          const tradeMinute = parseInt(timeParts[1]);
+          const tradeSecond = parseInt(timeParts[2]);
+          
+          if (isNaN(tradeHour) || isNaN(tradeMinute) || isNaN(tradeSecond)) {
+            return true; // Show trades with invalid time format
+          }
+          
+          // Calculate total minutes from trade time
+          const tradeTimeMinutes = tradeHour * 60 + tradeMinute + tradeSecond / 60;
+          
+          // For hourly contracts, closing time is the next hour
+          // So if trade is at 12:50:07, TTC is 9 minutes and 53 seconds
+          const nextHour = tradeHour + 1;
+          const closeTimeMinutes = nextHour * 60; // Next hour at :00
+          
+          let ttcMinutes = closeTimeMinutes - tradeTimeMinutes;
+          
+          // Handle edge case where trade is at 23:xx (next hour would be 0)
+          if (nextHour >= 24) {
+            ttcMinutes = (24 * 60) - tradeTimeMinutes;
+          }
+          
+          // Convert to total minutes for comparison
+          return ttcMinutes <= maxTTC;
+        } catch (error) {
+          console.warn('Error calculating TTC for trade:', trade.id, error);
+          return true; // Show trades with calculation errors
+        }
       });
     }
     
@@ -573,6 +628,7 @@
       const dateFilterPicker = document.getElementById('date-filter-picker');
       let filtered = filterTradesByDate(trades, dateFilterPicker ? dateFilterPicker.value : 'TODAY');
       filtered = filterTradesByWinLoss(filtered);
+      filtered = filterTradesByTTC(filtered);
       
       filteredTrades = [...filtered];
       applyCurrentSort();
@@ -840,6 +896,12 @@
           filterLoss.checked = data.loss_filter;
         }
         
+        // Apply TTC filter
+        const ttcFilter = document.getElementById('ttc-filter');
+        if (ttcFilter && data.ttc_filter !== undefined) {
+          ttcFilter.value = data.ttc_filter;
+        }
+        
         // Apply sort settings
         if (data.sort_key) {
           currentSort.key = data.sort_key;
@@ -893,6 +955,15 @@
         });
       }
 
+      // Hook up TTC filter
+      const ttcFilter = document.getElementById('ttc-filter');
+      if (ttcFilter) {
+        ttcFilter.addEventListener('input', () => {
+          applyFilters();
+          savePreferences();
+        });
+      }
+
       // Hook up All/None buttons
       const selectAllBtn = document.getElementById('select-all-filters');
       const selectNoneBtn = document.getElementById('select-none-filters');
@@ -927,11 +998,13 @@
       const dateFilterPicker = document.getElementById('date-filter-picker');
       const filterWin = document.getElementById('filter-win');
       const filterLoss = document.getElementById('filter-loss');
+      const ttcFilter = document.getElementById('ttc-filter');
       
       const preferences = {
         date_filter: dateFilterPicker ? dateFilterPicker.value : 'ALL',
         win_filter: filterWin ? filterWin.checked : true,
         loss_filter: filterLoss ? filterLoss.checked : true,
+        ttc_filter: ttcFilter ? parseInt(ttcFilter.value) : 60,
         sort_key: currentSort.key,
         sort_asc: currentSort.asc,
         page_size: 50,
