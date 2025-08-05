@@ -198,7 +198,7 @@ window.prepareTradeData = async function(target) {
     // Side is ONLY the active_side from the watchlist JSON
     if (target.dataset.side) {
       side = target.dataset.side;
-      console.log('🔍 prepareTradeData: Read side', side, 'from btn.dataset.side');
+  
     } else {
       console.error('No data-side attribute found - cannot determine trade side');
       console.error('btn.dataset.side value:', target.dataset.side);

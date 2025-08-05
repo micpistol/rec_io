@@ -266,6 +266,8 @@
       min-height: 0;
     }
     
+
+
     /* Ensure the sidebar content fits within viewport on smaller screens */
     @media (max-height: 600px) {
       .sidebar-nav {
@@ -285,7 +287,12 @@
         height: 50px;
         min-height: 50px;
       }
+      
+
     }
+
+
+    /* Sidebar styles */
   </style>
 </head>
 <body>
@@ -343,7 +350,10 @@
         </span>
         <span class="toggle-label">Collapse</span>
       </button>
+      
     </nav>
+    
+
     
     <!-- Main Content Area -->
     <div class="main-content">
@@ -405,10 +415,14 @@
       });
     });
     
+
+
     // Initialize with trade monitor active
     window.addEventListener('DOMContentLoaded', () => {
       // All frames are preloaded, trade monitor is already active
       console.log('All tabs preloaded and ready');
+      
+      
     });
     
     // Logout functionality

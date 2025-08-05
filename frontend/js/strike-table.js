@@ -378,7 +378,7 @@ async function updateStrikeTable() {
       const priceDrift = Math.abs(currentPrice - currentCenterStrike);
 
       if (priceDrift > 2 * strikeTier) {
-        console.log('🔄 Price drift detected. Re-centering strike table...');
+    
         const newBase = Math.round(currentPrice / strikeTier) * strikeTier;
         await initializeStrikeTable(newBase);
         setTimeout(updateStrikeTable, 50);
@@ -568,7 +568,7 @@ async function updateStrikeTable() {
 // Test function to manually check active trades
 window.testActiveTrades = async function() {
   try {
-    console.log('[TEST] Testing active trades API...');
+
     const tradesRes = await fetch('/api/active_trades', { cache: 'no-store' });
     if (!tradesRes.ok) {
       console.error('[TEST] API request failed:', tradesRes.status);
@@ -577,11 +577,11 @@ window.testActiveTrades = async function() {
     
     const data = await tradesRes.json();
     const activeTrades = data.active_trades || [];
-    console.log('[TEST] Active trades found:', activeTrades.length);
+
     
     activeTrades.forEach(trade => {
       const tradeStrike = parseFloat(trade.strike.replace(/[^\d.-]/g, ''));
-      console.log(`[TEST] Trade: ${trade.ticker}, Strike: ${trade.strike} -> parsed: ${tradeStrike}`);
+      
     });
     
     // Test specific strikes
@@ -591,7 +591,7 @@ window.testActiveTrades = async function() {
         const tradeStrike = parseFloat(trade.strike.replace(/[^\d.-]/g, ''));
         return tradeStrike === strike;
       });
-      console.log(`[TEST] Strike ${strike} has position: ${hasPosition}`);
+
     });
     
   } catch (e) {
@@ -609,26 +609,26 @@ async function updatePositionIndicator(strikeCell, strike) {
     const activeTrades = data.active_trades || [];
     
     // Debug logging
-    console.log(`[POSITION INDICATOR] Checking strike ${strike} against ${activeTrades.length} active trades`);
+
     
     // Check if any active trade has this strike
     const hasPosition = activeTrades.some(trade => {
       const tradeStrike = parseFloat(trade.strike.replace(/[^\d.-]/g, ''));
       const matches = tradeStrike === strike;
       if (matches) {
-        console.log(`[POSITION INDICATOR] ✅ Found match: trade strike ${tradeStrike} matches table strike ${strike}`);
+
       }
       return matches;
     });
     
     // Debug logging
-    console.log(`[POSITION INDICATOR] Strike ${strike} has position: ${hasPosition}`);
+    
     
     // Update visual indicator
     if (hasPosition) {
       strikeCell.style.backgroundColor = '#1a2a1a'; // Very subtle green tint
       strikeCell.style.borderLeft = '3px solid #45d34a'; // Green left border
-      console.log(`[POSITION INDICATOR] ✅ Applied indicator to strike ${strike}`);
+
     } else {
       strikeCell.style.backgroundColor = '';
       strikeCell.style.borderLeft = '';
@@ -744,7 +744,7 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
         
         if (response.ok) {
           const result = await response.json();
-          console.log('Strike table trade initiated successfully:', result);
+      
           
           // Play audio alert for trade opening
           if (typeof playSound === 'function') {
@@ -971,26 +971,26 @@ let dbChangeWebSocket = null;
 
 function connectDbChangeWebSocket() {
   if (dbChangeWebSocket && dbChangeWebSocket.readyState === WebSocket.OPEN) {
-    console.log("[WEBSOCKET] Already connected");
+
     return; // Already connected
   }
 
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}/ws/db_changes`;
-  console.log("[WEBSOCKET] Connecting to:", wsUrl);
+  
   
   dbChangeWebSocket = new WebSocket(wsUrl);
   
   dbChangeWebSocket.onopen = function() {
-    console.log("[WEBSOCKET] ✅ Connection opened successfully");
+    
   };
   
   dbChangeWebSocket.onmessage = function(event) {
     try {
-      console.log("[WEBSOCKET] Received message:", event.data);
+
       const data = JSON.parse(event.data);
       if (data.type === 'db_change' && data.database === 'trades') {
-        console.log("[WEBSOCKET] ✅ Trades DB change detected, updating UI");
+        
         fetchAndRenderStrikeTable();
         // Also update active trades when trades.db changes
         if (typeof window.fetchAndRenderTrades === 'function') {
@@ -1003,10 +1003,10 @@ function connectDbChangeWebSocket() {
   };
   
   dbChangeWebSocket.onclose = function(event) {
-    console.log("[WEBSOCKET] ❌ Connection closed:", event.code, event.reason);
+    
     // Try to reconnect after 5 seconds
     setTimeout(() => {
-      console.log("[WEBSOCKET] Attempting to reconnect...");
+      
       connectDbChangeWebSocket();
     }, 5000);
   };
@@ -1029,13 +1029,13 @@ if (typeof window !== 'undefined') {
   
   // Add a test function to manually trigger a database change notification
   window.testWebSocketConnection = function() {
-    console.log("[WEBSOCKET] Testing connection...");
+
     if (dbChangeWebSocket && dbChangeWebSocket.readyState === WebSocket.OPEN) {
-      console.log("[WEBSOCKET] ✅ Connection is open");
+      
       // Send a test message to the server
       dbChangeWebSocket.send("ping");
     } else {
-      console.log("[WEBSOCKET] ❌ Connection is not open, state:", dbChangeWebSocket ? dbChangeWebSocket.readyState : 'null');
+      
     }
   };
 } 

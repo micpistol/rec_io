@@ -470,7 +470,7 @@ function updateWatchlistBuyButton(spanEl, strike, side, askPrice, isActive, tick
         
         if (response.ok) {
           const result = await response.json();
-          console.log('Watchlist trade initiated successfully:', result);
+      
           
           // Play audio alert for trade opening
           if (typeof playSound === 'function') {
@@ -515,26 +515,26 @@ async function updateWatchlistPositionIndicator(strikeCell, strike) {
     const activeTrades = data.active_trades || [];
     
     // Debug logging
-    console.log(`[WATCHLIST POSITION INDICATOR] Checking strike ${strike} against ${activeTrades.length} active trades`);
+
     
     // Check if any active trade has this strike (SAME as main strike table)
     const hasPosition = activeTrades.some(trade => {
       const tradeStrike = parseFloat(trade.strike.replace(/[^\d.-]/g, ''));
       const matches = tradeStrike === strike;
       if (matches) {
-        console.log(`[WATCHLIST POSITION INDICATOR] ✅ Found match: trade strike ${tradeStrike} matches table strike ${strike}`);
+
       }
       return matches;
     });
     
     // Debug logging
-    console.log(`[WATCHLIST POSITION INDICATOR] Strike ${strike} has position: ${hasPosition}`);
+    
     
     // Update visual indicator (SAME as main strike table)
     if (hasPosition) {
       strikeCell.style.backgroundColor = '#1a2a1a'; // Very subtle green tint
       strikeCell.style.borderLeft = '3px solid #45d34a'; // Green left border
-      console.log(`[WATCHLIST POSITION INDICATOR] ✅ Applied indicator to strike ${strike}`);
+
     } else {
       strikeCell.style.backgroundColor = '';
       strikeCell.style.borderLeft = '';

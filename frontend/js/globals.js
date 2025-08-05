@@ -16,7 +16,7 @@ async function loadPortConfig() {
                 tradeExecutor: { port: config.ports.trade_executor, host: host },
                 activeTradeSupervisor: { port: config.ports.active_trade_supervisor, host: host }
             };
-            console.log('[GLOBALS] Loaded centralized port configuration:', serviceConfig);
+          
         } else {
             console.error('[GLOBALS] Failed to load port config - system cannot function without centralized configuration');
             throw new Error('Centralized port configuration is required');

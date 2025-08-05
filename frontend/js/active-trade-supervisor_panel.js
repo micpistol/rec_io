@@ -403,13 +403,13 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
 
 async function closeActiveTrade(tradeId, ticketId) {
   try {
-    console.log('[ACTIVE TRADE SUPERVISOR] Attempting to close trade:', tradeId);
+
     
     // Use the centralized closeTrade function from the trade execution controller
     if (typeof window.closeTrade === 'function') {
       // Get current BTC price for sell price
       const currentPrice = typeof getCurrentBTCTickerPrice === 'function' ? getCurrentBTCTickerPrice() : 0.5;
-      console.log('[ACTIVE TRADE SUPERVISOR] Current price for close:', currentPrice);
+
       
       // Create a mock event object since we don't have the actual event
       const mockEvent = {
@@ -419,9 +419,9 @@ async function closeActiveTrade(tradeId, ticketId) {
       };
       
       // Call the centralized close trade function - let it handle all notifications
-      console.log('[ACTIVE TRADE SUPERVISOR] Calling window.closeTrade with:', { tradeId, currentPrice });
+      
       await window.closeTrade(tradeId, currentPrice, mockEvent);
-      console.log('[ACTIVE TRADE SUPERVISOR] Close trade call completed');
+      
     } else {
       console.error('[ACTIVE TRADE SUPERVISOR] Centralized closeTrade function not available');
     }

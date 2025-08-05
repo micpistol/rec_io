@@ -336,6 +336,70 @@ async def get_ports():
     """Get all port assignments from centralized system."""
     return get_port_info()
 
+# Test endpoint
+@app.get("/api/test-health")
+async def test_health():
+    """Test endpoint to verify routing works."""
+    return {"message": "Test health endpoint working"}
+
+# System health endpoint
+@app.get("/api/system-health")
+async def get_system_health():
+    """Get comprehensive system health status."""
+    try:
+        # Import system monitor
+        from backend.system_monitor import SystemMonitor
+        
+        # Create system monitor instance and generate health report
+        monitor = SystemMonitor()
+        health_report = monitor.generate_health_report()
+        
+        # Determine overall system status
+        overall_status = "healthy"
+        issues = []
+        
+        # Check supervisor status
+        if health_report.get("supervisor_status", {}).get("status") != "running":
+            overall_status = "offline"
+            issues.append("Supervisor not running")
+        
+        # Check critical services
+        critical_services = ["main_app", "trade_manager", "trade_executor", "active_trade_supervisor"]
+        unhealthy_services = []
+        
+        for service in critical_services:
+            service_status = health_report.get("services", {}).get(service, {})
+            if service_status.get("status") != "healthy":
+                unhealthy_services.append(service)
+        
+        if unhealthy_services:
+            if len(unhealthy_services) >= len(critical_services) // 2:
+                overall_status = "offline"
+            else:
+                overall_status = "degraded"
+            issues.append(f"Unhealthy services: {', '.join(unhealthy_services)}")
+        
+        # Check database health
+        db_health = health_report.get("database_health", {})
+        if db_health.get("status") != "healthy":
+            overall_status = "degraded"
+            issues.append("Database issues detected")
+        
+        return {
+            "status": overall_status,
+            "issues": issues,
+            "timestamp": datetime.now().isoformat(),
+            "health_report": health_report
+        }
+        
+    except Exception as e:
+        return {
+            "status": "offline",
+            "issues": [f"System monitor error: {str(e)}"],
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e)
+        }
+
 # WebSocket connections
 class ConnectionManager:
     def __init__(self):

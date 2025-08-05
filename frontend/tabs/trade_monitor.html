@@ -819,7 +819,7 @@
 <script>
 // === Unified Preferences: AUTO STOP, Position Size, Multiplier with WebSocket sync (improved) ===
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOMContentLoaded - Starting preferences setup');
+  // Starting preferences setup
   
   const autoStopToggle = document.getElementById('autoStopToggle');
   const autoStopSupervisorToggle = document.getElementById('autoStopSupervisorToggle');
@@ -828,13 +828,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const autoEntryToggle = document.getElementById('autoEntryToggle');
   const plusMinusToggle = document.getElementById('plusMinusToggle');
   
-  console.log('Elements found:', {
-    autoStopToggle: !!autoStopToggle,
-    positionInput: !!positionInput,
-    multiplierButtons: multiplierButtons.length,
-    autoEntryToggle: !!autoEntryToggle,
-    plusMinusToggle: !!plusMinusToggle
-  });
+
   
   let currentMultiplier = null;
   // Remove: let ignoreWsUpdates = false; (now global)
@@ -871,7 +865,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // If AUTO ENTRY is enabled on initial load, apply filtering
         if (data.auto_entry) {
-          console.log('AUTO ENTRY enabled on initial load - applying automatic filtering');
+          // AUTO ENTRY enabled on initial load - applying automatic filtering
           setTimeout(() => {
             if (window.StrikeTable && window.StrikeTable.setAutoEntry) {
               window.StrikeTable.setAutoEntry(true);
@@ -912,11 +906,10 @@ document.addEventListener('DOMContentLoaded', () => {
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      console.log('WebSocket message received:', data);
 
       // === Automated Trade Notification ===
       if (data.type === 'automated_trade_triggered') {
-        console.log('🔔 Automated trade triggered:', data.data);
+
         
         // Trigger the same audio/visual alerts as manual trades
         if (typeof playSound === 'function') {
@@ -943,7 +936,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // === Automated Trade Close Notification ===
       if (data.type === 'automated_trade_closed') {
-        console.log('🔔 Automated trade closed:', data.data);
+
         
         // Trigger the same audio/visual alerts as manual trade closes
         if (typeof playSound === 'function') {
@@ -992,7 +985,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (autoEntryToggle && data.auto_entry !== undefined && document.activeElement !== autoEntryToggle) {
         ignoreWsUpdates = true;
-        console.log('Received AUTO ENTRY update via WebSocket:', data.auto_entry);
+
         autoEntryToggle.checked = data.auto_entry;
         
         // Use clean API to update strike table auto entry mode
@@ -1004,7 +997,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // === Auto Entry Indicator Change ===
       if (data.type === 'auto_entry_indicator_change') {
-        console.log('🔔 Auto entry indicator change:', data.data);
+
         updateAutoEntryIndicator(data.data);
         return; // Don't process other WebSocket messages for this type
       }
@@ -1013,7 +1006,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (plusMinusToggle && data.diff_mode !== undefined && document.activeElement !== plusMinusToggle) {
         ignoreWsUpdates = true;
-        console.log('Received diff_mode update via WebSocket:', data.diff_mode);
+
         plusMinusToggle.checked = data.diff_mode;
         
         // Use clean API to update strike table diff mode
@@ -1051,26 +1044,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Save handlers, ignoring changes triggered by WebSocket updates
   if (autoStopToggle) {
-    console.log('Adding auto stop event listener');
+
     autoStopToggle.addEventListener('change', () => {
-      console.log('Auto stop event handler triggered, ignoreWsUpdates:', ignoreWsUpdates);
+      
       if (ignoreWsUpdates) {
-        console.log('Ignoring auto stop change due to WebSocket update');
+        
         return;
       }
       const value = autoStopToggle.checked;
-      console.log('Auto stop toggle changed to:', value);
+      
       window.autoStopEnabled = value;
-      console.log('Sending auto stop update to backend:', { enabled: value });
+      
       fetch(window.location.origin + '/api/set_auto_stop', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: value })
       }).then(response => {
-        console.log('Auto stop backend response:', response.status);
+        
         return response.json();
       }).then(data => {
-        console.log('Auto stop backend data:', data);
+        
       }).catch(error => {
         console.error('Auto stop backend error:', error);
       });
@@ -1079,26 +1072,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Supervisor toggle - connected to same auto_stop preference
   if (autoStopSupervisorToggle) {
-    console.log('Adding auto stop supervisor event listener');
+    // Removed console.log
     autoStopSupervisorToggle.addEventListener('change', () => {
-      console.log('Auto stop supervisor event handler triggered, ignoreWsUpdates:', ignoreWsUpdates);
+      // Removed console.log
       if (ignoreWsUpdates) {
-        console.log('Ignoring auto stop supervisor change due to WebSocket update');
+        // Removed console.log
         return;
       }
       const value = autoStopSupervisorToggle.checked;
-      console.log('Auto stop supervisor toggle changed to:', value);
+      // Removed console.log
       window.autoStopEnabled = value;
-      console.log('Sending auto stop supervisor update to backend:', { enabled: value });
+      // Removed console.log
       fetch(window.location.origin + '/api/set_auto_stop', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: value })
       }).then(response => {
-        console.log('Auto stop supervisor backend response:', response.status);
+        // Removed console.log
         return response.json();
       }).then(data => {
-        console.log('Auto stop supervisor backend data:', data);
+        // Removed console.log
       }).catch(error => {
         console.error('Auto stop supervisor backend error:', error);
       });
@@ -1106,31 +1099,31 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (autoEntryToggle) {
-    console.log('Adding AUTO ENTRY event listener');
+    // Removed console.log
     autoEntryToggle.addEventListener('change', () => {
-      console.log('AUTO ENTRY event handler triggered, ignoreWsUpdates:', ignoreWsUpdates);
+      // Removed console.log
       if (ignoreWsUpdates) {
-        console.log('Ignoring AUTO ENTRY change due to WebSocket update');
+        // Removed console.log
         return;
       }
       const value = autoEntryToggle.checked;
-      console.log('AUTO ENTRY toggle changed to:', value);
+      // Removed console.log
       
       // Use clean API to update strike table auto entry mode
       if (window.StrikeTable && window.StrikeTable.setAutoEntry) {
         window.StrikeTable.setAutoEntry(value);
       }
       
-      console.log('Sending AUTO ENTRY update to backend:', { enabled: value });
+      // Removed console.log
       fetch(window.location.origin + '/api/set_auto_entry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: value })
       }).then(response => {
-        console.log('AUTO ENTRY backend response:', response.status);
+        // Removed console.log
         return response.json();
       }).then(data => {
-        console.log('AUTO ENTRY backend data:', data);
+        // Removed console.log
       }).catch(error => {
         console.error('AUTO ENTRY backend error:', error);
       });
@@ -1138,15 +1131,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (plusMinusToggle) {
-    console.log('Adding diff mode event listener');
+    // Removed console.log
     plusMinusToggle.addEventListener('change', () => {
-      console.log('Diff mode event handler triggered, ignoreWsUpdates:', ignoreWsUpdates);
+      // Removed console.log
       if (ignoreWsUpdates) {
-        console.log('Ignoring diff mode change due to WebSocket update');
+        // Removed console.log
         return;
       }
       const value = plusMinusToggle.checked;
-      console.log('DIFF mode toggle changed to:', value);
+      // Removed console.log
       
       // Use clean API to update strike table immediately
       if (window.StrikeTable && window.StrikeTable.setDiffMode) {
@@ -1154,16 +1147,16 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       // Sync to backend in background
-      console.log('Sending diff mode update to backend:', { enabled: value });
+      // Removed console.log
       fetch(window.location.origin + '/api/set_diff_mode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: value })
       }).then(response => {
-        console.log('Diff mode backend response:', response.status);
+        // Removed console.log
         return response.json();
       }).then(data => {
-        console.log('Diff mode backend data:', data);
+        // Removed console.log
       }).catch(error => {
         console.error('Diff mode backend error:', error);
       });
@@ -1171,25 +1164,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (positionInput) {
-    console.log('Adding position size event listener');
+    // Removed console.log
     positionInput.addEventListener('change', () => {
-      console.log('Position size event handler triggered, ignoreWsUpdates:', ignoreWsUpdates);
+      // Removed console.log
       if (ignoreWsUpdates) {
-        console.log('Ignoring position size change due to WebSocket update');
+        // Removed console.log
         return;
       }
       const value = parseInt(positionInput.value, 10) || 100;
-      console.log('Position size changed to:', value);
-      console.log('Sending position size update to backend:', { position_size: value });
+      // Removed console.log
+      // Removed console.log
       fetch(window.location.origin + '/api/set_position_size', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ position_size: value })
       }).then(response => {
-        console.log('Position size backend response:', response.status);
+        // Removed console.log
         return response.json();
       }).then(data => {
-        console.log('Position size backend data:', data);
+        // Removed console.log
       }).catch(error => {
         console.error('Position size backend error:', error);
       });
@@ -1198,28 +1191,28 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   multiplierButtons.forEach(btn => {
-    console.log('Adding event listener to multiplier button:', btn.dataset.multiplier);
+    // Removed console.log
     btn.addEventListener('click', () => {
-      console.log('Multiplier button clicked:', btn.dataset.multiplier);
+      // Removed console.log
       if (ignoreWsUpdates) {
-        console.log('Ignoring due to WebSocket update');
+        // Removed console.log
         return;
       }
       multiplierButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentMultiplier = parseInt(btn.dataset.multiplier, 10);
-      console.log('Setting currentMultiplier to:', currentMultiplier);
+      // Removed console.log
       updatePositionDisplay();
-      console.log('Sending multiplier update to backend:', { multiplier: currentMultiplier });
+      // Removed console.log
       fetch(window.location.origin + '/api/set_multiplier', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ multiplier: currentMultiplier })
       }).then(response => {
-        console.log('Multiplier backend response:', response.status);
+        // Removed console.log
         return response.json();
       }).then(data => {
-        console.log('Multiplier backend data:', data);
+        // Removed console.log
       }).catch(error => {
         console.error('Multiplier backend error:', error);
       });
@@ -2686,26 +2679,26 @@ function setupDatabaseChangeListener() {
   const ws = new WebSocket(`ws://${window.location.host}/ws/db_changes`);
   
   ws.onopen = function() {
-    console.log('🔗 Connected to database change notifications');
+    // Removed console.log
   };
   
   ws.onmessage = function(event) {
     try {
       const data = JSON.parse(event.data);
-      console.log('📡 Received database change notification:', data);
+      // Removed console.log
       
       // Handle different database change types and refresh immediately
       if (data.database === 'fills') {
-        console.log('🔄 Refreshing fills table due to database change');
+        // Removed console.log
         fetchAndRenderRecentTrades();
       } else if (data.database === 'positions') {
-        console.log('🔄 Refreshing positions table due to database change');
+        // Removed console.log
         fetchAndRenderPositions();
       } else if (data.database === 'settlements') {
-        console.log('🔄 Refreshing settlements table due to database change');
+        // Removed console.log
         fetchAndRenderSettlements();
       } else if (data.database === 'trades') {
-        console.log('🔄 Refreshing trade history table due to database change');
+        // Removed console.log
         fetchAndRenderTradeHistory();
       }
     } catch (error) {
@@ -2718,10 +2711,10 @@ function setupDatabaseChangeListener() {
   };
   
   ws.onclose = function() {
-    console.log('🔌 Database change WebSocket connection closed');
+    // Removed console.log
     // Attempt to reconnect after a delay
     setTimeout(() => {
-      console.log('🔄 Attempting to reconnect to database change notifications...');
+      // Removed console.log
       setupDatabaseChangeListener();
     }, 5000);
   };
@@ -3101,7 +3094,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
           });
           if (response.ok) {
-            console.log('Auto stop settings saved successfully');
+            // Removed console.log
             lastSavedProbability = newProb;
             window.lastSavedMinTTC = minTTC;
             window.lastSavedMomentumSpikeEnabled = momentumSpikeEnabled;
@@ -3639,7 +3632,7 @@ function handleMouseMove(e) {
   const snappedSeconds = Math.max(0, Math.min(3600, intervalIndex * 15));
   
   // Debug logging
-  console.log('Slider Debug:', {
+  
     x: x,
     percent: percent,
     intervalIndex: intervalIndex,
@@ -3724,7 +3717,7 @@ function updateAutoEntryIndicator(data) {
             }
         }
         
-        console.log('🚨 SPIKE ALERT: Auto trading paused due to market spike');
+        // Removed console.log
         return;
     }
     
@@ -3744,19 +3737,19 @@ function updateAutoEntryIndicator(data) {
             indicatorText.textContent = 'Automated Trading ON';
         }
         
-        console.log('🔔 AUTOMATED TRADING ON: Scanning is active');
+        // Removed console.log
     } else {
         // Hide the indicator when scanning is not active
         indicator.style.display = 'none';
-        console.log('🔔 AUTOMATED TRADING OFF: Scanning is not active');
+        // Removed console.log
         
         // Log additional debug info
         if (data.enabled && !data.service_healthy) {
-            console.log('⚠️ Auto entry enabled but service not healthy');
+            // Removed console.log
         } else if (data.enabled && data.service_healthy && !data.ttc_within_window) {
-            console.log('⚠️ Auto entry enabled and service healthy but TTC not in window');
+            // Removed console.log
         } else if (!data.enabled) {
-            console.log('⚠️ Auto entry not enabled');
+            // Removed console.log
         }
     }
 }
@@ -3775,38 +3768,38 @@ if (typeof window.liveData !== 'undefined') {
   <script>
     // Force initialize strike table after DOM is ready
     document.addEventListener('DOMContentLoaded', function() {
-      console.log('DOMContentLoaded - Force initializing strike table');
+      // Removed console.log
       
       // Wait a bit for all scripts to load
       setTimeout(function() {
-        console.log('Checking strike table functions...');
-        console.log('window.StrikeTable:', typeof window.StrikeTable);
-        console.log('window.initializeStrikeTableContainer:', typeof window.initializeStrikeTableContainer);
-        console.log('window.updateStrikeTable:', typeof window.updateStrikeTable);
+        // Removed console.log
+        // Removed console.log
+        // Removed console.log
+        // Removed console.log
         
         if (typeof window.StrikeTable !== 'undefined' && typeof window.StrikeTable.initialize === 'function') {
-          console.log('Initializing StrikeTable...');
+          // Removed console.log
           window.StrikeTable.initialize();
         } else {
-          console.log('StrikeTable not available, trying direct initialization...');
+          // Removed console.log
           if (typeof window.initializeStrikeTableContainer === 'function') {
-            console.log('Calling initializeStrikeTableContainer...');
+            // Removed console.log
             window.initializeStrikeTableContainer();
           }
           if (typeof window.updateStrikeTable === 'function') {
-            console.log('Calling updateStrikeTable...');
+            // Removed console.log
             window.updateStrikeTable();
           }
         }
         
         // Test API call directly
         setTimeout(function() {
-          console.log('Testing API call...');
+          // Removed console.log
           fetch('/api/strike_tables/btc')
             .then(response => response.json())
             .then(data => {
-              console.log('API response:', data);
-              console.log('Strikes count:', data.strikes ? data.strikes.length : 'no strikes');
+              // Removed console.log
+              // Removed console.log
             })
             .catch(error => {
               console.error('API error:', error);
@@ -3826,32 +3819,32 @@ if (typeof window.liveData !== 'undefined') {
   <script>
     // Auto-refresh trade history table every 10 seconds
     document.addEventListener('DOMContentLoaded', function() {
-      console.log('Setting up auto-refresh for trade history table (every 10 seconds)');
+  
       
       // Set up the auto-refresh interval
       const refreshInterval = setInterval(function() {
-        console.log('Auto-refreshing trade history table...');
+        // Removed console.log
         
         // Refresh trade history data without reloading the page
         // These functions are defined in this file, so they should be available
         try {
           if (typeof fetchAndRenderTrades === 'function') {
-            console.log('Calling fetchAndRenderTrades...');
+            // Removed console.log
             fetchAndRenderTrades();
           } else {
-            console.log('fetchAndRenderTrades function not found');
+            // Removed console.log
           }
           
           if (typeof fetchAndRenderRecentTrades === 'function') {
-            console.log('Calling fetchAndRenderRecentTrades...');
+            // Removed console.log
             fetchAndRenderRecentTrades();
           } else {
-            console.log('fetchAndRenderRecentTrades function not found');
+            // Removed console.log
           }
           
           // Also try to refresh other trade-related data
           if (typeof fetchAndRenderTradeHistory === 'function') {
-            console.log('Calling fetchAndRenderTradeHistory...');
+            // Removed console.log
             fetchAndRenderTradeHistory();
           }
           

@@ -120,7 +120,7 @@ function updateAutoEntryIndicator(data) {
       }
     }
     
-    console.log('🚨 SPIKE ALERT: Auto trading paused due to market spike');
+    
     return;
   }
   
@@ -140,11 +140,11 @@ function updateAutoEntryIndicator(data) {
       indicatorText.textContent = 'Automated Trading ON';
     }
     
-    console.log('🔔 AUTOMATED TRADING ON: Scanning is active');
+    
   } else {
     // Hide the indicator when scanning is not active
     indicator.style.display = 'none';
-    console.log('🔔 AUTOMATED TRADING OFF: Scanning is not active');
+    
   }
 }
 
