@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import re
 import requests
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from backend.core.config.settings import config
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -25,6 +27,21 @@ TRADE_MANAGER_PORT = get_port("trade_manager")
 # Thread-safe set to track trades being processed
 processing_trades = set()
 processing_lock = threading.Lock()
+
+# PostgreSQL connection function
+def get_postgresql_connection():
+    """Get a connection to the PostgreSQL database"""
+    try:
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        return conn
+    except Exception as e:
+        print(f"❌ Failed to connect to PostgreSQL: {e}")
+        return None
 
 def get_executor_port():
     return get_port("trade_executor")
@@ -93,6 +110,32 @@ def insert_trade(trade):
     last_id = cursor.lastrowid
     conn.close()
     
+    # Also write to PostgreSQL
+    try:
+        pg_conn = get_postgresql_connection()
+        if pg_conn:
+            with pg_conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO users.trades_0001 (
+                        date, time, strike, side, buy_price, position, status,
+                        contract, ticker, symbol, market, trade_strategy, symbol_open,
+                        momentum, prob, volatility, ticket_id, entry_method
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    trade['date'], trade['time'], trade['strike'], trade['side'], trade['buy_price'],
+                    trade['position'], trade.get('status', 'pending'), contract_name,
+                    trade.get('ticker'), trade.get('symbol'), trade.get('market'), trade.get('trade_strategy'),
+                    symbol_open, momentum_for_db, trade.get('prob'),
+                    trade.get('volatility'), trade.get('ticket_id'), trade.get('entry_method', 'manual')
+                ))
+                pg_conn.commit()
+                print(f"💾 Trade also written to PostgreSQL users.trades_0001")
+            pg_conn.close()
+        else:
+            print(f"⚠️ Skipping PostgreSQL write - no connection available")
+    except Exception as pg_err:
+        print(f"❌ Failed to write trade to PostgreSQL: {pg_err}")
+    
     notify_frontend_trade_change()
     return last_id
 
@@ -157,12 +200,15 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
                     else:
                         diff_formatted = None
                     
+                    # Update trade status to open (this will also update PostgreSQL)
+                    update_trade_status(id, 'open')
+                    
+                    # Update additional fields in SQLite
                     conn = get_db_connection()
                     cursor = conn.cursor()
                     cursor.execute("""
                         UPDATE trades
-                        SET status = 'open',
-                            position = ?,
+                        SET position = ?,
                             buy_price = ?,
                             fees = ?,
                             diff = ?
@@ -170,6 +216,49 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
                     """, (pos, price, round(fees_paid, 2), diff_formatted, id))
                     conn.commit()
                     conn.close()
+                    
+                    # Get current symbol price for symbol_open (same as symbol_close logic)
+                    symbol_open = None
+                    try:
+                        import requests
+                        main_port = get_port("main_app")
+                        response = requests.get(f"http://localhost:{main_port}/api/btc_price", timeout=5)
+                        if response.ok:
+                            btc_data = response.json()
+                            symbol_open = btc_data.get('price')
+                            if symbol_open:
+                                log_event(ticket_id, f"MANAGER: Retrieved current symbol price for open: {symbol_open}")
+                            else:
+                                log_event(ticket_id, f"MANAGER: No price data in unified endpoint response")
+                                symbol_open = None
+                        else:
+                            log_event(ticket_id, f"MANAGER: Unified BTC price endpoint returned status {response.status_code}")
+                            symbol_open = None
+                    except Exception as e:
+                        log_event(ticket_id, f"MANAGER: Failed to get current symbol price from unified endpoint: {e}")
+                        symbol_open = None
+                    
+                    # Also update additional fields in PostgreSQL
+                    try:
+                        pg_conn = get_postgresql_connection()
+                        if pg_conn:
+                            with pg_conn.cursor() as cursor:
+                                cursor.execute("""
+                                    UPDATE users.trades_0001
+                                    SET position = %s,
+                                        buy_price = %s,
+                                        fees = %s,
+                                        diff = %s,
+                                        symbol_open = %s
+                                    WHERE id = %s
+                                """, (pos, price, round(fees_paid, 2), diff_formatted, round(symbol_open, 2) if symbol_open else None, id))
+                                pg_conn.commit()
+                                print(f"💾 Trade additional fields also updated in PostgreSQL users.trades_0001")
+                            pg_conn.close()
+                        else:
+                            print(f"⚠️ Skipping PostgreSQL additional fields update - no connection available")
+                    except Exception as pg_err:
+                        print(f"❌ Failed to update trade additional fields in PostgreSQL: {pg_err}")
                     
                     log_event(ticket_id, f"MANAGER: OPEN TRADE CONFIRMED — pos={pos}, price={price}, fees={fees}, diff={diff_formatted}")
                     notify_active_trade_supervisor_direct(id, ticket_id, "open")
@@ -568,6 +657,31 @@ def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbo
         cursor.execute("UPDATE trades SET status = ? WHERE id = ?", (status, trade_id))
     conn.commit()
     conn.close()
+    
+    # Also update PostgreSQL
+    try:
+        pg_conn = get_postgresql_connection()
+        if pg_conn:
+            with pg_conn.cursor() as cursor:
+                if status == 'closed':
+                    cursor.execute("""
+                        UPDATE users.trades_0001 
+                        SET status = %s, closed_at = %s, sell_price = %s, symbol_close = %s, win_loss = %s, pnl = %s, close_method = %s 
+                        WHERE id = %s
+                    """, (status, closed_at, sell_price, symbol_close, win_loss, calculated_pnl, close_method, trade_id))
+                else:
+                    cursor.execute("""
+                        UPDATE users.trades_0001 
+                        SET status = %s 
+                        WHERE id = %s
+                    """, (status, trade_id))
+                pg_conn.commit()
+                print(f"💾 Trade status update also written to PostgreSQL users.trades_0001")
+            pg_conn.close()
+        else:
+            print(f"⚠️ Skipping PostgreSQL update - no connection available")
+    except Exception as pg_err:
+        print(f"❌ Failed to update trade status in PostgreSQL: {pg_err}")
     
     notify_frontend_trade_change()
 
