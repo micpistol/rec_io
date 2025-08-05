@@ -1026,11 +1026,15 @@ def sync_orders():
             pg_conn = get_postgresql_connection()
             if pg_conn:
                 with pg_conn.cursor() as cursor:
+                    # Get existing order_ids from PostgreSQL (same deduplication logic as SQLite)
+                    cursor.execute("SELECT order_id FROM users.orders_0001")
+                    pg_existing_ids = set(row[0] for row in cursor.fetchall())
+                    
                     pg_new_count = 0
                     for order in all_orders:
                         order_id = order.get("order_id")
-                        if not order_id:
-                            continue
+                        if not order_id or order_id in pg_existing_ids:
+                            continue  # Skip if already exists in PostgreSQL
                         
                         try:
                             cursor.execute("""
