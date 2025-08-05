@@ -1,12 +1,15 @@
 -- Create user_0001 table structure in PostgreSQL
 -- This script creates tables that match existing SQLite schemas exactly
 
--- Create user master table
+-- Cleaned up user_master table
+DROP TABLE IF EXISTS users.user_master CASCADE;
+
 CREATE TABLE IF NOT EXISTS users.user_master (
-    user_id VARCHAR(10) PRIMARY KEY DEFAULT '0001',
-    username VARCHAR(50) UNIQUE NOT NULL,
+    user_no VARCHAR(10) PRIMARY KEY, -- e.g., '0001'
+    user_id VARCHAR(50) UNIQUE NOT NULL, -- e.g., 'ewais'
     email VARCHAR(255) UNIQUE,
-    name VARCHAR(100),
+    first_name VARCHAR(50),
+    last_name VARCHAR(50),
     phone VARCHAR(20),
     account_type VARCHAR(20) DEFAULT 'master_admin',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -14,10 +17,30 @@ CREATE TABLE IF NOT EXISTS users.user_master (
     is_active BOOLEAN DEFAULT TRUE
 );
 
+-- Cleaned up user_info table
+DROP TABLE IF EXISTS users.user_info_0001 CASCADE;
+
+CREATE TABLE IF NOT EXISTS users.user_info_0001 (
+    user_no VARCHAR(10) PRIMARY KEY REFERENCES users.user_master(user_no),
+    user_id VARCHAR(50) NOT NULL,
+    email VARCHAR(255),
+    first_name VARCHAR(50),
+    last_name VARCHAR(50),
+    phone VARCHAR(20),
+    account_type VARCHAR(20),
+    created_at TIMESTAMP WITH TIME ZONE,
+    last_login TIMESTAMP WITH TIME ZONE,
+    is_active BOOLEAN
+);
+
 -- Insert user_0001 if not exists
-INSERT INTO users.user_master (user_id, username, name, email, phone, account_type) 
-VALUES ('0001', 'ewais', 'Eric Wais', 'eric@ewedit.com', '+1 (917) 586-4077', 'master_admin')
-ON CONFLICT (user_id) DO NOTHING;
+INSERT INTO users.user_master (user_no, user_id, first_name, last_name, email, phone, account_type)
+VALUES ('0001', 'ewais', 'Eric', 'Wais', 'eric@ewedit.com', '+1 (917) 586-4077', 'master_admin')
+ON CONFLICT (user_no) DO NOTHING;
+
+INSERT INTO users.user_info_0001 (user_no, user_id, first_name, last_name, email, phone, account_type, created_at, last_login, is_active)
+VALUES ('0001', 'ewais', 'Eric', 'Wais', 'eric@ewedit.com', '+1 (917) 586-4077', 'master_admin', CURRENT_TIMESTAMP, NULL, TRUE)
+ON CONFLICT (user_no) DO NOTHING;
 
 -- Create trades table (matches SQLite schema exactly)
 CREATE TABLE IF NOT EXISTS users.trades_0001 (
@@ -164,13 +187,13 @@ CREATE TABLE IF NOT EXISTS users.settlements_0001 (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create account_balance table (matches SQLite schema exactly)
-CREATE TABLE IF NOT EXISTS users.account_balance_0001 (
+-- Simplified account_balance_0001 table
+DROP TABLE IF EXISTS users.account_balance_0001 CASCADE;
+
+CREATE TABLE users.account_balance_0001 (
     id SERIAL PRIMARY KEY,
     balance REAL NOT NULL,
-    timestamp TEXT NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    timestamp TEXT NOT NULL
 );
 
 -- Create watchlist table

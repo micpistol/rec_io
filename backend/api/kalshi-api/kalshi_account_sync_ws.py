@@ -38,6 +38,8 @@ from cryptography.hazmat.primitives import hashes
 import asyncio
 import aiohttp
 import websockets
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 # Add project root to path for imports
 import sys
@@ -81,6 +83,21 @@ ENV_VARS = dotenv_values(CREDENTIALS_DIR / ".env")
 
 KEY_ID = ENV_VARS.get("KALSHI_API_KEY_ID")
 KEY_PATH = CREDENTIALS_DIR / "kalshi.pem"
+
+# PostgreSQL connection function
+def get_postgresql_connection():
+    """Get a connection to the PostgreSQL database"""
+    try:
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        return conn
+    except Exception as e:
+        print(f"❌ Failed to connect to PostgreSQL: {e}")
+        return None
 
 def generate_kalshi_signature(method, full_path, timestamp, key_path):
     from cryptography.hazmat.primitives import serialization, hashes
@@ -342,6 +359,24 @@ def sync_balance():
                 
         except Exception as db_err:
             print(f"❌ Failed to write balance to database: {db_err}")
+        
+        # Also write to PostgreSQL
+        try:
+            pg_conn = get_postgresql_connection()
+            if pg_conn:
+                with pg_conn.cursor() as cursor:
+                    current_timestamp = datetime.now(EST).isoformat()
+                    cursor.execute("""
+                        INSERT INTO users.account_balance_0001 (balance, timestamp)
+                        VALUES (%s, %s)
+                    """, (balance_amount, current_timestamp))
+                    pg_conn.commit()
+                    print(f"💾 Balance also written to PostgreSQL users.account_balance_0001")
+                pg_conn.close()
+            else:
+                print(f"⚠️ Skipping PostgreSQL write - no connection available")
+        except Exception as pg_err:
+            print(f"❌ Failed to write balance to PostgreSQL: {pg_err}")
             
     except Exception as e:
         print(f"[{datetime.now()}] ❌ Failed to fetch balance: {e}")
@@ -475,6 +510,41 @@ def sync_positions():
         conn.commit()
     print(f"💾 All positions written to {POSITIONS_DB_PATH}")
 
+    # Also write to PostgreSQL
+    try:
+        pg_conn = get_postgresql_connection()
+        if pg_conn:
+            with pg_conn.cursor() as cursor:
+                # Clear existing positions
+                cursor.execute("DELETE FROM users.positions_0001")
+                
+                for p in all_market_positions:
+                    try:
+                        ticker = p.get("ticker")
+                        total_traded = p.get("total_traded")
+                        position_value = p.get("position")
+                        market_exposure = p.get("market_exposure")
+                        realized_pnl = float(p.get("realized_pnl")) / 100 if p.get("realized_pnl") is not None else None
+                        fees_paid = float(p.get("fees_paid")) / 100 if p.get("fees_paid") is not None else None
+                        last_updated_ts = p.get("last_updated_ts")
+                        raw_json = json.dumps(p)
+
+                        cursor.execute("""
+                            INSERT INTO users.positions_0001
+                            (ticker, total_traded, position, market_exposure, realized_pnl, fees_paid, last_updated_ts, raw_json)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (ticker, total_traded, position_value, market_exposure, realized_pnl, fees_paid, last_updated_ts, raw_json))
+                    except Exception as e:
+                        print(f"❌ Failed to insert position {p.get('ticker')} to PostgreSQL: {e}")
+                
+                pg_conn.commit()
+                print(f"💾 All positions also written to PostgreSQL users.positions_0001")
+            pg_conn.close()
+        else:
+            print(f"⚠️ Skipping PostgreSQL write - no connection available")
+    except Exception as pg_err:
+        print(f"❌ Failed to write positions to PostgreSQL: {pg_err}")
+
     # Also save market_positions and event_positions to positions.json in the same folder
     positions_json_path = os.path.join(os.path.dirname(POSITIONS_DB_PATH), "positions.json")
     try:
@@ -553,21 +623,7 @@ def sync_fills():
         print(f"❌ Failed to fetch fills: {e}")
         return
 
-    # ----- CHANGE-DETECTION: skip writes if nothing changed -----
-    global LAST_FILLS_HASH
-    try:
-        fills_snapshot_hash = hashlib.md5(
-            json.dumps(all_fills, sort_keys=True).encode()
-        ).hexdigest()
-    except Exception as e:
-        print(f"❌ Failed to hash fills snapshot: {e}")
-        fills_snapshot_hash = None
-
-    if fills_snapshot_hash and fills_snapshot_hash == LAST_FILLS_HASH:
-        print("🔁 No changes in fills — skipping DB/JSON write.")
-        return
-
-    LAST_FILLS_HASH = fills_snapshot_hash
+    # WebSocket triggers ensure we only poll when there's new data, so always write
 
     if all_fills:
         latest_time = all_fills[0].get("created_time")
@@ -577,7 +633,7 @@ def sync_fills():
         print("⚠️ API returned zero fills.")
     # ------------------------------------------------------------
 
-    # Deduplicate/appends to fills.db by trade_id
+    # Write to SQLite with deduplication
     with sqlite3.connect(FILLS_DB_PATH) as conn:
         c = conn.cursor()
         # Get all existing trade_ids
@@ -609,6 +665,47 @@ def sync_fills():
             except Exception as e:
                 print(f"❌ Failed to insert fill {trade_id}: {e}")
         conn.commit()
+        
+        # Write to PostgreSQL (write all fills, let PostgreSQL handle duplicates)
+        try:
+            pg_conn = get_postgresql_connection()
+            if pg_conn:
+                with pg_conn.cursor() as cursor:
+                    pg_new_count = 0
+                    for fill in all_fills:
+                        trade_id = fill.get("trade_id")
+                        if not trade_id:
+                            continue
+                        ticker = fill.get("ticker")
+                        order_id = fill.get("order_id")
+                        side = fill.get("side")
+                        action = fill.get("action")
+                        count = fill.get("count")
+                        yes_price = float(fill.get("yes_price")) / 100 if fill.get("yes_price") is not None else None
+                        no_price = float(fill.get("no_price")) / 100 if fill.get("no_price") is not None else None
+                        is_taker = bool(fill.get("is_taker")) if fill.get("is_taker") is not None else None
+                        created_time = fill.get("created_time")
+                        raw_json = json.dumps(fill)
+
+                        try:
+                            cursor.execute("""
+                                INSERT INTO users.fills_0001
+                                (trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time, raw_json)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                ON CONFLICT (trade_id) DO NOTHING
+                            """, (trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time, raw_json))
+                            pg_new_count += 1
+                        except Exception as e:
+                            print(f"❌ Failed to insert fill {trade_id} to PostgreSQL: {e}")
+                    
+                    pg_conn.commit()
+                    print(f"💾 {pg_new_count} fills written to PostgreSQL users.fills_0001")
+                pg_conn.close()
+            else:
+                print(f"⚠️ Skipping PostgreSQL write - no connection available")
+        except Exception as pg_err:
+            print(f"❌ Failed to write fills to PostgreSQL: {pg_err}")
+        
         # Save all_fills to fills.json in the same folder
         fills_json_path = os.path.join(os.path.dirname(FILLS_DB_PATH), "fills.json")
         try:
@@ -730,6 +827,39 @@ def sync_settlements():
             db.commit()
     print(f"💾 {len(new_settlements)} new settlements written to {SETTLEMENTS_DB_PATH}")
     
+    # Also write to PostgreSQL
+    try:
+        pg_conn = get_postgresql_connection()
+        if pg_conn:
+            with pg_conn.cursor() as cursor:
+                for settlement in all_settlements:
+                    try:
+                        ticker = settlement.get("ticker")
+                        market_result = settlement.get("market_result")
+                        yes_count = settlement.get("yes_count")
+                        yes_total_cost = float(settlement.get("yes_total_cost", 0)) / 100 if settlement.get("yes_total_cost") is not None else None
+                        no_count = settlement.get("no_count")
+                        no_total_cost = float(settlement.get("no_total_cost", 0)) / 100 if settlement.get("no_total_cost") is not None else None
+                        revenue = float(settlement.get("revenue", 0)) / 100 if settlement.get("revenue") is not None else None
+                        settled_time = settlement.get("settled_time")
+                        raw_json = json.dumps(settlement)
+
+                        cursor.execute("""
+                            INSERT INTO users.settlements_0001
+                            (ticker, market_result, yes_count, yes_total_cost, no_count, no_total_cost, revenue, settled_time, raw_json)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (ticker, market_result, yes_count, yes_total_cost, no_count, no_total_cost, revenue, settled_time, raw_json))
+                    except Exception as e:
+                        print(f"❌ Failed to insert settlement {settlement.get('ticker')} to PostgreSQL: {e}")
+                
+                pg_conn.commit()
+                print(f"💾 All settlements also written to PostgreSQL users.settlements_0001")
+            pg_conn.close()
+        else:
+            print(f"⚠️ Skipping PostgreSQL write - no connection available")
+    except Exception as pg_err:
+        print(f"❌ Failed to write settlements to PostgreSQL: {pg_err}")
+    
     # Also write to settlements.json for frontend consumption
     settlements_json_path = os.path.join(os.path.dirname(SETTLEMENTS_DB_PATH), "settlements.json")
     try:
@@ -829,21 +959,7 @@ def sync_orders():
         print(f"❌ Failed to fetch orders: {e}")
         return
 
-    # ----- CHANGE-DETECTION: skip writes if nothing changed -----
-    global LAST_ORDERS_HASH
-    try:
-        orders_snapshot_hash = hashlib.md5(
-            json.dumps(all_orders, sort_keys=True).encode()
-        ).hexdigest()
-    except Exception as e:
-        print(f"❌ Failed to hash orders snapshot: {e}")
-        orders_snapshot_hash = None
-
-    if orders_snapshot_hash and orders_snapshot_hash == LAST_ORDERS_HASH:
-        print("🔁 No changes in orders — skipping DB/JSON write.")
-        return
-
-    LAST_ORDERS_HASH = orders_snapshot_hash
+    # WebSocket triggers ensure we only poll when there's new data, so always write
 
     if all_orders:
         latest_time = all_orders[0].get("created_time")
@@ -904,6 +1020,65 @@ def sync_orders():
             except Exception as e:
                 print(f"❌ Failed to insert order {order_id}: {e}")
         conn.commit()
+        
+        # Also write to PostgreSQL
+        try:
+            pg_conn = get_postgresql_connection()
+            if pg_conn:
+                with pg_conn.cursor() as cursor:
+                    pg_new_count = 0
+                    for order in all_orders:
+                        order_id = order.get("order_id")
+                        if not order_id:
+                            continue
+                        
+                        try:
+                            cursor.execute("""
+                                INSERT INTO users.orders_0001
+                                (order_id, user_id, ticker, status, action, side, type, yes_price, no_price,
+                                 initial_count, remaining_count, fill_count, created_time, expiration_time,
+                                 last_update_time, client_order_id, order_group_id, queue_position,
+                                 self_trade_prevention_type, maker_fees, taker_fees, maker_fill_cost,
+                                 taker_fill_cost, raw_json)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """, (
+                                order_id,
+                                order.get("user_id"),
+                                order.get("ticker"),
+                                order.get("status"),
+                                order.get("action"),
+                                order.get("side"),
+                                order.get("type"),
+                                order.get("yes_price"),
+                                order.get("no_price"),
+                                order.get("initial_count"),
+                                order.get("remaining_count"),
+                                order.get("fill_count"),
+                                order.get("created_time"),
+                                order.get("expiration_time"),
+                                order.get("last_update_time"),
+                                order.get("client_order_id"),
+                                order.get("order_group_id"),
+                                order.get("queue_position"),
+                                order.get("self_trade_prevention_type"),
+                                order.get("maker_fees"),
+                                order.get("taker_fees"),
+                                order.get("maker_fill_cost"),
+                                order.get("taker_fill_cost"),
+                                json.dumps(order)
+                            ))
+                            pg_new_count += 1
+                        except Exception as e:
+                            print(f"❌ Failed to insert order {order_id} to PostgreSQL: {e}")
+                    
+                    pg_conn.commit()
+                    print(f"💾 {pg_new_count} new orders also written to PostgreSQL users.orders_0001")
+                pg_conn.close()
+            else:
+                print(f"⚠️ Skipping PostgreSQL write - no connection available")
+        except Exception as pg_err:
+            print(f"❌ Failed to write orders to PostgreSQL: {pg_err}")
+        
         # Save all_orders to orders.json in the same folder
         orders_json_path = os.path.join(os.path.dirname(ORDERS_DB_PATH), "orders.json")
         try:
