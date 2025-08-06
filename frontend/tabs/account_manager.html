@@ -127,17 +127,21 @@
         window.GLOBAL_ACCOUNT_MODE = GLOBAL_ACCOUNT_MODE;
 
         const selector = document.getElementById("account-selector");
-        selector.value = data.mode === 'prod' ? 'live' : 'demo';
+        if (selector) {
+          selector.value = data.mode === 'prod' ? 'live' : 'demo';
+        }
 
         const statusEl = document.getElementById("account-status");
-        if (GLOBAL_ACCOUNT_MODE === 'prod') {
-          statusEl.textContent = "*** LIVE TRADING ***";
-          statusEl.style.color = "#00ff00";
-          statusEl.style.fontWeight = "bold";
-        } else {
-          statusEl.textContent = "Paper Trading";
-          statusEl.style.color = "orange";
-          statusEl.style.fontWeight = "normal";
+        if (statusEl) {
+          if (GLOBAL_ACCOUNT_MODE === 'prod') {
+            statusEl.textContent = "*** LIVE TRADING ***";
+            statusEl.style.color = "#00ff00";
+            statusEl.style.fontWeight = "bold";
+          } else {
+            statusEl.textContent = "Paper Trading";
+            statusEl.style.color = "orange";
+            statusEl.style.fontWeight = "normal";
+          }
         }
 
         loadAccountData();
@@ -173,11 +177,14 @@
       const activeBal = GLOBAL_ACCOUNT_MODE === "prod" ? prodBalJson : demoBalJson;
       const balanceVal = activeBal.balance ?? activeBal.total_balance ?? activeBal.available_balance ?? 0;
       const balanceInDollars = balanceVal / 100; // Convert cents to dollars
-      document.getElementById("account-balance").textContent =
-        `$${Number(balanceInDollars).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      const balanceEl = document.getElementById("account-balance");
+      if (balanceEl) {
+        balanceEl.textContent = `$${Number(balanceInDollars).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      }
 
             const settlementsBody = document.getElementById("settlements-body");
-      settlementsBody.innerHTML = settlements.map(s => {
+      if (settlementsBody) {
+        settlementsBody.innerHTML = settlements.map(s => {
         // Convert revenue from cents to dollars
         const revenueInDollars = s.revenue / 100;
         const formattedRevenue = revenueInDollars.toLocaleString(undefined, { 
@@ -196,9 +203,11 @@
           </tr>
         `;
       }).join("");
+        }
 
             const fillsBody = document.getElementById("fills-body");
-      fillsBody.innerHTML = fills.map(f => {
+      if (fillsBody) {
+        fillsBody.innerHTML = fills.map(f => {
         // Convert price from cents to dollars
         const price = f.side === "yes" ? f.yes_price : f.no_price;
         const priceInDollars = price / 100;
@@ -218,19 +227,22 @@
           </tr>
         `;
       }).join("");
+        }
 
       const positionsBody = document.getElementById("positions-body");
-      positionsBody.innerHTML = positions
-        .filter(p => p.position !== 0)
-        .map(p => `
-          <tr>
-            <td>${p.ticker}</td>
-            <td>${p.market_exposure && p.position !== 0 ? (p.market_exposure / p.position / 100).toFixed(2) : "0.00"}</td>
-            <td>${p.position}</td>
-            <td>${(p.fees_paid / 100).toFixed(2)}</td>
-            <td>${new Date(p.last_updated_ts).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
-          </tr>
-        `).join("");
+      if (positionsBody) {
+        positionsBody.innerHTML = positions
+          .filter(p => p.position !== 0)
+          .map(p => `
+            <tr>
+              <td>${p.ticker}</td>
+              <td>${p.market_exposure && p.position !== 0 ? (p.market_exposure / p.position / 100).toFixed(2) : "0.00"}</td>
+              <td>${p.position}</td>
+              <td>${(p.fees_paid / 100).toFixed(2)}</td>
+              <td>${new Date(p.last_updated_ts).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
+            </tr>
+          `).join("");
+      }
     }
 
 
@@ -310,7 +322,10 @@
       URL.revokeObjectURL(url);
     }
 
-    document.getElementById('download-csv-btn').addEventListener('click', downloadCSV);
+    const downloadBtn = document.getElementById('download-csv-btn');
+    if (downloadBtn) {
+      downloadBtn.addEventListener('click', downloadCSV);
+    }
   </script>
 </body>
 </html>

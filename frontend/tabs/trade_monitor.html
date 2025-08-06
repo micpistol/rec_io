@@ -614,6 +614,55 @@
 
 <!-- === STRIKE TABLES JS (inserted as per instructions) === -->
 <script>
+// Global modal functions - defined at top level for inline onclick handlers
+function showAutoStopSettingsModal() {
+  console.log('showAutoStopSettingsModal called');
+  const modal = document.getElementById('autoStopSettingsModal');
+  if (modal) {
+    console.log('Showing auto stop settings modal');
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  } else {
+    console.log('autoStopSettingsModal not found');
+  }
+}
+
+function showAutoEntrySettingsModal() {
+  console.log('showAutoEntrySettingsModal called');
+  const modal = document.getElementById('autoEntrySettingsModal');
+  if (modal) {
+    console.log('Showing auto entry settings modal');
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  } else {
+    console.log('autoEntrySettingsModal not found');
+  }
+}
+
+function hideAutoStopSettingsModal() {
+  console.log('hideAutoStopSettingsModal called');
+  const modal = document.getElementById('autoStopSettingsModal');
+  if (modal) {
+    console.log('Hiding auto stop settings modal');
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+  } else {
+    console.log('autoStopSettingsModal not found');
+  }
+}
+
+function hideAutoEntrySettingsModal() {
+  console.log('hideAutoEntrySettingsModal called');
+  const modal = document.getElementById('autoEntrySettingsModal');
+  if (modal) {
+    console.log('Hiding auto entry settings modal');
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+  } else {
+    console.log('autoEntrySettingsModal not found');
+  }
+}
+
 // === Trade Open/Close Master Functions (Symmetric) ===
 // Moved to strike-table.js and trade-execution-controller.js
 
@@ -652,15 +701,18 @@
               <div class="panel-container" id="watchlistPanel" style="min-height: 346px; max-height: 346px;">
         <div class="panel-header" style="display: flex; align-items: center; justify-content: space-between;">
           <span>Watchlist</span>
-          <div style="display: flex; align-items: center; gap: 6px;">
+          <div style="display: flex; align-items: center; gap: 6px; pointer-events: auto;">
             <img 
               id="autoEntrySettingsIcon"
-              src="../images/icons/panel_settings.png" 
+              src="/images/icons/panel_settings.png" 
               alt="Auto Entry Settings" 
               title="Auto Entry Settings" 
-              style="width: 14px; height: 14px; opacity: 0.7; transition: opacity 0.2s; cursor: pointer; align-self: center;"
+              style="width: 14px; height: 14px; opacity: 0.7; transition: opacity 0.2s; cursor: pointer; align-self: center; pointer-events: auto;"
               onmouseover="this.style.opacity='1'" 
               onmouseout="this.style.opacity='0.7'"
+              onclick="console.log('Auto Entry Settings icon clicked'); showAutoEntrySettingsModal();"
+              onload="console.log('Auto Entry Settings icon loaded');"
+              onerror="console.log('Auto Entry Settings icon failed to load');"
             />
             <label style="font-size: 12px; user-select: none; color: white; display: flex; align-items: center; gap: 6px; margin: 0;">
               AUTO ENTRY
@@ -1227,15 +1279,18 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="panel-container" style="min-height: 310px;" id="activeTradeSupervisorPanel">
         <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
           <span>Active Trade Supervisor</span>
-          <div style="display: flex; align-items: center; gap: 6px;">
+          <div style="display: flex; align-items: center; gap: 6px; pointer-events: auto;">
             <img 
               id="autoStopSettingsIcon"
-              src="../images/icons/panel_settings.png" 
+              src="/images/icons/panel_settings.png" 
               alt="Auto Stop Settings" 
               title="Auto Stop Settings" 
-              style="width: 14px; height: 14px; opacity: 0.7; transition: opacity 0.2s; cursor: pointer; align-self: center;"
+              style="width: 14px; height: 14px; opacity: 0.7; transition: opacity 0.2s; cursor: pointer; align-self: center; pointer-events: auto;"
               onmouseover="this.style.opacity='1'" 
               onmouseout="this.style.opacity='0.7'"
+              onclick="console.log('Auto Stop Settings icon clicked'); showAutoStopSettingsModal();"
+              onload="console.log('Auto Stop Settings icon loaded');"
+              onerror="console.log('Auto Stop Settings icon failed to load');"
             />
             <label style="font-size: 12px; user-select: none; color: white; display: flex; align-items: center; gap: 6px; margin: 0;">
               AUTO STOP
@@ -1259,7 +1314,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </table>
       </div>
       <!-- Modal for Auto Stop Settings -->
-      <div id="autoStopSettingsModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:1000;">
+      <div id="autoStopSettingsModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:10000;">
         <div id="autoStopSettingsDim" style="position:absolute; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4);"></div>
         <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; border-radius:8px; min-width:400px; min-height:200px; box-shadow:0 4px 32px rgba(0,0,0,0.25); padding:20px; display:flex; flex-direction:column; align-items:stretch;">
           <div id="autoStopSettingsHeader" style="font-size:16px; font-weight:500; margin-bottom:24px; color:#222; letter-spacing:0.2px; text-align:left;">Auto Stop Settings</div>
@@ -1301,7 +1356,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
       <!-- Modal for Auto Entry Settings -->
-      <div id="autoEntrySettingsModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:1000;">
+      <div id="autoEntrySettingsModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:10000;">
         <div id="autoEntrySettingsDim" style="position:absolute; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4);"></div>
         <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; border-radius:8px; min-width:400px; min-height:200px; box-shadow:0 4px 32px rgba(0,0,0,0.25); padding:20px; display:flex; flex-direction:column; align-items:stretch;">
           <div id="autoEntrySettingsHeader" style="font-size:16px; font-weight:500; margin-bottom:24px; color:#222; letter-spacing:0.2px; text-align:left;">Auto Entry Settings</div>
@@ -2949,6 +3004,13 @@ document.addEventListener('DOMContentLoaded', function() {
   const sliderValueDisplay = document.getElementById('sliderValueDisplay');
   let lastSavedProbability = 25;
 
+  // Debug logging
+  console.log('Auto Stop Settings - DOMContentLoaded fired');
+  console.log('autoStopSettingsIcon found:', !!autoStopSettingsIcon);
+  console.log('autoStopSettingsModal found:', !!autoStopSettingsModal);
+  console.log('Document ready state:', document.readyState);
+  console.log('Window location:', window.location.href);
+
   function updateSliderDisplay(value) {
     if (sliderValueDisplay && autoStopProbabilitySlider) {
       sliderValueDisplay.textContent = value + '%';
@@ -2992,9 +3054,15 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function showAutoStopSettingsModal() {
+    console.log('showAutoStopSettingsModal called');
     if (autoStopSettingsModal) {
+      console.log('Showing auto stop settings modal');
       autoStopSettingsModal.style.display = 'block';
       document.body.style.overflow = 'hidden';
+    
+
+  
+
       fetchAutoStopSettings().then(data => {
         // Set probability slider
         lastSavedProbability = data.current_probability ?? 25;
@@ -3038,7 +3106,10 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   if (autoStopSettingsIcon) {
+    console.log('Adding click listener to autoStopSettingsIcon');
     autoStopSettingsIcon.addEventListener('click', showAutoStopSettingsModal);
+  } else {
+    console.log('autoStopSettingsIcon not found - cannot add click listener');
   }
   if (autoStopSettingsCancel) {
     autoStopSettingsCancel.addEventListener('click', function() {
@@ -3183,6 +3254,13 @@ document.addEventListener('DOMContentLoaded', function() {
   let lastSavedAutoEntryProbability = 25;
   let lastSavedAutoEntryDifferential = 0;
 
+  // Debug logging
+  console.log('Auto Entry Settings - DOMContentLoaded fired');
+  console.log('autoEntrySettingsIcon found:', !!autoEntrySettingsIcon);
+  console.log('autoEntrySettingsModal found:', !!autoEntrySettingsModal);
+  console.log('Document ready state:', document.readyState);
+  console.log('Window location:', window.location.href);
+
   function updateAutoEntrySliderDisplay(value) {
     if (autoEntrySliderValueDisplay && autoEntryProbabilitySlider) {
       autoEntrySliderValueDisplay.textContent = value + '%';
@@ -3281,9 +3359,15 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function showAutoEntrySettingsModal() {
+    console.log('showAutoEntrySettingsModal called');
     if (autoEntrySettingsModal) {
+      console.log('Showing auto entry settings modal');
       autoEntrySettingsModal.style.display = 'block';
       document.body.style.overflow = 'hidden';
+    
+
+  
+
       fetchAutoEntrySettings().then(settings => {
         lastSavedAutoEntryProbability = settings.min_probability;
         lastSavedAutoEntryDifferential = settings.min_differential;
@@ -3364,7 +3448,10 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   if (autoEntrySettingsIcon) {
+    console.log('Adding click listener to autoEntrySettingsIcon');
     autoEntrySettingsIcon.addEventListener('click', showAutoEntrySettingsModal);
+  } else {
+    console.log('autoEntrySettingsIcon not found - cannot add click listener');
   }
   if (autoEntrySettingsCancel) {
     autoEntrySettingsCancel.addEventListener('click', function() {
@@ -3412,8 +3499,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateSpikeAlertTimeDisplay(window.lastSavedSpikeAlertTime);
       }
       
-      autoEntrySettingsModal.style.display = 'none';
-      document.body.style.overflow = 'auto';
+      hideAutoEntrySettingsModal();
     });
   }
   if (autoEntrySettingsSave) {
@@ -3464,8 +3550,7 @@ document.addEventListener('DOMContentLoaded', function() {
             window.lastSavedSpikeAlertMomentum = spikeAlertMomentum;
             window.lastSavedSpikeAlertCooldown = spikeAlertCooldown;
             window.lastSavedSpikeAlertTime = spikeAlertTime;
-            autoEntrySettingsModal.style.display = 'none';
-            document.body.style.overflow = 'auto';
+            hideAutoEntrySettingsModal();
           } else {
             console.error('Failed to save auto entry settings');
           }
@@ -3632,7 +3717,7 @@ function handleMouseMove(e) {
   const snappedSeconds = Math.max(0, Math.min(3600, intervalIndex * 15));
   
   // Debug logging
-  
+  console.log({
     x: x,
     percent: percent,
     intervalIndex: intervalIndex,
