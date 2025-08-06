@@ -1,8 +1,8 @@
 # **ACTIVE_TRADE_SUPERVISOR SQLITE MIGRATION CHECKLIST**
 
 ## **Current Status:**
-- **ATS is heavily dependent on SQLite** - would NOT be functional if SQLite files were deleted
-- **32+ SQLite operations** found across 3 databases
+- **ATS is partially migrated to PostgreSQL** - BTC price reads now use PostgreSQL with symbol-specific functionality
+- **26 remaining SQLite operations** found across 2 databases (`active_trades.db` and `trades.db`)
 
 ## **SQLite Operations to Migrate:**
 
@@ -43,8 +43,8 @@
 - [ ] **Line 953**: `UPDATE active_trades SET status = 'closing' WHERE trade_id = ?`
 - [ ] **Line 1212**: `UPDATE active_trades SET status = 'closing' WHERE trade_id = ?`
 
-### **4. READS FROM `btc_price_history.db` (1 operation)**
-- [ ] **Line 989**: `SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1`
+### **4. READS FROM `btc_price_history.db` (1 operation) - ✅ COMPLETED**
+- [x] **Line 989**: `SELECT price FROM live_data.btc_price_log ORDER BY timestamp DESC LIMIT 1` (symbol-specific)
 
 ## **Migration Strategy:**
 
@@ -57,8 +57,11 @@
 - [ ] Replace all `trades.db` reads with `users.trades_0001` reads
 - [ ] Update `get_trades_db_connection()` to use PostgreSQL
 
-### **Phase 3: Migrate BTC Price Reads**
-- [ ] Replace `btc_price_history.db` reads with `live_data.btc_price_log` reads
+### **Phase 3: Migrate BTC Price Reads - ✅ COMPLETED**
+- [x] Replace `btc_price_history.db` reads with `live_data.btc_price_log` reads
+- [x] Added symbol-specific functionality (BTC/ETH table selection)
+- [x] Added PostgreSQL connection function
+- [x] Updated monitoring to use symbol-specific pricing
 
 ### **Phase 4: Update All Functions**
 - [ ] `check_for_open_trades()` - migrate to PostgreSQL
@@ -70,7 +73,8 @@
 - [ ] `remove_failed_trade()` - migrate to PostgreSQL
 - [ ] `remove_closed_trade()` - migrate to PostgreSQL
 - [ ] `update_trade_status_to_closing()` - migrate to PostgreSQL
-- [ ] `get_current_btc_price()` - migrate to PostgreSQL
+- [x] `get_current_btc_price()` - migrate to PostgreSQL (symbol-specific)
+- [x] `update_active_trade_monitoring_data()` - migrate to PostgreSQL (symbol-specific pricing)
 - [ ] `sync_with_trades_db()` - migrate to PostgreSQL
 
 ### **Phase 5: Testing**

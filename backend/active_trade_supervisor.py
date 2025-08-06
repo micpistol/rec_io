@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import requests
 from typing import Dict, List, Optional, Any
+import psycopg2
 # Import the universal centralized port system
 from backend.core.port_config import get_port
 from backend.util.paths import get_host
@@ -479,6 +480,20 @@ def get_trades_db_connection():
     """Get connection to the main trades database"""
     trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
     return sqlite3.connect(trades_db_path, timeout=5.0, check_same_thread=False)
+
+def get_postgresql_connection():
+    """Get a connection to the PostgreSQL database"""
+    try:
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        return conn
+    except Exception as e:
+        print(f"❌ Failed to connect to PostgreSQL: {e}")
+        return None
 
 def add_new_active_trade(trade_id: int, ticket_id: str) -> bool:
     """
@@ -976,37 +991,45 @@ def update_trade_status_to_closing(trade_id: int) -> bool:
         log(f"❌ Error updating trade status to closing {trade_id}: {e}")
         return False
 
-def get_current_btc_price() -> Optional[float]:
-    """Get the current BTC price from the price_log table"""
+def get_current_btc_price(symbol: str = "BTC") -> Optional[float]:
+    """Get the current price for the specified symbol from the PostgreSQL live_data schema"""
     try:
-        # Get the path to the price history database
-        from backend.util.paths import get_btc_price_history_dir
-        btc_price_db = os.path.join(get_btc_price_history_dir(), "btc_price_history.db")
-        
-        if not os.path.exists(btc_price_db):
-            log("⚠️ BTC price database not found")
+        # Get PostgreSQL connection
+        conn = get_postgresql_connection()
+        if not conn:
+            log("⚠️ Failed to connect to PostgreSQL")
             return None
             
-        conn = sqlite3.connect(btc_price_db)
         cursor = conn.cursor()
-        cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
+        
+        # Map symbol to the appropriate price log table
+        if symbol.upper() == "BTC":
+            table_name = "live_data.btc_price_log"
+        elif symbol.upper() == "ETH":
+            table_name = "live_data.eth_price_log"
+        else:
+            # Default to BTC if symbol is not recognized
+            table_name = "live_data.btc_price_log"
+            log(f"⚠️ Unknown symbol '{symbol}', defaulting to BTC")
+            
+        cursor.execute(f"SELECT price FROM {table_name} ORDER BY timestamp DESC LIMIT 1")
         result = cursor.fetchone()
         conn.close()
         
         if result and result[0] is not None:
-            btc_price = float(result[0])
-            # Only log BTC price every 30 seconds to reduce noise
+            price = float(result[0])
+            # Only log price every 30 seconds to reduce noise
             current_time = time.time()
             if not hasattr(get_current_btc_price, 'last_log_time') or current_time - get_current_btc_price.last_log_time > 30:
-                # Only log BTC price occasionally to reduce noise
+                # Only log price occasionally to reduce noise
                 get_current_btc_price.last_log_time = current_time
-            return btc_price
+            return price
         else:
-            log("⚠️ No BTC price found in database")
+            log(f"⚠️ No {symbol} price found in PostgreSQL database")
             return None
             
     except Exception as e:
-        log(f"Error getting current BTC price: {e}")
+        log(f"Error getting current {symbol} price: {e}")
         return None
 
 def get_kalshi_market_snapshot() -> Optional[Dict[str, Any]]:
@@ -1122,11 +1145,8 @@ def update_active_trade_monitoring_data():
     - Current probability (from probability API)
     """
     try:
-        # Get current BTC price
-        current_btc_price = get_current_btc_price()
-        if current_btc_price is None:
-            log("⚠️ Could not get current BTC price, skipping monitoring update")
-            return
+        # Get current symbol price for each trade
+        # Note: We'll get the price per trade since each trade might have a different symbol
         
         # Get Kalshi market snapshot
         snapshot_data = get_kalshi_market_snapshot()
@@ -1138,7 +1158,7 @@ def update_active_trade_monitoring_data():
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, trade_id, buy_price, prob, time, date, strike, side, momentum, ticker
+            SELECT id, trade_id, buy_price, prob, time, date, strike, side, momentum, ticker, symbol
             FROM active_trades 
             WHERE status = 'active'
         """)
@@ -1148,11 +1168,17 @@ def update_active_trade_monitoring_data():
         if not active_trades:
             return
         
-        for (active_id, trade_id, buy_price, prob, time_str, date_str, strike, side, momentum, ticker) in active_trades:
+        for (active_id, trade_id, buy_price, prob, time_str, date_str, strike, side, momentum, ticker, symbol) in active_trades:
             try:
                 # Parse strike price - handle currency formatting
                 strike_clean = str(strike).replace('$', '').replace(',', '')
                 strike_price = float(strike_clean)
+                
+                # Get current symbol price for this specific trade
+                current_symbol_price = get_current_btc_price(symbol)
+                if current_symbol_price is None:
+                    log(f"⚠️ Could not get current {symbol} price for trade {trade_id}, skipping")
+                    continue
                 
                 # Get current market ask price for this specific contract
                 current_market_price = get_current_closing_price_for_trade(ticker, side)
@@ -1160,11 +1186,11 @@ def update_active_trade_monitoring_data():
                     log(f"⚠️ Could not get market price for trade {trade_id} ({ticker}), skipping")
                     continue
                 
-                # Calculate buffer using the actual BTC price difference from strike
-                # Buffer = current_btc_price - strike_price
-                # For YES trades: positive buffer when BTC > strike (safe), negative when BTC < strike (dangerous)
-                # For NO trades: positive buffer when BTC < strike (safe), negative when BTC > strike (dangerous)
-                raw_buffer = current_btc_price - strike_price
+                # Calculate buffer using the actual symbol price difference from strike
+                # Buffer = current_symbol_price - strike_price
+                # For YES trades: positive buffer when symbol > strike (safe), negative when symbol < strike (dangerous)
+                # For NO trades: positive buffer when symbol < strike (safe), negative when symbol > strike (dangerous)
+                raw_buffer = current_symbol_price - strike_price
                 
                 if side.upper() == 'Y':  # YES trade
                     # For YES trades, positive buffer when BTC > strike (safe)
@@ -1189,8 +1215,8 @@ def update_active_trade_monitoring_data():
                 # Get momentum score if available
                 momentum_score = float(momentum) if momentum is not None else None
                 
-                # Get current probability from API using the current BTC price
-                current_probability = get_current_probability(strike_price, current_btc_price, ttc_seconds, momentum_score)
+                # Get current probability from API using the current symbol price
+                current_probability = get_current_probability(strike_price, current_symbol_price, ttc_seconds, momentum_score)
                 
                 # Apply probability logic based on buffer
                 # When buffer is positive: use probability as-is (direct passthrough)
@@ -1219,7 +1245,7 @@ def update_active_trade_monitoring_data():
                         current_pnl = ?,
                         last_updated = CURRENT_TIMESTAMP
                     WHERE id = ?
-                """, (current_btc_price, current_probability, buffer_from_strike, time_since_entry, current_market_price, pnl_formatted, active_id))
+                """, (current_symbol_price, current_probability, buffer_from_strike, time_since_entry, current_market_price, pnl_formatted, active_id))
                 conn.commit()
                 conn.close()
                 
@@ -1228,7 +1254,7 @@ def update_active_trade_monitoring_data():
                 
                 # Only log significant updates (every 60 seconds) to reduce noise
                 if time_since_entry % 60 == 0:
-                    log(f"📊 MONITORING: Updated trade {trade_id} - symbol_price: {current_btc_price}, market_price: {current_market_price}, buffer: {buffer_from_strike}, prob: {current_probability}, pnl: {pnl_formatted}")
+                    log(f"📊 MONITORING: Updated trade {trade_id} - {symbol}_price: {current_symbol_price}, market_price: {current_market_price}, buffer: {buffer_from_strike}, prob: {current_probability}, pnl: {pnl_formatted}")
                 
             except Exception as e:
                 log(f"Error updating monitoring data for trade {trade_id}: {e}")
