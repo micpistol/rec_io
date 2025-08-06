@@ -1106,6 +1106,27 @@ def check_expired_trades():
         conn.commit()
         conn.close()
         
+        # Also update PostgreSQL
+        try:
+            pg_conn = get_postgresql_connection()
+            if pg_conn:
+                with pg_conn.cursor() as cursor:
+                    cursor.execute("""
+                        UPDATE users.trades_0001 
+                        SET status = 'expired', 
+                            closed_at = %s, 
+                            symbol_close = %s,
+                            close_method = 'expired'
+                        WHERE status = 'open'
+                    """, (closed_at, symbol_close))
+                    pg_conn.commit()
+                    print(f"💾 Expired trades update also written to PostgreSQL users.trades_0001")
+                pg_conn.close()
+            else:
+                print(f"⚠️ Skipping PostgreSQL expired trades update - no connection available")
+        except Exception as pg_err:
+            print(f"❌ Failed to update expired trades in PostgreSQL: {pg_err}")
+        
         notify_frontend_trade_change()
         
         for id, ticker in open_trades:
@@ -1206,7 +1227,7 @@ def poll_settlements_for_matches(expired_tickers):
                             win_loss = ?,
                             pnl = ?
                         WHERE ticker = ? AND status = 'expired'
-                    """, (sell_price, 'W' if sell_price > 0 else 'L', int(pnl) if pnl else None, ticker))
+                    """, (sell_price, 'W' if sell_price > 0 else 'L', pnl, ticker))
                     conn_trades.commit()
                     conn_trades.close()
                     
