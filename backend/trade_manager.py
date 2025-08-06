@@ -52,18 +52,14 @@ def insert_trade(trade):
     """Insert a new trade with BTC price from unified endpoint"""
     # log(f"[DEBUG] TRADES DB PATH (insert_trade): {DB_TRADES_PATH}")
     
-    # Get current BTC price directly from database - INSTANT
+    # Get current BTC price directly from PostgreSQL live_data table - INSTANT
     try:
-        from backend.util.paths import get_btc_price_history_dir
-        btc_price_db = os.path.join(get_btc_price_history_dir(), "btc_price_history.db")
-
-        if os.path.exists(btc_price_db):
-            conn = sqlite3.connect(btc_price_db)
-            cursor = conn.cursor()
-            cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
-            result = cursor.fetchone()
-            conn.close()
-
+        pg_conn = get_postgresql_connection()
+        if pg_conn:
+            with pg_conn.cursor() as cursor:
+                cursor.execute("SELECT price FROM live_data.btc_price_log ORDER BY timestamp DESC LIMIT 1")
+                result = cursor.fetchone()
+            
             if result and result[0] is not None:
                 symbol_open = int(float(result[0]))
             else:
@@ -147,11 +143,13 @@ def insert_trade(trade):
 
 def confirm_open_trade(id: int, ticket_id: str) -> None:
     """Confirms a PENDING trade has been opened in the market account"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT ticker FROM trades WHERE id = ?", (id,))
-    row = cursor.fetchone()
-    conn.close()
+    pg_conn = get_postgresql_connection()
+    if pg_conn:
+        with pg_conn.cursor() as cursor:
+            cursor.execute("SELECT ticker FROM users.trades_0001 WHERE id = %s", (id,))
+            row = cursor.fetchone()
+    else:
+        row = None
     
     if not row:
         log_event(ticket_id, f"MANAGER: No trade found for ID {id}")
@@ -180,19 +178,23 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
                 fees_paid = float(row[2]) if row[2] is not None else None
                 price = round(float(exposure) / float(pos) / 100, 2) if pos > 0 else 0.0
                 
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT status FROM trades WHERE id = ?", (id,))
-                status_row = cursor.fetchone()
-                current_status = status_row[0] if status_row else None
-                conn.close()
+                pg_conn = get_postgresql_connection()
+                if pg_conn:
+                    with pg_conn.cursor() as cursor:
+                        cursor.execute("SELECT status FROM users.trades_0001 WHERE id = %s", (id,))
+                        status_row = cursor.fetchone()
+                        current_status = status_row[0] if status_row else None
+                else:
+                    current_status = None
                 
                 if current_status == "pending" and pos > 0 and exposure > 0:
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT prob FROM trades WHERE id = ?", (id,))
-                    prob_row = cursor.fetchone()
-                    conn.close()
+                    pg_conn = get_postgresql_connection()
+                    if pg_conn:
+                        with pg_conn.cursor() as cursor:
+                            cursor.execute("SELECT prob FROM users.trades_0001 WHERE id = %s", (id,))
+                            prob_row = cursor.fetchone()
+                    else:
+                        prob_row = None
                     
                     prob_value = prob_row[0] if prob_row and prob_row[0] is not None else None
                     diff_value = None
@@ -300,12 +302,14 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
     pg_conn.close()
     log_event(ticket_id, f"MANAGER: OPEN TRADE polling complete for ticker: {expected_ticker}")
     
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT status FROM trades WHERE id = ?", (id,))
-    status_row = cursor.fetchone()
-    current_status = status_row[0] if status_row else None
-    conn.close()
+    pg_conn = get_postgresql_connection()
+    if pg_conn:
+        with pg_conn.cursor() as cursor:
+            cursor.execute("SELECT status FROM users.trades_0001 WHERE id = %s", (id,))
+            status_row = cursor.fetchone()
+            current_status = status_row[0] if status_row else None
+    else:
+        current_status = None
     
     if current_status == "pending":
         log_event(ticket_id, f"MANAGER: PENDING TRADE FAILED TO FILL - TIMEOUT")
@@ -316,11 +320,13 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
     log(f"CONFIRMING CLOSE TRADE: {id}")
     
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT ticker FROM trades WHERE id = ?", (id,))
-        row = cursor.fetchone()
-        conn.close()
+        pg_conn = get_postgresql_connection()
+        if pg_conn:
+            with pg_conn.cursor() as cursor:
+                cursor.execute("SELECT ticker FROM users.trades_0001 WHERE id = %s", (id,))
+                row = cursor.fetchone()
+        else:
+            row = None
         
         if not row:
             log_event(ticket_id, f"MANAGER: No trade found for ID {id}")
@@ -357,11 +363,13 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                 total_fees_paid = float(fees_row[0]) if fees_row and fees_row[0] is not None else None
                 # log(f"[CONFIRM_CLOSE] Total fees paid: {total_fees_paid}")
                 
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT side FROM trades WHERE id = ?", (id,))
-                side_row = cursor.fetchone()
-                conn.close()
+                pg_conn = get_postgresql_connection()
+                if pg_conn:
+                    with pg_conn.cursor() as cursor:
+                        cursor.execute("SELECT side FROM users.trades_0001 WHERE id = %s", (id,))
+                        side_row = cursor.fetchone()
+                else:
+                    side_row = None
                 
                 original_side = side_row[0] if side_row else None
                 
@@ -372,19 +380,21 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                     log(f"FILLS.DB NOT FOUND")
                     return
                 
-                conn_fills = sqlite3.connect(FILLS_DB_PATH, timeout=0.25)
-                cursor_fills = conn_fills.cursor()
-                opposite_side = 'no' if original_side == 'Y' else 'yes'
-                
-                cursor_fills.execute("""
-                    SELECT yes_price, no_price, created_time, side 
-                    FROM fills 
-                    WHERE ticker = ? AND side = ? 
-                    ORDER BY created_time DESC 
-                    LIMIT 1
-                """, (expected_ticker, opposite_side))
-                fill_row = cursor_fills.fetchone()
-                conn_fills.close()
+                pg_conn = get_postgresql_connection()
+                if pg_conn:
+                    with pg_conn.cursor() as cursor_fills:
+                        opposite_side = 'no' if original_side == 'Y' else 'yes'
+                        
+                        cursor_fills.execute("""
+                            SELECT yes_price, no_price, created_time, side 
+                            FROM users.fills_0001 
+                            WHERE ticker = %s AND side = %s 
+                            ORDER BY created_time DESC 
+                            LIMIT 1
+                        """, (expected_ticker, opposite_side))
+                        fill_row = cursor_fills.fetchone()
+                else:
+                    fill_row = None
                 
                 if not fill_row or not original_side:
                     log_event(ticket_id, f"MANAGER: No closing fill found for {opposite_side} side - cannot calculate sell price")
@@ -424,11 +434,13 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                     log_event(ticket_id, f"MANAGER: Failed to get current symbol price from unified endpoint: {e}")
                     symbol_close = None
                 
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT buy_price, position FROM trades WHERE id = ?", (id,))
-                trade_data = cursor.fetchone()
-                conn.close()
+                pg_conn_trade = get_postgresql_connection()
+                if pg_conn_trade:
+                    with pg_conn_trade.cursor() as cursor:
+                        cursor.execute("SELECT buy_price, position FROM users.trades_0001 WHERE id = %s", (id,))
+                        trade_data = cursor.fetchone()
+                else:
+                    trade_data = None
                 
                 if trade_data:
                     buy_price, position = trade_data
@@ -438,12 +450,14 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                     pnl = round(sell_value - buy_value - fees, 2)
                     win_loss = "W" if pnl > 0 else "L" if pnl < 0 else "D"
                     
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT close_method FROM trades WHERE id = ?", (id,))
-                    close_method_row = cursor.fetchone()
-                    close_method = close_method_row[0] if close_method_row else "manual"
-                    conn.close()
+                    pg_conn_method = get_postgresql_connection()
+                    if pg_conn_method:
+                        with pg_conn_method.cursor() as cursor:
+                            cursor.execute("SELECT close_method FROM users.trades_0001 WHERE id = %s", (id,))
+                            close_method_row = cursor.fetchone()
+                            close_method = close_method_row[0] if close_method_row else "manual"
+                    else:
+                        close_method = "manual"
                     
                     try:
                         update_trade_status(id, "closed", closed_at, sell_price, symbol_close, win_loss, pnl, close_method)
@@ -599,41 +613,145 @@ def truncate_contract_name(contract_name):
 DB_TRADES_PATH = os.path.join(get_trade_history_dir(), "trades.db")
 
 def init_trades_db():
-    os.makedirs(os.path.dirname(DB_TRADES_PATH), exist_ok=True)
-    
-    conn = sqlite3.connect(DB_TRADES_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS trades (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        date TEXT NOT NULL,
-        time TEXT NOT NULL,
-        strike TEXT NOT NULL,
-        side TEXT NOT NULL,
-        buy_price REAL NOT NULL,
-        position INTEGER NOT NULL,
-        status TEXT NOT NULL DEFAULT 'open',
-        closed_at TEXT DEFAULT NULL,
-        contract TEXT DEFAULT NULL,
-        sell_price REAL DEFAULT NULL,
-        pnl REAL DEFAULT NULL,
-        symbol TEXT DEFAULT NULL,
-        market TEXT DEFAULT NULL,
-        trade_strategy TEXT DEFAULT NULL,
-        symbol_open REAL DEFAULT NULL,
-        momentum REAL DEFAULT NULL,
-        prob REAL DEFAULT NULL,
-        volatility REAL DEFAULT NULL,
-        symbol_close REAL DEFAULT NULL,
-        win_loss TEXT DEFAULT NULL,
-        ticker TEXT DEFAULT NULL,
-        fees REAL DEFAULT NULL,
-        entry_method TEXT DEFAULT 'manual',
-        close_method TEXT DEFAULT NULL
-    )
-    """)
-    conn.commit()
-    conn.close()
+    """Initialize PostgreSQL database structure for fresh installs"""
+    try:
+        pg_conn = get_postgresql_connection()
+        if not pg_conn:
+            print("⚠️ Cannot connect to PostgreSQL - skipping database initialization")
+            return
+        
+        with pg_conn.cursor() as cursor:
+            # Create users schema if it doesn't exist
+            cursor.execute("CREATE SCHEMA IF NOT EXISTS users")
+            
+            # Create trades table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users.trades_0001 (
+                    id INTEGER PRIMARY KEY,
+                    status TEXT DEFAULT 'pending',
+                    date TEXT NOT NULL,
+                    time TEXT NOT NULL,
+                    symbol TEXT DEFAULT 'BTC',
+                    market TEXT DEFAULT 'Kalshi',
+                    trade_strategy TEXT DEFAULT 'Hourly HTC',
+                    contract TEXT,
+                    strike TEXT NOT NULL,
+                    side TEXT NOT NULL,
+                    prob REAL,
+                    diff TEXT,
+                    buy_price REAL NOT NULL,
+                    position INTEGER NOT NULL,
+                    sell_price REAL,
+                    closed_at TEXT,
+                    fees REAL,
+                    pnl REAL,
+                    symbol_open REAL,
+                    symbol_close REAL,
+                    momentum REAL,
+                    volatility REAL,
+                    win_loss TEXT,
+                    ticker TEXT,
+                    ticket_id TEXT,
+                    market_id TEXT DEFAULT 'BTC-USD',
+                    momentum_delta REAL,
+                    entry_method TEXT DEFAULT 'manual',
+                    close_method TEXT
+                )
+            """)
+            
+            # Create sequence for auto-incrementing ID
+            cursor.execute("""
+                CREATE SEQUENCE IF NOT EXISTS users.trades_0001_id_seq1
+                INCREMENT 1
+                START 1
+                OWNED BY users.trades_0001.id
+            """)
+            
+            # Create fills table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users.fills_0001 (
+                    id SERIAL PRIMARY KEY,
+                    trade_id TEXT UNIQUE,
+                    ticker TEXT,
+                    order_id TEXT,
+                    side TEXT,
+                    action TEXT,
+                    count INTEGER,
+                    yes_price REAL,
+                    no_price REAL,
+                    is_taker BOOLEAN,
+                    created_time TEXT,
+                    raw_json TEXT
+                )
+            """)
+            
+            # Create settlements table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users.settlements_0001 (
+                    id SERIAL PRIMARY KEY,
+                    ticker TEXT,
+                    market_result TEXT,
+                    yes_count INTEGER,
+                    yes_total_cost REAL,
+                    no_count INTEGER,
+                    no_total_cost REAL,
+                    revenue REAL,
+                    settled_time TEXT,
+                    raw_json TEXT
+                )
+            """)
+            
+            # Create positions table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users.positions_0001 (
+                    id SERIAL PRIMARY KEY,
+                    ticker TEXT,
+                    position INTEGER,
+                    market_exposure REAL,
+                    fees_paid REAL,
+                    created_time TEXT,
+                    raw_json TEXT
+                )
+            """)
+            
+            # Create live_data schema if it doesn't exist
+            cursor.execute("CREATE SCHEMA IF NOT EXISTS live_data")
+            
+            # Create BTC price log table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS live_data.btc_price_log (
+                    timestamp TEXT PRIMARY KEY,
+                    price NUMERIC(10,2),
+                    one_minute_avg NUMERIC(10,2),
+                    momentum NUMERIC(10,4),
+                    delta_1m NUMERIC(10,4),
+                    delta_2m NUMERIC(10,4),
+                    delta_3m NUMERIC(10,4),
+                    delta_4m NUMERIC(10,4),
+                    delta_15m NUMERIC(10,4),
+                    delta_30m NUMERIC(10,4)
+                )
+            """)
+            
+            # Create indexes for better performance
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_0001_status ON users.trades_0001(status)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_0001_ticker ON users.trades_0001(ticker)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_fills_0001_ticker ON users.fills_0001(ticker)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_settlements_0001_ticker ON users.settlements_0001(ticker)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_positions_0001_ticker ON users.positions_0001(ticker)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_btc_price_log_timestamp ON live_data.btc_price_log(timestamp)")
+            
+            pg_conn.commit()
+            print("✅ PostgreSQL database structure initialized successfully")
+            
+        pg_conn.close()
+        
+    except Exception as e:
+        print(f"❌ Error initializing PostgreSQL database structure: {e}")
+        try:
+            pg_conn.close()
+        except:
+            pass
 
 init_trades_db()
 
@@ -652,11 +770,18 @@ def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbo
         if pnl is not None:
             calculated_pnl = pnl
         else:
-            cursor.execute("SELECT buy_price, position, fees FROM trades WHERE id = ?", (trade_id,))
-            row = cursor.fetchone()
-            buy_price = row[0] if row else None
-            position = row[1] if row else None
-            fees_paid = row[2] if row else 0.0
+            pg_conn = get_postgresql_connection()
+            if pg_conn:
+                with pg_conn.cursor() as cursor_pg:
+                    cursor_pg.execute("SELECT buy_price, position, fees FROM users.trades_0001 WHERE id = %s", (trade_id,))
+                    row = cursor_pg.fetchone()
+                    buy_price = row[0] if row else None
+                    position = row[1] if row else None
+                    fees_paid = row[2] if row else 0.0
+            else:
+                buy_price = None
+                position = None
+                fees_paid = 0.0
 
             if buy_price is not None and sell_price is not None:
                 win_loss = 'W' if sell_price > buy_price else 'L'
@@ -700,12 +825,14 @@ def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbo
                 
                 # If no rows were updated, try to find by ticker
                 if cursor.rowcount == 0:
-                    # Get ticker from SQLite
-                    conn = get_db_connection()
-                    cursor_sqlite = conn.cursor()
-                    cursor_sqlite.execute("SELECT ticker FROM trades WHERE id = ?", (trade_id,))
-                    ticker_row = cursor_sqlite.fetchone()
-                    conn.close()
+                    # Get ticker from PostgreSQL
+                    pg_conn_ticker = get_postgresql_connection()
+                    if pg_conn_ticker:
+                        with pg_conn_ticker.cursor() as cursor_ticker:
+                            cursor_ticker.execute("SELECT ticker FROM users.trades_0001 WHERE id = %s", (trade_id,))
+                            ticker_row = cursor_ticker.fetchone()
+                    else:
+                        ticker_row = None
                     
                     if ticker_row and ticker_row[0]:
                         ticker = ticker_row[0]
@@ -742,12 +869,14 @@ def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbo
     
     # Notify Active Trade Supervisor when status changes to open
     if status == 'open':
-        # Get ticket_id from SQLite
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT ticket_id FROM trades WHERE id = ?", (trade_id,))
-        ticket_row = cursor.fetchone()
-        conn.close()
+        # Get ticket_id from PostgreSQL
+        pg_conn = get_postgresql_connection()
+        if pg_conn:
+            with pg_conn.cursor() as cursor:
+                cursor.execute("SELECT ticket_id FROM users.trades_0001 WHERE id = %s", (trade_id,))
+                ticket_row = cursor.fetchone()
+        else:
+            ticket_row = None
         
         if ticket_row and ticket_row[0]:
             ticket_id = ticket_row[0]
@@ -766,37 +895,44 @@ async def get_ports():
 @router.get("/trades")
 def get_trades(status: str = None, recent_hours: int = None):
     """Get trades with optional filtering by status"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    pg_conn = get_postgresql_connection()
+    if not pg_conn:
+        return []
     
-    if status == "open":
-        cursor.execute("SELECT id, date, time, strike, side, buy_price, position, status, contract FROM trades WHERE status = 'open'")
-        rows = cursor.fetchall()
-        result = [dict(zip(["id","date","time","strike","side","buy_price","position","status","contract"], row)) for row in rows]
-    elif status == "closed" and recent_hours:
-        cutoff = datetime.utcnow() - timedelta(hours=recent_hours)
-        cutoff_iso = cutoff.isoformat()
-        cursor.execute("""
-            SELECT id, date, time, strike, side, buy_price, position, status, closed_at, contract, sell_price, pnl, win_loss
-            FROM trades
-            WHERE status = 'closed' AND closed_at >= ?
-            ORDER BY closed_at DESC
-        """, (cutoff_iso,))
-        rows = cursor.fetchall()
-        result = [dict(zip(["id","date","time","strike","side","buy_price","position","status","closed_at","contract","sell_price","pnl","win_loss"], row)) for row in rows]
-    elif status == "closed":
-        cursor.execute("SELECT * FROM trades WHERE status = 'closed' ORDER BY id DESC")
-        rows = cursor.fetchall()
-        columns = [desc[0] for desc in cursor.description]
-        result = [dict(zip(columns, row)) for row in rows]
-    else:
-        cursor.execute("SELECT * FROM trades ORDER BY id DESC")
-        rows = cursor.fetchall()
-        columns = [desc[0] for desc in cursor.description]
-        result = [dict(zip(columns, row)) for row in rows]
-    
-    conn.close()
-    return result
+    try:
+        with pg_conn.cursor() as cursor:
+            if status == "open":
+                cursor.execute("SELECT id, date, time, strike, side, buy_price, position, status, contract FROM users.trades_0001 WHERE status = 'open'")
+                rows = cursor.fetchall()
+                result = [dict(zip(["id","date","time","strike","side","buy_price","position","status","contract"], row)) for row in rows]
+            elif status == "closed" and recent_hours:
+                cutoff = datetime.utcnow() - timedelta(hours=recent_hours)
+                cutoff_iso = cutoff.isoformat()
+                cursor.execute("""
+                    SELECT id, date, time, strike, side, buy_price, position, status, closed_at, contract, sell_price, pnl, win_loss
+                    FROM users.trades_0001
+                    WHERE status = 'closed' AND closed_at >= %s
+                    ORDER BY closed_at DESC
+                """, (cutoff_iso,))
+                rows = cursor.fetchall()
+                result = [dict(zip(["id","date","time","strike","side","buy_price","position","status","closed_at","contract","sell_price","pnl","win_loss"], row)) for row in rows]
+            elif status == "closed":
+                cursor.execute("SELECT * FROM users.trades_0001 WHERE status = 'closed' ORDER BY id DESC")
+                rows = cursor.fetchall()
+                columns = [desc[0] for desc in cursor.description]
+                result = [dict(zip(columns, row)) for row in rows]
+            else:
+                cursor.execute("SELECT * FROM users.trades_0001 ORDER BY id DESC")
+                rows = cursor.fetchall()
+                columns = [desc[0] for desc in cursor.description]
+                result = [dict(zip(columns, row)) for row in rows]
+        
+        return result
+    except Exception as e:
+        print(f"❌ Error reading trades from PostgreSQL: {e}")
+        return []
+    finally:
+        pg_conn.close()
 
 @router.post("/trades", status_code=status.HTTP_201_CREATED)
 async def add_trade(request: Request):
@@ -831,11 +967,13 @@ async def add_trade(request: Request):
                 log(f"CLOSE EXECUTOR ERROR: {e}")
             
             # Get trade_id for notifications
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT id FROM trades WHERE ticker = ?", (ticker,))
-            row = cursor.fetchone()
-            conn.close()
+            pg_conn = get_postgresql_connection()
+            if pg_conn:
+                with pg_conn.cursor() as cursor:
+                    cursor.execute("SELECT id FROM users.trades_0001 WHERE ticker = %s", (ticker,))
+                    row = cursor.fetchone()
+            else:
+                row = None
             
             if row:
                 trade_id = row[0]
@@ -843,11 +981,27 @@ async def add_trade(request: Request):
                 symbol_close = None
                 sell_price = data.get("buy_price")
                 close_method = data.get("close_method", "manual")
+                
+                # Update SQLite
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute("UPDATE trades SET status = 'closing', symbol_close = ?, close_method = ? WHERE ticker = ?", (symbol_close, close_method, ticker))
                 conn.commit()
                 conn.close()
+                
+                # Also update PostgreSQL
+                try:
+                    pg_conn_update = get_postgresql_connection()
+                    if pg_conn_update:
+                        with pg_conn_update.cursor() as cursor:
+                            cursor.execute("UPDATE users.trades_0001 SET status = 'closing', symbol_close = %s, close_method = %s WHERE ticker = %s", (symbol_close, close_method, ticker))
+                            pg_conn_update.commit()
+                            print(f"💾 Manual close trade also marked as 'closing' in PostgreSQL users.trades_0001")
+                        pg_conn_update.close()
+                    else:
+                        print(f"⚠️ Skipping PostgreSQL manual close update - no connection available")
+                except Exception as pg_err:
+                    print(f"❌ Failed to update manual close trade in PostgreSQL: {pg_err}")
                 
                 # Notify active trade supervisor
                 notify_active_trade_supervisor_direct(trade_id, data.get('ticket_id'), "closing")
@@ -864,11 +1018,13 @@ async def add_trade(request: Request):
 
                         if row:
                             pos_db = abs(row[0])
-                            conn = get_db_connection()
-                            cursor = conn.cursor()
-                            cursor.execute("SELECT position FROM trades WHERE ticker = ?", (ticker,))
-                            trade_row = cursor.fetchone()
-                            conn.close()
+                            pg_conn_trade = get_postgresql_connection()
+                            if pg_conn_trade:
+                                with pg_conn_trade.cursor() as cursor:
+                                    cursor.execute("SELECT position FROM users.trades_0001 WHERE ticker = %s", (ticker,))
+                                    trade_row = cursor.fetchone()
+                            else:
+                                trade_row = None
 
                             if trade_row and abs(trade_row[0]) == pos_db:
                                 log(f"CLOSE POSITION CONFIRMED: {ticker}")
@@ -933,21 +1089,25 @@ async def update_trade_status_api(request: Request):
         raise HTTPException(status_code=400, detail="Missing id or ticket_id or status")
 
     if not id and ticket_id:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM trades WHERE ticket_id = ?", (ticket_id,))
-        row = cursor.fetchone()
-        conn.close()
+        pg_conn = get_postgresql_connection()
+        if pg_conn:
+            with pg_conn.cursor() as cursor:
+                cursor.execute("SELECT id FROM users.trades_0001 WHERE ticket_id = %s", (ticket_id,))
+                row = cursor.fetchone()
+        else:
+            row = None
         if not row:
             raise HTTPException(status_code=404, detail="Trade with provided ticket_id not found")
         id = row[0]
 
     if not ticket_id:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT ticket_id FROM trades WHERE id = ?", (id,))
-        row = cursor.fetchone()
-        conn.close()
+        pg_conn = get_postgresql_connection()
+        if pg_conn:
+            with pg_conn.cursor() as cursor:
+                cursor.execute("SELECT ticket_id FROM users.trades_0001 WHERE id = %s", (id,))
+                row = cursor.fetchone()
+        else:
+            row = None
         ticket_id = row[0] if row else None
 
     if new_status == "accepted":
@@ -977,11 +1137,13 @@ async def positions_updated_api(request: Request):
         
         # Handle pending trades (only when positions database is updated)
         if db_name == "positions":
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, ticket_id FROM trades WHERE status = 'pending'")
-            pending_trades = cursor.fetchall()
-            conn.close()
+            pg_conn = get_postgresql_connection()
+            if pg_conn:
+                with pg_conn.cursor() as cursor:
+                    cursor.execute("SELECT id, ticket_id FROM users.trades_0001 WHERE status = 'pending'")
+                    pending_trades = cursor.fetchall()
+            else:
+                pending_trades = []
             
             if pending_trades:
                 log(f"[🔔 POSITIONS UPDATED] Found {len(pending_trades)} pending trades to confirm")
@@ -990,20 +1152,24 @@ async def positions_updated_api(request: Request):
         
         # Handle closing trades (only when fills database is updated)
         if db_name == "fills":
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, ticket_id FROM trades WHERE status = 'closing'")
-            closing_trades = cursor.fetchall()
-            conn.close()
+            pg_conn = get_postgresql_connection()
+            if pg_conn:
+                with pg_conn.cursor() as cursor:
+                    cursor.execute("SELECT id, ticket_id FROM users.trades_0001 WHERE status = 'closing'")
+                    closing_trades = cursor.fetchall()
+            else:
+                closing_trades = []
             
             if closing_trades:
                 # log(f"[🔔 POSITIONS UPDATED] Found {len(closing_trades)} closing trades to confirm")
                 for id, ticket_id in closing_trades:
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT status FROM trades WHERE id = ?", (id,))
-                    current_status = cursor.fetchone()
-                    conn.close()
+                    pg_conn = get_postgresql_connection()
+                    if pg_conn:
+                        with pg_conn.cursor() as cursor:
+                            cursor.execute("SELECT status FROM users.trades_0001 WHERE id = %s", (id,))
+                            current_status = cursor.fetchone()
+                    else:
+                        current_status = None
                     
                     if current_status and current_status[0] == 'closing':
                         # Process closing trade directly - no threading needed for single trades
@@ -1035,11 +1201,13 @@ async def manual_settlement_poll():
         log("[MANUAL] Manual settlement polling triggered")
         
         # Get expired trades that need settlement
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT ticker FROM trades WHERE status = 'expired'")
-        expired_trades = cursor.fetchall()
-        conn.close()
+        pg_conn = get_postgresql_connection()
+        if pg_conn:
+            with pg_conn.cursor() as cursor:
+                cursor.execute("SELECT ticker FROM users.trades_0001 WHERE status = 'expired'")
+                expired_trades = cursor.fetchall()
+        else:
+            expired_trades = []
         
         if expired_trades:
             expired_tickers = [trade[0] for trade in expired_trades]
@@ -1065,11 +1233,13 @@ def check_expired_trades():
         delete_error_trades()
         
         # Step 2: Check for open trades to mark as expired
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, ticker FROM trades WHERE status = 'open'")
-        open_trades = cursor.fetchall()
-        conn.close()
+        pg_conn = get_postgresql_connection()
+        if pg_conn:
+            with pg_conn.cursor() as cursor:
+                cursor.execute("SELECT id, ticker FROM users.trades_0001 WHERE status = 'open'")
+                open_trades = cursor.fetchall()
+        else:
+            open_trades = []
         
         if not open_trades:
             return
@@ -1139,31 +1309,34 @@ def check_expired_trades():
         pass
 
 def delete_error_trades():
-    """Delete trades with status ERROR from trades.db"""
+    """Delete trades with status ERROR from PostgreSQL database"""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        pg_conn = get_postgresql_connection()
+        if not pg_conn:
+            log(f"❌ Cannot connect to PostgreSQL for error cleanup")
+            return
         
-        # Count ERROR trades before deletion
-        cursor.execute("SELECT COUNT(*) FROM trades WHERE status = 'error'")
-        error_count = cursor.fetchone()[0]
+        with pg_conn.cursor() as cursor:
+            # Count ERROR trades before deletion
+            cursor.execute("SELECT COUNT(*) FROM users.trades_0001 WHERE status = 'error'")
+            error_count = cursor.fetchone()[0]
+            
+            if error_count > 0:
+                # Delete trades with status ERROR
+                cursor.execute("DELETE FROM users.trades_0001 WHERE status = 'error'")
+                deleted_count = cursor.rowcount
+                pg_conn.commit()
+                
+                log(f"🧹 DELETED {deleted_count} ERROR trades from PostgreSQL database")
+            else:
+                log(f"🧹 No ERROR trades found to delete")
         
-        if error_count > 0:
-            # Delete trades with status ERROR
-            cursor.execute("DELETE FROM trades WHERE status = 'error'")
-            deleted_count = cursor.rowcount
-            conn.commit()
-            
-            log(f"🧹 DELETED {deleted_count} ERROR trades from database")
-        else:
-            log(f"🧹 No ERROR trades found to delete")
-            
-        conn.close()
+        pg_conn.close()
         
     except Exception as e:
         log(f"❌ Error deleting ERROR trades: {e}")
         try:
-            conn.close()
+            pg_conn.close()
         except:
             pass
 
@@ -1184,15 +1357,17 @@ def poll_settlements_for_matches(expired_tickers):
             break
             
         try:
-            conn = sqlite3.connect(SETTLEMENTS_DB_PATH, timeout=0.25)
-            cursor = conn.cursor()
-            
             for ticker in expired_tickers:
                 if ticker in found_tickers:
                     continue
                     
-                cursor.execute("SELECT revenue FROM settlements WHERE ticker = ? ORDER BY settled_time DESC LIMIT 1", (ticker,))
-                row = cursor.fetchone()
+                pg_conn = get_postgresql_connection()
+                if pg_conn:
+                    with pg_conn.cursor() as cursor:
+                        cursor.execute("SELECT revenue FROM users.settlements_0001 WHERE ticker = %s ORDER BY settled_time DESC LIMIT 1", (ticker,))
+                        row = cursor.fetchone()
+                else:
+                    row = None
                 
                 if row:
                     revenue = row[0]
@@ -1206,11 +1381,13 @@ def poll_settlements_for_matches(expired_tickers):
                             fees_row = cursor_pos.fetchone()
                             total_fees_paid = float(fees_row[0]) if fees_row and fees_row[0] is not None else None
                     
-                    conn_trades = get_db_connection()
-                    cursor_trades = conn_trades.cursor()
-                    
-                    cursor_trades.execute("SELECT buy_price, position, fees FROM trades WHERE ticker = ? AND status = 'expired'", (ticker,))
-                    trade_row = cursor_trades.fetchone()
+                    pg_conn_trades = get_postgresql_connection()
+                    if pg_conn_trades:
+                        with pg_conn_trades.cursor() as cursor_trades:
+                            cursor_trades.execute("SELECT buy_price, position, fees FROM users.trades_0001 WHERE ticker = %s AND status = 'expired'", (ticker,))
+                            trade_row = cursor_trades.fetchone()
+                    else:
+                        trade_row = None
                     if trade_row:
                         buy_price, position, fees = trade_row
                         pnl = None
@@ -1220,7 +1397,10 @@ def poll_settlements_for_matches(expired_tickers):
                             fees = fees if fees is not None else None
                             pnl = round(sell_value - buy_value - fees, 2)
                     
-                    cursor_trades.execute("""
+                    # Update SQLite first (redundant writing)
+                    conn_sqlite = get_db_connection()
+                    cursor_sqlite = conn_sqlite.cursor()
+                    cursor_sqlite.execute("""
                         UPDATE trades 
                         SET status = 'closed',
                             sell_price = ?,
@@ -1228,8 +1408,8 @@ def poll_settlements_for_matches(expired_tickers):
                             pnl = ?
                         WHERE ticker = ? AND status = 'expired'
                     """, (sell_price, 'W' if sell_price > 0 else 'L', pnl, ticker))
-                    conn_trades.commit()
-                    conn_trades.close()
+                    conn_sqlite.commit()
+                    conn_sqlite.close()
                     
                     # Also update PostgreSQL
                     try:
