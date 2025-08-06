@@ -739,6 +739,19 @@ def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbo
         print(f"❌ Failed to update trade status in PostgreSQL: {pg_err}")
     
     notify_frontend_trade_change()
+    
+    # Notify Active Trade Supervisor when status changes to open
+    if status == 'open':
+        # Get ticket_id from SQLite
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT ticket_id FROM trades WHERE id = ?", (trade_id,))
+        ticket_row = cursor.fetchone()
+        conn.close()
+        
+        if ticket_row and ticket_row[0]:
+            ticket_id = ticket_row[0]
+            notify_active_trade_supervisor_direct(trade_id, ticket_id, "open")
 
 # ---------- API ENDPOINTS ----------------------------------------------------
 
@@ -971,7 +984,7 @@ async def positions_updated_api(request: Request):
             conn.close()
             
             if pending_trades:
-                # log(f"[🔔 POSITIONS UPDATED] Found {len(pending_trades)} pending trades to confirm")
+                log(f"[🔔 POSITIONS UPDATED] Found {len(pending_trades)} pending trades to confirm")
                 for id, ticket_id in pending_trades:
                     threading.Thread(target=confirm_open_trade, args=(id, ticket_id), daemon=True).start()
         
