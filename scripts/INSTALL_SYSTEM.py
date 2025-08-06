@@ -115,6 +115,86 @@ def ensure_data_directories():
         print(f"❌ Failed to create data directories: {e}")
         return False
 
+def setup_postgresql_database():
+    """Set up PostgreSQL database and tables."""
+    print("\n🗄️ Setting up PostgreSQL database...")
+    
+    try:
+        # Check if PostgreSQL is installed and running
+        result = subprocess.run(["psql", "--version"], capture_output=True, text=True)
+        if result.returncode != 0:
+            print("❌ PostgreSQL not found. Please install PostgreSQL first:")
+            print("   macOS: brew install postgresql")
+            print("   Ubuntu: sudo apt-get install postgresql postgresql-contrib")
+            print("   Windows: Download from https://www.postgresql.org/download/windows/")
+            return False
+        
+        print("✅ PostgreSQL found")
+        
+        # Check if database exists
+        result = subprocess.run([
+            "psql", "-h", "localhost", "-U", "rec_io_user", "-d", "rec_io_db", 
+            "-c", "SELECT 1;"
+        ], capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            print("📋 Creating database and user...")
+            
+            # Create database and user
+            subprocess.run([
+                "sudo", "-u", "postgres", "psql", "-c", 
+                "CREATE DATABASE rec_io_db;"
+            ], check=True)
+            
+            subprocess.run([
+                "sudo", "-u", "postgres", "psql", "-c", 
+                "CREATE USER rec_io_user WITH PASSWORD '';"
+            ], check=True)
+            
+            subprocess.run([
+                "sudo", "-u", "postgres", "psql", "-c", 
+                "GRANT ALL PRIVILEGES ON DATABASE rec_io_db TO rec_io_user;"
+            ], check=True)
+            
+            subprocess.run([
+                "sudo", "-u", "postgres", "psql", "-c", 
+                "CREATE SCHEMA IF NOT EXISTS users;"
+            ], check=True)
+            
+            subprocess.run([
+                "sudo", "-u", "postgres", "psql", "-c", 
+                "GRANT ALL ON SCHEMA users TO rec_io_user;"
+            ], check=True)
+            
+            print("✅ Database and user created")
+        else:
+            print("✅ Database already exists")
+        
+        # Set up table structure
+        print("📋 Creating table structure...")
+        project_root = Path(__file__).parent.parent
+        schema_file = project_root / "create_user_0001_tables.sql"
+        
+        if not schema_file.exists():
+            print(f"❌ Schema file not found: {schema_file}")
+            return False
+        
+        subprocess.run([
+            "psql", "-h", "localhost", "-U", "rec_io_user", "-d", "rec_io_db", 
+            "-f", str(schema_file)
+        ], check=True)
+        
+        print("✅ PostgreSQL database setup completed")
+        return True
+        
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Failed to set up PostgreSQL: {e}")
+        print("   Please ensure PostgreSQL is installed and running")
+        return False
+    except Exception as e:
+        print(f"❌ Failed to set up PostgreSQL: {e}")
+        return False
+
 def setup_new_user():
     """Set up a new user for the system."""
     print("\n👤 Setting up new user...")
@@ -272,10 +352,12 @@ def print_completion_message():
     print("   • Main Application: http://localhost:3000")
     print("   • Login Page: http://localhost:3000/login")
     print("   • Health Check: http://localhost:3000/health")
+    print("   • PostgreSQL Database: rec_io_db (localhost:5432)")
     print("\n🔧 Management Commands:")
     print("   • Restart System: ./scripts/MASTER_RESTART.sh")
     print("   • Check Status: supervisorctl -c backend/supervisord.conf status")
     print("   • View Logs: tail -f logs/*.out.log")
+    print("   • Database Access: psql -h localhost -U rec_io_user -d rec_io_db")
     print("\n📚 Documentation:")
     print("   • Deployment Guide: DEPLOYMENT_GUIDE.md")
     print("   • Authentication Guide: docs/AUTHENTICATION_GUIDE.md")
@@ -284,6 +366,8 @@ def print_completion_message():
     print("   • Change to production mode when ready")
     print("   • Default authentication is enabled")
     print("   • Use 'Local Development Bypass' for testing")
+    print("   • PostgreSQL database is ready for parallel writes")
+    print("   • Legacy SQLite files are maintained for compatibility")
     print("=" * 70)
 
 def main():
@@ -312,6 +396,11 @@ def main():
     # Ensure data directories
     if not ensure_data_directories():
         print("\n❌ Failed to create data directories.")
+        sys.exit(1)
+    
+    # Set up PostgreSQL database
+    if not setup_postgresql_database():
+        print("\n❌ Failed to set up PostgreSQL database.")
         sys.exit(1)
     
     # Handle user setup

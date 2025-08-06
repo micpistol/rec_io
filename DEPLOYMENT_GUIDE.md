@@ -85,6 +85,97 @@ du -sh backend/data/historical_data/
 # due to GitHub file size limits. These will need to be downloaded separately.
 ```
 
+### Step 3.5: Set Up PostgreSQL Database (Required)
+```bash
+# Install PostgreSQL if not already installed
+# On macOS:
+brew install postgresql
+brew services start postgresql
+
+# On Ubuntu/Debian:
+sudo apt-get update
+sudo apt-get install postgresql postgresql-contrib
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+
+# On Windows:
+# Download and install from https://www.postgresql.org/download/windows/
+
+# Create database and user
+sudo -u postgres psql -c "CREATE DATABASE rec_io_db;"
+sudo -u postgres psql -c "CREATE USER rec_io_user WITH PASSWORD '';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE rec_io_db TO rec_io_user;"
+sudo -u postgres psql -c "CREATE SCHEMA IF NOT EXISTS users;"
+sudo -u postgres psql -c "GRANT ALL ON SCHEMA users TO rec_io_user;"
+
+# Set up the database structure
+psql -h localhost -U rec_io_user -d rec_io_db -f create_user_0001_tables.sql
+
+# Verify the setup
+psql -h localhost -U rec_io_user -d rec_io_db -c "\dt users.*"
+```
+
+**What this creates:**
+- ✅ **Database**: `rec_io_db` with `rec_io_user` access
+- ✅ **Schema**: `users` schema for all user data
+- ✅ **Tables**: Complete table structure matching legacy SQLite schemas
+  - `users.trades_0001` - Trade history
+  - `users.positions_0001` - Position data
+  - `users.fills_0001` - Fill data
+  - `users.orders_0001` - Order data
+  - `users.settlements_0001` - Settlement data
+  - `users.account_balance_0001` - Account balance
+  - `users.user_info_0001` - User information
+  - `users.watchlist_0001` - Watchlist data
+  - `users.trade_preferences_0001` - Trade preferences
+  - `users.auto_trade_settings_0001` - Auto trade settings
+- ✅ **Indexes**: Performance indexes on key columns
+- ✅ **Triggers**: Automatic `updated_at` timestamp updates
+- ✅ **Constraints**: Data integrity constraints and foreign keys
+
+**Expected Output:**
+```
+🚀 Starting user_0001 table setup and data migration...
+📋 Step 1: Creating PostgreSQL table structure...
+✅ Table structure created successfully
+📊 Step 2: Migrating data from SQLite to PostgreSQL...
+✅ Data migration completed successfully
+🔍 Step 3: Validating migration...
+✅ Migration validation completed
+📈 Step 4: Migration Summary
+================================
+ table_name | row_count 
+------------+-----------
+ account_balance_0001 |       363
+ fills_0001          |      1930
+ orders_0001         |      1827
+ positions_0001      |         4
+ settlements_0001    |        50
+ trades_0001         |      1610
+(6 rows)
+
+🎉 User_0001 table setup and migration completed!
+```
+
+**Database Configuration:**
+The system uses these default PostgreSQL settings:
+- **Host**: `localhost`
+- **Port**: `5432`
+- **Database**: `rec_io_db`
+- **User**: `rec_io_user`
+- **Password**: `` (empty password for local development)
+- **Schema**: `users`
+
+**Environment Variables** (optional for custom configuration):
+```bash
+export DATABASE_TYPE=postgresql
+export POSTGRES_HOST=localhost
+export POSTGRES_PORT=5432
+export POSTGRES_DB=rec_io_db
+export POSTGRES_USER=rec_io_user
+export POSTGRES_PASSWORD=
+```
+
 ### Step 4: Set Up New User (Automated)
 ```bash
 # Run the comprehensive user setup script
@@ -556,6 +647,11 @@ netstat -an | grep :3000
 - [ ] Repository cloned successfully
 - [ ] Python virtual environment created and activated
 - [ ] Dependencies installed (`pip install -r requirements.txt`)
+- [ ] PostgreSQL installed and running
+- [ ] Database `rec_io_db` created
+- [ ] User `rec_io_user` created with proper permissions
+- [ ] Schema `users` created
+- [ ] Table structure created (`create_user_0001_tables.sql`)
 - [ ] Historical data verified (~347MB present)
 - [ ] Kalshi credentials created
 - [ ] User preferences configured
@@ -569,6 +665,7 @@ netstat -an | grep :3000
 - [ ] Login page accessible
 - [ ] Historical data loading in UI
 - [ ] Live data collection working
+- [ ] PostgreSQL parallel writes working
 - [ ] Demo trade test completed
 
-**🎉 Congratulations! Your REC.IO trading system is now fully operational.** 
+**🎉 Congratulations! Your REC.IO trading system is now fully operational with PostgreSQL support.** 
