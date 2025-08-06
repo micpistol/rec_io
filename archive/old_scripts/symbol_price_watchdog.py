@@ -11,6 +11,7 @@ import requests
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import argparse
+from typing import Optional, Dict, Any
 
 # Add the project root to the Python path (permanent scalable fix)
 from backend.util.paths import get_project_root
@@ -34,15 +35,15 @@ SYMBOL_CONFIG = {
         'table_name': 'btc_price_log',
         'heartbeat_file': 'btc_logger_heartbeat_postgresql.txt',
         'price_change_file': 'btc_price_change_postgresql.json'
+    },
+    'ETH': {
+        'api_endpoint': 'wss://ws-feed.exchange.coinbase.com',
+        'product_id': 'ETH-USD',
+        'table_name': 'eth_price_log',
+        'heartbeat_file': 'eth_logger_heartbeat_postgresql.txt',
+        'price_change_file': 'eth_price_change_postgresql.json'
     }
     # Add more symbols here as needed
-    # 'ETH': {
-    #     'api_endpoint': 'wss://ws-feed.exchange.coinbase.com',
-    #     'product_id': 'ETH-USD',
-    #     'table_name': 'eth_price_log',
-    #     'heartbeat_file': 'eth_logger_heartbeat_postgresql.txt',
-    #     'price_change_file': 'eth_price_change_postgresql.json'
-    # }
 }
 
 # PostgreSQL connection parameters
@@ -114,117 +115,151 @@ def get_current_price(symbol: str) -> float:
         print(f"Error getting current price: {e}")
         return 0.0
 
-def get_momentum_data() -> dict:
+def get_momentum_data(symbol: str = 'BTC') -> dict:
     """
-    Fetch momentum data from the live data analysis endpoint.
+    Calculate momentum data natively using the same logic as live_data_analysis.py
     Returns a dictionary with momentum information.
     """
     try:
-        # Get the main app port
-        main_app_port = get_port('main_app')
-        if not main_app_port:
-            return {"momentum": None}
-        
-        # Fetch momentum data from the core endpoint
-        url = f"http://localhost:{main_app_port}/core"
-        response = requests.get(url, timeout=5)
-        
-        if response.status_code == 200:
-            data = response.json()
-            return {
-                "momentum": data.get('weighted_momentum_score'),
-                "delta_1m": data.get('delta_1m'),
-                "delta_2m": data.get('delta_2m'),
-                "delta_3m": data.get('delta_3m'),
-                "delta_4m": data.get('delta_4m'),
-                "delta_15m": data.get('delta_15m'),
-                "delta_30m": data.get('delta_30m')
-            }
-        else:
-            return {"momentum": None}
-            
+        # Calculate momentum data natively
+        momentum_data = calculate_native_momentum(symbol)
+        return momentum_data
     except Exception as e:
-        print(f"Failed to get momentum data: {e}")
+        print(f"Failed to calculate momentum data: {e}")
         return {"momentum": None}
 
-def get_current_event_ticker():
-    """Get the current event ticker for BTC"""
-    from datetime import datetime, timedelta
-    from zoneinfo import ZoneInfo
-    
-    est = ZoneInfo("America/New_York")
-    now = datetime.now(est)
-    
-    # Try current hour first
-    test_time = now + timedelta(hours=1)
-    year_str = test_time.strftime("%y")
-    month_str = test_time.strftime("%b").upper()
-    day_str = test_time.strftime("%d")
-    hour_str = test_time.strftime("%H")
-    current_ticker = f"KXBTCD-{year_str}{month_str}{day_str}{hour_str}"
-    
-    return current_ticker
-
-def update_live_header(symbol: str, timestamp: str, price: float, momentum_data: dict):
-    """
-    Update the live header table with current price and momentum data.
-    This table is used by the strike table analysis for probability calculations.
-    """
-    conn = get_postgres_connection()
-    cursor = conn.cursor()
-    
+def get_price_at_offset(symbol: str, minutes_ago: int) -> Optional[float]:
+    """Get price from X minutes ago using PostgreSQL database"""
     try:
-        # Get current event ticker
-        event_ticker = get_current_event_ticker()
+        conn = get_postgres_connection()
+        cursor = conn.cursor()
         
-        if not event_ticker:
-            print(f"⚠️ No current event ticker found for {symbol}")
-            return
+        # Calculate timestamp for X minutes ago in EST
+        est_tz = ZoneInfo('US/Eastern')
+        now_est = datetime.now(est_tz)
+        target_time = now_est - timedelta(minutes=minutes_ago)
+        target_timestamp = target_time.strftime("%Y-%m-%dT%H:%M:%S")
         
-        # Calculate TTC (time to close)
-        from backend.strike_table_analysis import calculate_ttc
-        ttc_seconds = calculate_ttc()
+        table_name = SYMBOL_CONFIG[symbol]['table_name']
         
-        # Update or insert header data
-        cursor.execute(f'''
-            INSERT INTO live_data.btc_live_header 
-            (event_ticker, current_price, momentum_weighted_score, momentum_delta_1m, 
-             momentum_delta_2m, momentum_delta_3m, momentum_delta_4m, momentum_delta_15m, 
-             momentum_delta_30m, ttc_seconds, updated_at) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (event_ticker) DO UPDATE SET
-                current_price = EXCLUDED.current_price,
-                momentum_weighted_score = EXCLUDED.momentum_weighted_score,
-                momentum_delta_1m = EXCLUDED.momentum_delta_1m,
-                momentum_delta_2m = EXCLUDED.momentum_delta_2m,
-                momentum_delta_3m = EXCLUDED.momentum_delta_3m,
-                momentum_delta_4m = EXCLUDED.momentum_delta_4m,
-                momentum_delta_15m = EXCLUDED.momentum_delta_15m,
-                momentum_delta_30m = EXCLUDED.momentum_delta_30m,
-                ttc_seconds = EXCLUDED.ttc_seconds,
-                updated_at = EXCLUDED.updated_at
-        ''', (
-            event_ticker,
-            price,
-            momentum_data.get('momentum'),
-            momentum_data.get('delta_1m'),
-            momentum_data.get('delta_2m'),
-            momentum_data.get('delta_3m'),
-            momentum_data.get('delta_4m'),
-            momentum_data.get('delta_15m'),
-            momentum_data.get('delta_30m'),
-            ttc_seconds,
-            timestamp
-        ))
+        # Get the closest price before the target time
+        cursor.execute(f"""
+            SELECT price FROM live_data.{table_name} 
+            WHERE timestamp <= %s 
+            ORDER BY timestamp DESC 
+            LIMIT 1
+        """, (target_timestamp,))
         
-        conn.commit()
-        print(f"✅ Updated live header for {event_ticker}: price=${price:,.2f}, momentum={momentum_data.get('momentum', 'N/A')}")
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            return float(result[0])
+        return None
         
     except Exception as e:
-        print(f"⚠️ Error updating live header: {e}")
-        conn.rollback()
-    finally:
+        print(f"Error getting price at {minutes_ago}m offset: {e}")
+        return None
+
+def get_current_price_from_db(symbol: str) -> Optional[float]:
+    """Get the most recent price from PostgreSQL database"""
+    try:
+        conn = get_postgres_connection()
+        cursor = conn.cursor()
+        
+        table_name = SYMBOL_CONFIG[symbol]['table_name']
+        cursor.execute(f"SELECT price FROM live_data.{table_name} ORDER BY timestamp DESC LIMIT 1")
+        result = cursor.fetchone()
         conn.close()
+        
+        if result:
+            return float(result[0])
+        return None
+        
+    except Exception as e:
+        print(f"Error getting current price: {e}")
+        return None
+
+def calculate_delta(current_price: float, past_price: Optional[float]) -> Optional[float]:
+    """Calculate percentage delta between current and past price"""
+    if past_price is None or past_price == 0:
+        return None
+    return ((current_price - past_price) / past_price) * 100
+
+def calculate_momentum_deltas(symbol: str) -> Dict[str, Optional[float]]:
+    """Calculate all momentum deltas (1m, 2m, 3m, 4m, 15m, 30m)"""
+    current_price = get_current_price_from_db(symbol)
+    if current_price is None:
+        return {
+            'delta_1m': None,
+            'delta_2m': None,
+            'delta_3m': None,
+            'delta_4m': None,
+            'delta_15m': None,
+            'delta_30m': None
+        }
+    
+    # Get prices at different time offsets
+    price_1m = get_price_at_offset(symbol, 1)
+    price_2m = get_price_at_offset(symbol, 2)
+    price_3m = get_price_at_offset(symbol, 3)
+    price_4m = get_price_at_offset(symbol, 4)
+    price_15m = get_price_at_offset(symbol, 15)
+    price_30m = get_price_at_offset(symbol, 30)
+    
+    # Calculate deltas
+    deltas = {
+        'delta_1m': calculate_delta(current_price, price_1m),
+        'delta_2m': calculate_delta(current_price, price_2m),
+        'delta_3m': calculate_delta(current_price, price_3m),
+        'delta_4m': calculate_delta(current_price, price_4m),
+        'delta_15m': calculate_delta(current_price, price_15m),
+        'delta_30m': calculate_delta(current_price, price_30m)
+    }
+    
+    return deltas
+
+def calculate_weighted_momentum_score(deltas: Dict[str, Optional[float]]) -> Optional[float]:
+    """Calculate weighted momentum score using the standard formula"""
+    # Weights for each delta (same as live_data_analysis.py)
+    weights = {
+        'delta_1m': 0.3,
+        'delta_2m': 0.25,
+        'delta_3m': 0.2,
+        'delta_4m': 0.15,
+        'delta_15m': 0.05,
+        'delta_30m': 0.05
+    }
+    
+    weighted_sum = 0
+    total_weight = 0
+    
+    for delta_key, weight in weights.items():
+        delta_value = deltas.get(delta_key)
+        if delta_value is not None:
+            weighted_sum += delta_value * weight
+            total_weight += weight
+    
+    if total_weight > 0:
+        return weighted_sum / total_weight
+    return None
+
+def calculate_native_momentum(symbol: str = 'BTC') -> Dict[str, Any]:
+    """Calculate complete momentum analysis including deltas and weighted score"""
+    deltas = calculate_momentum_deltas(symbol)
+    weighted_score = calculate_weighted_momentum_score(deltas)
+    
+    # Use EST timestamp
+    est_tz = ZoneInfo('US/Eastern')
+    now_est = datetime.now(est_tz)
+    
+    return {
+        **deltas,
+        'momentum': weighted_score,  # Alias for weighted_momentum_score
+        'weighted_momentum_score': weighted_score,
+        'timestamp': now_est.isoformat(),
+        'current_price': get_current_price_from_db(symbol)
+    }
 
 def insert_tick(symbol: str, timestamp: str, price: float):
     """
@@ -239,7 +274,7 @@ def insert_tick(symbol: str, timestamp: str, price: float):
         one_minute_avg = get_1m_avg_price(symbol)
         
         # Get momentum data
-        momentum_data = get_momentum_data()
+        momentum_data = get_momentum_data(symbol)
         
         table_name = SYMBOL_CONFIG[symbol]['table_name']
         
@@ -279,8 +314,8 @@ def insert_tick(symbol: str, timestamp: str, price: float):
         
         conn.commit()
         
-        # Also update the live header table
-        update_live_header(symbol, timestamp, price, momentum_data)
+        # Log successful price insertion
+        print(f"✅ {symbol} price logged: ${price:,.2f} at {timestamp}")
         
     except Exception as e:
         print(f"⚠️ Logger encountered an error: {e}")
@@ -343,14 +378,16 @@ async def log_symbol_price(symbol: str):
             await asyncio.sleep(5)
 
 async def poll_kraken_price_changes(symbol: str):
-    """Poll Kraken for price changes (currently BTC-specific)"""
+    """Poll Kraken for price changes (supports BTC and ETH)"""
     while True:
         try:
-            # For now, this is BTC-specific. Can be expanded for other symbols
+            # Configure Kraken API endpoints for different symbols
             if symbol == 'BTC':
                 url = "https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=60"
+            elif symbol == 'ETH':
+                url = "https://api.kraken.com/0/public/OHLC?pair=ETHUSD&interval=60"
             else:
-                # Skip for other symbols for now
+                # Skip for unsupported symbols
                 await asyncio.sleep(60)
                 continue
                 
