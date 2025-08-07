@@ -61,13 +61,15 @@ def log_step(logger, step_name, start_time=None):
 
 def get_symbols():
     """Get list of symbols to process."""
-    data_dir = Path(__file__).parent.parent / "data" / "live_data" / "price_history"
+    data_dir = Path(__file__).parent.parent / "data" / "historical_data"
     symbols = []
     
     if data_dir.exists():
         for symbol_dir in data_dir.iterdir():
-            if symbol_dir.is_dir() and not symbol_dir.name.startswith('.'):
-                symbols.append(symbol_dir.name)
+            if symbol_dir.is_dir() and not symbol_dir.name.startswith('.') and symbol_dir.name.endswith('_historical'):
+                # Extract symbol name from directory (e.g., 'btc_historical' -> 'btc')
+                symbol = symbol_dir.name.replace('_historical', '')
+                symbols.append(symbol)
     
     return symbols
 
@@ -83,11 +85,12 @@ def update_symbol_datasets(logger):
         try:
             logger.info(f"Updating {symbol.upper()} dataset...")
             
-            # Construct the master file path
-            master_file = f"../data/live_data/price_history/{symbol}/{symbol}_1m_master_5y.csv"
+            # Construct the master file path - using absolute path
+            project_root = Path(__file__).parent.parent.parent
+            master_file = project_root / "backend" / "data" / "historical_data" / f"{symbol}_historical" / f"{symbol}_1m_master_5y.csv"
             
             # Update the dataset
-            result = update_existing_csv(f"{symbol.upper()}/USD", master_file)
+            result = update_existing_csv(f"{symbol.upper()}/USD", str(master_file))
             
             if result:
                 logger.info(f"✅ {symbol.upper()} dataset updated successfully")
@@ -110,11 +113,12 @@ def run_momentum_generation(logger, symbols):
         try:
             logger.info(f"Generating momentum for {symbol.upper()}...")
             
-            # Construct the master file path
-            master_file = f"../data/live_data/price_history/{symbol}/{symbol}_1m_master_5y.csv"
+            # Construct the master file path - using absolute path
+            project_root = Path(__file__).parent.parent.parent
+            master_file = project_root / "backend" / "data" / "historical_data" / f"{symbol}_historical" / f"{symbol}_1m_master_5y.csv"
             
             # Run momentum generation
-            fill_missing_momentum_inplace(master_file)
+            fill_missing_momentum_inplace(str(master_file))
             
             logger.info(f"✅ {symbol.upper()} momentum generation completed")
             processed_symbols.append(symbol)
@@ -135,9 +139,10 @@ def verify_data_completeness(logger, symbols):
         try:
             logger.info(f"Verifying {symbol.upper()} dataset...")
             
-            # Load the dataset
-            master_file = f"../data/live_data/price_history/{symbol}/{symbol}_1m_master_5y.csv"
-            df = pd.read_csv(master_file)
+            # Load the dataset - using absolute path
+            project_root = Path(__file__).parent.parent.parent
+            master_file = project_root / "backend" / "data" / "historical_data" / f"{symbol}_historical" / f"{symbol}_1m_master_5y.csv"
+            df = pd.read_csv(str(master_file))
             
             # Check data completeness
             total_rows = len(df)
@@ -187,17 +192,18 @@ def archive_existing_fingerprints(logger, symbols):
         try:
             logger.info(f"Archiving {symbol.upper()} fingerprint files...")
             
-            # Find fingerprint files
-            fingerprint_dir = f"../data/historical_data/{symbol}_historical/symbol_fingerprints"
-            fingerprint_files = find_fingerprint_files(fingerprint_dir)
+            # Find fingerprint files - using absolute path
+            project_root = Path(__file__).parent.parent.parent
+            fingerprint_dir = project_root / "backend" / "data" / "historical_data" / f"{symbol}_historical" / "symbol_fingerprints"
+            fingerprint_files = find_fingerprint_files(str(fingerprint_dir))
             
             if fingerprint_files:
                 # Create archive
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 archive_name = f"{symbol}_fingerprint_archive_{timestamp}"
-                output_dir = "../data/archives"
+                output_dir = project_root / "backend" / "data" / "archives"
                 
-                archive_path = create_archive(fingerprint_files, output_dir, archive_name, symbol)
+                archive_path = create_archive(fingerprint_files, str(output_dir), archive_name, symbol)
                 
                 if archive_path:
                     logger.info(f"✅ {symbol.upper()} fingerprints archived: {archive_path}")
@@ -222,11 +228,12 @@ def generate_new_fingerprints(logger, symbols):
         try:
             logger.info(f"Generating fingerprints for {symbol.upper()}...")
             
-            # Construct the master file path
-            master_file = f"../data/historical_data/{symbol}_historical/{symbol}_1m_master_5y.csv"
+            # Construct the master file path - using absolute path
+            project_root = Path(__file__).parent.parent.parent
+            master_file = project_root / "backend" / "data" / "historical_data" / f"{symbol}_historical" / f"{symbol}_1m_master_5y.csv"
             
             # Run fingerprint generation using subprocess
-            result = subprocess.run([sys.executable, "fingerprint_generator.py", master_file], 
+            result = subprocess.run([sys.executable, "fingerprint_generator.py", str(master_file)], 
                                   capture_output=True, text=True, cwd=os.path.dirname(__file__))
             
             if result.returncode != 0:
