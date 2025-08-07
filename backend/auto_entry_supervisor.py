@@ -283,6 +283,71 @@ def check_spike_alert_conditions():
     except Exception as e:
         log(f"[SPIKE ALERT] Error checking spike conditions: {e}")
 
+def update_auto_entry_status_in_db(status):
+    """Update auto_entry_status in the database"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE users.auto_trade_settings_0001 SET auto_entry_status = %s, updated_at = NOW() WHERE id = 1",
+                (status,)
+            )
+            conn.commit()
+        conn.close()
+        log(f"[AUTO ENTRY] ✅ Updated auto_entry_status to '{status}' in database")
+    except Exception as e:
+        log(f"[AUTO ENTRY] ❌ Error updating auto_entry_status: {e}")
+
+def determine_auto_entry_status():
+    """Determine the current auto entry status based on conditions"""
+    try:
+        # Check if auto entry is enabled
+        auto_entry_enabled = is_auto_entry_enabled()
+        
+        if not auto_entry_enabled:
+            return "DISABLED"
+        
+        # Check if service is healthy
+        service_healthy = monitoring_thread is not None and monitoring_thread.is_alive()
+        
+        if not service_healthy:
+            return "DISABLED"  # Service not running
+        
+        # Check if spike alert is active (blocks all trades)
+        spike_alert_active = auto_entry_indicator_state.get("spike_alert_active", False)
+        
+        if spike_alert_active:
+            return "PAUSED"  # Spike alert active
+        
+        # Get auto entry settings
+        settings = get_auto_entry_settings()
+        required_settings = ["min_time", "max_time", "min_probability", "min_differential"]
+        missing_settings = [setting for setting in required_settings if setting not in settings]
+        
+        if missing_settings:
+            return "DISABLED"  # Missing required settings
+        
+        # Check if TTC is within window
+        min_time = settings["min_time"]
+        max_time = settings["max_time"]
+        current_ttc = get_current_ttc()
+        ttc_within_window = min_time <= current_ttc <= max_time
+        
+        if ttc_within_window:
+            return "ACTIVE"
+        else:
+            return "INACTIVE"
+            
+    except Exception as e:
+        log(f"[AUTO ENTRY] ❌ Error determining status: {e}")
+        return "DISABLED"
+
 def broadcast_auto_entry_indicator_change():
     """Broadcast auto entry indicator state change via WebSocket to main app"""
     global auto_entry_indicator_state, previous_indicator_state
@@ -312,6 +377,10 @@ def broadcast_auto_entry_indicator_change():
         # Update previous state
         previous_indicator_state = current_state.copy()
         log(f"[AUTO ENTRY DEBUG]   State changed, broadcasting...")
+        
+        # Determine and update database status
+        new_status = determine_auto_entry_status()
+        update_auto_entry_status_in_db(new_status)
         
         # Send to main app for WebSocket broadcast
         try:

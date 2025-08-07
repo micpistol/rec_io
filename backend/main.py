@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 import pytz
 import requests
 import sqlite3
+import psycopg2
 from typing import List, Optional, Dict
 import fcntl
 from datetime import datetime, timezone
@@ -59,7 +60,7 @@ CACHE_TTL = 1.0  # 1 second cache TTL
 
 # PostgreSQL helper functions for auto trade settings
 def update_auto_trade_settings_postgresql(**kwargs):
-    """Update auto trade settings in PostgreSQL"""
+    """Update auto trade settings in PostgreSQL using UPSERT"""
     try:
         import psycopg2
         conn = psycopg2.connect(
@@ -69,19 +70,28 @@ def update_auto_trade_settings_postgresql(**kwargs):
             password="rec_io_password"
         )
         with conn.cursor() as cursor:
-            # Build dynamic update query
-            update_parts = []
-            params = []
+            # First, ensure we only have one row
+            cursor.execute("DELETE FROM users.auto_trade_settings_0001 WHERE id > 1")
             
-            for key, value in kwargs.items():
-                update_parts.append(f"{key} = %s")
-                params.append(value)
+            # Build dynamic UPSERT query
+            columns = list(kwargs.keys())
+            values = list(kwargs.values())
+            placeholders = ['%s'] * len(values)
             
-            if update_parts:
-                query = f"UPDATE users.auto_trade_settings_0001 SET {', '.join(update_parts)}, updated_at = CURRENT_TIMESTAMP WHERE id = 1"
-                cursor.execute(query, params)
-                conn.commit()
-                print(f"[PostgreSQL] Updated auto trade settings: {kwargs}")
+            # Add updated_at to the columns
+            columns.append('updated_at')
+            placeholders.append('CURRENT_TIMESTAMP')
+            
+            query = f"""
+                INSERT INTO users.auto_trade_settings_0001 (id, {', '.join(columns)})
+                VALUES (1, {', '.join(placeholders)})
+                ON CONFLICT (id) DO UPDATE SET
+                {', '.join([f"{col} = EXCLUDED.{col}" for col in columns])}
+            """
+            
+            cursor.execute(query, values)
+            conn.commit()
+            print(f"[PostgreSQL] Updated auto trade settings: {kwargs}")
         
         conn.close()
     except Exception as e:
@@ -144,7 +154,7 @@ def get_auto_trade_settings_postgresql():
 
 # PostgreSQL helper functions for trade preferences
 def update_trade_preferences_postgresql(**kwargs):
-    """Update trade preferences in PostgreSQL"""
+    """Update trade preferences in PostgreSQL using UPSERT"""
     try:
         import psycopg2
         conn = psycopg2.connect(
@@ -154,19 +164,28 @@ def update_trade_preferences_postgresql(**kwargs):
             password="rec_io_password"
         )
         with conn.cursor() as cursor:
-            # Build dynamic update query
-            update_parts = []
-            params = []
+            # First, ensure we only have one row
+            cursor.execute("DELETE FROM users.trade_preferences_0001 WHERE id > 1")
             
-            for key, value in kwargs.items():
-                update_parts.append(f"{key} = %s")
-                params.append(value)
+            # Build dynamic UPSERT query
+            columns = list(kwargs.keys())
+            values = list(kwargs.values())
+            placeholders = ['%s'] * len(values)
             
-            if update_parts:
-                query = f"UPDATE users.trade_preferences_0001 SET {', '.join(update_parts)}, updated_at = CURRENT_TIMESTAMP WHERE id = 1"
-                cursor.execute(query, params)
-                conn.commit()
-                print(f"[PostgreSQL] Updated trade preferences: {kwargs}")
+            # Add updated_at to the columns
+            columns.append('updated_at')
+            placeholders.append('CURRENT_TIMESTAMP')
+            
+            query = f"""
+                INSERT INTO users.trade_preferences_0001 (id, {', '.join(columns)})
+                VALUES (1, {', '.join(placeholders)})
+                ON CONFLICT (id) DO UPDATE SET
+                {', '.join([f"{col} = EXCLUDED.{col}" for col in columns])}
+            """
+            
+            cursor.execute(query, values)
+            conn.commit()
+            print(f"[PostgreSQL] Updated trade preferences: {kwargs}")
         
         conn.close()
     except Exception as e:
@@ -1463,6 +1482,17 @@ async def set_auto_entry(request: Request):
             
             # Also update PostgreSQL (new workflow)
             update_auto_trade_settings_postgresql(auto_entry=enabled)
+            
+            # Trigger auto entry supervisor to reload settings
+            try:
+                import subprocess
+                import sys
+                # Import the auto_entry_supervisor module and call reload function
+                sys.path.append('/Users/ericwais1/rec_io_20')
+                from backend.auto_entry_supervisor import log
+                log("[AUTO ENTRY] Settings updated via API - supervisor will reload on next check")
+            except Exception as e:
+                print(f"[Auto Entry Status Update Error] {e}")
         except Exception as e:
             print(f"[Auto Entry Update Error] {e}")
     
@@ -1689,6 +1719,26 @@ async def get_auto_trade_settings():
     """Get auto trade settings from PostgreSQL"""
     settings = get_auto_trade_settings_postgresql()
     return settings
+
+@app.get("/api/get_auto_entry_status")
+async def get_auto_entry_status():
+    """Get current auto entry status from PostgreSQL"""
+    try:
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT auto_entry_status FROM users.auto_trade_settings_0001 WHERE id = 1")
+            result = cursor.fetchone()
+            status = result[0] if result else "DISABLED"
+            conn.close()
+            return {"status": status}
+    except Exception as e:
+        print(f"Error getting auto entry status: {e}")
+        return {"status": "DISABLED", "error": str(e)}
 
 @app.get("/api/get_trade_preferences")
 async def get_trade_preferences():

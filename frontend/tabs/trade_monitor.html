@@ -583,9 +583,9 @@
       <div class="panel-container" style="height: 50px; min-height: 50px; max-height: 50px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
         <div id="strikePanelMarketTitleCell" style="font-size: 16px; text-align: left;">Loading market title...</div>
         <div style="display: flex; align-items: center; gap: 10px;">
-          <div id="autoEntryIndicator" style="display: none; align-items: center; gap: 6px; margin-right: 5px;padding: 4px 8px;  color: white; border-radius: 4px; font-size: 12px; font-weight: 500;">
+          <div id="autoEntryIndicator" style="display: flex; align-items: center; gap: 6px; margin-right: 5px;padding: 4px 8px;  color: white; border-radius: 4px; font-size: 12px; font-weight: 500;">
             <div style="width: 11px; height: 11px; background: #00ff2f; border-radius: 50%;"></div>
-            <span>Automated Trading ON</span>
+            <span>Loading...</span>
           </div>
           <div id="strikePanelTTC" style="font-size: 27px; font-weight: bold; text-align: right;">&nbsp;</div>
         </div>
@@ -3890,14 +3890,14 @@ function initTimeWindowSliderOnShow() {
 // Fetch initial auto entry indicator state
 async function fetchInitialAutoEntryIndicator() {
     try {
-        const response = await fetch('/api/auto_entry_indicator');
-        if (!response.ok) throw new Error('Failed to fetch auto entry indicator');
+        const response = await fetch('/api/get_auto_entry_status');
+        if (!response.ok) throw new Error('Failed to fetch auto entry status');
         const data = await response.json();
         
         // Update the indicator display
         updateAutoEntryIndicator(data);
     } catch (error) {
-        console.error('Error fetching initial auto entry indicator:', error);
+        console.error('Error fetching initial auto entry status:', error);
     }
 }
 
@@ -3913,66 +3913,88 @@ function updateAutoEntryIndicator(data) {
     const indicatorDot = indicator.querySelector('div');
     const indicatorText = indicator.querySelector('span');
     
-    // Check for SPIKE ALERT state first
-    if (data.spike_alert_active) {
-        // SPIKE ALERT MODE - Show red indicator
-        indicator.style.display = 'flex';
-        indicator.style.backgroundColor = '#dc3545'; // Red background
-        indicator.style.border = '1px solid #c82333';
-        
-        if (indicatorDot) {
-            indicatorDot.style.background = '#ff6b6b'; // Red dot
+    // Always show the indicator
+    indicator.style.display = 'flex';
+    
+    // Handle both old and new endpoint responses
+    let status = 'UNKNOWN';
+    
+    if (data.status) {
+        // New endpoint response: {"status": "DISABLED"}
+        status = data.status;
+    } else if (data.enabled !== undefined) {
+        // Old endpoint response: complex object with enabled field
+        if (data.enabled && data.scanning_active) {
+            status = 'ACTIVE';
+        } else if (data.enabled && !data.scanning_active) {
+            status = 'INACTIVE';
+        } else {
+            status = 'DISABLED';
         }
-        
-        if (indicatorText) {
-            const recoveryCountdown = data.spike_alert_recovery_countdown;
-            if (recoveryCountdown !== null && recoveryCountdown > 0) {
-                indicatorText.textContent = `SPIKE ALERT - AUTO TRADING PAUSED (${recoveryCountdown.toFixed(1)}m)`;
-            } else {
-                indicatorText.textContent = 'SPIKE ALERT - AUTO TRADING PAUSED';
-            }
-        }
-        
-        // Removed console.log
-        return;
     }
     
-    // Use the new scanning_active field as the primary condition
-    // This provides the true system-wide scanning status
-    if (data.scanning_active) {
-        // Show the indicator when scanning is actually active
-        indicator.style.display = 'flex';
-        indicator.style.backgroundColor = ''; // Reset background
-        indicator.style.border = ''; // Reset border
-        
-        if (indicatorDot) {
-            indicatorDot.style.background = '#00ff2f'; // Green dot
-        }
-        
-        if (indicatorText) {
-            indicatorText.textContent = 'Automated Trading ON';
-        }
-        
-        // Removed console.log
-    } else {
-        // Hide the indicator when scanning is not active
-        indicator.style.display = 'none';
-        // Removed console.log
-        
-        // Log additional debug info
-        if (data.enabled && !data.service_healthy) {
-            // Removed console.log
-        } else if (data.enabled && data.service_healthy && !data.ttc_within_window) {
-            // Removed console.log
-        } else if (!data.enabled) {
-            // Removed console.log
-        }
+    // Set colors and text based on status (no background colors)
+    switch (status) {
+        case 'ACTIVE':
+            indicator.style.display = 'flex';
+            indicator.style.backgroundColor = ''; // No background
+            indicator.style.border = '';
+            if (indicatorDot) {
+                indicatorDot.style.background = '#00ff2f'; // Green dot
+            }
+            if (indicatorText) {
+                indicatorText.textContent = 'Auto Trade ACTIVE';
+            }
+            break;
+            
+        case 'INACTIVE':
+            indicator.style.display = 'flex';
+            indicator.style.backgroundColor = ''; // No background
+            indicator.style.border = '';
+            if (indicatorDot) {
+                indicatorDot.style.background = '#ffc107'; // Yellow dot
+            }
+            if (indicatorText) {
+                indicatorText.textContent = 'Auto Trade INACTIVE';
+            }
+            break;
+            
+        case 'DISABLED':
+            indicator.style.display = 'none'; // Hide completely when disabled
+            break;
+            
+        case 'PAUSED':
+            indicator.style.display = 'flex';
+            indicator.style.backgroundColor = ''; // No background
+            indicator.style.border = '';
+            if (indicatorDot) {
+                indicatorDot.style.background = '#ff6b6b'; // Red dot
+            }
+            if (indicatorText) {
+                indicatorText.textContent = 'Auto Trade PAUSED';
+            }
+            break;
+            
+        default:
+            indicator.style.display = 'flex';
+            indicator.style.backgroundColor = ''; // No background
+            indicator.style.border = '';
+            if (indicatorDot) {
+                indicatorDot.style.background = '#6c757d'; // Gray dot
+            }
+            if (indicatorText) {
+                indicatorText.textContent = `Auto Trade ${status}`;
+            }
+            break;
     }
 }
 
 // Fetch initial state when page loads
 document.addEventListener('DOMContentLoaded', () => {
     fetchInitialAutoEntryIndicator();
+    
+    // Set up periodic refresh every 10 seconds (less aggressive to prevent flashing)
+    setInterval(fetchInitialAutoEntryIndicator, 10000);
 });
 
 // Also fetch initial state when live-data.js loads
