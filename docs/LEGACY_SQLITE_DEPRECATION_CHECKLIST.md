@@ -262,3 +262,57 @@ This checklist systematically identifies and deprecates legacy SQLite database f
 - Frontend components appear to be using API endpoints that should already be PostgreSQL-based
 - The migration should be done methodically to avoid breaking the live trading system
 - Focus is now on the three core components: Trade Manager, Active Trade Supervisor, and Account Sync
+
+## Phase 1: Trade Executor Cleanup ✅ COMPLETED
+
+### ✅ **Trade Executor API Cleanup (COMPLETED)**
+- **Removed duplicate API endpoints** from `trade_executor.py`:
+  - `/api/account/balance` - Was reading from JSON files, now uses main.py PostgreSQL endpoint
+  - `/api/db/positions` - Was reading from JSON files, now uses main.py PostgreSQL endpoint  
+  - `/api/db/fills` - Was reading from JSON files, now uses main.py PostgreSQL endpoint
+  - `/api/sync_account` - Removed (not needed)
+  - `/api/market_data` - Removed (not needed)
+- **Kept only essential endpoints**:
+  - `/trigger_trade` - Core trade execution functionality
+  - `/health` - Health monitoring
+  - `/api/ports` - Port information
+  - `/api/system_status` - System status (for monitoring)
+- **Frontend now uses main.py endpoints** which read from PostgreSQL directly
+
+### ✅ **Account Data Flow Verified**
+- **Frontend calls** → `main.py` endpoints → **PostgreSQL database**
+- **No more legacy SQLite** reading for account data
+- **Trade executor** now focused solely on trade execution
+
+## Phase 2: Account Sync Deprecation (NEXT PRIORITY)
+
+### ❌ **Account Sync Parallel Writing Issue (CRITICAL)**
+The `kalshi_account_sync_ws.py` is currently doing **parallel writing** to both SQLite and PostgreSQL:
+
+#### **Current Parallel Writing:**
+1. **`sync_balance()`** - Writes to:
+   - ✅ PostgreSQL: `users.account_balance_0001`
+   - ❌ SQLite: `account_balance_history.db`
+   - ❌ JSON: `account_balance.json`
+
+2. **`sync_positions()`** - Writes to:
+   - ✅ PostgreSQL: `users.positions_0001` 
+   - ❌ SQLite: `positions.db`
+
+3. **`sync_fills()`** - Writes to:
+   - ✅ PostgreSQL: `users.fills_0001`
+   - ❌ SQLite: `fills.db`
+
+4. **`sync_settlements()`** - Writes to:
+   - ✅ PostgreSQL: `users.settlements_0001`
+   - ❌ SQLite: `settlements.db`
+
+5. **`sync_orders()`** - Writes to:
+   - ✅ PostgreSQL: `users.orders_0001`
+   - ❌ SQLite: `orders.db`
+
+#### **Action Required:**
+- **Remove SQLite writing** from all sync functions
+- **Keep only PostgreSQL writing**
+- **Remove JSON file writing** (balance only)
+- **Test that PostgreSQL data is accurate** before removing SQLite

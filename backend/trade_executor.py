@@ -265,76 +265,7 @@ def trigger_trade():
         log_event(ticket_id, f"❌ ERROR: {e}")
         return jsonify({"error": str(e)}), 500
 
-# Account sync endpoint
-@app.route("/api/sync_account")
-def sync_account():
-    """Sync account data."""
-    try:
-        # Placeholder for account sync logic
-        return {"status": "success", "message": "Account sync completed"}
-    except Exception as e:
-        print(f"Error syncing account: {e}")
-        return {"status": "error", "message": str(e)}
-
-# Market data endpoint
-@app.route("/api/market_data")
-def get_market_data():
-    """Get market data."""
-    try:
-        # Placeholder for market data
-        return {
-            "timestamp": datetime.now().isoformat(),
-            "markets": [],
-            "status": "online"
-        }
-    except Exception as e:
-        print(f"Error getting market data: {e}")
-        return {"error": str(e)}
-
-# Account data endpoints
-@app.route("/api/account/balance")
-def get_account_balance():
-    """Get account balance."""
-    try:
-        mode = get_account_mode()
-        balance_file = os.path.join(get_accounts_data_dir(), "kalshi", mode, "account_balance.json")
-        if os.path.exists(balance_file):
-            with open(balance_file, 'r') as f:
-                return jsonify(json.load(f))
-        return jsonify({"balance": 0})
-    except Exception as e:
-        print(f"Error getting account balance: {e}")
-        return jsonify({"balance": 0})
-
-@app.route("/api/db/positions")
-def get_positions():
-    """Get positions data."""
-    try:
-        mode = get_account_mode()
-        positions_file = os.path.join(get_accounts_data_dir(), "kalshi", mode, "positions.json")
-        if os.path.exists(positions_file):
-            with open(positions_file, 'r') as f:
-                return jsonify(json.load(f))
-        return jsonify([])
-    except Exception as e:
-        print(f"Error getting positions: {e}")
-        return jsonify([])
-
-@app.route("/api/db/fills")
-def get_fills():
-    """Get fills data."""
-    try:
-        mode = get_account_mode()
-        fills_file = os.path.join(get_accounts_data_dir(), "kalshi", mode, "fills.json")
-        if os.path.exists(fills_file):
-            with open(fills_file, 'r') as f:
-                return jsonify(json.load(f))
-        return jsonify([])
-    except Exception as e:
-        print(f"Error getting fills: {e}")
-        return jsonify([])
-
-# System status endpoint
+# System status endpoint (kept for health monitoring)
 @app.route("/api/system_status")
 def get_system_status():
     """Get system status."""
