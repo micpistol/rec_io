@@ -992,7 +992,7 @@ function connectDbChangeWebSocket() {
       if (data.type === 'db_change' && data.database === 'trades') {
         
         fetchAndRenderStrikeTable();
-        // Also update active trades when trades.db changes
+        // Also update active trades when trades table changes
         if (typeof window.fetchAndRenderTrades === 'function') {
           window.fetchAndRenderTrades();
         }

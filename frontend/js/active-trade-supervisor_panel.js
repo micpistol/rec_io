@@ -1,7 +1,7 @@
 
 // === ACTIVE TRADE SUPERVISOR MANAGER ===
 // This module handles the Active Trade Supervisor table creation, updates, and maintenance
-// Pulls data directly from active_trades.db via the active_trade_supervisor service
+// Pulls data directly from PostgreSQL via the active_trade_supervisor service
 
 // Global active trade supervisor state
 window.activeTradeSupervisorRowsMap = new Map();
@@ -178,7 +178,7 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
       posCell.textContent = trade.position ?? "";
       row.appendChild(posCell);
       
-      // Buffer (from active_trades.db)
+      // Buffer (from PostgreSQL)
       const bufferCell = document.createElement("td");
       if (trade.buffer_from_entry !== null) {
         const buffer = trade.buffer_from_entry;
@@ -198,7 +198,7 @@ function renderActiveTradeSupervisorTrades(activeTrades) {
       }
       row.appendChild(bufferCell);
       
-      // Probability (from active_trades.db)
+      // Probability (from PostgreSQL)
       const probCell = document.createElement("td");
       if (trade.current_probability !== null) {
         probCell.textContent = trade.current_probability.toFixed(1);

@@ -285,35 +285,84 @@ This checklist systematically identifies and deprecates legacy SQLite database f
 - **Active Trade Supervisor** already using PostgreSQL only
 - **Frontend** uses main.py endpoints which read from PostgreSQL
 
-## Phase 2: Account Sync Deprecation (NEXT PRIORITY)
+## Phase 4: Frontend Legacy References Cleanup ✅ COMPLETED
+
+### ✅ **Frontend Legacy Database References Cleanup (COMPLETED)**
+- **Cleaned up all legacy SQLite references** in frontend files:
+  - ✅ `frontend/js/active-trade-supervisor_panel.js` - Updated comments to reference PostgreSQL
+  - ✅ `frontend/js/strike-table.js` - Updated WebSocket comments to reference "trades table" instead of "trades.db"
+  - ✅ `frontend/mobile/trade_monitor_mobile.html` - Updated comments to reference PostgreSQL
+  - ✅ `frontend/tabs/trade_monitor.html` - Updated comments to reference PostgreSQL
+- **All frontend code now appears** as if it was always built on PostgreSQL
+- **No legacy database file references** remain in frontend code
+- **Comments and documentation** updated to reflect PostgreSQL usage
+
+### ✅ **Frontend Data Flow Confirmed**
+- **All API endpoints** use PostgreSQL-backed services
+- **All data fetching** goes through PostgreSQL endpoints
+- **All real-time updates** reference PostgreSQL tables
+- **Frontend is 100% PostgreSQL-native**
+
+## Phase 5: Account Balance Migration ✅ COMPLETED
+
+### ✅ **Account Balance JSON to PostgreSQL Migration (COMPLETED)**
+- **Updated `/api/account/balance` endpoint** in `main.py`:
+  - ✅ **Removed JSON file reading** - No longer reads from `account_balance.json`
+  - ✅ **Added PostgreSQL reading** - Now reads from `users.account_balance_0001`
+  - ✅ **Returns latest balance** - Uses `ORDER BY timestamp DESC LIMIT 1`
+- **Updated account sync service** in `kalshi_account_sync_ws.py`:
+  - ✅ **Removed JSON writing** - No longer writes to `account_balance.json`
+  - ✅ **Removed SQLite writing** - No longer writes to `account_balance_history.db`
+  - ✅ **Kept only PostgreSQL writing** - Now writes exclusively to `users.account_balance_0001`
+- **Frontend impact**: Account balance display now uses PostgreSQL data exclusively
+- **System impact**: Account balance is now 100% PostgreSQL-native
+
+### ✅ **Account Balance Data Flow Verified**
+- **Account sync** → **PostgreSQL** → **Frontend display**
+- **No more legacy JSON files** for account balance
+- **No more legacy SQLite databases** for account balance
+- **Clean, single-source data flow**
+
+## Phase 6: Active Trades JSON Removal ✅ COMPLETED
+
+### ✅ **Active Trades JSON Export Removal (COMPLETED)**
+- **Removed all JSON export functionality** from `active_trade_supervisor.py`:
+  - ✅ **Removed `export_active_trades_to_json()` function** - No longer exports to JSON
+  - ✅ **Removed `ACTIVE_TRADES_JSON_PATH` variable** - No longer defines JSON path
+  - ✅ **Removed all function calls** - No longer called from any trade operations
+  - ✅ **Removed directory creation** - No longer creates JSON export directory
+- **System now uses PostgreSQL exclusively** for all active trades functionality
+- **Frontend continues to work** via `/api/active_trades` endpoint which reads from PostgreSQL
+- **No performance impact** - JSON export was just a backup, not used by frontend
+
+### ✅ **Active Trades Data Flow Verified**
+- **Frontend calls** → `/api/active_trades` endpoint → **PostgreSQL `users.active_trades_0001`**
+- **Trade operations** → **PostgreSQL only** → **Frontend updates via WebSocket**
+- **No legacy JSON files** used for active trades display or functionality
+
+## Phase 7: Account Sync Parallel Writing Removal (NEXT PRIORITY)
 
 ### ❌ **Account Sync Parallel Writing Issue (CRITICAL)**
-The `kalshi_account_sync_ws.py` is currently doing **parallel writing** to both SQLite and PostgreSQL:
+The `kalshi_account_sync_ws.py` is still doing **parallel writing** to both SQLite and PostgreSQL:
 
 #### **Current Parallel Writing:**
-1. **`sync_balance()`** - Writes to:
-   - ✅ PostgreSQL: `users.account_balance_0001`
-   - ❌ SQLite: `account_balance_history.db`
-   - ❌ JSON: `account_balance.json`
-
-2. **`sync_positions()`** - Writes to:
+1. **`sync_positions()`** - Writes to:
    - ✅ PostgreSQL: `users.positions_0001` 
    - ❌ SQLite: `positions.db`
 
-3. **`sync_fills()`** - Writes to:
+2. **`sync_fills()`** - Writes to:
    - ✅ PostgreSQL: `users.fills_0001`
    - ❌ SQLite: `fills.db`
 
-4. **`sync_settlements()`** - Writes to:
+3. **`sync_settlements()`** - Writes to:
    - ✅ PostgreSQL: `users.settlements_0001`
    - ❌ SQLite: `settlements.db`
 
-5. **`sync_orders()`** - Writes to:
+4. **`sync_orders()`** - Writes to:
    - ✅ PostgreSQL: `users.orders_0001`
    - ❌ SQLite: `orders.db`
 
 #### **Action Required:**
 - **Remove SQLite writing** from all sync functions
 - **Keep only PostgreSQL writing**
-- **Remove JSON file writing** (balance only)
 - **Test that PostgreSQL data is accurate** before removing SQLite

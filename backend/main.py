@@ -954,15 +954,37 @@ async def get_kalshi_snapshot():
 # API endpoints for account data
 @app.get("/api/account/balance")
 async def get_account_balance(mode: str = "prod"):
-    """Get account balance."""
+    """Get account balance from PostgreSQL database."""
     try:
-        balance_file = os.path.join(get_accounts_data_dir(), "kalshi", mode, "account_balance.json")
-        if os.path.exists(balance_file):
-            with open(balance_file, 'r') as f:
-                return json.load(f)
-        return {"balance": 0}
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            cursor.execute("""
+                SELECT balance, timestamp 
+                FROM users.account_balance_0001 
+                ORDER BY timestamp DESC 
+                LIMIT 1
+            """)
+            result = cursor.fetchone()
+            
+            conn.close()
+            
+            if result:
+                return {"balance": result['balance']}
+            else:
+                return {"balance": 0}
+            
     except Exception as e:
-        print(f"Error getting account balance: {e}")
+        print(f"Error getting account balance from PostgreSQL: {e}")
         return {"balance": 0}
 
 @app.get("/api/db/fills")

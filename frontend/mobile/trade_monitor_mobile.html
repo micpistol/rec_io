@@ -2151,7 +2151,7 @@
                     posCell.textContent = trade.position ?? "";
                     row.appendChild(posCell);
                     
-                    // Buffer (from active_trades.db)
+                    // Buffer (from PostgreSQL)
                     const bufferCell = document.createElement("td");
                     if (trade.buffer_from_entry !== null) {
                         const buffer = trade.buffer_from_entry;
@@ -2171,7 +2171,7 @@
                     }
                     row.appendChild(bufferCell);
                     
-                    // Probability (from active_trades.db)
+                    // Probability (from PostgreSQL)
                     const probCell = document.createElement("td");
                     if (trade.current_probability !== null) {
                         probCell.textContent = trade.current_probability.toFixed(1);
@@ -2619,7 +2619,7 @@
                     const data = JSON.parse(event.data);
                     if (data.type === 'db_change' && data.database === 'trades') {
                         console.log("[MOBILE WEBSOCKET] ✅ Trades DB change detected, updating mobile strike table");
-                        // Update mobile strike table when trades.db changes
+                        // Update mobile strike table when trades table changes
                         if (typeof updateMobileStrikeTable === 'function') {
                             updateMobileStrikeTable();
                         }

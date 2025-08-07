@@ -2201,10 +2201,10 @@ async function fetchAndRenderTrades() {
   }
 }
 
-// === Recent Trades Panel (now using fills.db) ===
+// === Recent Trades Panel (now using PostgreSQL) ===
 async function fetchAndRenderRecentTrades() {
   try {
-    // Fetch fills data from the fills.db
+    // Fetch fills data from PostgreSQL
     const res = await fetch('/api/db/fills', { cache: 'no-store' });
     if (!res.ok) throw new Error("Failed to fetch recent fills");
     const data = await res.json();

@@ -321,46 +321,7 @@ def sync_balance():
         balance_amount = data.get('balance')
         print(f"[{datetime.now()}] ✅ Balance: {balance_amount}")
         
-        # Save balance to JSON using unified data directory
-        output_path = os.path.join(get_accounts_data_dir(), "kalshi", get_account_mode(), "account_balance.json")
-        print(f"🧭 Attempting to write to: {os.path.abspath(output_path)}")
-        try:
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
-            with open(output_path, "w") as f:
-                json.dump({"balance": balance_amount}, f)
-            print(f"💾 Balance written to {output_path}")
-        except Exception as write_err:
-            print(f"❌ Failed to write balance JSON: {write_err}")
-        
-        # Save balance to SQLite database with timestamp
-        db_path = os.path.join(get_accounts_data_dir(), "kalshi", get_account_mode(), "account_balance_history.db")
-        try:
-            os.makedirs(os.path.dirname(db_path), exist_ok=True)
-            with sqlite3.connect(db_path) as conn:
-                c = conn.cursor()
-                c.execute("""
-                    CREATE TABLE IF NOT EXISTS balance_history (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        balance REAL NOT NULL,
-                        timestamp TEXT NOT NULL,
-                        created_at TEXT DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
-                conn.commit()
-                
-                # Insert new balance record with timestamp
-                current_timestamp = datetime.now(EST).isoformat()
-                c.execute("""
-                    INSERT INTO balance_history (balance, timestamp)
-                    VALUES (?, ?)
-                """, (balance_amount, current_timestamp))
-                conn.commit()
-                print(f"💾 Balance history written to {db_path}")
-                
-        except Exception as db_err:
-            print(f"❌ Failed to write balance to database: {db_err}")
-        
-        # Also write to PostgreSQL
+        # Write to PostgreSQL only
         try:
             pg_conn = get_postgresql_connection()
             if pg_conn:

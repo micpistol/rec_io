@@ -27,11 +27,7 @@ print(f"[ACTIVE_TRADE_SUPERVISOR] 🚀 Using centralized port: {ACTIVE_TRADE_SUP
 # Import centralized path utilities
 from backend.util.paths import get_project_root, get_data_dir, get_trade_history_dir, get_kalshi_data_dir, get_service_url, get_active_trades_dir
 
-# Active trades JSON export path
-ACTIVE_TRADES_JSON_PATH = os.path.join(get_active_trades_dir(), "active_trades.json")
 
-# Ensure directory exists
-os.makedirs(os.path.dirname(ACTIVE_TRADES_JSON_PATH), exist_ok=True)
 
 # Import centralized path utilities
 from backend.core.config.settings import config
@@ -411,9 +407,6 @@ def add_new_active_trade(trade_id: int, ticket_id: str) -> bool:
         # Invalidate cache when new trade is added
         invalidate_active_trades_cache()
         
-        # Export updated JSON after adding new trade
-        export_active_trades_to_json()
-        
         # Broadcast active trades change
         broadcast_active_trades_change()
         
@@ -503,9 +496,6 @@ def add_pending_trade(trade_id: int, ticket_id: str) -> bool:
         
         # Invalidate cache when new trade is added
         invalidate_active_trades_cache()
-        
-        # Export updated JSON after adding new trade
-        export_active_trades_to_json()
         
         # Broadcast active trades change
         broadcast_active_trades_change()
@@ -606,9 +596,6 @@ def confirm_pending_trade(trade_id: int, ticket_id: str) -> bool:
         # Invalidate cache when trade is confirmed
         invalidate_active_trades_cache()
         
-        # Export updated JSON after confirming trade
-        export_active_trades_to_json()
-        
         # Broadcast active trades change
         broadcast_active_trades_change()
         
@@ -665,9 +652,6 @@ def remove_pending_trade(trade_id: int, ticket_id: str) -> bool:
         # Invalidate cache when trade is removed
         invalidate_active_trades_cache()
         
-        # Export updated JSON after removing trade
-        export_active_trades_to_json()
-        
         # Broadcast active trades change
         broadcast_active_trades_change()
         
@@ -713,9 +697,6 @@ def remove_failed_trade(trade_id: int, ticket_id: str) -> bool:
         
         # Invalidate cache when trade is removed
         invalidate_active_trades_cache()
-        
-        # Export updated JSON after removing trade
-        export_active_trades_to_json()
         
         # Broadcast active trades change
         broadcast_active_trades_change()
@@ -763,9 +744,6 @@ def remove_closed_trade(trade_id: int) -> bool:
             
             # Invalidate cache when trade is removed
             invalidate_active_trades_cache()
-            
-            # Export updated JSON after removing trade
-            export_active_trades_to_json()
             
             # Broadcast active trades change
             broadcast_active_trades_change()
@@ -816,9 +794,6 @@ def update_trade_status_to_closing(trade_id: int) -> bool:
             
             # Invalidate cache when trade status changes
             invalidate_active_trades_cache()
-            
-            # Export updated JSON after updating trade
-            export_active_trades_to_json()
             
             return True
         else:
@@ -1160,9 +1135,6 @@ def start_monitoring_loop():
                 # Update monitoring data
                 update_active_trade_monitoring_data()
                 
-                # Export JSON after each update
-                export_active_trades_to_json()
-                
                 # Log monitoring status every 60 seconds
                 current_time = time.time()
                 if not hasattr(monitoring_worker, 'last_status_log') or current_time - monitoring_worker.last_status_log > 60:
@@ -1312,8 +1284,7 @@ def start_monitoring_loop():
                 log(f"🚨 CRITICAL: Failed to check for active trades during restart: {restart_error}")
                 log(f"🚨 CRITICAL: Restart stack trace: {restart_error.__class__.__name__}: {str(restart_error)}")
         
-        # Export final JSON after monitoring stops
-        export_active_trades_to_json()
+
         
         # Clear the global monitoring thread reference when done
         with monitoring_thread_lock:
@@ -1331,7 +1302,6 @@ def update_monitoring_on_demand():
     Update monitoring data on demand (called by other scripts when needed)
     """
     update_active_trade_monitoring_data()
-    export_active_trades_to_json()
 
 def invalidate_active_trades_cache():
     """Invalidate the active trades cache to force fresh data on next request"""
@@ -1339,40 +1309,7 @@ def invalidate_active_trades_cache():
     active_trades_cache = None
     active_trades_cache_time = 0
 
-def export_active_trades_to_json():
-    """Export active trades to JSON for easy access by other scripts"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT * FROM users.active_trades_0001 WHERE status IN ('active', 'pending', 'closing')
-        """)
-        
-        columns = [desc[0] for desc in cursor.description]
-        rows = cursor.fetchall()
-        conn.close()
-        
-        active_trades = []
-        for row in rows:
-            trade_dict = dict(zip(columns, row))
-            active_trades.append(trade_dict)
-        
-        # Write to JSON file
-        with open(ACTIVE_TRADES_JSON_PATH, 'w') as f:
-            json.dump({
-                'timestamp': datetime.now(ZoneInfo("America/New_York")).isoformat(),
-                'active_trades': active_trades,
-                'count': len(active_trades)
-            }, f, indent=2, default=str)
-            
-        # Only log JSON export every 30 seconds to reduce noise
-        current_time = time.time()
-        if not hasattr(export_active_trades_to_json, 'last_log_time') or current_time - export_active_trades_to_json.last_log_time > 30:
-            # Only log JSON export occasionally to reduce noise
-            export_active_trades_to_json.last_log_time = current_time
-        
-    except Exception as e:
-        log(f"Error exporting active trades to JSON: {e}")
+
 
 def get_all_active_trades() -> List[Dict[str, Any]]:
     """Get all currently active, pending, and closing trades"""
@@ -1438,15 +1375,13 @@ def sync_on_demand():
     Sync on demand (called by other scripts when needed)
     """
     sync_with_trades_db()
-    export_active_trades_to_json()
 
 def start_event_driven_supervisor():
     """Start the event-driven active trade supervisor with HTTP server"""
     log("🚀 Starting event-driven active trade supervisor")
     log("📡 Waiting for trade notifications...")
     
-    # Export initial state to JSON
-    export_active_trades_to_json()
+
     
     # Check if there are already active trades and start monitoring if needed
     conn = get_db_connection()
