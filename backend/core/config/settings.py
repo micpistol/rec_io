@@ -116,7 +116,6 @@ class ConfigManager:
         return {
             "base_path": "backend/data",
             "databases": {
-                "trades": "users/user_0001/trade_history/trades.db",
                 "prices": "price_history/",
                 "accounts": "accounts/",
                 "logs": "logs/"

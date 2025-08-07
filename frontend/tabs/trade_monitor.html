@@ -2432,20 +2432,8 @@ async function fetchAndRenderRecentTrades() {
         second: '2-digit',
         hour12: false 
       });
-      // Contract: extract the part before '-T', then last two digits as hour
-      let contract = '';
-      if (fill.ticker) {
-        const tickerMain = fill.ticker.split('-T')[0];
-        const hourMatch = tickerMain.match(/(\d{2})$/);
-        if (hourMatch) {
-          const hour = parseInt(hourMatch[1], 10);
-          const ampm = hour >= 12 ? 'pm' : 'am';
-          const displayHour = hour === 0 ? 12 : (hour > 12 ? hour - 12 : hour);
-          contract = `BTC ${displayHour}${ampm}`;
-        } else {
-          contract = fill.ticker;
-        }
-      }
+      // Contract: display full ticker string from database
+      const contract = fill.ticker || '';
       
       // Strike: extract number after "-T" at the end of the string
       let strike = '';
@@ -2463,11 +2451,10 @@ async function fetchAndRenderRecentTrades() {
       if (fill.side) {
         const s = fill.side.toUpperCase();
         side = s === 'YES' ? 'Y' : (s === 'NO' ? 'N' : s);
-        // Convert price from cents to dollars
+        // Display price as stored in database (no conversion needed)
         const price = s === 'YES' ? fill.yes_price : fill.no_price;
         if (price != null) {
-          const priceInDollars = price / 100;
-          buy = priceInDollars.toFixed(2);
+          buy = price.toString();
         } else {
           buy = '';
         }
@@ -2723,9 +2710,9 @@ async function fetchAndRenderPositions() {
       .map(p => `
         <tr>
           <td>${p.ticker}</td>
-          <td>${p.market_exposure && p.position !== 0 ? (p.market_exposure / p.position / 100).toFixed(2) : "0.00"}</td>
+          <td>${p.market_exposure && p.position !== 0 ? (p.market_exposure / p.position / 10000).toFixed(2) : "0.00"}</td>
           <td>${p.position}</td>
-          <td>${(p.fees_paid / 100).toFixed(2)}</td>
+                         <td>${(p.fees_paid / 10000).toFixed(2)}</td>
           <td>${new Date(p.last_updated_ts).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
         </tr>
       `).join("");
@@ -2780,17 +2767,20 @@ async function fetchAndRenderSettlements() {
         // Use unformatted ticker string from database
         const ticker = s.ticker || '';
         
-        // Format revenue
-        const revenue = s.revenue != null ? (s.revenue / 100).toFixed(2) : '0.00';
+        // Format revenue (already in dollars)
+        const revenue = s.revenue != null ? s.revenue.toString() : '0';
         
-        // Format settled time
+        // Format settled time with date
         let settledTime = '';
         if (s.settled_time) {
           try {
             const settledDate = new Date(s.settled_time);
-            settledTime = settledDate.toLocaleTimeString("en-US", { 
+            settledTime = settledDate.toLocaleString("en-US", { 
               timeZone: "America/New_York", 
               hour12: false, 
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
               hour: '2-digit', 
               minute: '2-digit', 
               second: '2-digit' 

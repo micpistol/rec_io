@@ -1,0 +1,1004 @@
+{
+  "fills": [
+    {
+      "trade_id": "d35647a0-1c33-4820-80b8-5dd1d3727a05",
+      "ticker": "KXBTCD-25AUG0711-T116749.99",
+      "order_id": "7ce7d4bc-450e-456e-81d5-7bd0cbf46f09",
+      "side": "no",
+      "action": "buy",
+      "count": 200,
+      "yes_price": 4,
+      "no_price": 96,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-07T14:48:58.830461Z"
+    },
+    {
+      "trade_id": "9cf93bc6-09b9-44fe-af45-8b29904f4c0e",
+      "ticker": "KXBTCD-25AUG0711-T117249.99",
+      "order_id": "13e932b5-2e76-43cc-877a-64b802870c7d",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 7,
+      "no_price": 93,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-07T14:23:26.969605Z"
+    },
+    {
+      "trade_id": "95140381-89fa-4e63-a5fd-65f0e5a6b1cd",
+      "ticker": "KXBTCD-25AUG0711-T117249.99",
+      "order_id": "76234e36-9e46-41f8-a5e4-8a26c8fc794c",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 3,
+      "no_price": 97,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-07T14:23:16.754092Z"
+    },
+    {
+      "trade_id": "10c3c0cd-6dd6-4578-a483-f0db89d4495d",
+      "ticker": "KXBTCD-25AUG0711-T115749.99",
+      "order_id": "391444a7-98f3-4e02-9b91-34c2f1906027",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 93,
+      "no_price": 7,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-07T14:22:46.33811Z"
+    },
+    {
+      "trade_id": "f6bc72d6-f834-4b9f-81c5-e085e2fbf405",
+      "ticker": "KXBTCD-25AUG0711-T115749.99",
+      "order_id": "33211153-7b3e-4516-9e28-d211477721a6",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 97,
+      "no_price": 3,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-07T14:20:56.874594Z"
+    },
+    {
+      "trade_id": "d1b2f268-9d7d-430a-8b17-fe7845da2a1a",
+      "ticker": "KXBTCD-25AUG0711-T117249.99",
+      "order_id": "5fc4dddf-ef5f-44d4-9591-6103fb37ddc0",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 6,
+      "no_price": 94,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-07T14:12:00.193678Z"
+    },
+    {
+      "trade_id": "87c4fef2-911a-4241-bd51-bbe82c1fee8d",
+      "ticker": "KXBTCD-25AUG0711-T117249.99",
+      "order_id": "f9fa4e6b-45f5-4848-8457-b7f998c8cb04",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 2,
+      "no_price": 98,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-07T14:11:48.666363Z"
+    },
+    {
+      "trade_id": "2e8bf5a4-65c9-4cd9-8f40-2aa4746a1634",
+      "ticker": "KXBTCD-25AUG0710-T115999.99",
+      "order_id": "c89f49e4-cefa-4168-86d9-e1b458c0dee3",
+      "side": "yes",
+      "action": "buy",
+      "count": 200,
+      "yes_price": 98,
+      "no_price": 2,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-07T13:47:17.293452Z"
+    },
+    {
+      "trade_id": "dda29ecf-ae35-4ac0-97e8-a2fb81d390b7",
+      "ticker": "KXBTCD-25AUG0710-T116249.99",
+      "order_id": "d134dd70-d48a-482c-9b89-94faf7948fc1",
+      "side": "yes",
+      "action": "buy",
+      "count": 200,
+      "yes_price": 93,
+      "no_price": 7,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-07T13:45:10.457444Z"
+    },
+    {
+      "trade_id": "eb936018-6fe5-4dcd-bb6d-08105d6dbacb",
+      "ticker": "KXBTCD-25AUG0710-T116999.99",
+      "order_id": "cc92652c-2f33-451d-aa78-a53415293137",
+      "side": "no",
+      "action": "buy",
+      "count": 200,
+      "yes_price": 6,
+      "no_price": 94,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-07T13:45:10.15473Z"
+    },
+    {
+      "trade_id": "400f2b30-02de-4bf8-b2f3-fb5ca7580c8d",
+      "ticker": "KXBTCD-25AUG0621-T115249.99",
+      "order_id": "9a13072a-4f91-4afd-aa72-ace4be9d7f3c",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 5,
+      "no_price": 95,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-07T00:27:20.046134Z"
+    },
+    {
+      "trade_id": "6c752637-9773-45be-bd7d-e7ac5f9235e6",
+      "ticker": "KXBTCD-25AUG0621-T115249.99",
+      "order_id": "7751d4e6-7f7b-4c3e-9baa-f0dd9d6be3d2",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 9,
+      "no_price": 91,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-07T00:16:38.243016Z"
+    },
+    {
+      "trade_id": "d4b0a050-ee32-4643-96a6-9c027e8b3c5f",
+      "ticker": "KXBTCD-25AUG0621-T115249.99",
+      "order_id": "0286539b-1f61-412a-829b-93de7388d9af",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 8,
+      "no_price": 92,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-07T00:14:56.549011Z"
+    },
+    {
+      "trade_id": "b493d7eb-a704-4f0c-bace-e866edfffdba",
+      "ticker": "KXBTCD-25AUG0621-T115249.99",
+      "order_id": "bd2c5e6d-f0dc-4aae-844d-9d34aadee672",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 17,
+      "no_price": 83,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-07T00:02:11.77529Z"
+    },
+    {
+      "trade_id": "f1dbbede-2ce5-4602-935b-e69247d5de46",
+      "ticker": "KXBTCD-25AUG0621-T115249.99",
+      "order_id": "d0908e99-e283-4e53-914f-d3034fd77830",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 13,
+      "no_price": 87,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-07T00:01:50.064515Z"
+    },
+    {
+      "trade_id": "905729ab-eedd-47b2-ad26-ba73a0c0a7d1",
+      "ticker": "KXBTCD-25AUG0620-T114999.99",
+      "order_id": "e6548e0a-7a46-43e5-82bc-adb6fd99b62b",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 72,
+      "no_price": 28,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T23:12:29.176663Z"
+    },
+    {
+      "trade_id": "0edf7d41-ad49-47fe-a781-49bab9e715d0",
+      "ticker": "KXBTCD-25AUG0620-T115249.99",
+      "order_id": "8debe9a2-99e8-41fe-b8e7-19f537b93f21",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 19,
+      "no_price": 81,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T23:08:52.414487Z"
+    },
+    {
+      "trade_id": "2e11c48b-5ce9-4188-8154-a1b3727621cd",
+      "ticker": "KXBTCD-25AUG0620-T115249.99",
+      "order_id": "7009438c-bb8f-4d88-9064-8f489db6d5f7",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 15,
+      "no_price": 85,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T23:08:23.431064Z"
+    },
+    {
+      "trade_id": "28da8398-d27b-48a2-9cd8-f96a3634701e",
+      "ticker": "KXBTCD-25AUG0620-T115249.99",
+      "order_id": "7243b34a-25d0-45bb-a13a-507599b40696",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 21,
+      "no_price": 79,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T23:07:19.920918Z"
+    },
+    {
+      "trade_id": "71cdd9be-b9fe-42e8-bc1b-3a80dc2c091a",
+      "ticker": "KXBTCD-25AUG0620-T115249.99",
+      "order_id": "63ec057d-cb36-4a19-b2d3-dede83050449",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 13,
+      "no_price": 87,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T23:05:32.587031Z"
+    },
+    {
+      "trade_id": "a69011e8-52a3-4196-8539-de45c5ee29e2",
+      "ticker": "KXBTCD-25AUG0619-T115249.99",
+      "order_id": "399646ff-fae7-46ae-8db5-ecc8e1ef09f2",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 3,
+      "no_price": 97,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T22:43:59.44538Z"
+    },
+    {
+      "trade_id": "0cdca955-ac99-4e24-bbb6-b1ba6605bc5b",
+      "ticker": "KXBTCD-25AUG0619-T115249.99",
+      "order_id": "d2423950-6a3f-4ad4-9cd8-e7628782a688",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 28,
+      "no_price": 72,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T22:31:15.454471Z"
+    },
+    {
+      "trade_id": "c34d0081-7508-4544-a0fb-dad7be2ee746",
+      "ticker": "KXBTCD-25AUG0619-T115249.99",
+      "order_id": "b3c2f032-79a4-413f-8ca1-542b40d35caa",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 21,
+      "no_price": 79,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T22:31:02.123598Z"
+    },
+    {
+      "trade_id": "213a3cff-80c0-4d5f-b5ce-e677fc0e67bd",
+      "ticker": "KXBTCD-25AUG0619-T115499.99",
+      "order_id": "eded3539-6bf0-45fe-8846-1640fd47fce9",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 4,
+      "no_price": 96,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T22:27:49.087756Z"
+    },
+    {
+      "trade_id": "50881057-c326-4d23-a3c2-8b2fc06ff021",
+      "ticker": "KXBTCD-25AUG0619-T115499.99",
+      "order_id": "51ea7758-03d1-4fe9-b48b-4f663915b22d",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 3,
+      "no_price": 97,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T22:27:38.812468Z"
+    },
+    {
+      "trade_id": "00df58ef-9bfb-4366-ac79-f14112ec3cb2",
+      "ticker": "KXBTCD-25AUG0619-T114749.99",
+      "order_id": "5145d699-ca36-4af3-b256-0ad6a90cfe85",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 97,
+      "no_price": 3,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T22:25:51.529257Z"
+    },
+    {
+      "trade_id": "1e29ee4e-d6fa-4c92-8633-1f3a2891abbb",
+      "ticker": "KXBTCD-25AUG0619-T114749.99",
+      "order_id": "7b913378-d178-4eb8-a321-d7d0d3a53dc1",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 98,
+      "no_price": 2,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T22:25:30.636074Z"
+    },
+    {
+      "trade_id": "9a997165-8244-4f54-93d2-0ccb884bc4c6",
+      "ticker": "KXBTCD-25AUG0619-T115499.99",
+      "order_id": "a9d0f544-cc4f-47bc-a62a-c39f8e3c1112",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 10,
+      "no_price": 90,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T22:15:46.849254Z"
+    },
+    {
+      "trade_id": "def0881e-49c7-461b-be1c-22ec7fc0ca94",
+      "ticker": "KXBTCD-25AUG0619-T115499.99",
+      "order_id": "995d535c-7203-4247-bd20-435aeeaa65cf",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 7,
+      "no_price": 93,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T22:15:22.049231Z"
+    },
+    {
+      "trade_id": "77202f83-1935-400c-80fb-2c7bd30b0882",
+      "ticker": "KXBTCD-25AUG0619-T114749.99",
+      "order_id": "3b98e6ab-a5ca-4867-95b4-1bdef7d2d6a7",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 96,
+      "no_price": 4,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T22:07:36.951552Z"
+    },
+    {
+      "trade_id": "3f24e185-a460-4dd3-ac65-dbc84ca2a34f",
+      "ticker": "KXBTCD-25AUG0619-T114749.99",
+      "order_id": "272bca5b-d677-4f5e-84b4-c10b5ec74f34",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 97,
+      "no_price": 3,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T22:07:22.409532Z"
+    },
+    {
+      "trade_id": "0d4e2d19-c027-42d8-897f-f410ddebc9a1",
+      "ticker": "KXBTCD-25AUG0618-T114999.99",
+      "order_id": "442a42f9-2ae7-45d4-b37c-98870e6d39b6",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 35,
+      "no_price": 65,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T21:45:52.560941Z"
+    },
+    {
+      "trade_id": "b81e30c5-ff68-4a9d-b054-24c86b75b1ce",
+      "ticker": "KXBTCD-25AUG0618-T114999.99",
+      "order_id": "4a9a47e2-590f-4110-bd93-92cf30d4a6dd",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 33,
+      "no_price": 67,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T21:45:41.815444Z"
+    },
+    {
+      "trade_id": "34bed265-361a-43a5-a29c-6b5ab84fb8b1",
+      "ticker": "KXBTCD-25AUG0618-T114749.99",
+      "order_id": "3bd983a8-f62c-462e-a0ee-158ade93f71d",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 96,
+      "no_price": 4,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T21:36:17.695154Z"
+    },
+    {
+      "trade_id": "0a9ee975-0da1-4fdb-88aa-705b2adc7958",
+      "ticker": "KXBTCD-25AUG0618-T115499.99",
+      "order_id": "e6385d91-064c-4d6a-a5f3-a0cf87dab11e",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 10,
+      "no_price": 90,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T21:22:19.37306Z"
+    },
+    {
+      "trade_id": "c74b5f9d-2ec0-4a67-9e60-7a9a86511f23",
+      "ticker": "KXBTCD-25AUG0618-T115499.99",
+      "order_id": "29c6535f-7116-4713-9429-8f28e508d821",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 7,
+      "no_price": 93,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T21:21:49.25908Z"
+    },
+    {
+      "trade_id": "c98da657-a4df-465d-92c8-c54db6ce26a7",
+      "ticker": "KXBTCD-25AUG0618-T115249.99",
+      "order_id": "7f6a2b61-1b4b-43cc-80b4-e40eea00d96b",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 47,
+      "no_price": 53,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T21:15:48.221329Z"
+    },
+    {
+      "trade_id": "a7f777b5-c216-4dc2-bd48-4d756b50dd71",
+      "ticker": "KXBTCD-25AUG0618-T115249.99",
+      "order_id": "d2fd07c1-a164-4b0f-bd31-094209a003b5",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 48,
+      "no_price": 52,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T21:15:38.239172Z"
+    },
+    {
+      "trade_id": "8d49962d-4453-4681-9ba9-7415e5858418",
+      "ticker": "KXBTCD-25AUG0618-T115499.99",
+      "order_id": "dc745688-3bad-4b67-be6a-1eb834857dc0",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 11,
+      "no_price": 89,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T21:15:31.367943Z"
+    },
+    {
+      "trade_id": "e7075136-32f6-45da-8a36-2ec0b742f2a3",
+      "ticker": "KXBTCD-25AUG0618-T115249.99",
+      "order_id": "5bed33fb-f2e8-4c83-ae15-7d70f823b305",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 48,
+      "no_price": 52,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T21:15:25.56794Z"
+    },
+    {
+      "trade_id": "be235801-bad2-4a91-a8dc-abc55ade7ab6",
+      "ticker": "KXBTCD-25AUG0618-T114999.99",
+      "order_id": "75acbb8e-44e4-4d7a-9214-34f9820f724a",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 90,
+      "no_price": 10,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T21:15:21.037184Z"
+    },
+    {
+      "trade_id": "720d83ca-70a6-4c49-b707-27a899f841d8",
+      "ticker": "KXBTCD-25AUG0618-T115249.99",
+      "order_id": "2c4fc0e5-f9bb-402e-abd9-93e13d36aa25",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 34,
+      "no_price": 66,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T21:14:20.63664Z"
+    },
+    {
+      "trade_id": "ef76ce4d-7542-427e-9411-869085c93167",
+      "ticker": "KXBTCD-25AUG0618-T115499.99",
+      "order_id": "89deca73-7a18-4377-b8ab-74ef09b53746",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 5,
+      "no_price": 95,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T21:12:50.42057Z"
+    },
+    {
+      "trade_id": "a7760934-1629-42b9-9b1a-ff47116a60b4",
+      "ticker": "KXBTCD-25AUG0618-T114999.99",
+      "order_id": "67d4b9c0-64c2-423b-9ba3-037bffe1d99a",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 83,
+      "no_price": 17,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T21:07:12.853199Z"
+    },
+    {
+      "trade_id": "c197d85b-4f72-4349-9f16-f5f80d604001",
+      "ticker": "KXBTCD-25AUG0617-T115249.99",
+      "order_id": "d4a519ae-aa2c-4856-8750-e8434ccc35b8",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 4,
+      "no_price": 96,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T20:51:55.454465Z"
+    },
+    {
+      "trade_id": "bf07ff7e-edeb-4542-9a18-8862a6a271b8",
+      "ticker": "KXBTCD-25AUG0617-T114749.99",
+      "order_id": "76a2a8cb-a768-424d-86c3-dd1e1121908b",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 98,
+      "no_price": 2,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T20:51:41.202836Z"
+    },
+    {
+      "trade_id": "b8916704-f609-4b82-ad7a-3dc3e6c08cac",
+      "ticker": "KXBTCD-25AUG0617-T115249.99",
+      "order_id": "ba0c9090-07da-4c64-8e5c-ae163a592257",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 9,
+      "no_price": 91,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T20:51:11.627071Z"
+    },
+    {
+      "trade_id": "604d7ab3-c8bd-4cc5-a8eb-843abdcbd813",
+      "ticker": "KXBTCD-25AUG0617-T114749.99",
+      "order_id": "14f9e2b7-0413-4c5c-a6f3-6e4b42ccd365",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 97,
+      "no_price": 3,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T20:38:40.580638Z"
+    },
+    {
+      "trade_id": "d6571a0d-3ff1-4be4-9a33-0a8fd8aa3d22",
+      "ticker": "KXBTCD-25AUG0617-T115249.99",
+      "order_id": "d787411c-edb6-4421-944f-6b5707c05cb2",
+      "side": "no",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 40,
+      "no_price": 60,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T20:30:07.390599Z"
+    },
+    {
+      "trade_id": "b186c577-ad82-49b5-8dc2-76427ea324bf",
+      "ticker": "KXBTCD-25AUG0617-T115749.99",
+      "order_id": "8e2e8f10-5792-40d3-84ae-9c748811c5c1",
+      "side": "yes",
+      "action": "buy",
+      "count": 1,
+      "yes_price": 4,
+      "no_price": 96,
+      "yes_price_fixed": [
+        0,
+        0
+      ],
+      "no_price_fixed": [
+        0,
+        0
+      ],
+      "is_taker": true,
+      "created_time": "2025-08-06T20:20:16.324451Z"
+    }
+  ]
+}

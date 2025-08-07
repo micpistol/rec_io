@@ -724,16 +724,21 @@ async def get_core_data():
                 'weighted_momentum_score': None
             }
         
-        # Get latest database price
+        # Get latest database price from PostgreSQL
         latest_db_price = 0
         try:
-            trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
-            conn = sqlite3.connect(trades_db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT buy_price FROM trades ORDER BY date DESC, time DESC LIMIT 1")
-            result = cursor.fetchone()
-            if result:
-                latest_db_price = result[0]
+            import psycopg2
+            conn = psycopg2.connect(
+                host="localhost",
+                database="rec_io_db",
+                user="rec_io_user",
+                password="rec_io_password"
+            )
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT buy_price FROM users.trades_0001 ORDER BY date DESC, time DESC LIMIT 1")
+                result = cursor.fetchone()
+                if result:
+                    latest_db_price = result[0]
             conn.close()
         except Exception as e:
             print(f"Error getting latest DB price: {e}")
