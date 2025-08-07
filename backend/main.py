@@ -57,6 +57,159 @@ _preferences_cache = None
 _cache_timestamp = 0
 CACHE_TTL = 1.0  # 1 second cache TTL
 
+# PostgreSQL helper functions for auto trade settings
+def update_auto_trade_settings_postgresql(**kwargs):
+    """Update auto trade settings in PostgreSQL"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            # Build dynamic update query
+            update_parts = []
+            params = []
+            
+            for key, value in kwargs.items():
+                update_parts.append(f"{key} = %s")
+                params.append(value)
+            
+            if update_parts:
+                query = f"UPDATE users.auto_trade_settings_0001 SET {', '.join(update_parts)}, updated_at = CURRENT_TIMESTAMP WHERE id = 1"
+                cursor.execute(query, params)
+                conn.commit()
+                print(f"[PostgreSQL] Updated auto trade settings: {kwargs}")
+        
+        conn.close()
+    except Exception as e:
+        print(f"[PostgreSQL Error] Failed to update auto trade settings: {e}")
+
+def get_auto_trade_settings_postgresql():
+    """Get auto trade settings from PostgreSQL"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT auto_entry, auto_stop, 
+                       min_probability, min_differential, min_time, max_time, allow_re_entry,
+                       spike_alert_enabled, spike_alert_momentum_threshold, spike_alert_cooldown_threshold, spike_alert_cooldown_minutes,
+                       current_probability, min_ttc_seconds, momentum_spike_enabled, momentum_spike_threshold
+                FROM users.auto_trade_settings_0001 WHERE id = 1
+            """)
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result:
+                return {
+                    "auto_entry": result[0],
+                    "auto_stop": result[1],
+                    "min_probability": result[2],
+                    "min_differential": float(result[3]) if result[3] else 0.25,
+                    "min_time": result[4],
+                    "max_time": result[5],
+                    "allow_re_entry": result[6],
+                    "spike_alert_enabled": result[7],
+                    "spike_alert_momentum_threshold": result[8],
+                    "spike_alert_cooldown_threshold": result[9],
+                    "spike_alert_cooldown_minutes": result[10],
+                    "current_probability": result[11],
+                    "min_ttc_seconds": result[12],
+                    "momentum_spike_enabled": result[13],
+                    "momentum_spike_threshold": result[14]
+                }
+            else:
+                return {
+                    "auto_entry": False, "auto_stop": False,
+                    "min_probability": 95, "min_differential": 0.25, "min_time": 120, "max_time": 900, "allow_re_entry": False,
+                    "spike_alert_enabled": True, "spike_alert_momentum_threshold": 36, "spike_alert_cooldown_threshold": 30, "spike_alert_cooldown_minutes": 15,
+                    "current_probability": 40, "min_ttc_seconds": 60, "momentum_spike_enabled": True, "momentum_spike_threshold": 36
+                }
+    except Exception as e:
+        print(f"[PostgreSQL Error] Failed to get auto trade settings: {e}")
+        return {
+            "auto_entry": False, "auto_stop": False,
+            "min_probability": 95, "min_differential": 0.25, "min_time": 120, "max_time": 900, "allow_re_entry": False,
+            "spike_alert_enabled": True, "spike_alert_momentum_threshold": 36, "spike_alert_cooldown_threshold": 30, "spike_alert_cooldown_minutes": 15,
+            "current_probability": 40, "min_ttc_seconds": 60, "momentum_spike_enabled": True, "momentum_spike_threshold": 36
+        }
+
+# PostgreSQL helper functions for trade preferences
+def update_trade_preferences_postgresql(**kwargs):
+    """Update trade preferences in PostgreSQL"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            # Build dynamic update query
+            update_parts = []
+            params = []
+            
+            for key, value in kwargs.items():
+                update_parts.append(f"{key} = %s")
+                params.append(value)
+            
+            if update_parts:
+                query = f"UPDATE users.trade_preferences_0001 SET {', '.join(update_parts)}, updated_at = CURRENT_TIMESTAMP WHERE id = 1"
+                cursor.execute(query, params)
+                conn.commit()
+                print(f"[PostgreSQL] Updated trade preferences: {kwargs}")
+        
+        conn.close()
+    except Exception as e:
+        print(f"[PostgreSQL Error] Failed to update trade preferences: {e}")
+
+def get_trade_preferences_postgresql():
+    """Get trade preferences from PostgreSQL"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT trade_strategy, position_size, multiplier
+                FROM users.trade_preferences_0001 WHERE id = 1
+            """)
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result:
+                return {
+                    "trade_strategy": result[0],
+                    "position_size": result[1],
+                    "multiplier": result[2]
+                }
+            else:
+                return {
+                    "trade_strategy": "Hourly HTC",
+                    "position_size": 1,
+                    "multiplier": 1
+                }
+    except Exception as e:
+        print(f"[PostgreSQL Error] Failed to get trade preferences: {e}")
+        return {
+            "trade_strategy": "Hourly HTC",
+            "position_size": 1,
+            "multiplier": 1
+        }
+
 # Authentication system
 AUTH_TOKENS_FILE = os.path.join(get_data_dir(), "users", "user_0001", "auth_tokens.json")
 DEVICE_TOKENS_FILE = os.path.join(get_data_dir(), "users", "user_0001", "device_tokens.json")
@@ -1274,10 +1427,14 @@ async def set_auto_stop(request: Request):
     # Handle file operations asynchronously
     async def update_preferences():
         try:
+            # Update JSON preferences (existing workflow)
             prefs = load_preferences()
             prefs["auto_stop"] = enabled
             await save_preferences(prefs)
             await broadcast_preferences_update()
+            
+            # Also update PostgreSQL (new workflow)
+            update_auto_trade_settings_postgresql(auto_stop=enabled)
         except Exception as e:
             print(f"[Auto Stop Update Error] {e}")
     
@@ -1298,10 +1455,14 @@ async def set_auto_entry(request: Request):
     # Handle file operations asynchronously
     async def update_preferences():
         try:
+            # Update JSON preferences (existing workflow)
             prefs = load_preferences()
             prefs["auto_entry"] = enabled
             await save_preferences(prefs)
             await broadcast_preferences_update()
+            
+            # Also update PostgreSQL (new workflow)
+            update_auto_trade_settings_postgresql(auto_entry=enabled)
         except Exception as e:
             print(f"[Auto Entry Update Error] {e}")
     
@@ -1338,9 +1499,15 @@ async def set_diff_mode(request: Request):
 @app.post("/api/set_position_size")
 async def set_position_size(request: Request):
     data = await request.json()
+    position_size = int(data.get("position_size", 100))
+    
+    # Update PostgreSQL
+    update_trade_preferences_postgresql(position_size=position_size)
+    
+    # Also update legacy JSON for compatibility during migration
     prefs = load_preferences()
     try:
-        prefs["position_size"] = int(data.get("position_size", 100))
+        prefs["position_size"] = position_size
         await save_preferences(prefs)
         await broadcast_preferences_update()
     except Exception as e:
@@ -1350,9 +1517,15 @@ async def set_position_size(request: Request):
 @app.post("/api/set_multiplier")
 async def set_multiplier(request: Request):
     data = await request.json()
+    multiplier = int(data.get("multiplier", 1))
+    
+    # Update PostgreSQL
+    update_trade_preferences_postgresql(multiplier=multiplier)
+    
+    # Also update legacy JSON for compatibility during migration
     prefs = load_preferences()
     try:
-        prefs["multiplier"] = int(data.get("multiplier", 1))
+        prefs["multiplier"] = multiplier
         await save_preferences(prefs)
         await broadcast_preferences_update()
     except Exception as e:
@@ -1387,7 +1560,17 @@ async def update_preferences(request: Request):
 @app.get("/api/get_preferences")
 async def get_preferences():
     """Get current preferences"""
-    return load_preferences()
+    prefs = load_preferences()
+    
+    # Add trade strategy from PostgreSQL
+    try:
+        trade_prefs = get_trade_preferences_postgresql()
+        prefs["trade_strategy"] = trade_prefs["trade_strategy"]
+    except Exception as e:
+        print(f"[Get Preferences Error] Failed to get trade strategy from PostgreSQL: {e}")
+        prefs["trade_strategy"] = "Hourly HTC"  # Default fallback
+    
+    return prefs
 
 # === ACTIVE TRADES PROXY ROUTE ===
 @app.get("/api/active_trades")
@@ -1501,6 +1684,95 @@ async def get_auto_stop():
     prefs = load_preferences()
     return {"enabled": prefs.get("auto_stop", True)}
 
+@app.get("/api/get_auto_trade_settings")
+async def get_auto_trade_settings():
+    """Get auto trade settings from PostgreSQL"""
+    settings = get_auto_trade_settings_postgresql()
+    return settings
+
+@app.get("/api/get_trade_preferences")
+async def get_trade_preferences():
+    """Get trade preferences from PostgreSQL"""
+    return get_trade_preferences_postgresql()
+
+@app.post("/api/update_trade_preferences")
+async def update_trade_preferences(request: Request):
+    """Update trade preferences in PostgreSQL"""
+    try:
+        data = await request.json()
+        
+        # Update PostgreSQL
+        update_trade_preferences_postgresql(**data)
+        
+        # Also update legacy JSON for compatibility during migration
+        prefs = load_preferences()
+        if 'trade_strategy' in data:
+            prefs['trade_strategy'] = data['trade_strategy']
+        if 'position_size' in data:
+            prefs['position_size'] = data['position_size']
+        if 'multiplier' in data:
+            prefs['multiplier'] = data['multiplier']
+        
+        await save_preferences(prefs)
+        await broadcast_preferences_update()
+        
+        return {"status": "ok", "updated": data}
+    except Exception as e:
+        print(f"Error updating trade preferences: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/update_auto_entry_settings")
+async def update_auto_entry_settings(request: Request):
+    """Update auto entry settings in PostgreSQL"""
+    data = await request.json()
+    
+    # Extract auto entry settings
+    update_data = {}
+    if "min_probability" in data:
+        update_data["min_probability"] = int(data["min_probability"])
+    if "min_differential" in data:
+        update_data["min_differential"] = float(data["min_differential"])
+    if "min_time" in data:
+        update_data["min_time"] = int(data["min_time"])
+    if "max_time" in data:
+        update_data["max_time"] = int(data["max_time"])
+    if "allow_re_entry" in data:
+        update_data["allow_re_entry"] = bool(data["allow_re_entry"])
+    if "spike_alert_enabled" in data:
+        update_data["spike_alert_enabled"] = bool(data["spike_alert_enabled"])
+    if "spike_alert_momentum_threshold" in data:
+        update_data["spike_alert_momentum_threshold"] = int(data["spike_alert_momentum_threshold"])
+    if "spike_alert_cooldown_threshold" in data:
+        update_data["spike_alert_cooldown_threshold"] = int(data["spike_alert_cooldown_threshold"])
+    if "spike_alert_cooldown_minutes" in data:
+        update_data["spike_alert_cooldown_minutes"] = int(data["spike_alert_cooldown_minutes"])
+    
+    if update_data:
+        update_auto_trade_settings_postgresql(**update_data)
+    
+    return {"status": "ok", "updated": update_data}
+
+@app.post("/api/update_auto_stop_settings")
+async def update_auto_stop_settings(request: Request):
+    """Update auto stop settings in PostgreSQL"""
+    data = await request.json()
+    
+    # Extract auto stop settings
+    update_data = {}
+    if "current_probability" in data:
+        update_data["current_probability"] = int(data["current_probability"])
+    if "min_ttc_seconds" in data:
+        update_data["min_ttc_seconds"] = int(data["min_ttc_seconds"])
+    if "momentum_spike_enabled" in data:
+        update_data["momentum_spike_enabled"] = bool(data["momentum_spike_enabled"])
+    if "momentum_spike_threshold" in data:
+        update_data["momentum_spike_threshold"] = int(data["momentum_spike_threshold"])
+    
+    if update_data:
+        update_auto_trade_settings_postgresql(**update_data)
+    
+    return {"status": "ok", "updated": update_data}
+
 import os
 import json
 AUTO_STOP_SETTINGS_PATH = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_stop_settings.json")
@@ -1546,6 +1818,8 @@ async def get_auto_stop_settings():
 async def set_auto_stop_settings(request: Request):
     data = await request.json()
     settings = load_auto_stop_settings()
+    
+    # Update JSON settings (existing workflow)
     if "current_probability" in data:
         settings["current_probability"] = int(data["current_probability"])
     if "min_ttc_seconds" in data:
@@ -1555,6 +1829,24 @@ async def set_auto_stop_settings(request: Request):
     if "momentum_spike_threshold" in data:
         settings["momentum_spike_threshold"] = int(data["momentum_spike_threshold"])
     save_auto_stop_settings(settings)
+    
+    # Update PostgreSQL database (new workflow)
+    try:
+        update_data = {}
+        if "current_probability" in data:
+            update_data["current_probability"] = int(data["current_probability"])
+        if "min_ttc_seconds" in data:
+            update_data["min_ttc_seconds"] = int(data["min_ttc_seconds"])
+        if "momentum_spike_enabled" in data:
+            update_data["momentum_spike_enabled"] = bool(data["momentum_spike_enabled"])
+        if "momentum_spike_threshold" in data:
+            update_data["momentum_spike_threshold"] = int(data["momentum_spike_threshold"])
+        
+        if update_data:
+            update_auto_trade_settings_postgresql(**update_data)
+    except Exception as e:
+        print(f"[Auto Stop Settings PostgreSQL Update Error] {e}")
+    
     return {"status": "ok", "current_probability": settings["current_probability"], "min_ttc_seconds": settings["min_ttc_seconds"], "momentum_spike_enabled": settings.get("momentum_spike_enabled", True), "momentum_spike_threshold": settings.get("momentum_spike_threshold", 35)}
 
 # AUTO ENTRY SETTINGS
@@ -1604,6 +1896,8 @@ async def get_auto_entry_settings():
 async def set_auto_entry_settings(request: Request):
     data = await request.json()
     settings = load_auto_entry_settings()
+    
+    # Update JSON settings (existing workflow)
     if "min_probability" in data:
         settings["min_probability"] = int(data["min_probability"])
     if "min_differential" in data:
@@ -1625,6 +1919,34 @@ async def set_auto_entry_settings(request: Request):
     if "spike_alert_cooldown_minutes" in data:
         settings["spike_alert_cooldown_minutes"] = int(data["spike_alert_cooldown_minutes"])
     save_auto_entry_settings(settings)
+    
+    # Update PostgreSQL database (new workflow)
+    try:
+        update_data = {}
+        if "min_probability" in data:
+            update_data["min_probability"] = int(data["min_probability"])
+        if "min_differential" in data:
+            update_data["min_differential"] = float(data["min_differential"])
+        if "min_time" in data:
+            update_data["min_time"] = int(data["min_time"])
+        if "max_time" in data:
+            update_data["max_time"] = int(data["max_time"])
+        if "allow_re_entry" in data:
+            update_data["allow_re_entry"] = bool(data["allow_re_entry"])
+        if "spike_alert_enabled" in data:
+            update_data["spike_alert_enabled"] = bool(data["spike_alert_enabled"])
+        if "spike_alert_momentum_threshold" in data:
+            update_data["spike_alert_momentum_threshold"] = int(data["spike_alert_momentum_threshold"])
+        if "spike_alert_cooldown_threshold" in data:
+            update_data["spike_alert_cooldown_threshold"] = int(data["spike_alert_cooldown_threshold"])
+        if "spike_alert_cooldown_minutes" in data:
+            update_data["spike_alert_cooldown_minutes"] = int(data["spike_alert_cooldown_minutes"])
+        
+        if update_data:
+            update_auto_trade_settings_postgresql(**update_data)
+    except Exception as e:
+        print(f"[Auto Entry Settings PostgreSQL Update Error] {e}")
+    
     return {"status": "ok", "min_probability": settings["min_probability"], "min_differential": settings["min_differential"], "min_ttc_seconds": settings["min_ttc_seconds"], "min_time": settings["min_time"], "max_time": settings["max_time"], "allow_re_entry": settings["allow_re_entry"], "spike_alert_enabled": settings.get("spike_alert_enabled", True), "spike_alert_momentum_threshold": settings.get("spike_alert_momentum_threshold", 40), "spike_alert_cooldown_threshold": settings.get("spike_alert_cooldown_threshold", 30), "spike_alert_cooldown_minutes": settings.get("spike_alert_cooldown_minutes", 15)}
 
 @app.post("/api/trigger_open_trade")

@@ -949,6 +949,9 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         });
       }
+      if (tradeStrategyPicker && data.trade_strategy !== undefined) {
+        tradeStrategyPicker.value = data.trade_strategy;
+      }
       updatePositionDisplay();
     });
 
@@ -1211,6 +1214,28 @@ document.addEventListener('DOMContentLoaded', () => {
         // Removed console.log
       }).catch(error => {
         console.error('Diff mode backend error:', error);
+      });
+    });
+  }
+
+  // Trade Strategy Picker
+  const tradeStrategyPicker = document.getElementById('trade-strategy-picker');
+  if (tradeStrategyPicker) {
+    tradeStrategyPicker.addEventListener('change', () => {
+      if (ignoreWsUpdates) {
+        return;
+      }
+      const value = tradeStrategyPicker.value;
+      fetch(window.location.origin + '/api/update_trade_preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trade_strategy: value })
+      }).then(response => {
+        return response.json();
+      }).then(data => {
+        console.log('Trade strategy updated:', data);
+      }).catch(error => {
+        console.error('Trade strategy backend error:', error);
       });
     });
   }

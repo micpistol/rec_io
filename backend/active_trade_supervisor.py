@@ -1457,18 +1457,22 @@ def start_event_driven_supervisor():
         log(f"❌ Error in supervisor: {e}")
 
 def is_auto_stop_enabled():
-    """Check if AUTO STOP is enabled in trade_preferences.json"""
-    from backend.util.paths import get_data_dir
-    import json
-    prefs_path = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "trade_preferences.json")
-    if os.path.exists(prefs_path):
-        try:
-            with open(prefs_path, "r") as f:
-                prefs = json.load(f)
-                return prefs.get("auto_stop", False)
-        except Exception as e:
-            log(f"[AUTO STOP] Error reading preferences: {e}")
-    return False
+    """Check if AUTO STOP is enabled in PostgreSQL"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db", 
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT auto_stop FROM users.auto_trade_settings_0001 WHERE id = 1")
+            result = cursor.fetchone()
+            return result[0] if result else False
+    except Exception as e:
+        log(f"[AUTO STOP] Error reading PostgreSQL settings: {e}")
+        return False
 
 def trigger_auto_stop_close(trade):
     """Trigger a close for the given trade using the same payload as manual close."""
@@ -1542,31 +1546,43 @@ def trigger_auto_stop_close(trade):
     except Exception as e:
         log(f"[AUTO STOP] Exception posting close for trade {trade['trade_id']}: {e}")
 
-import os
-import json
-
-AUTO_STOP_SETTINGS_PATH = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_stop_settings.json")
+# Auto stop settings now read from PostgreSQL users.auto_trade_settings_0001 table
 
 def get_auto_stop_threshold():
+    """Get auto stop probability threshold from PostgreSQL"""
     try:
-        if os.path.exists(AUTO_STOP_SETTINGS_PATH):
-            with open(AUTO_STOP_SETTINGS_PATH, "r") as f:
-                data = json.load(f)
-                return int(data.get("current_probability", 25))
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db", 
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT current_probability FROM users.auto_trade_settings_0001 WHERE id = 1")
+            result = cursor.fetchone()
+            return result[0] if result else 40
     except Exception as e:
-        log(f"[AUTO STOP] Error reading threshold: {e}")
-    return 25
+        log(f"[AUTO STOP] Error reading threshold from PostgreSQL: {e}")
+        return 40
 
 def get_min_ttc_seconds():
-    """Get the minimum TTC seconds setting from auto_stop_settings.json"""
+    """Get the minimum TTC seconds setting from PostgreSQL"""
     try:
-        if os.path.exists(AUTO_STOP_SETTINGS_PATH):
-            with open(AUTO_STOP_SETTINGS_PATH, "r") as f:
-                data = json.load(f)
-                return int(data.get("min_ttc_seconds", 60))
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db", 
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT min_ttc_seconds FROM users.auto_trade_settings_0001 WHERE id = 1")
+            result = cursor.fetchone()
+            return result[0] if result else 60
     except Exception as e:
-        log(f"[AUTO STOP] Error reading min_ttc_seconds: {e}")
-    return 60
+        log(f"[AUTO STOP] Error reading min_ttc_seconds from PostgreSQL: {e}")
+        return 60
 
 if __name__ == "__main__":
     # Start the event-driven supervisor

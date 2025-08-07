@@ -217,16 +217,46 @@ CREATE TABLE IF NOT EXISTS users.trade_preferences_0001 (
     UNIQUE(preference_key)
 );
 
--- Create auto_trade_settings table (JSONB for flexible settings)
+-- Create auto_trade_settings table (comprehensive with all individual columns)
 CREATE TABLE IF NOT EXISTS users.auto_trade_settings_0001 (
     id SERIAL PRIMARY KEY,
-    setting_name VARCHAR(100) NOT NULL,
-    setting_value JSONB NOT NULL,
-    is_enabled BOOLEAN DEFAULT TRUE,
+    -- Main toggles
+    auto_entry BOOLEAN DEFAULT FALSE,
+    auto_stop BOOLEAN DEFAULT FALSE,
+    
+    -- Auto Entry Settings
+    min_probability INTEGER DEFAULT 95,
+    min_differential DECIMAL(5,2) DEFAULT 0.25,
+    min_time INTEGER DEFAULT 120, -- seconds
+    max_time INTEGER DEFAULT 900, -- seconds
+    allow_re_entry BOOLEAN DEFAULT FALSE,
+    spike_alert_enabled BOOLEAN DEFAULT TRUE,
+    spike_alert_momentum_threshold INTEGER DEFAULT 36,
+    spike_alert_cooldown_threshold INTEGER DEFAULT 30,
+    spike_alert_cooldown_minutes INTEGER DEFAULT 15,
+    
+    -- Auto Stop Settings
+    current_probability INTEGER DEFAULT 40,
+    min_ttc_seconds INTEGER DEFAULT 60,
+    momentum_spike_enabled BOOLEAN DEFAULT TRUE,
+    momentum_spike_threshold INTEGER DEFAULT 36,
+    
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(setting_name)
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Insert initial auto trade settings with all defaults
+INSERT INTO users.auto_trade_settings_0001 (
+    auto_entry, auto_stop,
+    min_probability, min_differential, min_time, max_time, allow_re_entry,
+    spike_alert_enabled, spike_alert_momentum_threshold, spike_alert_cooldown_threshold, spike_alert_cooldown_minutes,
+    current_probability, min_ttc_seconds, momentum_spike_enabled, momentum_spike_threshold
+) VALUES (
+    TRUE, TRUE,
+    95, 0.25, 120, 900, FALSE,
+    TRUE, 36, 30, 15,
+    40, 60, TRUE, 36
+) ON CONFLICT (id) DO NOTHING;
 
 -- Create user_info table
 CREATE TABLE IF NOT EXISTS users.user_info_0001 (
@@ -300,15 +330,27 @@ INSERT INTO users.trade_preferences_0001 (preference_key, preference_value)
 VALUES ('trade_preferences', '{"auto_stop": true, "multiplier": 2, "position_size": 100, "watchlist": [], "auto_entry": true, "diff_mode": true}'::jsonb)
 ON CONFLICT (preference_key) DO NOTHING;
 
--- Insert initial auto entry settings from JSON
-INSERT INTO users.auto_trade_settings_0001 (setting_name, setting_value) 
-VALUES ('auto_entry_settings', '{"min_probability": 95, "min_differential": 0.25, "min_ttc_seconds": 60, "min_time": 120, "max_time": 900, "allow_re_entry": false, "watchlist_min_volume": 1000, "watchlist_max_ask": 98, "spike_alert_enabled": true, "spike_alert_momentum_threshold": 40, "spike_alert_cooldown_threshold": 30, "spike_alert_cooldown_minutes": 15}'::jsonb)
-ON CONFLICT (setting_name) DO NOTHING;
+-- Auto trade settings are now managed via the simplified table structure
 
--- Insert auto stop settings
-INSERT INTO users.auto_trade_settings_0001 (setting_name, setting_value) 
-VALUES ('auto_stop_settings', '{"enabled": true}'::jsonb)
-ON CONFLICT (setting_name) DO NOTHING;
+-- Create trade_preferences table for trade strategy and position settings
+CREATE TABLE IF NOT EXISTS users.trade_preferences_0001 (
+    id SERIAL PRIMARY KEY,
+    trade_strategy VARCHAR(50) DEFAULT 'Hourly HTC',
+    position_size INTEGER DEFAULT 1,
+    multiplier INTEGER DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insert initial trade preferences
+INSERT INTO users.trade_preferences_0001 (trade_strategy, position_size, multiplier) 
+VALUES ('Hourly HTC', 1, 1)
+ON CONFLICT (id) DO NOTHING;
+
+-- Create trigger for updated_at
+CREATE TRIGGER update_trade_preferences_0001_updated_at 
+    BEFORE UPDATE ON users.trade_preferences_0001 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Insert trade history preferences
 INSERT INTO users.trade_preferences_0001 (preference_key, preference_value) 

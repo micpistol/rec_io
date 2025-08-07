@@ -329,32 +329,60 @@ def broadcast_auto_entry_indicator_change():
         log(f"[AUTO ENTRY] ❌ Error in broadcast_auto_entry_indicator_change: {e}")
 
 def is_auto_entry_enabled():
-    """Check if AUTO ENTRY is enabled in trade_preferences.json"""
-    prefs_path = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "trade_preferences.json")
-    if os.path.exists(prefs_path):
-        try:
-            with open(prefs_path, "r") as f:
-                prefs = json.load(f)
-                enabled = prefs.get("auto_entry", False)
-                return enabled
-        except Exception as e:
-            log(f"[AUTO ENTRY] Error reading preferences: {e}")
-    return False
+    """Check if AUTO ENTRY is enabled in PostgreSQL"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db", 
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT auto_entry FROM users.auto_trade_settings_0001 WHERE id = 1")
+            result = cursor.fetchone()
+            return result[0] if result else False
+    except Exception as e:
+        log(f"[AUTO ENTRY] Error reading from PostgreSQL: {e}")
+        return False
 
 def get_auto_entry_settings():
-    """Get auto entry settings from auto_entry_settings.json - NO DEFAULTS"""
-    settings_path = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_entry_settings.json")
-    if os.path.exists(settings_path):
-        try:
-            with open(settings_path, "r") as f:
-                settings = json.load(f)
-                log(f"[AUTO ENTRY] Loaded settings from {settings_path}")
+    """Get auto entry settings from PostgreSQL - NO DEFAULTS"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db", 
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT min_probability, min_differential, min_time, max_time, allow_re_entry,
+                       spike_alert_enabled, spike_alert_momentum_threshold, 
+                       spike_alert_cooldown_threshold, spike_alert_cooldown_minutes
+                FROM users.auto_trade_settings_0001 WHERE id = 1
+            """)
+            result = cursor.fetchone()
+            if result:
+                settings = {
+                    "min_probability": result[0],
+                    "min_differential": float(result[1]),
+                    "min_time": result[2],
+                    "max_time": result[3],
+                    "allow_re_entry": result[4],
+                    "spike_alert_enabled": result[5],
+                    "spike_alert_momentum_threshold": result[6],
+                    "spike_alert_cooldown_threshold": result[7],
+                    "spike_alert_cooldown_minutes": result[8]
+                }
+                log(f"[AUTO ENTRY] Loaded settings from PostgreSQL")
                 return settings
-        except Exception as e:
-            log(f"[AUTO ENTRY] Error reading settings: {e}")
-            return {}
-    else:
-        log(f"[AUTO ENTRY] Settings file not found at {settings_path}")
+            else:
+                log(f"[AUTO ENTRY] No settings found in PostgreSQL")
+                return {}
+    except Exception as e:
+        log(f"[AUTO ENTRY] Error reading settings from PostgreSQL: {e}")
         return {}
 
 def get_current_ttc():
@@ -388,22 +416,60 @@ def get_watchlist_data():
     return None
 
 def get_position_size():
-    """Get position size from trade preferences including multiplier"""
+    """Get position size from PostgreSQL trade preferences including multiplier"""
     try:
-        preferences_file = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "trade_preferences.json")
-        if os.path.exists(preferences_file):
-            with open(preferences_file, 'r') as f:
-                data = json.load(f)
-                position_size = data.get("position_size", 1)
-                multiplier = data.get("multiplier", 1)
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT position_size, multiplier FROM users.trade_preferences_0001 WHERE id = 1")
+            result = cursor.fetchone()
+            if result:
+                position_size = result[0]
+                multiplier = result[1]
                 total_position = position_size * multiplier
+                log(f"[AUTO ENTRY] Loaded position size from PostgreSQL: {position_size} * {multiplier} = {total_position}")
                 return total_position
-        else:
-            log(f"[AUTO ENTRY] Trade preferences file not found")
-            return None
+            else:
+                log(f"[AUTO ENTRY] No trade preferences found in PostgreSQL")
+                return None
     except Exception as e:
-        log(f"[AUTO ENTRY] Error loading position size: {e}")
+        log(f"[AUTO ENTRY] Error loading position size from PostgreSQL: {e}")
         return None
+    finally:
+        if conn:
+            conn.close()
+
+def get_trade_strategy():
+    """Get trade strategy from PostgreSQL trade preferences"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT trade_strategy FROM users.trade_preferences_0001 WHERE id = 1")
+            result = cursor.fetchone()
+            if result:
+                trade_strategy = result[0]
+                log(f"[AUTO ENTRY] Loaded trade strategy from PostgreSQL: {trade_strategy}")
+                return trade_strategy
+            else:
+                log(f"[AUTO ENTRY] No trade preferences found in PostgreSQL")
+                return "Hourly HTC"  # Default fallback
+    except Exception as e:
+        log(f"[AUTO ENTRY] Error loading trade strategy from PostgreSQL: {e}")
+        return "Hourly HTC"  # Default fallback
+    finally:
+        if conn:
+            conn.close()
 
 def trigger_auto_entry_trade(strike_data):
     """Trigger a buy trade by calling the trade_manager service directly"""
@@ -459,6 +525,9 @@ def trigger_auto_entry_trade(strike_data):
             log(f"[AUTO ENTRY] ⚠️ Could not get BTC price: {e}")
             symbol_open = None
         
+        # Get trade strategy from PostgreSQL
+        trade_strategy = get_trade_strategy()
+        
         # Prepare the trade data exactly like trade_initiator does
         trade_payload = {
             "ticket_id": ticket_id,
@@ -467,7 +536,7 @@ def trigger_auto_entry_trade(strike_data):
             "time": eastern_time,
             "symbol": "BTC",
             "market": "Kalshi",
-            "trade_strategy": "Hourly HTC",
+            "trade_strategy": trade_strategy,
             "contract": contract_name,
             "strike": strike_data.get("strike"),
             "side": converted_side,
