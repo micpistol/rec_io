@@ -222,7 +222,7 @@ def check_for_open_trades():
             SELECT id, ticket_id, date, time, strike, side, buy_price, position,
                    contract, ticker, symbol, market, trade_strategy, symbol_open,
                    momentum, prob, fees, diff
-            FROM trades 
+            FROM users.trades_0001 
             WHERE status = 'open'
         """)
         
@@ -291,10 +291,10 @@ def check_for_closed_trades():
             log("🔍 CHECKING: No active trades to check")
             return
         
-        # Check which trades are still open in trades.db
+        # Check which trades are still open in PostgreSQL
         conn = get_trades_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM trades WHERE status = 'open'")
+        cursor.execute("SELECT id FROM users.trades_0001 WHERE status = 'open'")
         still_open_trade_ids = {row[0] for row in cursor.fetchall()}
         conn.close()
         
@@ -478,8 +478,7 @@ def get_db_connection():
 
 def get_trades_db_connection():
     """Get connection to the main trades database"""
-    trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
-    return sqlite3.connect(trades_db_path, timeout=5.0, check_same_thread=False)
+    return get_postgresql_connection()
 
 def get_postgresql_connection():
     """Get a connection to the PostgreSQL database"""
@@ -507,15 +506,15 @@ def add_new_active_trade(trade_id: int, ticket_id: str) -> bool:
         bool: True if successfully added, False otherwise
     """
     try:
-        # Get the trade data from trades.db
+        # Get the trade data from PostgreSQL
         conn = get_trades_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, ticket_id, date, time, strike, side, buy_price, position,
                    contract, ticker, symbol, market, trade_strategy, symbol_open,
                    momentum, prob, fees, diff
-            FROM trades 
-            WHERE id = ? AND status = 'open'
+            FROM users.trades_0001 
+            WHERE id = %s AND status = 'open'
         """, (trade_id,))
         
         row = cursor.fetchone()
@@ -614,8 +613,8 @@ def add_pending_trade(trade_id: int, ticket_id: str) -> bool:
             SELECT id, ticket_id, date, time, strike, side, buy_price, position,
                    contract, ticker, symbol, market, trade_strategy, symbol_open,
                    momentum, prob, fees, diff
-            FROM trades 
-            WHERE id = ? AND status = 'pending'
+            FROM users.trades_0001 
+            WHERE id = %s AND status = 'pending'
         """, (trade_id,))
         
         row = cursor.fetchone()
@@ -700,15 +699,15 @@ def confirm_pending_trade(trade_id: int, ticket_id: str) -> bool:
         bool: True if successfully confirmed, False otherwise
     """
     try:
-        # Get the updated trade data from trades.db
+        # Get the updated trade data from PostgreSQL
         conn = get_trades_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, ticket_id, date, time, strike, side, buy_price, position,
                    contract, ticker, symbol, market, trade_strategy, symbol_open,
                    momentum, prob, fees, diff
-            FROM trades 
-            WHERE id = ? AND status = 'open'
+            FROM users.trades_0001 
+            WHERE id = %s AND status = 'open'
         """, (trade_id,))
         
         row = cursor.fetchone()
@@ -1561,10 +1560,10 @@ def sync_with_trades_db():
     This should be called on demand to catch any missed updates.
     """
     try:
-        # Get all open trades from trades.db
+        # Get all open trades from PostgreSQL
         conn = get_trades_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM trades WHERE status = 'open'")
+        cursor.execute("SELECT id FROM users.trades_0001 WHERE status = 'open'")
         open_trade_ids = [row[0] for row in cursor.fetchall()]
         conn.close()
         
