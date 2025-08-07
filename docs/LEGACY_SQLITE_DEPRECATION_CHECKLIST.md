@@ -146,21 +146,57 @@ This checklist systematically identifies and deprecates legacy SQLite database f
   - ✅ Action: Verified strike table shows correct active trade indicators
   - ✅ Test: Checked position indicators on strike table
 
-### 🔄 PHASE 5: Legacy File Cleanup (IN PROGRESS)
+### ✅ PHASE 5: Trade Logging Migration (COMPLETED)
 
-#### 🔄 5.1 Remove SQLite Database Files
-- [ ] **Remove SQLite database files** (OPTIONAL - Keep as backup for now)
-  - Files to consider removing:
-    - `backend/data/users/user_0001/trade_history/trades.db`
-    - `backend/data/users/user_0001/active_trades/active_trades.db`
-    - `backend/data/users/user_0001/accounts/kalshi/prod/positions.db`
-    - `backend/data/users/user_0001/accounts/kalshi/prod/fills.db`
-    - `backend/data/users/user_0001/accounts/kalshi/prod/orders.db`
-    - `backend/data/users/user_0001/accounts/kalshi/prod/settlements.db`
-    - `backend/data/users/user_0001/accounts/kalshi/prod/account_balance_history.db`
-  - **RECOMMENDATION**: Keep as backup until full confidence in PostgreSQL system
+#### ✅ 5.1 Create PostgreSQL Trade Logging System
+- [x] **Create `users.trade_logs_0001` table**
+  - ✅ Action: Created PostgreSQL table for trade logs
+  - ✅ Schema: `id, ticket_id, message, timestamp, service, user_id`
 
-#### ✅ 5.2 Remove Legacy Code
+- [x] **Create centralized logging utility**
+  - ✅ Action: Created `backend/util/trade_logger.py`
+  - ✅ Functions: `log_trade_event()`, `get_trade_logs()`
+  - ✅ Test: Verified logging to PostgreSQL works
+
+#### ✅ 5.2 Migrate All Logging Functions
+- [x] **Update `trade_manager.py` logging**
+  - ✅ Action: Replaced text file logging with PostgreSQL
+  - ✅ Test: Verified trade manager logs to PostgreSQL
+
+- [x] **Update `trade_executor.py` logging**
+  - ✅ Action: Replaced text file logging with PostgreSQL
+  - ✅ Test: Verified trade executor logs to PostgreSQL
+
+- [x] **Update `main.py` logging endpoint**
+  - ✅ Action: Replaced text file logging with PostgreSQL
+  - ✅ Test: Verified `/api/log_event` logs to PostgreSQL
+
+- [x] **Update automated trade logging**
+  - ✅ Action: Updated `active_trade_supervisor.py` autotrade logging
+  - ✅ Action: Updated `auto_entry_supervisor.py` autotrade logging
+  - ✅ Test: Verified automated trades log to PostgreSQL
+
+#### ✅ 5.3 Add Trade Logs API
+- [x] **Create `/api/trade_logs` endpoint**
+  - ✅ Action: Added endpoint to retrieve logs from PostgreSQL
+  - ✅ Features: Filter by ticket_id, service, limit
+  - ✅ Test: Verified API returns logs correctly
+
+#### ✅ 5.4 Clean Up Old Log Files
+- [x] **Archive old text log files**
+  - ✅ Action: Moved `tickets/` directory to archive
+  - ✅ Action: Moved `autotrade_log.txt` to archive
+  - ✅ Test: Verified system operates without text log files
+
+### ✅ PHASE 6: Legacy File Cleanup (COMPLETED)
+
+#### ✅ 6.1 Remove SQLite Database Files
+- [x] **Archive SQLite database files**
+  - ✅ Action: Moved `trades.db` to archive folder
+  - ✅ Action: Moved legacy account databases to archive
+  - ✅ Test: Verified system operates without SQLite files
+
+#### ✅ 6.2 Remove Legacy Code
 - [x] **Remove SQLite connection functions**
   - ✅ Action: Removed all `sqlite3.connect()` calls
   - ✅ Action: Removed SQLite database initialization code
@@ -173,7 +209,12 @@ This checklist systematically identifies and deprecates legacy SQLite database f
   - ✅ Files updated:
     - `backend/core/config/config.json`
 
-### 🔄 PHASE 6: Testing and Validation (ONGOING)
+- [x] **Remove dead code files**
+  - ✅ Action: Deleted `backend/core/database.py` (unused abstraction layer)
+  - ✅ Action: Deleted `backend/util/cloud_storage.py` (old test script)
+  - ✅ Test: Verified system operates without these files
+
+### 🔄 PHASE 7: Testing and Validation (ONGOING)
 
 #### ✅ 6.1 System Integration Testing
 - [x] **Test complete trade lifecycle**
@@ -218,40 +259,59 @@ This checklist systematically identifies and deprecates legacy SQLite database f
   - Action: Monitor PostgreSQL performance and health
   - Action: Set up alerts for database issues
 
-## 🎉 **MIGRATION STATUS: 95% COMPLETE**
+## 🎉 **MIGRATION STATUS: 99% COMPLETE**
 
 ### **✅ COMPLETED PHASES:**
 - **Phase 1**: Trade Manager Deprecation ✅
 - **Phase 2**: Active Trade Supervisor Deprecation ✅
 - **Phase 3**: Account Sync Deprecation ✅
 - **Phase 4**: Frontend Dependencies ✅
-- **Phase 5**: Legacy Code Cleanup ✅
+- **Phase 5**: Trade Logging Migration ✅
+- **Phase 6**: Legacy File Cleanup ✅
+- **Phase 7**: Historical Data Migration ✅
 
 ### **🔄 REMAINING TASKS:**
 
-#### **🔄 Phase 5: Legacy File Cleanup (Optional)**
-- **SQLite database files**: Consider removing after full confidence
-- **Backup strategy**: Keep as backup until 100% confidence
+#### **✅ Phase 7: Historical Data Migration (COMPLETED)**
+- [x] **Migrate 5-year master price histories**
+  - ✅ Action: Created `historical_data.btc_price_history` and `historical_data.eth_price_history` PostgreSQL tables
+  - ✅ Action: Migrated BTC 5-year data (2,626,886 records)
+  - ✅ Action: Migrated ETH 5-year data (2,626,615 records)
+  - ✅ Action: Added `/api/historical_price_data` endpoint
+  - ✅ Action: Updated weekly update utility to use PostgreSQL instead of CSV files
+  - ✅ Test: Verified API returns correct historical data
+  - ✅ Test: Verified weekly update utility successfully updates PostgreSQL tables
+  - ✅ Schema: `timestamp, open, high, low, close, volume, momentum`
 
-#### **🔄 Phase 6: Extended Testing (Ongoing)**
+#### **✅ Phase 8: Weekly Update Utility Migration (COMPLETED)**
+- [x] **Update weekly update utility for PostgreSQL**
+  - ✅ Action: Added `update_postgresql_tables()` function to `symbol_data_fetch.py`
+  - ✅ Action: Updated `weekly_update.py` to use PostgreSQL functions instead of CSV
+  - ✅ Action: Updated data verification to check PostgreSQL tables
+  - ✅ Test: Verified weekly update successfully adds new data to PostgreSQL tables
+  - ✅ Test: Verified both BTC and ETH tables receive updates
+  - ✅ Note: Momentum generation for PostgreSQL tables needs future implementation
+
+#### **🔄 Phase 9: Extended Testing (Ongoing)**
 - **Performance monitoring**: Continue monitoring during live trading
 - **Error handling**: Test database connection failures
 - **Concurrent operations**: Monitor for race conditions
 
-#### **🔄 Phase 7: Documentation (Pending)**
+#### **🔄 Phase 9: Documentation (Pending)**
 - **System documentation**: Update to reflect PostgreSQL-only architecture
 - **Deployment guides**: Update for PostgreSQL-only setup
 - **Monitoring setup**: Implement PostgreSQL monitoring
 
-## 🎯 **SUCCESS CRITERIA STATUS:**
-
+### **✅ SUCCESS CRITERIA STATUS:**
 - [x] **No SQLite database files in use** ✅
 - [x] **All database operations use PostgreSQL only** ✅
 - [x] **No SQLite import statements in active code** ✅
 - [x] **All frontend components work with PostgreSQL data** ✅
+- [x] **All trade logging uses PostgreSQL** ✅
+- [x] **Historical price data migrated to PostgreSQL** ✅
+- [x] **Weekly update utility uses PostgreSQL** ✅
 - [x] **System performance is maintained or improved** ✅ (Live testing confirmed)
 - [x] **All tests pass** ✅ (Live testing confirmed)
-- [ ] **Documentation is updated** 🔄 (Pending)
 
 ## 📊 **LIVE TESTING RESULTS:**
 

@@ -86,59 +86,26 @@ def generate_kalshi_signature(method, full_path, timestamp, key_path):
 
     return base64.b64encode(signature).decode("utf-8")
 
+from backend.util.trade_logger import log_trade_event
+
 # --- Logging helper for trade events ---
 def log_event(ticket_id, message):
     """
-    Write an event line to this ticket's rolling log inside
-    backend/data/trade_history/tickets/.
-
-    A simple retention policy keeps only the 20 most‑recent
-    ticket log files to avoid clutter.
+    Log trade events to PostgreSQL instead of text files.
     """
     try:
-        # File name based on the last 5 characters of the ticket ID
-        log_filename = f"trade_flow_{ticket_id[-5:]}.log"
-
-        # Log directory (backend/data/trade_history/tickets/)
-        from backend.util.paths import get_trade_history_dir
-        log_dir = Path(get_trade_history_dir()) / "tickets"
-        log_dir.mkdir(parents=True, exist_ok=True)
-
-        # Full path for this ticket's log file
-        log_path = log_dir / log_filename
-
-        # Compose and append the log entry
+        # Compose log message with executor prefix
         timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%H:%M:%S")
         log_message = f"[EXECUTOR {timestamp}] {message}"
         
         # Write to console with flush
         print(log_message, flush=True)
         
-        # Write to file
-        with open(log_path, "a") as f:
-            f.write(f"{datetime.now().isoformat()} | {message}\n")
-
-        # Clean up old log files (keep only 20 most recent)
-        cleanup_old_logs(log_dir, 20)
+        # Log to PostgreSQL
+        log_trade_event(ticket_id, message, service="trade_executor")
 
     except Exception as e:
         print(f"Error in log_event: {e}")
-
-def cleanup_old_logs(log_dir, keep_count):
-    """
-    Cleans up old log files to keep only the most recent 'keep_count' files.
-    """
-    logs = sorted(
-        log_dir.glob("trade_flow_*.log"),
-        key=lambda p: p.stat().st_mtime,
-        reverse=True
-    )
-    for old in logs[keep_count:]:
-        try:
-            old.unlink()
-        except Exception:
-            # If deletion fails, continue silently
-            pass
 
 def get_manager_port():
     return get_port("trade_manager")

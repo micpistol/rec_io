@@ -4,7 +4,6 @@ import os
 from datetime import datetime, timedelta, timezone
 import time
 from typing import Optional, Tuple
-import yfinance as yf
 
 # Use Coinbase (Kraken limits historical depth)
 exchange = ccxt.coinbase({'enableRateLimit': True})

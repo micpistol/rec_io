@@ -490,9 +490,11 @@ def trigger_auto_entry_trade(strike_data):
             result = response.json()
             log(f"[AUTO ENTRY] ✅ Trade initiated successfully via trade_manager: {result}")
             
-            # Log to master autotrade log
-            with open(os.path.join(get_trade_history_dir(), "autotrade_log.txt"), "a") as f:
-                f.write(f'{datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")} | ENTRY | {contract_name} | {strike_data.get("strike")} | {strike_data.get("side")} | {position_size} | {strike_data.get("buy_price")} | {strike_data.get("probability")}\n')
+            from backend.util.trade_logger import log_trade_event
+            
+            # Log to PostgreSQL instead of text file
+            log_message = f"ENTRY | {contract_name} | {strike_data.get('strike')} | {strike_data.get('side')} | {position_size} | {strike_data.get('buy_price')} | {strike_data.get('probability')}"
+            log_trade_event(ticket_id, log_message, service="auto_entry_supervisor")
             
             # Send WebSocket notification to frontend for audio/popup alerts
             try:

@@ -1843,37 +1843,91 @@ async def get_auto_entry_indicator():
         return {"error": f"Error getting auto entry indicator: {str(e)}"}
 
 # Log event endpoint
+from backend.util.trade_logger import log_trade_event, get_trade_logs
+
+@app.get("/api/trade_logs")
+async def get_trade_logs_endpoint(ticket_id: str = None, service: str = None, limit: int = 100):
+    """Get trade logs from PostgreSQL"""
+    try:
+        logs = get_trade_logs(ticket_id=ticket_id, service=service, limit=limit)
+        return {"status": "ok", "logs": logs}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/historical_price_data")
+async def get_historical_price_data(symbol: str = "BTC", limit: int = 1000, start_date: str = None, end_date: str = None):
+    """Get historical price data from PostgreSQL"""
+    try:
+        import psycopg2
+        from datetime import datetime
+        
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        
+        # Build query
+        query = """
+            SELECT timestamp, open_price, high_price, low_price, close_price, volume, momentum
+            FROM live_data.historical_price_data 
+            WHERE symbol = %s
+        """
+        params = [symbol.upper()]
+        
+        # Add date filters if provided
+        if start_date:
+            query += " AND timestamp >= %s"
+            params.append(start_date)
+        if end_date:
+            query += " AND timestamp <= %s"
+            params.append(end_date)
+        
+        query += " ORDER BY timestamp DESC LIMIT %s"
+        params.append(limit)
+        
+        with conn.cursor() as cursor:
+            cursor.execute(query, params)
+            results = cursor.fetchall()
+            
+        conn.close()
+        
+        # Format results
+        data = []
+        for row in results:
+            data.append({
+                "timestamp": row[0].isoformat() if row[0] else None,
+                "open": float(row[1]) if row[1] else None,
+                "high": float(row[2]) if row[2] else None,
+                "low": float(row[3]) if row[3] else None,
+                "close": float(row[4]) if row[4] else None,
+                "volume": float(row[5]) if row[5] else None,
+                "momentum": float(row[6]) if row[6] else None
+            })
+        
+        return {
+            "status": "ok",
+            "symbol": symbol.upper(),
+            "count": len(data),
+            "data": data
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.post("/api/log_event")
 async def log_event(request: Request):
-    """Log trade events to ticket-specific log files"""
+    """Log trade events to PostgreSQL instead of text files"""
     try:
         data = await request.json()
         ticket_id = data.get("ticket_id", "UNKNOWN")
         message = data.get("message", "No message provided")
-        timestamp = datetime.now(pytz.timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S")
 
-        log_line = f"[{timestamp}] Ticket {ticket_id}: {message}\n"
-        # Directory for trade flow logs
-        log_dir = os.path.join(get_trade_history_dir(), "tickets")
-        # Use last 5 characters of ticket_id for log file name, fallback to full ticket_id if too short
-        log_path = os.path.join(log_dir, f"trade_flow_{ticket_id[-5:] if len(ticket_id) >= 5 else ticket_id}.log")
+        # Log to PostgreSQL
+        log_trade_event(ticket_id, message, service="main")
 
-        try:
-            os.makedirs(log_dir, exist_ok=True)
-            with open(log_path, "a") as f:
-                f.write(log_line)
-
-            # Prune older log files, keep only latest 100
-            log_files = sorted(
-                [f for f in os.listdir(log_dir) if f.startswith("trade_flow_") and f.endswith(".log")],
-                key=lambda name: os.path.getmtime(os.path.join(log_dir, name)),
-                reverse=True
-            )
-            for old_log in log_files[100:]:
-                os.remove(os.path.join(log_dir, old_log))
-
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
         return {"status": "ok"}
     except Exception as e:
         return {"status": "error", "message": str(e)}

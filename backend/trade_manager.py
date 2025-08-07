@@ -468,14 +468,12 @@ def log(msg):
     timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%H:%M:%S")
     print(f"[TRADE_MANAGER {timestamp}] {msg}", flush=True)
 
+from backend.util.trade_logger import log_trade_event
+
 def log_event(ticket_id, message):
+    """Log trade events to PostgreSQL instead of text files"""
     try:
-        trade_suffix = ticket_id[-5:] if len(ticket_id) >= 5 else ticket_id
-        log_path = os.path.join(get_trade_history_dir(), "tickets", f"trade_flow_{trade_suffix}.log")
-        timestamp = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
-        log_line = f"[{timestamp}] Ticket {ticket_id[-5:]}: {message}\n"
-        with open(log_path, "a") as f:
-            f.write(log_line)
+        log_trade_event(ticket_id, message, service="trade_manager")
     except Exception as e:
         print(f"[LOG ERROR] Failed to write log: {message} — {e}")
 
