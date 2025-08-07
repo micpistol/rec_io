@@ -22,39 +22,53 @@ from backend.util.paths import get_data_dir
 __all__ = ['send_user_notification', 'send_sms_via_email']
 
 def get_user_info():
-    """Get user info from settings."""
+    """Get user information from PostgreSQL"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT user_id, first_name, last_name, email, phone, account_type
+                FROM users.user_info_0001 WHERE user_no = '0001'
+            """)
+            result = cursor.fetchone()
+            if result:
+                user_id, first_name, last_name, email, phone, account_type = result
+                return {
+                    "user_id": user_id,
+                    "name": f"{first_name} {last_name}",
+                    "email": email,
+                    "phone": phone,
+                    "account_type": account_type
+                }
+    except Exception as e:
+        print(f"⚠️ Error reading user info from PostgreSQL: {e}")
+    
+    # Fallback to JSON file for backward compatibility
     try:
         user_settings_path = os.path.join(get_data_dir(), "users", "user_0001", "user_info.json")
-        
-        if not os.path.exists(user_settings_path):
-            print(f"⚠️ User settings file not found: {user_settings_path}")
+        if os.path.exists(user_settings_path):
+            with open(user_settings_path, "r") as f:
+                user_info = json.load(f)
+                return user_info
+        else:
             print("Please create the user_info.json file with your phone number and email")
-            return None, None
-        
-        with open(user_settings_path, 'r') as f:
-            user_settings = json.load(f)
-        
-        phone_number = user_settings.get("phone")
-        email_address = user_settings.get("email")
-        
-        if not phone_number:
-            print("⚠️ No phone number found in user settings")
-            print("Please add a 'phone' field to your user_info.json file")
-        
-        if not email_address:
-            print("⚠️ No email address found in user settings")
-            print("Please add an 'email' field to your user_info.json file")
-        
-        return phone_number, email_address
-        
+            return None
     except Exception as e:
-        print(f"❌ Error reading user settings: {e}")
-        return None, None
+        print(f"⚠️ Error reading user info from JSON: {e}")
+        return None
 
 def get_phone_number():
     """Get phone number from user settings."""
-    phone_number, _ = get_user_info()
-    return phone_number
+    user_info = get_user_info()
+    if user_info:
+        return user_info.get("phone")
+    return None
 
 def clean_phone_number(phone_number):
     """Clean phone number for email gateway."""
@@ -182,16 +196,21 @@ def send_email_notification(email_address, message, notification_type="SYSTEM"):
 
 def test_sms_functionality():
     """Test SMS functionality."""
-    print("🧪 Testing SMS Functionality")
-    print("=" * 50)
+    print("🧪 Testing SMS functionality...")
     
     # Get phone number
-    phone_number = get_phone_number()
-    if not phone_number:
+    user_info = get_user_info()
+    if not user_info or not user_info.get("phone"):
         print("\n📝 To set up SMS testing:")
         print("1. Create file: backend/data/users/user_0001/user_info.json")
-        print("2. Add your phone number: {\"phone\": \"1234567890\"}")
+        print("2. Add your phone number: {\"phone\": \"+1234567890\"}")
         print("3. Run this script again")
+        return False
+    
+    phone_number = user_info.get('phone')
+    if not phone_number:
+        print("⚠️ Phone number not found in user_info.json")
+        print("Please create the user_info.json file with your phone number")
         return False
     
     print(f"📱 Phone number found: {phone_number}")
@@ -228,20 +247,19 @@ def send_user_notification(message, notification_type="SYSTEM"):
     formatted_message = f"REC.IO TRADING ALERT: {message}"
     
     # Get user info
-    phone_number, email_address = get_user_info()
+    user_info = get_user_info()
     
     sms_success = False
     email_success = False
     
     # Send SMS if phone number is available
-    if phone_number:
+    if user_info and user_info.get("phone"):
         # Try multiple carriers for better delivery
         carriers_to_try = ["verizon_alt", "verizon", "att", "tmobile"]
-        sms_success = False
         
         for carrier in carriers_to_try:
             print(f"📱 Trying {carrier} gateway...")
-            if send_sms_via_email(phone_number, formatted_message, carrier=carrier, notification_type=notification_type):
+            if send_sms_via_email(user_info["phone"], formatted_message, carrier=carrier, notification_type=notification_type):
                 sms_success = True
                 print(f"✅ SMS sent successfully via {carrier}")
                 break
@@ -251,8 +269,8 @@ def send_user_notification(message, notification_type="SYSTEM"):
         print("⚠️ No phone number configured for SMS notifications")
     
     # Send email if email address is available
-    if email_address:
-        email_success = send_email_notification(email_address, message, notification_type)
+    if user_info and user_info.get("email"):
+        email_success = send_email_notification(user_info["email"], message, notification_type)
     else:
         print("⚠️ No email address configured for email notifications")
     

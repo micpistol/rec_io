@@ -17,28 +17,46 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.util.paths import get_data_dir
 
-def get_phone_number():
-    """Get phone number from user settings."""
+def get_user_info():
+    """Get user information from PostgreSQL"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT user_id, first_name, last_name, email, phone, account_type
+                FROM users.user_info_0001 WHERE user_no = '0001'
+            """)
+            result = cursor.fetchone()
+            if result:
+                user_id, first_name, last_name, email, phone, account_type = result
+                return {
+                    "user_id": user_id,
+                    "name": f"{first_name} {last_name}",
+                    "email": email,
+                    "phone": phone,
+                    "account_type": account_type
+                }
+    except Exception as e:
+        print(f"⚠️ Error reading user info from PostgreSQL: {e}")
+    
+    # Fallback to JSON file for backward compatibility
     try:
         user_settings_path = os.path.join(get_data_dir(), "users", "user_0001", "user_info.json")
-        
-        if not os.path.exists(user_settings_path):
-            print(f"⚠️ User settings file not found: {user_settings_path}")
+        if os.path.exists(user_settings_path):
+            with open(user_settings_path, "r") as f:
+                user_info = json.load(f)
+                return user_info
+        else:
             print("Please create the user_info.json file with your phone number")
             return None
-        
-        with open(user_settings_path, 'r') as f:
-            user_info = json.load(f)
-        
-        phone_number = user_info.get('phone')
-        if not phone_number:
-            print("⚠️ Phone number not found in user_info.json")
-            return None
-        
-        return phone_number
-        
     except Exception as e:
-        print(f"❌ Error reading user settings: {e}")
+        print(f"⚠️ Error reading user info from JSON: {e}")
         return None
 
 def clean_phone_number(phone_number):
@@ -109,6 +127,9 @@ def send_sms_via_email(phone_number, message, carrier="verizon"):
 
 def main():
     """Main function."""
+    print("📱 SMS Testing Script")
+    print("=" * 50)
+    
     if len(sys.argv) > 1:
         # Custom message provided
         message = " ".join(sys.argv[1:])
@@ -118,13 +139,19 @@ def main():
         message = "🧪 REC.IO SMS Test - This is a test message from the trading system"
         print("📱 Sending default test message")
     
-    # Get phone number
-    phone_number = get_phone_number()
-    if not phone_number:
+    # Get user info
+    user_info = get_user_info()
+    if not user_info or not user_info.get("phone"):
         print("\n📝 To set up SMS testing:")
         print("1. Create file: backend/data/users/user_0001/user_info.json")
-        print("2. Add your phone number: {\"phone\": \"1234567890\"}")
+        print("2. Add your phone number: {\"phone\": \"+1234567890\"}")
         print("3. Run this script again")
+        return False
+    
+    phone_number = user_info.get('phone')
+    if not phone_number:
+        print("⚠️ Phone number not found in user_info.json")
+        print("Please create the user_info.json file with your phone number")
         return False
     
     print(f"📱 Phone number found: {phone_number}")
@@ -133,11 +160,11 @@ def main():
     success = send_sms_via_email(phone_number, message)
     
     if success:
-        print("✅ SMS test completed")
+        print("✅ SMS sent successfully")
+        return True
     else:
-        print("❌ SMS test failed")
-    
-    return success
+        print("❌ Failed to send SMS")
+        return False
 
 if __name__ == "__main__":
     main() 
