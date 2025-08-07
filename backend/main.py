@@ -60,7 +60,7 @@ CACHE_TTL = 1.0  # 1 second cache TTL
 
 # PostgreSQL helper functions for auto trade settings
 def update_auto_trade_settings_postgresql(**kwargs):
-    """Update auto trade settings in PostgreSQL using UPSERT"""
+    """Update auto trade settings in PostgreSQL using UPDATE"""
     try:
         import psycopg2
         conn = psycopg2.connect(
@@ -73,23 +73,40 @@ def update_auto_trade_settings_postgresql(**kwargs):
             # First, ensure we only have one row
             cursor.execute("DELETE FROM users.auto_trade_settings_0001 WHERE id > 1")
             
-            # Build dynamic UPSERT query
-            columns = list(kwargs.keys())
-            values = list(kwargs.values())
-            placeholders = ['%s'] * len(values)
+            # Check if row exists
+            cursor.execute("SELECT COUNT(*) FROM users.auto_trade_settings_0001 WHERE id = 1")
+            row_exists = cursor.fetchone()[0] > 0
             
-            # Add updated_at to the columns
-            columns.append('updated_at')
-            placeholders.append('CURRENT_TIMESTAMP')
+            if row_exists:
+                # UPDATE existing row
+                set_clauses = []
+                values = []
+                for key, value in kwargs.items():
+                    set_clauses.append(f"{key} = %s")
+                    values.append(value)
+                
+                if set_clauses:
+                    query = f"UPDATE users.auto_trade_settings_0001 SET {', '.join(set_clauses)}, updated_at = CURRENT_TIMESTAMP WHERE id = 1"
+                    cursor.execute(query, values)
+            else:
+                # INSERT new row with defaults
+                columns = list(kwargs.keys())
+                values = list(kwargs.values())
+                placeholders = ['%s'] * len(values)
+                
+                # Add default values for missing columns
+                default_columns = ['id', 'auto_entry', 'auto_stop', 'min_probability', 'min_differential', 'min_time', 'max_time', 'allow_re_entry', 'spike_alert_enabled', 'spike_alert_momentum_threshold', 'spike_alert_cooldown_threshold', 'spike_alert_cooldown_minutes', 'current_probability', 'min_ttc_seconds', 'momentum_spike_enabled', 'momentum_spike_threshold', 'auto_entry_status', 'user_id', 'cooldown_timer']
+                default_values = [1, False, False, 95, 0.25, 120, 900, False, True, 36, 30, 15, 40, 60, True, 36, 'disabled', '0001', 0]
+                
+                # Merge provided values with defaults
+                for col, val in zip(columns, values):
+                    if col in default_columns:
+                        idx = default_columns.index(col)
+                        default_values[idx] = val
+                
+                query = f"INSERT INTO users.auto_trade_settings_0001 ({', '.join(default_columns)}) VALUES ({', '.join(['%s'] * len(default_values))})"
+                cursor.execute(query, default_values)
             
-            query = f"""
-                INSERT INTO users.auto_trade_settings_0001 (id, {', '.join(columns)})
-                VALUES (1, {', '.join(placeholders)})
-                ON CONFLICT (id) DO UPDATE SET
-                {', '.join([f"{col} = EXCLUDED.{col}" for col in columns])}
-            """
-            
-            cursor.execute(query, values)
             conn.commit()
             print(f"[PostgreSQL] Updated auto trade settings: {kwargs}")
         
@@ -150,6 +167,47 @@ def get_auto_trade_settings_postgresql():
             "min_probability": 95, "min_differential": 0.25, "min_time": 120, "max_time": 900, "allow_re_entry": False,
             "spike_alert_enabled": True, "spike_alert_momentum_threshold": 36, "spike_alert_cooldown_threshold": 30, "spike_alert_cooldown_minutes": 15,
             "current_probability": 40, "min_ttc_seconds": 60, "momentum_spike_enabled": True, "momentum_spike_threshold": 36
+        }
+
+def get_auto_stop_settings_postgresql():
+    """Get auto stop settings from PostgreSQL"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT current_probability, min_ttc_seconds, momentum_spike_enabled, momentum_spike_threshold
+                FROM users.auto_trade_settings_0001 WHERE id = 1
+            """)
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result:
+                return {
+                    "current_probability": result[0],
+                    "min_ttc_seconds": result[1],
+                    "momentum_spike_enabled": result[2],
+                    "momentum_spike_threshold": result[3]
+                }
+            else:
+                return {
+                    "current_probability": 40,
+                    "min_ttc_seconds": 60,
+                    "momentum_spike_enabled": True,
+                    "momentum_spike_threshold": 36
+                }
+    except Exception as e:
+        print(f"[PostgreSQL Error] Failed to get auto stop settings: {e}")
+        return {
+            "current_probability": 40,
+            "min_ttc_seconds": 60,
+            "momentum_spike_enabled": True,
+            "momentum_spike_threshold": 36
         }
 
 # PostgreSQL helper functions for trade preferences
@@ -228,6 +286,147 @@ def get_trade_preferences_postgresql():
             "position_size": 1,
             "multiplier": 1
         }
+
+def get_all_preferences_postgresql():
+    """Get all preferences from PostgreSQL (combines auto_trade_settings and trade_preferences)"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            # Get auto trade settings
+            cursor.execute("""
+                SELECT auto_entry, auto_stop
+                FROM users.auto_trade_settings_0001 WHERE id = 1
+            """)
+            auto_settings = cursor.fetchone()
+            
+            # Get trade preferences
+            cursor.execute("""
+                SELECT trade_strategy, position_size, multiplier
+                FROM users.trade_preferences_0001 WHERE id = 1
+            """)
+            trade_prefs = cursor.fetchone()
+            
+            conn.close()
+            
+            # Combine the results
+            preferences = {
+                "auto_stop": auto_settings[1] if auto_settings else True,  # auto_stop is second column
+                "auto_entry": auto_settings[0] if auto_settings else False,  # auto_entry is first column
+                "position_size": trade_prefs[1] if trade_prefs else 1,
+                "multiplier": trade_prefs[2] if trade_prefs else 1
+            }
+            
+            return preferences
+    except Exception as e:
+        print(f"[PostgreSQL Error] Failed to get all preferences: {e}")
+        return {
+            "auto_stop": True,
+            "auto_entry": False,
+            "diff_mode": False,
+            "position_size": 1,
+            "multiplier": 1
+        }
+
+def get_trade_history_preferences_postgresql():
+    """Get trade history preferences from PostgreSQL"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT date_filter, custom_date_start, custom_date_end, win_filter, loss_filter,
+                       sort_key, sort_asc, page_size, last_search_timestamp
+                FROM users.trade_history_preferences_0001 WHERE id = 1
+            """)
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result:
+                return {
+                    "date_filter": result[0],
+                    "custom_date_start": result[1].isoformat() if result[1] else None,
+                    "custom_date_end": result[2].isoformat() if result[2] else None,
+                    "win_filter": result[3],
+                    "loss_filter": result[4],
+                    "sort_key": result[5],
+                    "sort_asc": result[6],
+                    "page_size": result[7],
+                    "last_search_timestamp": result[8]
+                }
+            else:
+                return {
+                    "date_filter": "TODAY",
+                    "custom_date_start": None,
+                    "custom_date_end": None,
+                    "win_filter": True,
+                    "loss_filter": True,
+                    "sort_key": None,
+                    "sort_asc": True,
+                    "page_size": 50,
+                    "last_search_timestamp": int(time.time())
+                }
+    except Exception as e:
+        print(f"[PostgreSQL Error] Failed to get trade history preferences: {e}")
+        return {
+            "date_filter": "TODAY",
+            "custom_date_start": None,
+            "custom_date_end": None,
+            "win_filter": True,
+            "loss_filter": True,
+            "sort_key": None,
+            "sort_asc": True,
+            "page_size": 50,
+            "last_search_timestamp": int(time.time())
+        }
+
+def update_trade_history_preferences_postgresql(**kwargs):
+    """Update trade history preferences in PostgreSQL using UPSERT"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            # First, ensure we only have one row
+            cursor.execute("DELETE FROM users.trade_history_preferences_0001 WHERE id > 1")
+            
+            # Build dynamic UPSERT query
+            columns = list(kwargs.keys())
+            values = list(kwargs.values())
+            placeholders = ['%s'] * len(values)
+            
+            # Add updated_at to the columns
+            columns.append('updated_at')
+            placeholders.append('CURRENT_TIMESTAMP')
+            
+            query = f"""
+                INSERT INTO users.trade_history_preferences_0001 (id, {', '.join(columns)})
+                VALUES (1, {', '.join(placeholders)})
+                ON CONFLICT (id) DO UPDATE SET
+                {', '.join([f"{col} = EXCLUDED.{col}" for col in columns])}
+            """
+            
+            cursor.execute(query, values)
+            conn.commit()
+            print(f"[PostgreSQL] Updated trade history preferences: {kwargs}")
+        
+        conn.close()
+    except Exception as e:
+        print(f"[PostgreSQL Error] Failed to update trade history preferences: {e}")
 
 # Authentication system
 AUTH_TOKENS_FILE = os.path.join(get_data_dir(), "users", "user_0001", "auth_tokens.json")
@@ -324,56 +523,51 @@ def load_preferences():
     if _preferences_cache is not None and (current_time - _cache_timestamp) < CACHE_TTL:
         return _preferences_cache.copy()
     
-    # Load from file
-    if os.path.exists(PREFERENCES_PATH):
-        try:
-            with open(PREFERENCES_PATH, "r") as f:
-                prefs = json.load(f)
-                # Migrate old plus_minus_mode to diff_mode if needed
-                if "plus_minus_mode" in prefs and "diff_mode" not in prefs:
-                    prefs["diff_mode"] = prefs.pop("plus_minus_mode")
-                    # Save the migrated preferences
-                    asyncio.create_task(save_preferences(prefs))
-                # Migrate old reco to auto_entry if needed
-                if "reco" in prefs and "auto_entry" not in prefs:
-                    prefs["auto_entry"] = prefs.pop("reco")
-                    # Save the migrated preferences
-                    asyncio.create_task(save_preferences(prefs))
-                
-                # Update cache
-                _preferences_cache = prefs
-                _cache_timestamp = current_time
-                return prefs
-        except Exception:
-            pass
-    
-    # Default preferences
-    default_prefs = {"auto_stop": True, "auto_entry": False, "diff_mode": False, "position_size": 1, "multiplier": 1}
-    _preferences_cache = default_prefs
-    _cache_timestamp = current_time
-    return default_prefs
+    # Load from PostgreSQL
+    try:
+        prefs = get_all_preferences_postgresql()
+        
+        # Update cache
+        _preferences_cache = prefs
+        _cache_timestamp = current_time
+        return prefs
+    except Exception as e:
+        print(f"[Preferences Load Error] {e}")
+        # Default preferences
+        default_prefs = {"auto_stop": True, "auto_entry": False, "diff_mode": False, "position_size": 1, "multiplier": 1}
+        _preferences_cache = default_prefs
+        _cache_timestamp = current_time
+        return default_prefs
 
 async def save_preferences(prefs):
     global _preferences_cache, _cache_timestamp
     try:
-        import aiofiles
-        async with aiofiles.open(PREFERENCES_PATH, "w") as f:
-            await f.write(json.dumps(prefs))
+        # Update PostgreSQL
+        update_data = {}
+        if "auto_stop" in prefs:
+            update_data["auto_stop"] = bool(prefs["auto_stop"])
+        if "auto_entry" in prefs:
+            update_data["auto_entry"] = bool(prefs["auto_entry"])
+        if "position_size" in prefs:
+            update_data["position_size"] = int(prefs["position_size"])
+        if "multiplier" in prefs:
+            update_data["multiplier"] = int(prefs["multiplier"])
+        
+        if update_data:
+            # Update auto_trade_settings for auto_stop and auto_entry
+            auto_settings = {k: v for k, v in update_data.items() if k in ["auto_stop", "auto_entry"]}
+            if auto_settings:
+                update_auto_trade_settings_postgresql(**auto_settings)
+            
+            # Update trade_preferences for position_size and multiplier
+            trade_settings = {k: v for k, v in update_data.items() if k in ["position_size", "multiplier"]}
+            if trade_settings:
+                update_trade_preferences_postgresql(**trade_settings)
         
         # Update cache
         _preferences_cache = prefs.copy()
         _cache_timestamp = time.time()
-    except ImportError:
-        # Fallback to synchronous if aiofiles not available
-        try:
-            with open(PREFERENCES_PATH, "w") as f:
-                json.dump(prefs, f)
-            
-            # Update cache
-            _preferences_cache = prefs.copy()
-            _cache_timestamp = time.time()
-        except Exception as e:
-            print(f"[Preferences Save Error] {e}")
+        print(f"[Preferences] ✅ Updated PostgreSQL: {list(update_data.keys())}")
     except Exception as e:
         print(f"[Preferences Save Error] {e}")
 
@@ -1446,14 +1640,11 @@ async def set_auto_stop(request: Request):
     # Handle file operations asynchronously
     async def update_preferences():
         try:
-            # Update JSON preferences (existing workflow)
-            prefs = load_preferences()
-            prefs["auto_stop"] = enabled
-            await save_preferences(prefs)
-            await broadcast_preferences_update()
-            
-            # Also update PostgreSQL (new workflow)
+            # Update PostgreSQL directly (new workflow)
             update_auto_trade_settings_postgresql(auto_stop=enabled)
+            
+            # Broadcast the update to connected clients
+            await broadcast_preferences_update()
         except Exception as e:
             print(f"[Auto Stop Update Error] {e}")
     
@@ -1474,14 +1665,11 @@ async def set_auto_entry(request: Request):
     # Handle file operations asynchronously
     async def update_preferences():
         try:
-            # Update JSON preferences (existing workflow)
-            prefs = load_preferences()
-            prefs["auto_entry"] = enabled
-            await save_preferences(prefs)
-            await broadcast_preferences_update()
-            
-            # Also update PostgreSQL (new workflow)
+            # Update PostgreSQL directly (new workflow)
             update_auto_trade_settings_postgresql(auto_entry=enabled)
+            
+            # Broadcast the update to connected clients
+            await broadcast_preferences_update()
             
             # Trigger auto entry supervisor to reload settings
             try:
@@ -1502,29 +1690,7 @@ async def set_auto_entry(request: Request):
     
     return response_data
 
-@app.post("/api/set_diff_mode")
-async def set_diff_mode(request: Request):
-    data = await request.json()
-    enabled = bool(data.get("enabled", False))
-    
-    # Return immediate response
-    response_data = {"status": "ok", "enabled": enabled}
-    
-    # Handle file operations asynchronously
-    async def update_preferences():
-        try:
-            prefs = load_preferences()
-            prefs["diff_mode"] = enabled
-            await save_preferences(prefs)
-            await broadcast_preferences_update()
-        except Exception as e:
-            print(f"[Diff Mode Update Error] {e}")
-    
-    # Start async task without waiting
-    import asyncio
-    asyncio.create_task(update_preferences())
-    
-    return response_data
+# Diff mode is now local only - no API endpoint needed
 
 @app.post("/api/set_position_size")
 async def set_position_size(request: Request):
@@ -1620,24 +1786,9 @@ async def proxy_active_trades():
 TRADE_HISTORY_PREFERENCES_PATH = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "trade_history_preferences.json")
 
 def load_trade_history_preferences():
-    """Load trade history preferences from file"""
+    """Load trade history preferences from PostgreSQL"""
     try:
-        if os.path.exists(TRADE_HISTORY_PREFERENCES_PATH):
-            with open(TRADE_HISTORY_PREFERENCES_PATH, "r") as f:
-                preferences = json.load(f)
-        else:
-            preferences = {
-                "date_filter": "TODAY",
-                "custom_date_start": None,
-                "custom_date_end": None,
-                "win_filter": True,
-                "loss_filter": True,
-                "sort_key": None,
-                "sort_asc": True,
-                "page_size": 50,
-                "last_search_timestamp": time.time()
-            }
-        return preferences
+        return get_trade_history_preferences_postgresql()
     except Exception as e:
         print(f"[Trade History Preferences Load Error] {e}")
         return {
@@ -1653,32 +1804,32 @@ def load_trade_history_preferences():
         }
 
 def save_trade_history_preferences(preferences):
-    """Save trade history preferences to file"""
+    """Save trade history preferences to PostgreSQL"""
     try:
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(TRADE_HISTORY_PREFERENCES_PATH), exist_ok=True)
-        # Set defaults if missing
-        if "date_filter" not in preferences:
-            preferences["date_filter"] = "TODAY"
-        if "custom_date_start" not in preferences:
-            preferences["custom_date_start"] = None
-        if "custom_date_end" not in preferences:
-            preferences["custom_date_end"] = None
-        if "win_filter" not in preferences:
-            preferences["win_filter"] = True
-        if "loss_filter" not in preferences:
-            preferences["loss_filter"] = True
-        if "sort_key" not in preferences:
-            preferences["sort_key"] = None
-        if "sort_asc" not in preferences:
-            preferences["sort_asc"] = True
-        if "page_size" not in preferences:
-            preferences["page_size"] = 50
-        if "last_search_timestamp" not in preferences:
-            preferences["last_search_timestamp"] = time.time()
+        # Prepare data for PostgreSQL
+        update_data = {}
+        if "date_filter" in preferences:
+            update_data["date_filter"] = str(preferences["date_filter"])
+        if "custom_date_start" in preferences:
+            update_data["custom_date_start"] = preferences["custom_date_start"]
+        if "custom_date_end" in preferences:
+            update_data["custom_date_end"] = preferences["custom_date_end"]
+        if "win_filter" in preferences:
+            update_data["win_filter"] = bool(preferences["win_filter"])
+        if "loss_filter" in preferences:
+            update_data["loss_filter"] = bool(preferences["loss_filter"])
+        if "sort_key" in preferences:
+            update_data["sort_key"] = preferences["sort_key"]
+        if "sort_asc" in preferences:
+            update_data["sort_asc"] = bool(preferences["sort_asc"])
+        if "page_size" in preferences:
+            update_data["page_size"] = int(preferences["page_size"])
+        if "last_search_timestamp" in preferences:
+            update_data["last_search_timestamp"] = int(preferences["last_search_timestamp"])
         
-        with open(TRADE_HISTORY_PREFERENCES_PATH, "w") as f:
-            json.dump(preferences, f, indent=2)
+        if update_data:
+            update_trade_history_preferences_postgresql(**update_data)
+            print(f"[Trade History Preferences] ✅ Updated PostgreSQL: {list(update_data.keys())}")
     except Exception as e:
         print(f"[Trade History Preferences Save Error] {e}")
 
@@ -1863,25 +2014,13 @@ def save_auto_stop_settings(settings):
 
 @app.get("/api/get_auto_stop_settings")
 async def get_auto_stop_settings():
-    return load_auto_stop_settings()
+    return get_auto_stop_settings_postgresql()
 
 @app.post("/api/set_auto_stop_settings")
 async def set_auto_stop_settings(request: Request):
     data = await request.json()
-    settings = load_auto_stop_settings()
     
-    # Update JSON settings (existing workflow)
-    if "current_probability" in data:
-        settings["current_probability"] = int(data["current_probability"])
-    if "min_ttc_seconds" in data:
-        settings["min_ttc_seconds"] = int(data["min_ttc_seconds"])
-    if "momentum_spike_enabled" in data:
-        settings["momentum_spike_enabled"] = bool(data["momentum_spike_enabled"])
-    if "momentum_spike_threshold" in data:
-        settings["momentum_spike_threshold"] = int(data["momentum_spike_threshold"])
-    save_auto_stop_settings(settings)
-    
-    # Update PostgreSQL database (new workflow)
+    # Update PostgreSQL database
     try:
         update_data = {}
         if "current_probability" in data:
@@ -1895,10 +2034,13 @@ async def set_auto_stop_settings(request: Request):
         
         if update_data:
             update_auto_trade_settings_postgresql(**update_data)
+            print(f"[Auto Stop Settings] ✅ Updated PostgreSQL: {list(update_data.keys())}")
     except Exception as e:
-        print(f"[Auto Stop Settings PostgreSQL Update Error] {e}")
+        print(f"[Auto Stop Settings] ❌ PostgreSQL Update Error: {e}")
     
-    return {"status": "ok", "current_probability": settings["current_probability"], "min_ttc_seconds": settings["min_ttc_seconds"], "momentum_spike_enabled": settings.get("momentum_spike_enabled", True), "momentum_spike_threshold": settings.get("momentum_spike_threshold", 35)}
+    # Return updated settings from PostgreSQL
+    updated_settings = get_auto_stop_settings_postgresql()
+    return {"status": "ok", **updated_settings}
 
 # AUTO ENTRY SETTINGS
 AUTO_ENTRY_SETTINGS_PATH = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_entry_settings.json")
@@ -1941,37 +2083,13 @@ def save_auto_entry_settings(settings):
 
 @app.get("/api/get_auto_entry_settings")
 async def get_auto_entry_settings():
-    return load_auto_entry_settings()
+    return get_auto_trade_settings_postgresql()
 
 @app.post("/api/set_auto_entry_settings")
 async def set_auto_entry_settings(request: Request):
     data = await request.json()
-    settings = load_auto_entry_settings()
     
-    # Update JSON settings (existing workflow)
-    if "min_probability" in data:
-        settings["min_probability"] = int(data["min_probability"])
-    if "min_differential" in data:
-        settings["min_differential"] = float(data["min_differential"])
-    if "min_ttc_seconds" in data:
-        settings["min_ttc_seconds"] = int(data["min_ttc_seconds"])
-    if "min_time" in data:
-        settings["min_time"] = int(data["min_time"])
-    if "max_time" in data:
-        settings["max_time"] = int(data["max_time"])
-    if "allow_re_entry" in data:
-        settings["allow_re_entry"] = bool(data["allow_re_entry"])
-    if "spike_alert_enabled" in data:
-        settings["spike_alert_enabled"] = bool(data["spike_alert_enabled"])
-    if "spike_alert_momentum_threshold" in data:
-        settings["spike_alert_momentum_threshold"] = int(data["spike_alert_momentum_threshold"])
-    if "spike_alert_cooldown_threshold" in data:
-        settings["spike_alert_cooldown_threshold"] = int(data["spike_alert_cooldown_threshold"])
-    if "spike_alert_cooldown_minutes" in data:
-        settings["spike_alert_cooldown_minutes"] = int(data["spike_alert_cooldown_minutes"])
-    save_auto_entry_settings(settings)
-    
-    # Update PostgreSQL database (new workflow)
+    # Update PostgreSQL database
     try:
         update_data = {}
         if "min_probability" in data:
@@ -1995,10 +2113,13 @@ async def set_auto_entry_settings(request: Request):
         
         if update_data:
             update_auto_trade_settings_postgresql(**update_data)
+            print(f"[Auto Entry Settings] ✅ Updated PostgreSQL: {list(update_data.keys())}")
     except Exception as e:
-        print(f"[Auto Entry Settings PostgreSQL Update Error] {e}")
+        print(f"[Auto Entry Settings] ❌ PostgreSQL Update Error: {e}")
     
-    return {"status": "ok", "min_probability": settings["min_probability"], "min_differential": settings["min_differential"], "min_ttc_seconds": settings["min_ttc_seconds"], "min_time": settings["min_time"], "max_time": settings["max_time"], "allow_re_entry": settings["allow_re_entry"], "spike_alert_enabled": settings.get("spike_alert_enabled", True), "spike_alert_momentum_threshold": settings.get("spike_alert_momentum_threshold", 40), "spike_alert_cooldown_threshold": settings.get("spike_alert_cooldown_threshold", 30), "spike_alert_cooldown_minutes": settings.get("spike_alert_cooldown_minutes", 15)}
+    # Return updated settings from PostgreSQL
+    updated_settings = get_auto_trade_settings_postgresql()
+    return {"status": "ok", **updated_settings}
 
 @app.post("/api/trigger_open_trade")
 async def trigger_open_trade(request: Request):

@@ -885,11 +885,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentMultiplier = null;
   // Remove: let ignoreWsUpdates = false; (now global)
   
-  // Define ignoreWsUpdates for this scope
+  // Define ignoreWsUpdates globally
   if (typeof window.ignoreWsUpdates === 'undefined') {
     window.ignoreWsUpdates = false;
   }
-  let ignoreWsUpdates = window.ignoreWsUpdates;
 
   function updatePositionDisplay() {
     const baseValue = parseInt(positionInput.value, 10) || 0;
@@ -932,9 +931,10 @@ document.addEventListener('DOMContentLoaded', () => {
           }, 1000); // Delay to ensure strike table is loaded
         }
       }
-              if (plusMinusToggle && data.diff_mode !== undefined) {
-          plusMinusToggle.checked = data.diff_mode;
-          window.diffMode = data.diff_mode;
+      // Diff mode defaults to ON and is local only
+      if (plusMinusToggle) {
+        plusMinusToggle.checked = true;
+        window.diffMode = true;
       }
       if (positionInput && data.position_size !== undefined) {
         positionInput.value = data.position_size;
@@ -1025,21 +1025,21 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
 
-      // Only update UI if not focused to avoid overwriting user input
-      if (autoStopToggle && data.auto_stop !== undefined && document.activeElement !== autoStopToggle) {
-        ignoreWsUpdates = true;
+      // Update auto stop toggles
+      if (autoStopToggle && data.auto_stop !== undefined) {
+        window.ignoreWsUpdates = true;
         autoStopToggle.checked = data.auto_stop;
         window.autoStopEnabled = data.auto_stop;
-        ignoreWsUpdates = false;
+        window.ignoreWsUpdates = false;
       }
-      if (autoStopSupervisorToggle && data.auto_stop !== undefined && document.activeElement !== autoStopSupervisorToggle) {
-        ignoreWsUpdates = true;
+      if (autoStopSupervisorToggle && data.auto_stop !== undefined) {
+        window.ignoreWsUpdates = true;
         autoStopSupervisorToggle.checked = data.auto_stop;
-        ignoreWsUpdates = false;
+        window.ignoreWsUpdates = false;
       }
 
-      if (autoEntryToggle && data.auto_entry !== undefined && document.activeElement !== autoEntryToggle) {
-        ignoreWsUpdates = true;
+      if (autoEntryToggle && data.auto_entry !== undefined) {
+        window.ignoreWsUpdates = true;
 
         autoEntryToggle.checked = data.auto_entry;
         
@@ -1048,6 +1048,7 @@ document.addEventListener('DOMContentLoaded', () => {
           window.StrikeTable.setAutoEntry(data.auto_entry);
         }
         
+        window.ignoreWsUpdates = false;
       }
 
       // === Auto Entry Indicator Change ===
@@ -1059,27 +1060,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Fingerprint and momentum now consolidated in strike table - no separate WebSocket handlers needed
 
-      if (plusMinusToggle && data.diff_mode !== undefined && document.activeElement !== plusMinusToggle) {
-        ignoreWsUpdates = true;
-
-        plusMinusToggle.checked = data.diff_mode;
-        
-        // Use clean API to update strike table diff mode
-        if (window.StrikeTable && window.StrikeTable.setDiffMode) {
-          window.StrikeTable.setDiffMode(data.diff_mode);
-        }
-        
-        ignoreWsUpdates = false;
-      }
+      // Diff mode is local only - no WebSocket updates needed
 
       if (positionInput && data.position_size !== undefined && document.activeElement !== positionInput) {
-        ignoreWsUpdates = true;
+        window.ignoreWsUpdates = true;
         positionInput.value = data.position_size;
-        ignoreWsUpdates = false;
+        window.ignoreWsUpdates = false;
       }
 
       if (multiplierButtons.length && data.multiplier !== undefined && currentMultiplier !== data.multiplier) {
-        ignoreWsUpdates = true;
+        window.ignoreWsUpdates = true;
         currentMultiplier = data.multiplier;
         multiplierButtons.forEach(btn => {
           if (parseInt(btn.dataset.multiplier, 10) === data.multiplier) {
@@ -1088,7 +1078,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.classList.remove('active');
           }
         });
-        ignoreWsUpdates = false;
+        window.ignoreWsUpdates = false;
       }
 
       updatePositionDisplay();
@@ -1102,7 +1092,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     autoStopToggle.addEventListener('change', () => {
       
-      if (ignoreWsUpdates) {
+      if (window.ignoreWsUpdates) {
         
         return;
       }
@@ -1130,7 +1120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Removed console.log
     autoStopSupervisorToggle.addEventListener('change', () => {
       // Removed console.log
-      if (ignoreWsUpdates) {
+      if (window.ignoreWsUpdates) {
         // Removed console.log
         return;
       }
@@ -1157,7 +1147,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Removed console.log
     autoEntryToggle.addEventListener('change', () => {
       // Removed console.log
-      if (ignoreWsUpdates) {
+      if (window.ignoreWsUpdates) {
         // Removed console.log
         return;
       }
@@ -1186,35 +1176,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (plusMinusToggle) {
-    // Removed console.log
     plusMinusToggle.addEventListener('change', () => {
-      // Removed console.log
-      if (ignoreWsUpdates) {
-        // Removed console.log
-        return;
-      }
       const value = plusMinusToggle.checked;
-      // Removed console.log
       
-      // Use clean API to update strike table immediately
+      // Update strike table immediately (local only)
       if (window.StrikeTable && window.StrikeTable.setDiffMode) {
         window.StrikeTable.setDiffMode(value);
       }
-      
-      // Sync to backend in background
-      // Removed console.log
-      fetch(window.location.origin + '/api/set_diff_mode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: value })
-      }).then(response => {
-        // Removed console.log
-        return response.json();
-      }).then(data => {
-        // Removed console.log
-      }).catch(error => {
-        console.error('Diff mode backend error:', error);
-      });
     });
   }
 

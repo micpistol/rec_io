@@ -935,20 +935,15 @@ function addStrikeTableRowClickHandlers() {
 }
 
 // Load DIFF mode setting from preferences
-async function loadDiffModeFromPreferences() {
-  try {
-    const response = await fetch('/api/get_preferences');
-    const data = await response.json();
-    window.diffMode = data.diff_mode || false;
-  } catch (error) {
-    window.diffMode = false;
-  }
+function loadDiffModeFromPreferences() {
+  // Diff mode defaults to ON and is local only
+  window.diffMode = true;
 }
 
 // Attach handlers after table is rendered
 if (typeof window !== 'undefined') {
   document.addEventListener('DOMContentLoaded', async () => {
-    await loadDiffModeFromPreferences();
+    loadDiffModeFromPreferences();
     
     // Initialize strike table container first
     initializeStrikeTableContainer();

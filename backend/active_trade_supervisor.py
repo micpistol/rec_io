@@ -1184,18 +1184,28 @@ def start_monitoring_loop():
                             log(f"[AUTO STOP] Skipping auto stop for trade {trade_id} - TTC ({ttc_seconds}s) below minimum ({min_ttc_seconds}s)")
                 
                 # === MOMENTUM SPIKE AUTO-STOPOUT LOGIC ===
-                # Get momentum spike settings from auto_stop_settings.json
+                # Get momentum spike settings from PostgreSQL
                 try:
-                    import json
-                    auto_stop_settings_path = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_stop_settings.json")
-                    if os.path.exists(auto_stop_settings_path):
-                        with open(auto_stop_settings_path, "r") as f:
-                            momentum_settings = json.load(f)
-                            momentum_spike_enabled = momentum_settings.get("momentum_spike_enabled", True)
-                            momentum_spike_threshold = momentum_settings.get("momentum_spike_threshold", 35) / 100.0  # Convert percentage to decimal
-                    else:
-                        momentum_spike_enabled = True
-                        momentum_spike_threshold = 35 / 100.0  # Convert percentage to decimal
+                    import psycopg2
+                    conn = psycopg2.connect(
+                        host="localhost",
+                        database="rec_io_db",
+                        user="rec_io_user",
+                        password="rec_io_password"
+                    )
+                    with conn.cursor() as cursor:
+                        cursor.execute("""
+                            SELECT momentum_spike_enabled, momentum_spike_threshold
+                            FROM users.auto_trade_settings_0001 WHERE id = 1
+                        """)
+                        result = cursor.fetchone()
+                        if result:
+                            momentum_spike_enabled = result[0]
+                            momentum_spike_threshold = result[1] / 100.0  # Convert percentage to decimal
+                        else:
+                            momentum_spike_enabled = True
+                            momentum_spike_threshold = 35 / 100.0  # Convert percentage to decimal
+                    conn.close()
                     
                     # Only proceed if momentum spike is enabled
                     if momentum_spike_enabled:

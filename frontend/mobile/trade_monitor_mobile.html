@@ -913,35 +913,19 @@
                 });
             }
 
-            // Plus/Minus Toggle
+            // Plus/Minus Toggle (local only, defaults to ON)
             const plusMinusToggle = document.getElementById('plusMinusToggle');
             if (plusMinusToggle) {
                 plusMinusToggle.addEventListener('click', function() {
                     const enabled = !this.classList.contains('active');
                     
-                    // Prevent multiple clicks during request
-                    if (this.classList.contains('loading')) return;
-                    
-                    // Add loading state
-                    this.classList.add('loading');
-                    
                     // Immediate visual feedback
                     this.classList.toggle('active');
                     
-                    // Update backend
-                    fetch('/api/set_diff_mode', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ enabled })
-                    }).then(() => {
-                        // Remove loading state on success
-                        this.classList.remove('loading');
-                    }).catch(error => {
-                        // Revert if failed
-                        this.classList.toggle('active');
-                        this.classList.remove('loading');
-                        console.error('Error updating diff mode:', error);
-                    });
+                    // Update strike table (local only)
+                    if (window.StrikeTable && window.StrikeTable.setDiffMode) {
+                        window.StrikeTable.setDiffMode(enabled);
+                    }
                 });
             }
 
@@ -1005,11 +989,7 @@
                 autoStopToggle.classList.toggle('active', data.auto_stop);
             }
             
-            // Update Plus/Minus toggle
-            const plusMinusToggle = document.getElementById('plusMinusToggle');
-            if (plusMinusToggle && data.diff_mode !== undefined) {
-                plusMinusToggle.classList.toggle('active', data.diff_mode);
-            }
+            // Diff mode is local only - no WebSocket updates needed
             
             // Update position size and multiplier
             const positionInput = document.getElementById('position-size');
@@ -1060,13 +1040,11 @@
                     }
                 }
                 
-                // Set Plus/Minus toggle
+                // Set Plus/Minus toggle (defaults to ON, local only)
                 const plusMinusToggle = document.getElementById('plusMinusToggle');
                 if (plusMinusToggle) {
                     plusMinusToggle.classList.remove('active');
-                    if (data.diff_mode === true) {
-                        plusMinusToggle.classList.add('active');
-                    }
+                    plusMinusToggle.classList.add('active'); // Always ON by default
                 }
                 
                 // Set Position Size and Multiplier
