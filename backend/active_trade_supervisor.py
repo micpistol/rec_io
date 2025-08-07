@@ -8,7 +8,6 @@ new open trades and creates corresponding entries in ACTIVE_TRADES.DB.
 """
 
 import os
-import sqlite3
 import json
 import time
 import threading
@@ -28,12 +27,11 @@ print(f"[ACTIVE_TRADE_SUPERVISOR] 🚀 Using centralized port: {ACTIVE_TRADE_SUP
 # Import centralized path utilities
 from backend.util.paths import get_project_root, get_data_dir, get_trade_history_dir, get_kalshi_data_dir, get_service_url, get_active_trades_dir
 
-# Configuration using centralized paths
-ACTIVE_TRADES_DB_PATH = os.path.join(get_active_trades_dir(), "active_trades.db")
+# Active trades JSON export path
 ACTIVE_TRADES_JSON_PATH = os.path.join(get_active_trades_dir(), "active_trades.json")
 
 # Ensure directory exists
-os.makedirs(os.path.dirname(ACTIVE_TRADES_DB_PATH), exist_ok=True)
+os.makedirs(os.path.dirname(ACTIVE_TRADES_JSON_PATH), exist_ok=True)
 
 # Import centralized path utilities
 from backend.core.config.settings import config
@@ -212,105 +210,13 @@ def check_for_open_trades():
     """
     Check trades.db for any OPEN trades and add them to active monitoring.
     """
-    try:
-        log("🔍 CHECKING: Checking trades.db for OPEN trades...")
-        
-        # Get all open trades from trades.db
-        conn = get_trades_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, ticket_id, date, time, strike, side, buy_price, position,
-                   contract, ticker, symbol, market, trade_strategy, symbol_open,
-                   momentum, prob, fees, diff
-            FROM users.trades_0001 
-            WHERE status = 'open'
-        """)
-        
-        open_trades = cursor.fetchall()
-        conn.close()
-        
-        if not open_trades:
-            log("🔍 CHECKING: No OPEN trades found in trades.db")
-            return
-        
-        log(f"🔍 CHECKING: Found {len(open_trades)} OPEN trades in trades.db")
-        
-        # Get currently active trade IDs
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT trade_id FROM users.active_trades_0001 WHERE status = 'active'")
-        active_trade_ids = {row[0] for row in cursor.fetchall()}
-        conn.close()
-        
-        # Check each open trade
-        new_trades_added = 0
-        for trade_data in open_trades:
-            trade_id = trade_data[0]
-            ticket_id = trade_data[1]
-            
-            if trade_id not in active_trade_ids:
-                log(f"🆕 CHECKING: Found new OPEN trade {trade_id}, adding to active monitoring")
-                if add_new_active_trade(trade_id, ticket_id):
-                    new_trades_added += 1
-            else:
-                log(f"✅ CHECKING: Trade {trade_id} already being monitored")
-        
-        if new_trades_added > 0:
-            log(f"🆕 CHECKING: Added {new_trades_added} new trades to active monitoring")
-            
-            # Start monitoring loop if there are any active trades
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM users.active_trades_0001 WHERE status = 'active'")
-            active_count = cursor.fetchone()[0]
-            conn.close()
-            
-            if active_count > 0:  # Start monitoring if there are any active trades
-                start_monitoring_loop()
-        else:
-            log("🔍 CHECKING: No new trades to add to active monitoring")
-            
-    except Exception as e:
-        log(f"❌ Error checking for open trades: {e}")
+    pass
 
 def check_for_closed_trades():
     """
     Check if any active trades have been closed in trades.db.
     """
-    try:
-        log("🔍 CHECKING: Checking for closed trades...")
-        
-        # Get all active trade IDs
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT trade_id FROM users.active_trades_0001 WHERE status = 'active'")
-        active_trade_ids = {row[0] for row in cursor.fetchall()}
-        conn.close()
-        
-        if not active_trade_ids:
-            log("🔍 CHECKING: No active trades to check")
-            return
-        
-        # Check which trades are still open in PostgreSQL
-        conn = get_trades_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM users.trades_0001 WHERE status = 'open'")
-        still_open_trade_ids = {row[0] for row in cursor.fetchall()}
-        conn.close()
-        
-        # Find trades that are no longer open
-        closed_trade_ids = active_trade_ids - still_open_trade_ids
-        
-        if closed_trade_ids:
-            log(f"🔍 CHECKING: Found {len(closed_trade_ids)} closed trades to remove")
-            for trade_id in closed_trade_ids:
-                log(f"🔚 CHECKING: Removing closed trade {trade_id}")
-                remove_closed_trade(trade_id)
-        else:
-            log("🔍 CHECKING: No closed trades found")
-            
-    except Exception as e:
-        log(f"❌ Error checking for closed trades: {e}")
+    pass
 
 # HTTP endpoints for receiving notifications
 
@@ -399,78 +305,11 @@ def handle_trade_manager_notification():
 
 def migrate_database_schema():
     """Migrate the database schema if needed"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Check if current_price column exists
-        cursor.execute("PRAGMA table_info(active_trades)")
-        columns = [column[1] for column in cursor.fetchall()]
-        
-        if "current_price" in columns and "current_symbol_price" not in columns:
-            log("🔄 MIGRATION: Renaming current_price to current_symbol_price")
-            cursor.execute("ALTER TABLE active_trades RENAME COLUMN current_price TO current_symbol_price")
-            conn.commit()
-            log("✅ MIGRATION: Successfully renamed current_price to current_symbol_price")
-        elif "current_symbol_price" in columns:
-            log("✅ MIGRATION: Database schema is up to date")
-        else:
-            log("⚠️ MIGRATION: Neither current_price nor current_symbol_price column found")
-        
-        conn.close()
-        
-    except Exception as e:
-        log(f"❌ MIGRATION: Error during database migration: {e}")
+    pass
 
 def init_active_trades_db():
     """Initialize the active trades database"""
-    conn = sqlite3.connect(ACTIVE_TRADES_DB_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS active_trades (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trade_id INTEGER NOT NULL,  -- Reference to trades.db id
-        ticket_id TEXT NOT NULL,
-        date TEXT NOT NULL,
-        time TEXT NOT NULL,
-        strike TEXT NOT NULL,
-        side TEXT NOT NULL,
-        buy_price REAL NOT NULL,
-        position INTEGER NOT NULL,
-        contract TEXT,
-        ticker TEXT,
-        symbol TEXT,
-        market TEXT,
-        trade_strategy TEXT,
-        symbol_open REAL,
-        momentum REAL,
-        prob REAL,
-
-        fees REAL,
-        diff TEXT,
-        
-        -- Active monitoring fields
-        current_symbol_price REAL DEFAULT NULL,  -- THE LIVE PRICE OF THE ACTIVE SYMBOL (BTC, etc.)
-        current_probability REAL DEFAULT NULL,
-        buffer_from_entry REAL DEFAULT NULL,
-        time_since_entry INTEGER DEFAULT NULL,  -- seconds
-        current_close_price REAL DEFAULT NULL,  -- Current closing price from Kalshi market snapshot
-        current_pnl TEXT DEFAULT NULL,  -- Current PnL as formatted string (e.g., "0.15" or "-0.08")
-        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        
-        -- Status tracking
-        status TEXT DEFAULT 'active',
-        notes TEXT DEFAULT NULL
-    )
-    """)
-    
-    conn.commit()
-    conn.close()
-    log("Active trades database initialized")
-    
-    # Run migration if needed
-    migrate_database_schema()
+    pass
 
 def get_db_connection():
     """Get database connection with appropriate timeout"""
@@ -1605,9 +1444,6 @@ def start_event_driven_supervisor():
     """Start the event-driven active trade supervisor with HTTP server"""
     log("🚀 Starting event-driven active trade supervisor")
     log("📡 Waiting for trade notifications...")
-    
-    # Initialize the database
-    init_active_trades_db()
     
     # Export initial state to JSON
     export_active_trades_to_json()
