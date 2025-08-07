@@ -436,10 +436,9 @@ def sync_fills():
         latest_time = all_fills[0].get("created_time")
         oldest_time = all_fills[-1].get("created_time")
         print(f"🕒 Fills range — newest: {latest_time}, oldest: {oldest_time}, total: {len(all_fills)}")
-    else:
-        print("⚠️ API returned zero fills.")
-    # ------------------------------------------------------------
-    # Write to PostgreSQL (write all fills, let PostgreSQL handle duplicates)
+        
+        # ------------------------------------------------------------
+        # Write to PostgreSQL (write all fills, let PostgreSQL handle duplicates)
         try:
             pg_conn = get_postgresql_connection()
             if pg_conn:
@@ -480,7 +479,9 @@ def sync_fills():
             print(f"❌ Failed to write fills to PostgreSQL: {pg_err}")
         
         # JSON writing removed - PostgreSQL only
-    print(f"💾 Fills written to PostgreSQL only")
+        print(f"💾 Fills written to PostgreSQL only")
+    else:
+        print("⚠️ API returned zero fills.")
 
     notify_frontend_db_change("fills", {"fills": len(all_fills)})
     
