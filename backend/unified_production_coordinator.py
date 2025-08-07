@@ -376,33 +376,63 @@ def get_unified_ttc(symbol: str = "btc") -> Dict[str, Any]:
         raise
 
 def load_auto_entry_settings() -> Dict[str, Any]:
-    """Load auto entry settings from JSON file"""
-    settings_path = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_entry_settings.json")
-    default_settings = {
-        "min_probability": 37,
-        "min_differential": -5,
-        "min_ttc_seconds": 60,
-        "min_time": 120,
-        "max_time": 905,
-        "allow_re_entry": False,
-        "watchlist_min_volume": 1000,
-        "watchlist_max_ask": 98
-    }
-    
+    """Load auto entry settings from PostgreSQL"""
     try:
-        if os.path.exists(settings_path):
-            with open(settings_path, "r") as f:
-                settings = json.load(f)
-                # Ensure all required keys exist
-                for key, default_value in default_settings.items():
-                    if key not in settings:
-                        settings[key] = default_value
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT min_probability, min_differential, min_time, max_time, allow_re_entry,
+                       spike_alert_enabled, spike_alert_momentum_threshold, 
+                       spike_alert_cooldown_threshold, spike_alert_cooldown_minutes
+                FROM users.auto_trade_settings_0001 WHERE id = 1
+            """)
+            result = cursor.fetchone()
+            if result:
+                settings = {
+                    "min_probability": result[0],
+                    "min_differential": float(result[1]),
+                    "min_time": result[2],
+                    "max_time": result[3],
+                    "allow_re_entry": result[4],
+                    "spike_alert_enabled": result[5],
+                    "spike_alert_momentum_threshold": result[6],
+                    "spike_alert_cooldown_threshold": result[7],
+                    "spike_alert_cooldown_minutes": result[8],
+                    "watchlist_min_volume": 1000,  # Default value
+                    "watchlist_max_ask": 98  # Default value
+                }
+                print(f"📊 Loaded auto entry settings from PostgreSQL: {settings}")
                 return settings
-        else:
-            return default_settings
+            else:
+                print(f"⚠️ No auto entry settings found in PostgreSQL, using defaults")
+                return {
+                    "min_probability": 37,
+                    "min_differential": -5,
+                    "min_ttc_seconds": 60,
+                    "min_time": 120,
+                    "max_time": 905,
+                    "allow_re_entry": False,
+                    "watchlist_min_volume": 1000,
+                    "watchlist_max_ask": 98
+                }
     except Exception as e:
-        print(f"⚠️ Error loading auto entry settings: {e}")
-        return default_settings
+        print(f"⚠️ Error loading auto entry settings from PostgreSQL: {e}")
+        return {
+            "min_probability": 37,
+            "min_differential": -5,
+            "min_ttc_seconds": 60,
+            "min_time": 120,
+            "max_time": 905,
+            "allow_re_entry": False,
+            "watchlist_min_volume": 1000,
+            "watchlist_max_ask": 98
+        }
 
 class PipelineStep(Enum):
     BTC_PRICE = "btc_price"
@@ -854,8 +884,10 @@ class UnifiedProductionCoordinator:
             settings = load_auto_entry_settings()
             min_volume = settings.get("watchlist_min_volume", 1000)
             max_ask = settings.get("watchlist_max_ask", 98)
-            min_probability = settings.get("min_probability", 37) - 5  # Subtract 5 as requested
-            min_differential = settings.get("min_differential", -5) - 3  # Subtract 3 as requested
+            min_probability = settings.get("min_probability", 37)  # Use actual setting from JSON
+            min_differential = settings.get("min_differential", -5)  # Use actual setting from JSON
+            
+            print(f"🔍 Watchlist filtering with settings: min_prob={min_probability}, min_diff={min_differential}")
             
             # Filter strikes for watchlist
             filtered_strikes = []
@@ -881,12 +913,20 @@ class UnifiedProductionCoordinator:
                 # Get the active button's differential
                 active_diff = no_diff if is_above_money_line else yes_diff
                 
+                # Check if at least one side meets the differential requirement
+                yes_diff_ok = yes_diff >= min_differential
+                no_diff_ok = no_diff >= min_differential
+                at_least_one_diff_ok = yes_diff_ok or no_diff_ok
+                
                 # Apply filter criteria from auto entry settings
-                if (volume >= min_volume and 
-                    probability > min_probability and 
-                    max_ask_price <= max_ask and 
-                    active_diff >= min_differential):
+                volume_ok = volume >= min_volume
+                probability_ok = probability > min_probability
+                ask_ok = max_ask_price <= max_ask
+                
+                if (volume_ok and probability_ok and ask_ok and at_least_one_diff_ok):
                     filtered_strikes.append(strike)
+                else:
+                    print(f"❌ Strike {strike.get('strike')} filtered out: vol={volume_ok}, prob={probability_ok}, ask={ask_ok}, diff={at_least_one_diff_ok}")
             
             # Sort by probability (highest to lowest)
             filtered_strikes.sort(key=lambda x: x.get("probability", 0), reverse=True)

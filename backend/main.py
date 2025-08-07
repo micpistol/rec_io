@@ -50,8 +50,7 @@ connected_clients = set()
 # Global set of connected websocket clients for database changes
 db_change_clients = set()
 
-# Global auto_stop state
-PREFERENCES_PATH = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "trade_preferences.json")
+# Legacy preference path removed - all data now in PostgreSQL
 
 # Global preferences cache
 _preferences_cache = None
@@ -494,7 +493,35 @@ def verify_password(password, hashed):
         return False
 
 def get_user_credentials():
-    """Get user credentials from user_info.json"""
+    """Get user credentials from PostgreSQL"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT user_id, first_name, last_name, email, phone, account_type, password_hash
+                FROM users.user_info_0001 WHERE user_no = '0001'
+            """)
+            result = cursor.fetchone()
+            if result:
+                user_id, first_name, last_name, email, phone, account_type, password_hash = result
+                return {
+                    "username": user_id,
+                    "password_hash": password_hash,
+                    "name": f"{first_name} {last_name}",
+                    "email": email,
+                    "phone": phone,
+                    "account_type": account_type
+                }
+    except Exception as e:
+        print(f"[AUTH] Error loading user credentials from PostgreSQL: {e}")
+    
+    # Fallback to JSON file for backward compatibility
     try:
         user_info_path = os.path.join(get_data_dir(), "users", "user_0001", "user_info.json")
         if os.path.exists(user_info_path):
@@ -502,18 +529,27 @@ def get_user_credentials():
                 user_info = json.load(f)
                 return {
                     "username": user_info.get("user_id", "admin"),
-                    "password": user_info.get("password", "admin"),  # Default password
+                    "password": user_info.get("password", "admin"),  # Plain text fallback
                     "name": user_info.get("name", "Admin User")
                 }
     except Exception as e:
-        print(f"[AUTH] Error loading user credentials: {e}")
+        print(f"[AUTH] Error loading user credentials from JSON: {e}")
     
-    # Default credentials if no user_info.json
+    # Default credentials if nothing works
     return {
         "username": "admin",
         "password": "admin",
         "name": "Admin User"
     }
+
+def verify_password(password, hashed_password):
+    """Verify a password against its hash"""
+    try:
+        import bcrypt
+        return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
+    except Exception as e:
+        print(f"[AUTH] Password verification error: {e}")
+        return False
 
 def load_preferences():
     global _preferences_cache, _cache_timestamp
@@ -1782,8 +1818,7 @@ async def proxy_active_trades():
     except requests.exceptions.RequestException as e:
         return {"error": f"Failed to connect to active trade supervisor: {str(e)}"}, 503
 
-# TRADE HISTORY PREFERENCES
-TRADE_HISTORY_PREFERENCES_PATH = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "trade_history_preferences.json")
+# Legacy trade history preferences path removed - all data now in PostgreSQL
 
 def load_trade_history_preferences():
     """Load trade history preferences from PostgreSQL"""
@@ -1976,41 +2011,9 @@ async def update_auto_stop_settings(request: Request):
     return {"status": "ok", "updated": update_data}
 
 import os
-import json
-AUTO_STOP_SETTINGS_PATH = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_stop_settings.json")
+# Legacy auto stop settings path removed - all data now in PostgreSQL
 
-def load_auto_stop_settings():
-    if os.path.exists(AUTO_STOP_SETTINGS_PATH):
-        try:
-            with open(AUTO_STOP_SETTINGS_PATH, "r") as f:
-                data = json.load(f)
-                # Ensure all required fields are present
-                if "min_ttc_seconds" not in data:
-                    data["min_ttc_seconds"] = 60
-                if "momentum_spike_enabled" not in data:
-                    data["momentum_spike_enabled"] = True
-                if "momentum_spike_threshold" not in data:
-                    data["momentum_spike_threshold"] = 35
-                return data
-        except Exception:
-            pass
-    return {"current_probability": 25, "min_ttc_seconds": 60, "momentum_spike_enabled": True, "momentum_spike_threshold": 35}
-
-def save_auto_stop_settings(settings):
-    try:
-        # Always write all fields
-        if "current_probability" not in settings:
-            settings["current_probability"] = 25
-        if "min_ttc_seconds" not in settings:
-            settings["min_ttc_seconds"] = 60
-        if "momentum_spike_enabled" not in settings:
-            settings["momentum_spike_enabled"] = True
-        if "momentum_spike_threshold" not in settings:
-            settings["momentum_spike_threshold"] = 35
-        with open(AUTO_STOP_SETTINGS_PATH, "w") as f:
-            json.dump(settings, f)
-    except Exception as e:
-        print(f"[Auto Stop Settings Save Error] {e}")
+# Legacy auto stop settings functions removed - all data now in PostgreSQL
 
 @app.get("/api/get_auto_stop_settings")
 async def get_auto_stop_settings():
@@ -2042,44 +2045,9 @@ async def set_auto_stop_settings(request: Request):
     updated_settings = get_auto_stop_settings_postgresql()
     return {"status": "ok", **updated_settings}
 
-# AUTO ENTRY SETTINGS
-AUTO_ENTRY_SETTINGS_PATH = os.path.join(get_data_dir(), "users", "user_0001", "preferences", "auto_entry_settings.json")
+# Legacy auto entry settings path removed - all data now in PostgreSQL
 
-def load_auto_entry_settings():
-    """Load auto entry settings from file"""
-    try:
-        if os.path.exists(AUTO_ENTRY_SETTINGS_PATH):
-            with open(AUTO_ENTRY_SETTINGS_PATH, "r") as f:
-                settings = json.load(f)
-        else:
-            settings = {"min_probability": 25, "min_differential": 0, "min_ttc_seconds": 60, "min_time": 0, "max_time": 3600, "allow_re_entry": False}
-        return settings
-    except Exception as e:
-        print(f"[Auto Entry Settings Load Error] {e}")
-        return {"min_probability": 25, "min_differential": 0, "min_ttc_seconds": 60, "min_time": 0, "max_time": 3600, "allow_re_entry": False}
-
-def save_auto_entry_settings(settings):
-    """Save auto entry settings to file"""
-    try:
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(AUTO_ENTRY_SETTINGS_PATH), exist_ok=True)
-        # Set defaults if missing
-        if "min_probability" not in settings:
-            settings["min_probability"] = 25
-        if "min_differential" not in settings:
-            settings["min_differential"] = 0
-        if "min_ttc_seconds" not in settings:
-            settings["min_ttc_seconds"] = 60
-        if "min_time" not in settings:
-            settings["min_time"] = 0
-        if "max_time" not in settings:
-            settings["max_time"] = 3600
-        if "allow_re_entry" not in settings:
-            settings["allow_re_entry"] = False
-        with open(AUTO_ENTRY_SETTINGS_PATH, "w") as f:
-            json.dump(settings, f)
-    except Exception as e:
-        print(f"[Auto Entry Settings Save Error] {e}")
+# Legacy auto entry settings functions removed - all data now in PostgreSQL
 
 @app.get("/api/get_auto_entry_settings")
 async def get_auto_entry_settings():
@@ -2576,39 +2544,60 @@ async def login(request: Request):
         credentials = get_user_credentials()
         
         # Check credentials
-        if username == credentials["username"] and password == credentials["password"]:
-            # Generate authentication token
-            token = generate_token()
-            device_id = f"device_{secrets.token_hex(8)}"
+        if username == credentials["username"]:
+            # Check if we have a hashed password (PostgreSQL) or plain text (JSON fallback)
+            if "password_hash" in credentials:
+                # PostgreSQL authentication with hashed password
+                if verify_password(password, credentials["password_hash"]):
+                    auth_success = True
+                else:
+                    auth_success = False
+            else:
+                # JSON fallback with plain text password
+                if password == credentials["password"]:
+                    auth_success = True
+                else:
+                    auth_success = False
             
-            # Store token
-            auth_tokens = load_auth_tokens()
-            auth_tokens[token] = {
-                "username": username,
-                "created": datetime.now().isoformat(),
-                "expires": (datetime.now() + timedelta(days=30)).isoformat() if remember_device else (datetime.now() + timedelta(hours=24)).isoformat()
-            }
-            save_auth_tokens(auth_tokens)
-            
-            # Store device token if remember device
-            if remember_device:
-                device_tokens = load_device_tokens()
-                device_tokens[device_id] = {
+            if auth_success:
+                # Generate authentication token
+                token = generate_token()
+                device_id = f"device_{secrets.token_hex(8)}"
+                
+                # Store token
+                auth_tokens = load_auth_tokens()
+                auth_tokens[token] = {
                     "username": username,
-                    "token": token,
                     "created": datetime.now().isoformat(),
-                    "expires": (datetime.now() + timedelta(days=365)).isoformat()
+                    "expires": (datetime.now() + timedelta(days=30)).isoformat() if remember_device else (datetime.now() + timedelta(hours=24)).isoformat()
                 }
-                save_device_tokens(device_tokens)
-            
-            print(f"[AUTH] User {username} logged in successfully")
-            return {
-                "success": True,
-                "token": token,
-                "deviceId": device_id,
-                "username": username,
-                "name": credentials["name"]
-            }
+                save_auth_tokens(auth_tokens)
+                
+                # Store device token if remember device
+                if remember_device:
+                    device_tokens = load_device_tokens()
+                    device_tokens[device_id] = {
+                        "username": username,
+                        "token": token,
+                        "created": datetime.now().isoformat(),
+                        "expires": (datetime.now() + timedelta(days=365)).isoformat()
+                    }
+                    save_device_tokens(device_tokens)
+                
+                print(f"[AUTH] User {username} logged in successfully")
+                return {
+                    "success": True,
+                    "token": token,
+                    "deviceId": device_id,
+                    "username": username,
+                    "name": credentials["name"]
+                }
+            else:
+                print(f"[AUTH] Failed login attempt for username: {username}")
+                return {
+                    "success": False,
+                    "error": "Invalid username or password"
+                }
         else:
             print(f"[AUTH] Failed login attempt for username: {username}")
             return {
