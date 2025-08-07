@@ -1,4 +1,4 @@
-import sqlite3
+
 import threading
 import time
 import os
@@ -50,7 +50,7 @@ def get_executor_port():
 
 def insert_trade(trade):
     """Insert a new trade with BTC price from unified endpoint"""
-    # log(f"[DEBUG] TRADES DB PATH (insert_trade): {DB_TRADES_PATH}")
+
     
     # Get current BTC price directly from PostgreSQL live_data table - INSTANT
     try:
@@ -83,46 +83,24 @@ def insert_trade(trade):
     except Exception as e:
         momentum_for_db = 0
     
-    conn = get_db_connection()
-    cursor = conn.cursor()
     contract_name = truncate_contract_name(trade.get('contract'))
     
-    cursor.execute(
-        """INSERT INTO trades (
-            date, time, strike, side, buy_price, position, status,
-            contract, ticker, symbol, market, trade_strategy, symbol_open,
-            momentum, prob, volatility, ticket_id, entry_method
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (
-            trade['date'], trade['time'], trade['strike'], trade['side'], trade['buy_price'],
-            trade['position'], trade.get('status', 'pending'), contract_name,
-            trade.get('ticker'), trade.get('symbol'), trade.get('market'), trade.get('trade_strategy'),
-            symbol_open, momentum_for_db, trade.get('prob'),
-            trade.get('volatility'), trade.get('ticket_id'), trade.get('entry_method', 'manual')
-        )
-    )
-    conn.commit()
-    last_id = cursor.lastrowid
-    conn.close()
-    
-    # Also write to PostgreSQL with the same ID as SQLite
+    # Write to PostgreSQL only
     try:
         pg_conn = get_postgresql_connection()
         if pg_conn:
             with pg_conn.cursor() as cursor:
-                # Set the sequence to the NEXT ID value (current ID + 1)
-                cursor.execute("SELECT setval('users.trades_0001_id_seq1', %s)", (last_id + 1,))
-                
                 cursor.execute("""
                     INSERT INTO users.trades_0001 (
-                        id, status, date, time, symbol, market, trade_strategy,
+                        status, date, time, symbol, market, trade_strategy,
                         contract, strike, side, prob, diff, buy_price, position,
                         sell_price, closed_at, fees, pnl, symbol_open, symbol_close,
                         momentum, volatility, win_loss, ticker, ticket_id, market_id,
                         momentum_delta, entry_method, close_method
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
                 """, (
-                    last_id, trade.get('status', 'pending'), trade['date'], trade['time'], 
+                    trade.get('status', 'pending'), trade['date'], trade['time'], 
                     trade.get('symbol', 'BTC'), trade.get('market', 'Kalshi'), trade.get('trade_strategy', 'Hourly HTC'),
                     contract_name, trade['strike'], trade['side'], trade.get('prob'),
                     trade.get('diff'), trade['buy_price'], trade['position'], None, None,
@@ -130,13 +108,16 @@ def insert_trade(trade):
                     None, trade.get('ticker'), trade.get('ticket_id'), trade.get('market_id', 'BTC-USD'),
                     trade.get('momentum_delta'), trade.get('entry_method', 'manual'), trade.get('close_method')
                 ))
+                last_id = cursor.fetchone()[0]
                 pg_conn.commit()
-                print(f"💾 Trade also written to PostgreSQL users.trades_0001 with ID {last_id}")
+                print(f"💾 Trade written to PostgreSQL users.trades_0001 with ID {last_id}")
             pg_conn.close()
         else:
             print(f"⚠️ Skipping PostgreSQL write - no connection available")
+            return None
     except Exception as pg_err:
         print(f"❌ Failed to write trade to PostgreSQL: {pg_err}")
+        return None
     
     notify_frontend_trade_change()
     return last_id
@@ -158,7 +139,7 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
     expected_ticker = row[0]
     mode = get_account_mode()
     
-    # Read from PostgreSQL positions table instead of SQLite
+            # Read from PostgreSQL positions table
     pg_conn = get_postgresql_connection()
     if not pg_conn:
         log_event(ticket_id, f"MANAGER: Cannot connect to PostgreSQL positions table")
@@ -209,20 +190,6 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
                     
                     # Update trade status to open (this will also update PostgreSQL)
                     update_trade_status(id, 'open')
-                    
-                    # Update additional fields in SQLite
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                        UPDATE trades
-                        SET position = ?,
-                            buy_price = ?,
-                            fees = ?,
-                            diff = ?
-                        WHERE id = ?
-                    """, (pos, price, fees_paid, diff_formatted, id))
-                    conn.commit()
-                    conn.close()
                     
                     # Get current symbol price for symbol_open (same as symbol_close logic)
                     symbol_open = None
@@ -337,7 +304,7 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
         
         mode = get_account_mode()
         
-        # Read from PostgreSQL positions table instead of SQLite
+        # Read from PostgreSQL positions table
         pg_conn = get_postgresql_connection()
         if not pg_conn:
             log_event(ticket_id, f"MANAGER: Cannot connect to PostgreSQL positions table")
@@ -373,12 +340,7 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                 
                 original_side = side_row[0] if side_row else None
                 
-                FILLS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "fills.db")
-                
-                if not os.path.exists(FILLS_DB_PATH):
-                    log_event(ticket_id, f"MANAGER: fills.db not found at {FILLS_DB_PATH}")
-                    log(f"FILLS.DB NOT FOUND")
-                    return
+
                 
                 pg_conn = get_postgresql_connection()
                 if pg_conn:
@@ -462,11 +424,7 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                     try:
                         update_trade_status(id, "closed", closed_at, sell_price, symbol_close, win_loss, pnl, close_method)
                         
-                        conn = get_db_connection()
-                        cursor = conn.cursor()
-                        cursor.execute("UPDATE trades SET fees = ? WHERE id = ?", (total_fees_paid, id))
-                        conn.commit()
-                        conn.close()
+
                         
                         log_event(ticket_id, f"MANAGER: CLOSE TRADE CONFIRMED - PnL: {pnl}, W/L: {win_loss}, Fees: {total_fees_paid}")
                         log(f"CLOSE TRADE CONFIRMED: {expected_ticker}, PnL={pnl}, W/L={win_loss}")
@@ -552,7 +510,7 @@ def notify_active_trade_supervisor_direct(trade_id: int, ticket_id: str, status:
         log(f"ERROR SENDING NOTIFICATION")
 
 def notify_frontend_trade_change() -> None:
-    """Send notification to frontend when trades.db is updated"""
+    """Send notification to frontend when trades are updated"""
     try:
         import requests
         notification_url = f"http://localhost:{get_port('main_app')}/api/notify_db_change"
@@ -609,8 +567,6 @@ def truncate_contract_name(contract_name):
     return contract_name
 
 # ---------- DATABASE FUNCTIONS ----------------------------------------------------
-
-DB_TRADES_PATH = os.path.join(get_trade_history_dir(), "trades.db")
 
 def init_trades_db():
     """Initialize PostgreSQL database structure for fresh installs"""
@@ -755,12 +711,10 @@ def init_trades_db():
 
 init_trades_db()
 
-def get_db_connection():
-    return sqlite3.connect(DB_TRADES_PATH, timeout=0.25, check_same_thread=False)
+
 
 def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbol_close=None, win_loss=None, pnl=None, close_method=None):
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    """Update trade status in PostgreSQL database only."""
     if status == 'closed':
         if closed_at is None:
             utc_now = datetime.utcnow().replace(tzinfo=ZoneInfo("UTC"))
@@ -795,16 +749,7 @@ def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbo
                 fees = fees_paid if fees_paid is not None else 0.0
                 calculated_pnl = round(sell_value - buy_value - fees, 2)
 
-        cursor.execute(
-            "UPDATE trades SET status = ?, closed_at = ?, sell_price = ?, symbol_close = ?, win_loss = ?, pnl = ?, close_method = ? WHERE id = ?",
-            (status, closed_at, sell_price, symbol_close, win_loss, calculated_pnl, close_method, trade_id)
-        )
-    else:
-        cursor.execute("UPDATE trades SET status = ? WHERE id = ?", (status, trade_id))
-    conn.commit()
-    conn.close()
-    
-    # Also update PostgreSQL
+    # Update PostgreSQL only
     try:
         pg_conn = get_postgresql_connection()
         if pg_conn:
@@ -854,16 +799,18 @@ def update_trade_status(trade_id, status, closed_at=None, sell_price=None, symbo
                         else:
                             print(f"⚠️ No matching trade found in PostgreSQL for ID {trade_id} or ticker {ticker}")
                     else:
-                        print(f"⚠️ Could not find ticker for trade ID {trade_id} in SQLite")
+                        print(f"⚠️ Could not find ticker for trade ID {trade_id} in PostgreSQL")
                 else:
-                    print(f"💾 Trade status update also written to PostgreSQL users.trades_0001")
+                    print(f"💾 Trade status update written to PostgreSQL users.trades_0001")
                 
                 pg_conn.commit()
-            pg_conn.close()
+                pg_conn.close()
         else:
             print(f"⚠️ Skipping PostgreSQL update - no connection available")
-    except Exception as pg_err:
-        print(f"❌ Failed to update trade status in PostgreSQL: {pg_err}")
+    except Exception as e:
+        print(f"❌ Failed to update PostgreSQL: {e}")
+        if pg_conn:
+            pg_conn.close()
     
     notify_frontend_trade_change()
     
@@ -982,14 +929,7 @@ async def add_trade(request: Request):
                 sell_price = data.get("buy_price")
                 close_method = data.get("close_method", "manual")
                 
-                # Update SQLite
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("UPDATE trades SET status = 'closing', symbol_close = ?, close_method = ? WHERE ticker = ?", (symbol_close, close_method, ticker))
-                conn.commit()
-                conn.close()
-                
-                # Also update PostgreSQL
+                # Update PostgreSQL
                 try:
                     pg_conn_update = get_postgresql_connection()
                     if pg_conn_update:
@@ -1263,20 +1203,7 @@ def check_expired_trades():
         except Exception as e:
             symbol_close = None
         
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE trades 
-            SET status = 'expired', 
-                closed_at = ?, 
-                symbol_close = ?,
-                close_method = 'expired'
-            WHERE status = 'open'
-        """, (closed_at, symbol_close))
-        conn.commit()
-        conn.close()
-        
-        # Also update PostgreSQL
+        # Update PostgreSQL
         try:
             pg_conn = get_postgresql_connection()
             if pg_conn:
@@ -1341,12 +1268,10 @@ def delete_error_trades():
             pass
 
 def poll_settlements_for_matches(expired_tickers):
-    """Poll settlements.db for matches to expired trades"""
+    """Poll settlements for matches to expired trades"""
     mode = get_account_mode()
-    SETTLEMENTS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", mode, "settlements.db")
     
-    if not os.path.exists(SETTLEMENTS_DB_PATH):
-        return
+
     
     found_tickers = set()
     start_time = time.time()
@@ -1397,21 +1322,7 @@ def poll_settlements_for_matches(expired_tickers):
                             fees = fees if fees is not None else None
                             pnl = round(sell_value - buy_value - fees, 2)
                     
-                    # Update SQLite first (redundant writing)
-                    conn_sqlite = get_db_connection()
-                    cursor_sqlite = conn_sqlite.cursor()
-                    cursor_sqlite.execute("""
-                        UPDATE trades 
-                        SET status = 'closed',
-                            sell_price = ?,
-                            win_loss = ?,
-                            pnl = ?
-                        WHERE ticker = ? AND status = 'expired'
-                    """, (sell_price, 'W' if sell_price > 0 else 'L', pnl, ticker))
-                    conn_sqlite.commit()
-                    conn_sqlite.close()
-                    
-                    # Also update PostgreSQL
+                    # Update PostgreSQL
                     try:
                         pg_conn = get_postgresql_connection()
                         if pg_conn:

@@ -263,26 +263,27 @@ This checklist systematically identifies and deprecates legacy SQLite database f
 - The migration should be done methodically to avoid breaking the live trading system
 - Focus is now on the three core components: Trade Manager, Active Trade Supervisor, and Account Sync
 
-## Phase 1: Trade Executor Cleanup ✅ COMPLETED
+## Phase 3: Trade Manager Deprecation ✅ COMPLETED
 
-### ✅ **Trade Executor API Cleanup (COMPLETED)**
-- **Removed duplicate API endpoints** from `trade_executor.py`:
-  - `/api/account/balance` - Was reading from JSON files, now uses main.py PostgreSQL endpoint
-  - `/api/db/positions` - Was reading from JSON files, now uses main.py PostgreSQL endpoint  
-  - `/api/db/fills` - Was reading from JSON files, now uses main.py PostgreSQL endpoint
-  - `/api/sync_account` - Removed (not needed)
-  - `/api/market_data` - Removed (not needed)
-- **Kept only essential endpoints**:
-  - `/trigger_trade` - Core trade execution functionality
-  - `/health` - Health monitoring
-  - `/api/ports` - Port information
-  - `/api/system_status` - System status (for monitoring)
-- **Frontend now uses main.py endpoints** which read from PostgreSQL directly
+### ✅ **Trade Manager Legacy Database Cleanup (COMPLETED)**
+- **Removed all SQLite writing** from `trade_manager.py`:
+  - ✅ `insert_trade()` - Now writes to PostgreSQL only
+  - ✅ `update_trade_status()` - Now writes to PostgreSQL only  
+  - ✅ `confirm_open_trade()` - Now writes to PostgreSQL only
+  - ✅ `confirm_close_trade()` - Now writes to PostgreSQL only
+  - ✅ `check_expired_trades()` - Now writes to PostgreSQL only
+  - ✅ `poll_settlements_for_matches()` - Now writes to PostgreSQL only
+  - ✅ `add_trade()` - Now writes to PostgreSQL only
+- **Removed legacy functions**:
+  - ✅ `get_db_connection()` - Removed (was SQLite connection)
+  - ✅ `DB_TRADES_PATH` - Removed (was SQLite path)
+- **System now uses PostgreSQL exclusively** for all trade operations
 
-### ✅ **Account Data Flow Verified**
-- **Frontend calls** → `main.py` endpoints → **PostgreSQL database**
-- **No more legacy SQLite** reading for account data
-- **Trade executor** now focused solely on trade execution
+### ✅ **Trade Manager Data Flow Verified**
+- **All trade operations** → PostgreSQL `users.trades_0001`
+- **No more legacy SQLite** writing for trades
+- **Active Trade Supervisor** already using PostgreSQL only
+- **Frontend** uses main.py endpoints which read from PostgreSQL
 
 ## Phase 2: Account Sync Deprecation (NEXT PRIORITY)
 
