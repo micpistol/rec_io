@@ -801,41 +801,57 @@ async def set_account_mode(mode_data: dict):
 # Trade data endpoints
 @app.get("/trades")
 async def get_trades(status: Optional[str] = None):
-    """Get trade data."""
+    """Get trade data from PostgreSQL database."""
     try:
-        trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
-        conn = sqlite3.connect(trades_db_path)
-        cursor = conn.cursor()
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
         
-        if status:
-            cursor.execute("SELECT * FROM trades WHERE status = ? ORDER BY date DESC, time DESC", (status,))
-        else:
-            cursor.execute("SELECT * FROM trades ORDER BY date DESC, time DESC")
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
         
-        trades = cursor.fetchall()
-        conn.close()
-        
-        # Get column names from cursor description
-        columns = [desc[0] for desc in cursor.description]
-        
-        # Convert to list of dictionaries
-        result = []
-        for trade in trades:
-            trade_dict = dict(zip(columns, trade))
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            # Build query based on status filter
+            if status:
+                cursor.execute("""
+                    SELECT * FROM users.trades_0001 
+                    WHERE status = %s 
+                    ORDER BY id DESC 
+                    LIMIT 100
+                """, (status,))
+            else:
+                cursor.execute("""
+                    SELECT * FROM users.trades_0001 
+                    ORDER BY id DESC 
+                    LIMIT 100
+                """)
             
-            # Create a combined timestamp field for frontend compatibility
-            if 'date' in trade_dict and 'time' in trade_dict:
-                trade_dict['timestamp'] = f"{trade_dict['date']} {trade_dict['time']}"
+            trades = cursor.fetchall()
             
-            # Create a combined price field for frontend compatibility
-            if 'buy_price' in trade_dict:
-                trade_dict['price'] = trade_dict['buy_price']
+            # Convert RealDictRow objects to regular dictionaries
+            result = []
+            for trade in trades:
+                trade_dict = dict(trade)
+                
+                # Create a combined timestamp field for frontend compatibility
+                if 'date' in trade_dict and 'time' in trade_dict:
+                    trade_dict['timestamp'] = f"{trade_dict['date']} {trade_dict['time']}"
+                
+                # Create a combined price field for frontend compatibility
+                if 'buy_price' in trade_dict:
+                    trade_dict['price'] = trade_dict['buy_price']
+                
+                result.append(trade_dict)
             
-            result.append(trade_dict)
-        
-        return result
+            conn.close()
+            return result
+            
     except Exception as e:
-        print(f"Error getting trades: {e}")
+        print(f"Error getting trades from PostgreSQL: {e}")
         return []
 
 @app.get("/trades/{trade_id}")
@@ -951,48 +967,172 @@ async def get_account_balance(mode: str = "prod"):
 
 @app.get("/api/db/fills")
 def get_fills():
-    """Get fills data."""
+    """Get fills data from PostgreSQL database."""
     try:
-        mode = get_account_mode()
-        fills_file = os.path.join(get_accounts_data_dir(), "kalshi", mode, "fills.json")
-        if os.path.exists(fills_file):
-            with open(fills_file, 'r') as f:
-                return json.load(f)
-        return {"fills": []}
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            cursor.execute("""
+                SELECT * FROM users.fills_0001 
+                ORDER BY id DESC 
+                LIMIT 100
+            """)
+            fills = cursor.fetchall()
+            
+            # Convert RealDictRow objects to regular dictionaries
+            fills_list = []
+            for fill in fills:
+                fill_dict = dict(fill)
+                fills_list.append(fill_dict)
+            
+            conn.close()
+            return {"fills": fills_list}
+            
     except Exception as e:
-        print(f"Error getting fills: {e}")
+        print(f"Error getting fills from PostgreSQL: {e}")
         return {"fills": []}
 
 @app.get("/api/db/positions")
 def get_positions():
-    """Get positions data."""
+    """Get positions data from PostgreSQL database."""
     try:
-        mode = get_account_mode()
-        positions_file = os.path.join(get_accounts_data_dir(), "kalshi", mode, "positions.json")
-        if os.path.exists(positions_file):
-            with open(positions_file, 'r') as f:
-                data = json.load(f)
-                # Extract market_positions and return as positions array
-                positions = data.get("market_positions", [])
-                return {"positions": positions}
-        return {"positions": []}
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            cursor.execute("""
+                SELECT * FROM users.positions_0001 
+                ORDER BY id DESC 
+                LIMIT 100
+            """)
+            positions = cursor.fetchall()
+            
+            # Convert RealDictRow objects to regular dictionaries
+            positions_list = []
+            for position in positions:
+                position_dict = dict(position)
+                positions_list.append(position_dict)
+            
+            conn.close()
+            return {"positions": positions_list}
+            
     except Exception as e:
-        print(f"Error getting positions: {e}")
+        print(f"Error getting positions from PostgreSQL: {e}")
         return {"positions": []}
 
 @app.get("/api/db/settlements")
 def get_settlements():
-    """Get settlements data."""
+    """Get settlements data from PostgreSQL database."""
     try:
-        mode = get_account_mode()
-        settlements_file = os.path.join(get_accounts_data_dir(), "kalshi", mode, "settlements.json")
-        if os.path.exists(settlements_file):
-            with open(settlements_file, 'r') as f:
-                return json.load(f)
-        return {"settlements": []}
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            cursor.execute("""
+                SELECT * FROM users.settlements_0001 
+                ORDER BY id DESC 
+                LIMIT 100
+            """)
+            settlements = cursor.fetchall()
+            
+            # Convert RealDictRow objects to regular dictionaries
+            settlements_list = []
+            for settlement in settlements:
+                settlement_dict = dict(settlement)
+                settlements_list.append(settlement_dict)
+            
+            conn.close()
+            return {"settlements": settlements_list}
+            
     except Exception as e:
-        print(f"Error getting settlements: {e}")
+        print(f"Error getting settlements from PostgreSQL: {e}")
         return {"settlements": []}
+
+@app.get("/api/db/trades")
+def get_trades_from_postgresql():
+    """Get trades data from PostgreSQL database."""
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            # Get all trades from PostgreSQL
+            cursor.execute("""
+                SELECT * FROM users.trades_0001 
+                ORDER BY id DESC 
+                LIMIT 100
+            """)
+            trades = cursor.fetchall()
+            
+            # Convert RealDictRow objects to regular dictionaries
+            trades_list = []
+            for trade in trades:
+                trade_dict = dict(trade)
+                # Ensure all fields are present for frontend compatibility
+                trade_dict.update({
+                    'id': trade_dict.get('id'),
+                    'status': trade_dict.get('status', ''),
+                    'date': trade_dict.get('date', ''),
+                    'time': trade_dict.get('time', ''),
+                    'symbol': trade_dict.get('symbol', 'BTC'),
+                    'trade_strategy': trade_dict.get('trade_strategy', ''),
+                    'contract': trade_dict.get('contract', ''),
+                    'strike': trade_dict.get('strike', ''),
+                    'side': trade_dict.get('side', ''),
+                    'prob': trade_dict.get('prob'),
+                    'diff': trade_dict.get('diff'),
+                    'buy_price': trade_dict.get('buy_price'),
+                    'sell_price': trade_dict.get('sell_price'),
+                    'position': trade_dict.get('position'),
+                    'closed_at': trade_dict.get('closed_at'),
+                    'fees': trade_dict.get('fees'),
+                    'pnl': trade_dict.get('pnl'),
+                    'symbol_open': trade_dict.get('symbol_open'),
+                    'symbol_close': trade_dict.get('symbol_close'),
+                    'momentum': trade_dict.get('momentum'),
+                    'win_loss': trade_dict.get('win_loss')
+                })
+                trades_list.append(trade_dict)
+            
+            conn.close()
+            return {"trades": trades_list}
+            
+    except Exception as e:
+        print(f"Error getting trades from PostgreSQL: {e}")
+        return {"trades": []}
 
 # Fingerprint and strike probability endpoints
 @app.get("/api/current_fingerprint")

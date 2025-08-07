@@ -2297,8 +2297,9 @@ async function fetchAndRenderRecentTrades() {
 // === Trade History Data Fetching and Rendering ===
 async function fetchAndRenderTradeHistory() {
   try {
+    // Use PostgreSQL endpoint instead of legacy SQLite
     const res = await fetch('/trades', { cache: 'no-store' });
-    if (!res.ok) throw new Error("Failed to fetch trade history");
+    if (!res.ok) throw new Error("Failed to fetch trade history from PostgreSQL");
     const trades = await res.json();
     
     const tradeHistoryTableBody = document.querySelector('#tradeHistoryTable tbody');
@@ -2389,11 +2390,104 @@ async function fetchAndRenderTradeHistory() {
       tradeHistoryTableBody.appendChild(tr);
     });
   } catch (err) {
-    console.error('Error fetching trade history:', err);
+    console.error('Error fetching trade history from PostgreSQL:', err);
     const tradeHistoryTableBody = document.querySelector('#tradeHistoryTable tbody');
     if (tradeHistoryTableBody) {
       tradeHistoryTableBody.innerHTML = '<tr><td colspan="21" style="text-align: center; color: red; padding: 20px;">Error loading trade history</td></tr>';
     }
+  }
+}
+
+// === Recent Trades Panel (now using PostgreSQL fills table) ===
+async function fetchAndRenderRecentTrades() {
+  try {
+    // Fetch fills data from PostgreSQL
+    const res = await fetch('/api/db/fills', { cache: 'no-store' });
+    if (!res.ok) throw new Error("Failed to fetch recent fills from PostgreSQL");
+    const data = await res.json();
+    const fills = data.fills || [];
+    
+    // Limit to previous 30 fills (same logic as settlements)
+    const recentFills = fills.slice(0, 30);
+    
+    const recentTradesTableBody = document.querySelector('#recentTradesTable tbody');
+    if (!recentTradesTableBody) return;
+    recentTradesTableBody.innerHTML = '';
+    
+    if (recentFills.length === 0) {
+      // Show "No Fills" message
+      const noFillsRow = document.createElement('tr');
+      noFillsRow.innerHTML = '<td colspan="7" style="text-align: center; color: #ccc; padding: 20px;">No Fills</td>';
+      recentTradesTableBody.appendChild(noFillsRow);
+      return;
+    }
+    
+    recentFills.forEach(fill => {
+      // Parse the created_time to extract date and time
+      const createdTime = new Date(fill.created_time);
+      const dateCell = createdTime.toLocaleDateString();
+      const timeCell = createdTime.toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: false 
+      });
+      // Contract: extract the part before '-T', then last two digits as hour
+      let contract = '';
+      if (fill.ticker) {
+        const tickerMain = fill.ticker.split('-T')[0];
+        const hourMatch = tickerMain.match(/(\d{2})$/);
+        if (hourMatch) {
+          const hour = parseInt(hourMatch[1], 10);
+          const ampm = hour >= 12 ? 'pm' : 'am';
+          const displayHour = hour === 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+          contract = `BTC ${displayHour}${ampm}`;
+        } else {
+          contract = fill.ticker;
+        }
+      }
+      
+      // Strike: extract number after "-T" at the end of the string
+      let strike = '';
+      if (fill.ticker) {
+        // Find the number after "-T" at the end
+        const strikeMatch = fill.ticker.match(/-T(\d+\.?\d*)$/);
+        if (strikeMatch) {
+          const strikeValue = Math.round(parseFloat(strikeMatch[1]));
+          strike = `$${strikeValue.toLocaleString()}`;
+        }
+      }
+      // Side: force display as 'Y' for YES and 'N' for NO, and use original for Buy
+      let side = '';
+      let buy = '';
+      if (fill.side) {
+        const s = fill.side.toUpperCase();
+        side = s === 'YES' ? 'Y' : (s === 'NO' ? 'N' : s);
+        // Convert price from cents to dollars
+        const price = s === 'YES' ? fill.yes_price : fill.no_price;
+        if (price != null) {
+          const priceInDollars = price / 100;
+          buy = priceInDollars.toFixed(2);
+        } else {
+          buy = '';
+        }
+      }
+      // Pos: count
+      const pos = fill.count != null ? fill.count : '';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${dateCell}</td>
+        <td>${timeCell}</td>
+        <td>${contract}</td>
+        <td>${strike}</td>
+        <td>${side}</td>
+        <td>${pos}</td>
+        <td>${buy}</td>
+      `;
+      recentTradesTableBody.appendChild(tr);
+    });
+  } catch (err) {
+    console.error('Error fetching recent fills from PostgreSQL:', err);
   }
 }
 
@@ -2597,7 +2691,7 @@ async function fetchAndRenderPositions() {
   try {
     const response = await fetch('/api/db/positions', { cache: 'no-store' });
     if (!response.ok) {
-      throw new Error('Failed to fetch positions data');
+      throw new Error('Failed to fetch positions data from PostgreSQL');
     }
     
     const data = await response.json();
@@ -2637,7 +2731,7 @@ async function fetchAndRenderPositions() {
       `).join("");
     
   } catch (error) {
-    console.error('Error fetching positions:', error);
+    console.error('Error fetching positions from PostgreSQL:', error);
     const openPositionsTableBody = document.querySelector('#openPositionsTable tbody');
     if (openPositionsTableBody) {
       openPositionsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #dc3545; padding: 20px;">Error loading positions</td></tr>';
@@ -2652,7 +2746,7 @@ async function fetchAndRenderSettlements() {
   try {
     const response = await fetch('/api/db/settlements', { cache: 'no-store' });
     if (!response.ok) {
-      throw new Error('Failed to fetch settlements data');
+      throw new Error('Failed to fetch settlements data from PostgreSQL');
     }
     
     const data = await response.json();
@@ -2675,29 +2769,59 @@ async function fetchAndRenderSettlements() {
       return;
     }
     
-    // Render settlements data using the same logic as account_manager.html
-    settlementsTableBody.innerHTML = recentSettlements.map(s => {
-      // Convert revenue from cents to dollars
-      const revenueInDollars = s.revenue / 100;
-      const formattedRevenue = revenueInDollars.toLocaleString(undefined, { 
-        minimumFractionDigits: 0, 
-        maximumFractionDigits: 0 
-      });
-      
-      return `
-        <tr>
-          <td>${s.ticker}</td>
-          <td>${s.market_result === "yes" ? "Y" : "N"}</td>
-          <td>${s.yes_count}</td>
-          <td>${s.no_count}</td>
-          <td>$${formattedRevenue}</td>
-          <td>${new Date(s.settled_time).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
-        </tr>
-      `;
-    }).join("");
+    // Render settlements data
+    settlementsTableBody.innerHTML = recentSettlements
+      .map(s => {
+        // Format ticker for display
+        let ticker = s.ticker || '';
+        if (ticker.includes('-T')) {
+          const parts = ticker.split('-T');
+          if (parts.length >= 2) {
+            const timePart = parts[1];
+            const hourMatch = timePart.match(/(\d{2})/);
+            if (hourMatch) {
+              const hour = parseInt(hourMatch[1], 10);
+              const ampm = hour >= 12 ? 'pm' : 'am';
+              const displayHour = hour === 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+              ticker = `BTC ${displayHour}${ampm}`;
+            }
+          }
+        }
+        
+        // Format revenue
+        const revenue = s.revenue != null ? (s.revenue / 100).toFixed(2) : '0.00';
+        
+        // Format settled time
+        let settledTime = '';
+        if (s.settled_time) {
+          try {
+            const settledDate = new Date(s.settled_time);
+            settledTime = settledDate.toLocaleTimeString("en-US", { 
+              timeZone: "America/New_York", 
+              hour12: false, 
+              hour: '2-digit', 
+              minute: '2-digit', 
+              second: '2-digit' 
+            });
+          } catch (e) {
+            settledTime = s.settled_time;
+          }
+        }
+        
+        return `
+          <tr>
+            <td>${ticker}</td>
+            <td>${s.market_result || ''}</td>
+            <td>${s.yes_count || 0}</td>
+            <td>${s.no_count || 0}</td>
+            <td>$${revenue}</td>
+            <td>${settledTime}</td>
+          </tr>
+        `;
+      }).join("");
     
   } catch (error) {
-    console.error('Error fetching settlements:', error);
+    console.error('Error fetching settlements from PostgreSQL:', error);
     const settlementsTableBody = document.querySelector('#settlementsTable tbody');
     if (settlementsTableBody) {
       settlementsTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #dc3545; padding: 20px;">Error loading settlements</td></tr>';
