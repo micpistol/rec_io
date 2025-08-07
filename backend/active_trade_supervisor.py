@@ -1192,10 +1192,10 @@ def start_monitoring_loop():
                         with open(auto_stop_settings_path, "r") as f:
                             momentum_settings = json.load(f)
                             momentum_spike_enabled = momentum_settings.get("momentum_spike_enabled", True)
-                            momentum_spike_threshold = momentum_settings.get("momentum_spike_threshold", 35)
+                            momentum_spike_threshold = momentum_settings.get("momentum_spike_threshold", 35) / 100.0  # Convert percentage to decimal
                     else:
                         momentum_spike_enabled = True
-                        momentum_spike_threshold = 35
+                        momentum_spike_threshold = 35 / 100.0  # Convert percentage to decimal
                     
                     # Only proceed if momentum spike is enabled
                     if momentum_spike_enabled:
