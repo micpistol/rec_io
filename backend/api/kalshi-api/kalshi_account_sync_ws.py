@@ -20,7 +20,6 @@ from backend.core.config.settings import config
 from backend.account_mode import get_account_mode
 import requests
 import json
-import sqlite3
 import threading
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -131,16 +130,7 @@ API_HEADERS = {
     "User-Agent": "KalshiWatcher/1.0"
 }
 
-DB_PATH = os.path.join(get_kalshi_data_dir(), "kalshi_market_log.db")
-JSON_SNAPSHOT_PATH = os.path.join(get_kalshi_data_dir(), "latest_market_snapshot.json")
-HEARTBEAT_PATH = os.path.join(get_kalshi_data_dir(), "kalshi_logger_heartbeat.txt")
-
-POLL_INTERVAL_SECONDS = 1
-
 EST = ZoneInfo("America/New_York")
-
-# Ensure data directory exists
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 last_failed_ticker = None  # Global tracker
 
@@ -227,71 +217,7 @@ def fetch_event_json(event_ticker):
         print(f"[{datetime.now()}] ❌ Exception fetching event JSON: {e}")
         return None
 
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS market_data (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            event_ticker TEXT NOT NULL,
-            strike REAL,
-            yes_bid REAL,
-            yes_ask REAL,
-            no_bid REAL,
-            no_ask REAL,
-            last_price REAL,
-            volume INTEGER
-        )
-    """)
-    conn.commit()
-    return conn
 
-def save_market_data(conn, event_ticker, markets):
-    c = conn.cursor()
-    timestamp = datetime.now(EST).isoformat()
-    rows = []
-    for market in markets:
-        rows.append((
-            timestamp,
-            event_ticker,
-            market.get("floor_strike"),
-            market.get("yes_bid"),
-            market.get("yes_ask"),
-            market.get("no_bid"),
-            market.get("no_ask"),
-            market.get("last_price"),
-            market.get("volume"),
-        ))
-    print(f"[{datetime.now(EST)}] Attempting to save {len(rows)} market data rows to DB at {DB_PATH}...")
-    try:
-        c.executemany("""
-            INSERT INTO market_data (
-                timestamp, event_ticker, strike, yes_bid, yes_ask, no_bid, no_ask, last_price, volume
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, rows)
-        conn.commit()
-        print(f"[{datetime.now(EST)}] ✅ Market data saved successfully.")
-    except Exception as e:
-        print(f"[{datetime.now(EST)}] ❌ Failed to save market data: {e}")
-
-def save_json_snapshot(data):
-    print(f"[{datetime.now(EST)}] Attempting to write JSON snapshot to {JSON_SNAPSHOT_PATH}...")
-    try:
-        with open(JSON_SNAPSHOT_PATH, "w") as f:
-            json.dump(data, f, indent=2)
-        print(f"[{datetime.now(EST)}] ✅ JSON snapshot written successfully.")
-    except Exception as e:
-        print(f"[{datetime.now(EST)}] ❌ Failed to write JSON snapshot: {e}")
-
-def write_heartbeat():
-    print(f"[{datetime.now(EST)}] Attempting to write heartbeat to {HEARTBEAT_PATH}...")
-    try:
-        with open(HEARTBEAT_PATH, "w") as f:
-            f.write(f"{datetime.now(EST).isoformat()} Kalshi logger alive\n")
-        print(f"[{datetime.now(EST)}] ✅ Heartbeat written successfully.")
-    except Exception as e:
-        print(f"[{datetime.now(EST)}] ❌ Failed to write heartbeat: {e}")
 
 def sync_balance():
     print("⏱ Sync attempt...")
@@ -344,47 +270,12 @@ def sync_balance():
 
 
 
-# --- New sync functions for positions, fills, settlements using SQLite ---
+# --- New sync functions for positions, fills, settlements using PostgreSQL ---
 
 
 
 def sync_positions():
-    POSITIONS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", get_account_mode(), "positions.db")
-    os.makedirs(os.path.dirname(POSITIONS_DB_PATH), exist_ok=True)
-    # Ensure positions table exists with new schema
-    with sqlite3.connect(POSITIONS_DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS positions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticker TEXT,
-                total_traded INTEGER,
-                position INTEGER,
-                market_exposure INTEGER,
-                realized_pnl REAL,
-                fees_paid REAL,
-                last_updated_ts TEXT,
-                raw_json TEXT
-            )
-        """)
-        conn.commit()
-
-        # --- Ensure ticker uniqueness for UPSERT logic ---
-        # 1) Deduplicate existing rows (keep the first row per ticker)
-        c.execute("""
-            DELETE FROM positions
-            WHERE id NOT IN (
-                SELECT MIN(id)
-                FROM positions
-                GROUP BY ticker
-            )
-        """)
-        conn.commit()
-
-        # 2) Create a UNIQUE index on ticker if it doesn't already exist
-        c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_positions_ticker ON positions (ticker)")
-        conn.commit()
-        # -------------------------------------------------
+    # PostgreSQL only - no legacy database paths needed
     print("⏱ Syncing recent positions...")
     method = "GET"
     path = "/portfolio/positions"
@@ -446,32 +337,7 @@ def sync_positions():
 
     LAST_POSITIONS_HASH = snapshot_hash
     # ------------------------------------------------------------
-    # Write to positions.db, replacing all
-    with sqlite3.connect(POSITIONS_DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute("DELETE FROM positions")
-        for p in all_market_positions:
-            try:
-                ticker = p.get("ticker")
-                total_traded = p.get("total_traded")
-                position_value = p.get("position")
-                market_exposure = p.get("market_exposure")
-                realized_pnl = float(p.get("realized_pnl")) / 100 if p.get("realized_pnl") is not None else None
-                fees_paid = float(p.get("fees_paid")) / 100 if p.get("fees_paid") is not None else None
-                last_updated_ts = p.get("last_updated_ts")
-                raw_json = json.dumps(p)
-
-                c.execute("""
-                    INSERT INTO positions
-                    (ticker, total_traded, position, market_exposure, realized_pnl, fees_paid, last_updated_ts, raw_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (ticker, total_traded, position_value, market_exposure, realized_pnl, fees_paid, last_updated_ts, raw_json))
-            except Exception as e:
-                print(f"❌ Failed to insert position {p.get('ticker')}: {e}")
-        conn.commit()
-    print(f"💾 All positions written to {POSITIONS_DB_PATH}")
-
-    # Also write to PostgreSQL
+    # Write to PostgreSQL
     try:
         pg_conn = get_postgresql_connection()
         if pg_conn:
@@ -506,15 +372,7 @@ def sync_positions():
     except Exception as pg_err:
         print(f"❌ Failed to write positions to PostgreSQL: {pg_err}")
 
-    # Also save market_positions and event_positions to positions.json in the same folder
-    positions_json_path = os.path.join(os.path.dirname(POSITIONS_DB_PATH), "positions.json")
-    try:
-        with open(positions_json_path, "w") as f:
-            json.dump({"market_positions": all_market_positions, "event_positions": all_event_positions}, f, indent=2)
-        print(f"💾 market_positions and event_positions written to {positions_json_path}")
-    except Exception as e:
-        print(f"❌ Failed to write positions.json: {e}")
-
+    # JSON writing removed - PostgreSQL only
     notify_frontend_db_change("positions", {"market_positions": len(all_market_positions), "event_positions": len(all_event_positions)})
     
     # Notify trade_manager about positions update
@@ -534,19 +392,7 @@ def sync_positions():
 
 
 def sync_fills():
-    FILLS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", get_account_mode(), "fills.db")
-    os.makedirs(os.path.dirname(FILLS_DB_PATH), exist_ok=True)
-    # Ensure fills table exists
-    with sqlite3.connect(FILLS_DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS fills (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                trade_id TEXT UNIQUE,
-                data TEXT
-            )
-        """)
-        conn.commit()
+    # PostgreSQL only - no legacy database paths needed
     print("⏱ Syncing recent fills...")
     method = "GET"
     path = "/portfolio/fills"
@@ -593,41 +439,7 @@ def sync_fills():
     else:
         print("⚠️ API returned zero fills.")
     # ------------------------------------------------------------
-
-    # Write to SQLite with deduplication
-    with sqlite3.connect(FILLS_DB_PATH) as conn:
-        c = conn.cursor()
-        # Get all existing trade_ids
-        c.execute("SELECT trade_id FROM fills")
-        existing_ids = set(row[0] for row in c.fetchall())
-        new_count = 0
-        for fill in all_fills:
-            trade_id = fill.get("trade_id")
-            if not trade_id or trade_id in existing_ids:
-                continue
-            ticker = fill.get("ticker")
-            order_id = fill.get("order_id")
-            side = fill.get("side")
-            action = fill.get("action")
-            count = fill.get("count")
-            yes_price = float(fill.get("yes_price")) / 100 if fill.get("yes_price") is not None else None
-            no_price = float(fill.get("no_price")) / 100 if fill.get("no_price") is not None else None
-            is_taker = fill.get("is_taker")
-            created_time = fill.get("created_time")
-            raw_json = json.dumps(fill)
-
-            try:
-                c.execute("""
-                    INSERT OR IGNORE INTO fills
-                    (trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time, raw_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time, raw_json))
-                new_count += 1
-            except Exception as e:
-                print(f"❌ Failed to insert fill {trade_id}: {e}")
-        conn.commit()
-        
-        # Write to PostgreSQL (write all fills, let PostgreSQL handle duplicates)
+    # Write to PostgreSQL (write all fills, let PostgreSQL handle duplicates)
         try:
             pg_conn = get_postgresql_connection()
             if pg_conn:
@@ -667,15 +479,8 @@ def sync_fills():
         except Exception as pg_err:
             print(f"❌ Failed to write fills to PostgreSQL: {pg_err}")
         
-        # Save all_fills to fills.json in the same folder
-        fills_json_path = os.path.join(os.path.dirname(FILLS_DB_PATH), "fills.json")
-        try:
-            with open(fills_json_path, "w") as f:
-                json.dump({"fills": all_fills}, f, indent=2)
-            print(f"💾 fills snapshot written to {fills_json_path}")
-        except Exception as e:
-            print(f"❌ Failed to write fills.json: {e}")
-    print(f"💾 {new_count} new fills written to {FILLS_DB_PATH}")
+        # JSON writing removed - PostgreSQL only
+    print(f"💾 Fills written to PostgreSQL only")
 
     notify_frontend_db_change("fills", {"fills": len(all_fills)})
     
@@ -696,26 +501,7 @@ def sync_fills():
 
 
 def sync_settlements():
-    SETTLEMENTS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", get_account_mode(), "settlements.db")
-    os.makedirs(os.path.dirname(SETTLEMENTS_DB_PATH), exist_ok=True)
-    # Ensure settlements table exists
-    with sqlite3.connect(SETTLEMENTS_DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS settlements (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticker TEXT,
-                market_result TEXT,
-                yes_count INTEGER,
-                yes_total_cost REAL,
-                no_count INTEGER,
-                no_total_cost REAL,
-                revenue REAL,
-                settled_time TEXT,
-                raw_json TEXT
-            )
-        """)
-        conn.commit()
+    # PostgreSQL only - no legacy database paths needed
     print("⏱ Syncing recent settlements...")
     method = "GET"
     path = "/portfolio/settlements"
@@ -753,42 +539,10 @@ def sync_settlements():
         print(f"❌ Failed to fetch settlements: {e}")
         return
 
-    # Transform settlements for insertion
-    new_settlements = []
-    for settlement in all_settlements:
-        new_settlements.append((
-            settlement.get("ticker"),
-            settlement.get("market_result"),
-            settlement.get("yes_count"),
-            float(settlement.get("yes_total_cost", 0)) / 100 if settlement.get("yes_total_cost") is not None else None,
-            settlement.get("no_count"),
-            float(settlement.get("no_total_cost", 0)) / 100 if settlement.get("no_total_cost") is not None else None,
-            float(settlement.get("revenue", 0)) / 100 if settlement.get("revenue") is not None else None,
-            settlement.get("settled_time"),
-            json.dumps(settlement)
-        ))
-
-    # Insert all settlements with duplicate handling
-    def sync_log(msg):
-        print(msg)
-
-    with sqlite3.connect(SETTLEMENTS_DB_PATH) as db:
-        try:
-            db.executemany("""
-                INSERT INTO settlements
-                (ticker, market_result, yes_count, yes_total_cost, no_count, no_total_cost, revenue, settled_time, raw_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, new_settlements)
-        except sqlite3.IntegrityError as e:
-            if "UNIQUE constraint failed" in str(e):
-                sync_log("⚠️ Some settlements already existed in DB — skipping duplicates")
-            else:
-                raise
-        else:
-            db.commit()
-    print(f"💾 {len(new_settlements)} new settlements written to {SETTLEMENTS_DB_PATH}")
+    # Transform settlements for PostgreSQL insertion
+    # PostgreSQL only
     
-    # Also write to PostgreSQL
+    # Write to PostgreSQL
     try:
         pg_conn = get_postgresql_connection()
         if pg_conn:
@@ -821,68 +575,12 @@ def sync_settlements():
     except Exception as pg_err:
         print(f"❌ Failed to write settlements to PostgreSQL: {pg_err}")
     
-    # Also write to settlements.json for frontend consumption
-    settlements_json_path = os.path.join(os.path.dirname(SETTLEMENTS_DB_PATH), "settlements.json")
-    try:
-        # Transform settlements back to JSON format for frontend
-        settlements_for_json = []
-        for settlement in all_settlements:
-            settlements_for_json.append({
-                "ticker": settlement.get("ticker"),
-                "market_result": settlement.get("market_result"),
-                "yes_count": settlement.get("yes_count"),
-                "yes_total_cost": settlement.get("yes_total_cost"),
-                "no_count": settlement.get("no_count"),
-                "no_total_cost": settlement.get("no_total_cost"),
-                "revenue": settlement.get("revenue"),
-                "settled_time": settlement.get("settled_time")
-            })
-        
-        with open(settlements_json_path, "w") as f:
-            json.dump({"settlements": settlements_for_json}, f, indent=2)
-        print(f"💾 settlements.json updated at {settlements_json_path}")
-    except Exception as e:
-        print(f"❌ Failed to write settlements.json: {e}")
-
+    # JSON writing removed - PostgreSQL only
     notify_frontend_db_change("settlements", {"settlements": len(all_settlements)})
 
 
 def sync_orders():
-    ORDERS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", get_account_mode(), "orders.db")
-    os.makedirs(os.path.dirname(ORDERS_DB_PATH), exist_ok=True)
-    # Ensure orders table exists
-    with sqlite3.connect(ORDERS_DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS orders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                order_id TEXT UNIQUE,
-                user_id TEXT,
-                ticker TEXT,
-                status TEXT,
-                action TEXT,
-                side TEXT,
-                type TEXT,
-                yes_price INTEGER,
-                no_price INTEGER,
-                initial_count INTEGER,
-                remaining_count INTEGER,
-                fill_count INTEGER,
-                created_time TEXT,
-                expiration_time TEXT,
-                last_update_time TEXT,
-                client_order_id TEXT,
-                order_group_id TEXT,
-                queue_position INTEGER,
-                self_trade_prevention_type TEXT,
-                maker_fees INTEGER,
-                taker_fees INTEGER,
-                maker_fill_cost INTEGER,
-                taker_fill_cost INTEGER,
-                raw_json TEXT
-            )
-        """)
-        conn.commit()
+    # PostgreSQL only - no legacy database paths needed
     print("⏱ Syncing recent orders...")
     method = "GET"
     path = "/portfolio/orders"
@@ -929,65 +627,12 @@ def sync_orders():
     else:
         print("⚠️ API returned zero orders.")
     # ------------------------------------------------------------
-
-    # Deduplicate/appends to orders.db by order_id
-    with sqlite3.connect(ORDERS_DB_PATH) as conn:
-        c = conn.cursor()
-        # Get all existing order_ids
-        c.execute("SELECT order_id FROM orders")
-        existing_ids = set(row[0] for row in c.fetchall())
-        new_count = 0
-        for order in all_orders:
-            order_id = order.get("order_id")
-            if not order_id or order_id in existing_ids:
-                continue
-            
-            try:
-                c.execute("""
-                    INSERT OR IGNORE INTO orders
-                    (order_id, user_id, ticker, status, action, side, type, yes_price, no_price,
-                     initial_count, remaining_count, fill_count, created_time, expiration_time,
-                     last_update_time, client_order_id, order_group_id, queue_position,
-                     self_trade_prevention_type, maker_fees, taker_fees, maker_fill_cost,
-                     taker_fill_cost, raw_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    order_id,
-                    order.get("user_id"),
-                    order.get("ticker"),
-                    order.get("status"),
-                    order.get("action"),
-                    order.get("side"),
-                    order.get("type"),
-                    order.get("yes_price"),
-                    order.get("no_price"),
-                    order.get("initial_count"),
-                    order.get("remaining_count"),
-                    order.get("fill_count"),
-                    order.get("created_time"),
-                    order.get("expiration_time"),
-                    order.get("last_update_time"),
-                    order.get("client_order_id"),
-                    order.get("order_group_id"),
-                    order.get("queue_position"),
-                    order.get("self_trade_prevention_type"),
-                    order.get("maker_fees"),
-                    order.get("taker_fees"),
-                    order.get("maker_fill_cost"),
-                    order.get("taker_fill_cost"),
-                    json.dumps(order)
-                ))
-                new_count += 1
-            except Exception as e:
-                print(f"❌ Failed to insert order {order_id}: {e}")
-        conn.commit()
-        
-        # Also write to PostgreSQL
+    # Write to PostgreSQL
         try:
             pg_conn = get_postgresql_connection()
             if pg_conn:
                 with pg_conn.cursor() as cursor:
-                    # Get existing order_ids from PostgreSQL (same deduplication logic as SQLite)
+                    # Get existing order_ids from PostgreSQL
                     cursor.execute("SELECT order_id FROM users.orders_0001")
                     pg_existing_ids = set(row[0] for row in cursor.fetchall())
                     
@@ -1044,15 +689,8 @@ def sync_orders():
         except Exception as pg_err:
             print(f"❌ Failed to write orders to PostgreSQL: {pg_err}")
         
-        # Save all_orders to orders.json in the same folder
-        orders_json_path = os.path.join(os.path.dirname(ORDERS_DB_PATH), "orders.json")
-        try:
-            with open(orders_json_path, "w") as f:
-                json.dump({"orders": all_orders}, f, indent=2)
-            print(f"💾 orders snapshot written to {orders_json_path}")
-        except Exception as e:
-            print(f"❌ Failed to write orders.json: {e}")
-    print(f"💾 {new_count} new orders written to {ORDERS_DB_PATH}")
+        # JSON writing removed - PostgreSQL only
+    print(f"💾 Orders written to PostgreSQL only")
 
     notify_frontend_db_change("orders", {"orders": len(all_orders)})
 
@@ -1283,38 +921,46 @@ class KalshiWebSocketSync:
             print(f"[{datetime.now(EST)}] ❌ Error in triggered settlements sync: {e}")
     
     async def write_market_position_to_db(self, position_data):
-        """Write market position data to database"""
+        """Write market position data to PostgreSQL database"""
         try:
-            POSITIONS_DB_PATH = os.path.join(get_accounts_data_dir(), "kalshi", get_account_mode(), "positions.db")
-            
-            with sqlite3.connect(POSITIONS_DB_PATH) as conn:
-                c = conn.cursor()
-                
-                # Insert or update market position
-                c.execute("""
-                    INSERT OR REPLACE INTO positions (
-                        ticker, total_traded, position, market_exposure, 
-                        realized_pnl, fees_paid, last_updated_ts, raw_json
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    position_data.get('market_ticker'),
-                    position_data.get('volume', 0),
-                    position_data.get('position', 0),
-                    position_data.get('position_cost', 0),
-                    position_data.get('realized_pnl', 0),
-                    position_data.get('fees_paid', 0),
-                    datetime.now(EST).isoformat(),
-                    json.dumps(position_data)
-                ))
-                
-                conn.commit()
-                print(f"[{datetime.now(EST)}] 💾 Market position updated in database")
-                
-                # Notify frontend and trade manager
-                notify_frontend_db_change("positions", {"positions": 1})
+            # Write to PostgreSQL
+            pg_conn = get_postgresql_connection()
+            if pg_conn:
+                with pg_conn.cursor() as cursor:
+                    cursor.execute("""
+                        INSERT INTO users.positions_0001
+                        (ticker, total_traded, position, market_exposure, realized_pnl, fees_paid, last_updated_ts, raw_json)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (ticker) DO UPDATE SET
+                        total_traded = EXCLUDED.total_traded,
+                        position = EXCLUDED.position,
+                        market_exposure = EXCLUDED.market_exposure,
+                        realized_pnl = EXCLUDED.realized_pnl,
+                        fees_paid = EXCLUDED.fees_paid,
+                        last_updated_ts = EXCLUDED.last_updated_ts,
+                        raw_json = EXCLUDED.raw_json
+                    """, (
+                        position_data.get('market_ticker'),
+                        position_data.get('volume', 0),
+                        position_data.get('position', 0),
+                        position_data.get('position_cost', 0),
+                        position_data.get('realized_pnl', 0),
+                        position_data.get('fees_paid', 0),
+                        datetime.now(EST).isoformat(),
+                        json.dumps(position_data)
+                    ))
+                    
+                    pg_conn.commit()
+                    print(f"[{datetime.now(EST)}] 💾 Market position updated in PostgreSQL")
+                    
+                    # Notify frontend and trade manager
+                    notify_frontend_db_change("positions", {"positions": 1})
+                pg_conn.close()
+            else:
+                print(f"[{datetime.now(EST)}] ❌ No PostgreSQL connection available")
                 
         except Exception as e:
-            print(f"[{datetime.now(EST)}] ❌ Error writing market position to database: {e}")
+            print(f"[{datetime.now(EST)}] ❌ Error writing market position to PostgreSQL: {e}")
     
 
     

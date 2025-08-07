@@ -2752,8 +2752,13 @@ async function fetchAndRenderSettlements() {
     const data = await response.json();
     const allSettlements = data.settlements || [];
     
-    // Limit to previous 30 settlements
-    const recentSettlements = allSettlements.slice(0, 30);
+    // Sort by settled time from latest to oldest, then limit to previous 30 settlements
+    const sortedSettlements = allSettlements.sort((a, b) => {
+      const timeA = new Date(a.settled_time || 0);
+      const timeB = new Date(b.settled_time || 0);
+      return timeB - timeA; // Latest first
+    });
+    const recentSettlements = sortedSettlements.slice(0, 30);
     
     const settlementsTableBody = document.querySelector('#settlementsTable tbody');
     if (!settlementsTableBody) return;
@@ -2772,21 +2777,8 @@ async function fetchAndRenderSettlements() {
     // Render settlements data
     settlementsTableBody.innerHTML = recentSettlements
       .map(s => {
-        // Format ticker for display
-        let ticker = s.ticker || '';
-        if (ticker.includes('-T')) {
-          const parts = ticker.split('-T');
-          if (parts.length >= 2) {
-            const timePart = parts[1];
-            const hourMatch = timePart.match(/(\d{2})/);
-            if (hourMatch) {
-              const hour = parseInt(hourMatch[1], 10);
-              const ampm = hour >= 12 ? 'pm' : 'am';
-              const displayHour = hour === 0 ? 12 : (hour > 12 ? hour - 12 : hour);
-              ticker = `BTC ${displayHour}${ampm}`;
-            }
-          }
-        }
+        // Use unformatted ticker string from database
+        const ticker = s.ticker || '';
         
         // Format revenue
         const revenue = s.revenue != null ? (s.revenue / 100).toFixed(2) : '0.00';
