@@ -1,18 +1,18 @@
 # **ACTIVE_TRADE_SUPERVISOR SQLITE MIGRATION CHECKLIST**
 
 ## **Current Status:**
-- **ATS is partially migrated to PostgreSQL** - BTC price reads now use PostgreSQL with symbol-specific functionality
-- **26 remaining SQLite operations** found across 2 databases (`active_trades.db` and `trades.db`)
+- **ATS is partially migrated to PostgreSQL** - BTC price reads and trade data reads now use PostgreSQL
+- **25 remaining SQLite operations** found across 1 database (`active_trades.db`)
 
 ## **SQLite Operations to Migrate:**
 
-### **1. READS FROM `trades.db` (6 operations)**
-- [ ] **Line 223**: `SELECT id, ticket_id, date, time, strike, side, buy_price, position, contract, ticker, symbol, market, trade_strategy, symbol_open, momentum, prob, fees, diff FROM trades WHERE status = 'open'`
-- [ ] **Line 295**: `SELECT id FROM trades WHERE status = 'open'`
-- [ ] **Line 501**: `SELECT id, ticket_id, date, time, strike, side, buy_price, position, contract, ticker, symbol, market, trade_strategy, symbol_open, momentum, prob, fees, diff FROM trades WHERE id = ? AND status = 'open'`
-- [ ] **Line 601**: `SELECT id, ticket_id, date, time, strike, side, buy_price, position, contract, ticker, symbol, market, trade_strategy, symbol_open, momentum, prob, fees, diff FROM trades WHERE id = ? AND status = 'pending'`
-- [ ] **Line 694**: `SELECT id, ticket_id, date, time, strike, side, buy_price, position, contract, ticker, symbol, market, trade_strategy, symbol_open, momentum, prob, fees, diff FROM trades WHERE id = ? AND status = 'open'`
-- [ ] **Line 1540**: `SELECT id FROM trades WHERE status = 'open'`
+### **1. READS FROM `trades.db` (6 operations) - ✅ COMPLETED**
+- [x] **Line 223**: `SELECT id, ticket_id, date, time, strike, side, buy_price, position, contract, ticker, symbol, market, trade_strategy, symbol_open, momentum, prob, fees, diff FROM users.trades_0001 WHERE status = 'open'`
+- [x] **Line 295**: `SELECT id FROM users.trades_0001 WHERE status = 'open'`
+- [x] **Line 501**: `SELECT id, ticket_id, date, time, strike, side, buy_price, position, contract, ticker, symbol, market, trade_strategy, symbol_open, momentum, prob, fees, diff FROM users.trades_0001 WHERE id = %s AND status = 'open'`
+- [x] **Line 601**: `SELECT id, ticket_id, date, time, strike, side, buy_price, position, contract, ticker, symbol, market, trade_strategy, symbol_open, momentum, prob, fees, diff FROM users.trades_0001 WHERE id = %s AND status = 'pending'`
+- [x] **Line 694**: `SELECT id, ticket_id, date, time, strike, side, buy_price, position, contract, ticker, symbol, market, trade_strategy, symbol_open, momentum, prob, fees, diff FROM users.trades_0001 WHERE id = %s AND status = 'open'`
+- [x] **Line 1540**: `SELECT id FROM users.trades_0001 WHERE status = 'open'`
 
 ### **2. READS FROM `active_trades.db` (18 operations)**
 - [ ] **Line 239**: `SELECT trade_id FROM active_trades WHERE status = 'active'`
@@ -49,13 +49,13 @@
 ## **Migration Strategy:**
 
 ### **Phase 1: Create PostgreSQL Schema**
-- [ ] Create `users.active_trades_0001` table in PostgreSQL
-- [ ] Migrate existing `active_trades.db` data to PostgreSQL
+- [x] Create `users.active_trades_0001` table in PostgreSQL
+- [x] Migrate existing `active_trades.db` data to PostgreSQL
 - [ ] Update `get_db_connection()` to use PostgreSQL
 
-### **Phase 2: Migrate Trade Data Reads**
-- [ ] Replace all `trades.db` reads with `users.trades_0001` reads
-- [ ] Update `get_trades_db_connection()` to use PostgreSQL
+### **Phase 2: Migrate Trade Data Reads - ✅ COMPLETED**
+- [x] Replace all `trades.db` reads with `users.trades_0001` reads
+- [x] Update `get_trades_db_connection()` to use PostgreSQL
 
 ### **Phase 3: Migrate BTC Price Reads - ✅ COMPLETED**
 - [x] Replace `btc_price_history.db` reads with `live_data.btc_price_log` reads
@@ -64,18 +64,18 @@
 - [x] Updated monitoring to use symbol-specific pricing
 
 ### **Phase 4: Update All Functions**
-- [ ] `check_for_open_trades()` - migrate to PostgreSQL
-- [ ] `check_for_closed_trades()` - migrate to PostgreSQL
-- [ ] `add_new_active_trade()` - migrate to PostgreSQL
-- [ ] `add_pending_trade()` - migrate to PostgreSQL
-- [ ] `confirm_pending_trade()` - migrate to PostgreSQL
+- [x] `check_for_open_trades()` - migrate to PostgreSQL
+- [x] `check_for_closed_trades()` - migrate to PostgreSQL
+- [x] `add_new_active_trade()` - migrate to PostgreSQL
+- [x] `add_pending_trade()` - migrate to PostgreSQL
+- [x] `confirm_pending_trade()` - migrate to PostgreSQL
 - [ ] `remove_pending_trade()` - migrate to PostgreSQL
 - [ ] `remove_failed_trade()` - migrate to PostgreSQL
 - [ ] `remove_closed_trade()` - migrate to PostgreSQL
 - [ ] `update_trade_status_to_closing()` - migrate to PostgreSQL
 - [x] `get_current_btc_price()` - migrate to PostgreSQL (symbol-specific)
 - [x] `update_active_trade_monitoring_data()` - migrate to PostgreSQL (symbol-specific pricing)
-- [ ] `sync_with_trades_db()` - migrate to PostgreSQL
+- [x] `sync_with_trades_db()` - migrate to PostgreSQL
 
 ### **Phase 5: Testing**
 - [ ] Test all functions work with PostgreSQL only
@@ -84,6 +84,6 @@
 
 ## **Notes:**
 - ATS maintains its own `active_trades.db` for tracking active trades
-- ATS reads from `trades.db` to get trade data and check status
-- ATS reads from `btc_price_history.db` for price data
+- ATS reads from `users.trades_0001` to get trade data and check status ✅
+- ATS reads from `live_data.btc_price_log` for price data ✅
 - All operations need to be migrated to PostgreSQL equivalents 

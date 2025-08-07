@@ -238,7 +238,7 @@ def check_for_open_trades():
         # Get currently active trade IDs
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT trade_id FROM active_trades WHERE status = 'active'")
+        cursor.execute("SELECT trade_id FROM users.active_trades_0001 WHERE status = 'active'")
         active_trade_ids = {row[0] for row in cursor.fetchall()}
         conn.close()
         
@@ -261,7 +261,7 @@ def check_for_open_trades():
             # Start monitoring loop if there are any active trades
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
+            cursor.execute("SELECT COUNT(*) FROM users.active_trades_0001 WHERE status = 'active'")
             active_count = cursor.fetchone()[0]
             conn.close()
             
@@ -283,7 +283,7 @@ def check_for_closed_trades():
         # Get all active trade IDs
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT trade_id FROM active_trades WHERE status = 'active'")
+        cursor.execute("SELECT trade_id FROM users.active_trades_0001 WHERE status = 'active'")
         active_trade_ids = {row[0] for row in cursor.fetchall()}
         conn.close()
         
@@ -474,7 +474,7 @@ def init_active_trades_db():
 
 def get_db_connection():
     """Get database connection with appropriate timeout"""
-    return sqlite3.connect(ACTIVE_TRADES_DB_PATH, timeout=5.0, check_same_thread=False)
+    return get_postgresql_connection()
 
 def get_trades_db_connection():
     """Get connection to the main trades database"""
@@ -533,11 +533,11 @@ def add_new_active_trade(trade_id: int, ticket_id: str) -> bool:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO active_trades (
+            INSERT INTO users.active_trades_0001 (
                 trade_id, ticket_id, date, time, strike, side, buy_price, position,
                 contract, ticker, symbol, market, trade_strategy, symbol_open,
                 momentum, prob, fees, diff
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             trade_id, ticket_id, date, time, strike, side, buy_price, position,
             contract, ticker, symbol, market, trade_strategy, symbol_open,
@@ -581,7 +581,7 @@ def add_new_active_trade(trade_id: int, ticket_id: str) -> bool:
         # Start monitoring loop if this is the first active trade
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
+        cursor.execute("SELECT COUNT(*) FROM users.active_trades_0001 WHERE status = 'active'")
         active_count = cursor.fetchone()[0]
         conn.close()
         
@@ -633,11 +633,11 @@ def add_pending_trade(trade_id: int, ticket_id: str) -> bool:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO active_trades (
+            INSERT INTO users.active_trades_0001 (
                 trade_id, ticket_id, date, time, strike, side, buy_price, position,
                 contract, ticker, symbol, market, trade_strategy, symbol_open,
                 momentum, prob, fees, diff, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending')
         """, (
             trade_id, ticket_id, date, time, strike, side, buy_price, position,
             contract, ticker, symbol, market, trade_strategy, symbol_open,
@@ -674,7 +674,7 @@ def add_pending_trade(trade_id: int, ticket_id: str) -> bool:
         # Start monitoring loop if this is the first active trade
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
+        cursor.execute("SELECT COUNT(*) FROM users.active_trades_0001 WHERE status = 'active'")
         active_count = cursor.fetchone()[0]
         conn.close()
         
@@ -726,13 +726,13 @@ def confirm_pending_trade(trade_id: int, ticket_id: str) -> bool:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            UPDATE active_trades
+            UPDATE users.active_trades_0001
             SET status = 'active',
-                buy_price = ?,
-                position = ?,
-                fees = ?,
-                diff = ?
-            WHERE trade_id = ? AND status = 'pending'
+                buy_price = %s,
+                position = %s,
+                fees = %s,
+                diff = %s
+            WHERE trade_id = %s AND status = 'pending'
         """, (buy_price, position, fees, diff, trade_id))
         
         if cursor.rowcount == 0:
@@ -776,7 +776,7 @@ def confirm_pending_trade(trade_id: int, ticket_id: str) -> bool:
         # Start monitoring loop if this is the first active trade
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
+        cursor.execute("SELECT COUNT(*) FROM users.active_trades_0001 WHERE status = 'active'")
         active_count = cursor.fetchone()[0]
         conn.close()
         
@@ -805,8 +805,8 @@ def remove_pending_trade(trade_id: int, ticket_id: str) -> bool:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            DELETE FROM active_trades
-            WHERE trade_id = ? AND status = 'pending'
+            DELETE FROM users.active_trades_0001
+            WHERE trade_id = %s AND status = 'pending'
         """, (trade_id,))
         
         if cursor.rowcount == 0:
@@ -854,8 +854,8 @@ def remove_failed_trade(trade_id: int, ticket_id: str) -> bool:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            DELETE FROM active_trades
-            WHERE trade_id = ?
+            DELETE FROM users.active_trades_0001
+            WHERE trade_id = %s
         """, (trade_id,))
         
         if cursor.rowcount == 0:
@@ -901,7 +901,7 @@ def remove_closed_trade(trade_id: int) -> bool:
         # Check if trade exists before trying to remove it
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM active_trades WHERE trade_id = ?", (trade_id,))
+        cursor.execute("SELECT COUNT(*) FROM users.active_trades_0001 WHERE trade_id = %s", (trade_id,))
         exists = cursor.fetchone()[0] > 0
         conn.close()
         
@@ -912,7 +912,7 @@ def remove_closed_trade(trade_id: int) -> bool:
         # Remove the trade
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM active_trades WHERE trade_id = ?", (trade_id,))
+        cursor.execute("DELETE FROM users.active_trades_0001 WHERE trade_id = %s", (trade_id,))
         deleted_count = cursor.rowcount
         conn.commit()
         conn.close()
@@ -954,7 +954,7 @@ def update_trade_status_to_closing(trade_id: int) -> bool:
         # Check if trade exists in active_trades.db
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM active_trades WHERE trade_id = ?", (trade_id,))
+        cursor.execute("SELECT COUNT(*) FROM users.active_trades_0001 WHERE trade_id = %s", (trade_id,))
         exists = cursor.fetchone()[0] > 0
         conn.close()
         
@@ -965,7 +965,7 @@ def update_trade_status_to_closing(trade_id: int) -> bool:
         # Update the trade status to 'closing'
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("UPDATE active_trades SET status = 'closing' WHERE trade_id = ?", (trade_id,))
+        cursor.execute("UPDATE users.active_trades_0001 SET status = 'closing' WHERE trade_id = %s", (trade_id,))
         updated_count = cursor.rowcount
         conn.commit()
         conn.close()
@@ -1158,7 +1158,7 @@ def update_active_trade_monitoring_data():
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, trade_id, buy_price, prob, time, date, strike, side, momentum, ticker, symbol
-            FROM active_trades 
+            FROM users.active_trades_0001 
             WHERE status = 'active'
         """)
         active_trades = cursor.fetchall()
@@ -1235,15 +1235,15 @@ def update_active_trade_monitoring_data():
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute("""
-                    UPDATE active_trades 
-                    SET current_symbol_price = ?, 
-                        current_probability = ?,
-                        buffer_from_entry = ?,
-                        time_since_entry = ?,
-                        current_close_price = ?,
-                        current_pnl = ?,
+                    UPDATE users.active_trades_0001 
+                    SET current_symbol_price = %s, 
+                        current_probability = %s,
+                        buffer_from_entry = %s,
+                        time_since_entry = %s,
+                        current_close_price = %s,
+                        current_pnl = %s,
                         last_updated = CURRENT_TIMESTAMP
-                    WHERE id = ?
+                    WHERE id = %s
                 """, (current_symbol_price, current_probability, buffer_from_strike, time_since_entry, current_market_price, pnl_formatted, active_id))
                 conn.commit()
                 conn.close()
@@ -1272,7 +1272,7 @@ def check_monitoring_failsafe():
         # Check if there are active trades
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
+        cursor.execute("SELECT COUNT(*) FROM users.active_trades_0001 WHERE status = 'active'")
         active_count = cursor.fetchone()[0]
         conn.close()
         
@@ -1309,7 +1309,7 @@ def start_monitoring_loop():
                 # Check if there are still active trades
                 conn = get_db_connection()
                 cursor = conn.cursor()
-                cursor.execute("SELECT * FROM active_trades WHERE status = 'active'")
+                cursor.execute("SELECT * FROM users.active_trades_0001 WHERE status = 'active'")
                 columns = [desc[0] for desc in cursor.description]
                 active_trades = [dict(zip(columns, row)) for row in cursor.fetchall()]
                 conn.close()
@@ -1451,7 +1451,7 @@ def start_monitoring_loop():
             try:
                 conn = get_db_connection()
                 cursor = conn.cursor()
-                cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
+                cursor.execute("SELECT COUNT(*) FROM users.active_trades_0001 WHERE status = 'active'")
                 active_count = cursor.fetchone()[0]
                 conn.close()
                 
@@ -1506,7 +1506,7 @@ def export_active_trades_to_json():
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT * FROM active_trades WHERE status IN ('active', 'pending', 'closing')
+            SELECT * FROM users.active_trades_0001 WHERE status IN ('active', 'pending', 'closing')
         """)
         
         columns = [desc[0] for desc in cursor.description]
@@ -1541,7 +1541,7 @@ def get_all_active_trades() -> List[Dict[str, Any]]:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT * FROM active_trades WHERE status IN ('active', 'pending', 'closing')
+            SELECT * FROM users.active_trades_0001 WHERE status IN ('active', 'pending', 'closing')
         """)
         
         columns = [desc[0] for desc in cursor.description]
@@ -1570,7 +1570,7 @@ def sync_with_trades_db():
         # Get all active trade IDs
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT trade_id FROM active_trades WHERE status = 'active'")
+        cursor.execute("SELECT trade_id FROM users.active_trades_0001 WHERE status = 'active'")
         active_trade_ids = [row[0] for row in cursor.fetchall()]
         conn.close()
         
@@ -1615,7 +1615,7 @@ def start_event_driven_supervisor():
     # Check if there are already active trades and start monitoring if needed
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
+    cursor.execute("SELECT COUNT(*) FROM users.active_trades_0001 WHERE status = 'active'")
     active_count = cursor.fetchone()[0]
     conn.close()
     
@@ -1643,7 +1643,7 @@ def start_event_driven_supervisor():
             # If there are active trades but no monitoring thread, restart it
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM active_trades WHERE status = 'active'")
+            cursor.execute("SELECT COUNT(*) FROM users.active_trades_0001 WHERE status = 'active'")
             active_count = cursor.fetchone()[0]
             conn.close()
             
