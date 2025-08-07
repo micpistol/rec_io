@@ -151,22 +151,45 @@ class CascadingFailureDetector:
             return {"status": "error", "error": str(e)}
     
     def check_database_integrity(self) -> bool:
-        """Check if critical databases are accessible."""
+        """Check if critical PostgreSQL databases are accessible."""
         try:
-            from backend.util.paths import get_trade_history_dir, get_btc_price_history_dir
+            import psycopg2
             
-            # Check trades database
-            trades_db_path = os.path.join(get_trade_history_dir(), "trades.db")
-            if not os.path.exists(trades_db_path):
+            # Check trades database connection
+            try:
+                conn_trades = psycopg2.connect(
+                    host="localhost",
+                    database="rec_io_db",
+                    user="rec_io_user",
+                    password="rec_io_password"
+                )
+                cursor_trades = conn_trades.cursor()
+                cursor_trades.execute("SELECT 1 FROM users.trades_0001 LIMIT 1")
+                cursor_trades.fetchone()
+                conn_trades.close()
+            except Exception as e:
+                self._log_event(f"❌ Trades database connection failed: {e}")
                 return False
             
-            # Check price database
-            price_db_path = os.path.join(get_btc_price_history_dir(), "btc_price_history.db")
-            if not os.path.exists(price_db_path):
+            # Check live_data database connection
+            try:
+                conn_live_data = psycopg2.connect(
+                    host="localhost",
+                    database="rec_io_db",
+                    user="rec_io_user",
+                    password="rec_io_password"
+                )
+                cursor_live_data = conn_live_data.cursor()
+                cursor_live_data.execute("SELECT 1 FROM live_data.btc_price_log LIMIT 1")
+                cursor_live_data.fetchone()
+                conn_live_data.close()
+            except Exception as e:
+                self._log_event(f"❌ Live data database connection failed: {e}")
                 return False
             
             return True
-        except Exception:
+        except Exception as e:
+            self._log_event(f"❌ Database integrity check failed: {e}")
             return False
     
     def check_critical_files(self) -> bool:

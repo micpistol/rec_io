@@ -161,132 +161,147 @@ def sync_fills():
 
     # SQLite insertion will be handled later by write_fills_to_db()
 
-import sqlite3
+
 
 def write_settlements_to_db():
     global mode
-    print("💾 Writing settlements to SQLite database...")
+    print("💾 Writing settlements to PostgreSQL database...")
     settlements_path = os.path.join(get_accounts_data_dir(), "kalshi", mode, "settlements.json")
-    db_path = os.path.join(get_accounts_data_dir(), "kalshi", mode, "settlements.db")
-
-    # Ensure data directory exists
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
     with open(settlements_path, "r") as f:
         data = json.load(f)
         settlements = data.get("settlements", [])
 
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS settlements (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ticker TEXT,
-            market_result TEXT,
-            yes_count INTEGER,
-            yes_total_cost REAL,
-            no_count INTEGER,
-            no_total_cost REAL,
-            revenue REAL,
-            settled_time TEXT,
-            raw_json TEXT,
-            UNIQUE(ticker, settled_time)
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
         )
-    """)
+        c = conn.cursor()
 
-    for s in settlements:
-        ticker = s.get("ticker")
-        market_result = s.get("market_result")
-        yes_count = s.get("yes_count")
-        yes_total_cost = s.get("yes_total_cost")
-        no_count = s.get("no_count")
-        no_total_cost = s.get("no_total_cost")
-        revenue = s.get("revenue")
-        settled_time = s.get("settled_time")
-        raw_json = json.dumps(s)
+        # Create settlements table if it doesn't exist
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS users.settlements_0001 (
+                id SERIAL PRIMARY KEY,
+                ticker TEXT,
+                market_result TEXT,
+                yes_count INTEGER,
+                yes_total_cost DECIMAL(10,2),
+                no_count INTEGER,
+                no_total_cost DECIMAL(10,2),
+                revenue DECIMAL(10,2),
+                settled_time TEXT,
+                raw_json TEXT,
+                UNIQUE(ticker, settled_time)
+            )
+        """)
 
-        try:
-            revenue = float(revenue) / 100 if revenue is not None else None
-            yes_total_cost = float(yes_total_cost) / 100 if yes_total_cost is not None else None
-            no_total_cost = float(no_total_cost) / 100 if no_total_cost is not None else None
-        except Exception as e:
-            print(f"⚠️ Error formatting cost fields for {ticker} at {settled_time}: {e}")
-            continue
+        for s in settlements:
+            ticker = s.get("ticker")
+            market_result = s.get("market_result")
+            yes_count = s.get("yes_count")
+            yes_total_cost = s.get("yes_total_cost")
+            no_count = s.get("no_count")
+            no_total_cost = s.get("no_total_cost")
+            revenue = s.get("revenue")
+            settled_time = s.get("settled_time")
+            raw_json = json.dumps(s)
 
-        try:
-            c.execute("""
-                INSERT OR IGNORE INTO settlements
-                (ticker, market_result, yes_count, yes_total_cost, no_count, no_total_cost, revenue, settled_time, raw_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (ticker, market_result, yes_count, yes_total_cost, no_count, no_total_cost, revenue, settled_time, raw_json))
-        except Exception as e:
-            print(f"❌ Failed to insert settlement {ticker} at {settled_time}: {e}")
+            try:
+                revenue = float(revenue) / 100 if revenue is not None else None
+                yes_total_cost = float(yes_total_cost) / 100 if yes_total_cost is not None else None
+                no_total_cost = float(no_total_cost) / 100 if no_total_cost is not None else None
+            except Exception as e:
+                print(f"⚠️ Error formatting cost fields for {ticker} at {settled_time}: {e}")
+                continue
 
-    conn.commit()
-    conn.close()
-    print(f"✅ Settlements written to database at {db_path}")
+            try:
+                c.execute("""
+                    INSERT INTO users.settlements_0001
+                    (ticker, market_result, yes_count, yes_total_cost, no_count, no_total_cost, revenue, settled_time, raw_json)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (ticker, settled_time) DO NOTHING
+                """, (ticker, market_result, yes_count, yes_total_cost, no_count, no_total_cost, revenue, settled_time, raw_json))
+            except Exception as e:
+                print(f"❌ Failed to insert settlement {ticker} at {settled_time}: {e}")
+
+        conn.commit()
+        conn.close()
+        print(f"✅ Settlements written to PostgreSQL database")
+    except Exception as e:
+        print(f"❌ Failed to connect to PostgreSQL: {e}")
 
 def write_fills_to_db():
     global mode
-    print("💾 Writing fills to SQLite database...")
+    print("💾 Writing fills to PostgreSQL database...")
     fills_path = os.path.join(get_accounts_data_dir(), "kalshi", mode, "fills.json")
-    db_path = os.path.join(get_accounts_data_dir(), "kalshi", mode, "fills.db")
-
-    # Ensure data directory exists
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
     with open(fills_path, "r") as f:
         data = json.load(f)
         fills = data.get("fills", [])
 
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS fills (
-            trade_id TEXT PRIMARY KEY,
-            ticker TEXT,
-            order_id TEXT,
-            side TEXT,
-            action TEXT,
-            count INTEGER,
-            yes_price REAL,
-            no_price REAL,
-            is_taker BOOLEAN,
-            created_time TEXT,
-            raw_json TEXT
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
         )
-    """)
+        c = conn.cursor()
 
-    for fill in fills:
-        trade_id = fill.get("trade_id")
-        ticker = fill.get("ticker")
-        order_id = fill.get("order_id")
-        side = fill.get("side")
-        action = fill.get("action")
-        count = fill.get("count")
-        yes_price = float(fill.get("yes_price")) / 100 if fill.get("yes_price") is not None else None
-        no_price = float(fill.get("no_price")) / 100 if fill.get("no_price") is not None else None
-        is_taker = fill.get("is_taker")
-        created_time = fill.get("created_time")
-        raw_json = json.dumps(fill)
+        # Create fills table if it doesn't exist
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS users.fills_0001 (
+                trade_id TEXT PRIMARY KEY,
+                ticker TEXT,
+                order_id TEXT,
+                side TEXT,
+                action TEXT,
+                count INTEGER,
+                yes_price DECIMAL(10,2),
+                no_price DECIMAL(10,2),
+                is_taker BOOLEAN,
+                created_time TEXT,
+                raw_json TEXT
+            )
+        """)
 
-        try:
-            c.execute("""
-                INSERT OR IGNORE INTO fills
-                (trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time, raw_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time, raw_json))
-        except Exception as e:
-            print(f"❌ Failed to insert fill {trade_id}: {e}")
+        for fill in fills:
+            trade_id = fill.get("trade_id")
+            ticker = fill.get("ticker")
+            order_id = fill.get("order_id")
+            side = fill.get("side")
+            action = fill.get("action")
+            count = fill.get("count")
+            yes_price = float(fill.get("yes_price")) / 100 if fill.get("yes_price") is not None else None
+            no_price = float(fill.get("no_price")) / 100 if fill.get("no_price") is not None else None
+            is_taker = fill.get("is_taker")
+            created_time = fill.get("created_time")
+            raw_json = json.dumps(fill)
 
-    conn.commit()
-    conn.close()
-    print(f"✅ Fills written to database at {db_path}")
+            try:
+                c.execute("""
+                    INSERT INTO users.fills_0001
+                    (trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time, raw_json)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (trade_id) DO NOTHING
+                """, (trade_id, ticker, order_id, side, action, count, yes_price, no_price, is_taker, created_time, raw_json))
+            except Exception as e:
+                print(f"❌ Failed to insert fill {trade_id}: {e}")
+
+        conn.commit()
+        conn.close()
+        print(f"✅ Fills written to PostgreSQL database")
+    except Exception as e:
+        print(f"❌ Failed to connect to PostgreSQL: {e}")
 
 def write_positions_to_db():
     global mode
-    print("💾 Writing positions to SQLite database...")
+    print("💾 Writing positions to PostgreSQL database...")
     method = "GET"
     path = "/portfolio/positions"
     cursor = ""
@@ -336,48 +351,58 @@ def write_positions_to_db():
         json.dump({"market_positions": market_positions, "event_positions": event_positions}, f, indent=2)
     print(f"💾 All positions written to {json_output_path}")
 
-    db_path = os.path.join(get_accounts_data_dir(), "kalshi", mode, "positions.db")
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
-
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    c.execute("DROP TABLE IF EXISTS positions")
-    c.execute("""
-        CREATE TABLE positions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ticker TEXT,
-            total_traded INTEGER,
-            position INTEGER,
-            market_exposure INTEGER,
-            realized_pnl REAL,
-            fees_paid REAL,
-            last_updated_ts TEXT,
-            raw_json TEXT
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
         )
-    """)
+        c = conn.cursor()
 
-    for p in positions:
-        try:
-            ticker = p.get("ticker")
-            total_traded = p.get("total_traded")
-            position_value = p.get("position")
-            market_exposure = p.get("market_exposure")
-            realized_pnl = float(p.get("realized_pnl")) / 100 if p.get("realized_pnl") is not None else None
-            fees_paid = float(p.get("fees_paid")) / 100 if p.get("fees_paid") is not None else None
-            last_updated_ts = p.get("last_updated_ts")
-            raw_json = json.dumps(p)
+        # Create positions table if it doesn't exist
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS users.positions_0001 (
+                id SERIAL PRIMARY KEY,
+                ticker TEXT,
+                total_traded INTEGER,
+                position INTEGER,
+                market_exposure INTEGER,
+                realized_pnl DECIMAL(10,2),
+                fees_paid DECIMAL(10,2),
+                last_updated_ts TEXT,
+                raw_json TEXT
+            )
+        """)
 
-            c.execute("""
-                INSERT INTO positions
-                (ticker, total_traded, position, market_exposure, realized_pnl, fees_paid, last_updated_ts, raw_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (ticker, total_traded, position_value, market_exposure, realized_pnl, fees_paid, last_updated_ts, raw_json))
-        except Exception as e:
-            print(f"❌ Failed to insert position {p.get('ticker')}: {e}")
+        # Clear existing positions data
+        c.execute("DELETE FROM users.positions_0001")
 
-    conn.commit()
-    conn.close()
-    print(f"✅ Positions written to database at {db_path}")
+        for p in positions:
+            try:
+                ticker = p.get("ticker")
+                total_traded = p.get("total_traded")
+                position_value = p.get("position")
+                market_exposure = p.get("market_exposure")
+                realized_pnl = float(p.get("realized_pnl")) / 100 if p.get("realized_pnl") is not None else None
+                fees_paid = float(p.get("fees_paid")) / 100 if p.get("fees_paid") is not None else None
+                last_updated_ts = p.get("last_updated_ts")
+                raw_json = json.dumps(p)
+
+                c.execute("""
+                    INSERT INTO users.positions_0001
+                    (ticker, total_traded, position, market_exposure, realized_pnl, fees_paid, last_updated_ts, raw_json)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (ticker, total_traded, position_value, market_exposure, realized_pnl, fees_paid, last_updated_ts, raw_json))
+            except Exception as e:
+                print(f"❌ Failed to insert position {p.get('ticker')}: {e}")
+
+        conn.commit()
+        conn.close()
+        print(f"✅ Positions written to PostgreSQL database")
+    except Exception as e:
+        print(f"❌ Failed to connect to PostgreSQL: {e}")
 
 def ingest_settlements():
     """Ingest settlements data."""

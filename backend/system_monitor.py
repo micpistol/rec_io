@@ -7,7 +7,7 @@ Monitors system health and performance metrics without aggressive restart logic.
 import os
 import sys
 import psutil
-import sqlite3
+
 import time
 import subprocess
 import platform
@@ -93,58 +93,57 @@ class SystemMonitor:
             }
     
     def check_database_health(self) -> Dict[str, Any]:
-        """Check database connectivity and health."""
+        """Check PostgreSQL database connectivity and health."""
         db_health = {}
         
         # Check trades database
         try:
-            db_path = os.path.join(get_trade_history_dir(), "trades.db")
-            if os.path.exists(db_path):
-                conn = sqlite3.connect(db_path)
-                cursor = conn.cursor()
-                cursor.execute("SELECT COUNT(*) FROM trades")
-                trade_count = cursor.fetchone()[0]
-                conn.close()
-                db_health["trades_db"] = {
-                    "status": "healthy",
-                    "trade_count": trade_count,
-                    "file_size": os.path.getsize(db_path)
-                }
-            else:
-                db_health["trades_db"] = {
-                    "status": "missing",
-                    "error": "Database file not found"
-                }
+            import psycopg2
+            conn = psycopg2.connect(
+                host="localhost",
+                database="rec_io_db",
+                user="rec_io_user",
+                password="rec_io_password"
+            )
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM users.trades_0001")
+            trade_count = cursor.fetchone()[0]
+            conn.close()
+            db_health["trades_db"] = {
+                "status": "healthy",
+                "trade_count": trade_count,
+                "database_type": "postgresql"
+            }
         except Exception as e:
             db_health["trades_db"] = {
                 "status": "unhealthy",
-                "error": str(e)
+                "error": str(e),
+                "database_type": "postgresql"
             }
         
         # Check price history database
         try:
-            from backend.util.paths import get_btc_price_history_dir
-            db_path = os.path.join(get_btc_price_history_dir(), "btc_price_history.db")
-            if os.path.exists(db_path):
-                conn = sqlite3.connect(db_path)
-                cursor = conn.cursor()
-                cursor.execute("SELECT COUNT(*) FROM price_log")
-                price_count = cursor.fetchone()[0]
-                conn.close()
-                db_health["price_db"] = {
-                    "status": "healthy",
-                    "price_count": price_count,
-                    "file_size": os.path.getsize(db_path)
-                }
-            else:
-                db_health["price_db"] = {
-                    "status": "missing",
-                    "error": "Database file not found"
-                }
+            import psycopg2
+            conn = psycopg2.connect(
+                host="localhost",
+                database="rec_io_db",
+                user="rec_io_user",
+                password="rec_io_password"
+            )
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM live_data.btc_price_log")
+            price_count = cursor.fetchone()[0]
+            conn.close()
+            db_health["price_db"] = {
+                "status": "healthy",
+                "price_count": price_count,
+                "database_type": "postgresql"
+            }
         except Exception as e:
             db_health["price_db"] = {
                 "status": "unhealthy",
-                "error": str(e)
+                "error": str(e),
+                "database_type": "postgresql"
             }
         
         return db_health
