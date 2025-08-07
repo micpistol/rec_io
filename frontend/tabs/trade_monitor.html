@@ -1435,13 +1435,13 @@ document.addEventListener('DOMContentLoaded', () => {
               
               <label for="spikeAlertMomentumSlider" style="font-size:14px; color:#333; margin-bottom:34px; font-weight:500;">Momentum Spike Level (±):</label>
               <div style="position:relative; margin-bottom:24px; width:100%;">
-                <input type="range" id="spikeAlertMomentumSlider" min="10" max="100" value="40" style="width:100%; height:6px; z-index:1; position:relative; background:#e0e0e0; border-radius:3px; outline:none;" />
+                <input type="range" id="spikeAlertMomentumSlider" min="0" max="100" value="40" style="width:100%; height:6px; z-index:1; position:relative; background:#e0e0e0; border-radius:3px; outline:none;" />
                 <div id="spikeAlertMomentumValueDisplay" style="position:absolute; top:-32px; left:0; font-size:12px; color:#222; background:white; padding:4px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0;">±40</div>
               </div>
               
               <label for="spikeAlertCooldownSlider" style="font-size:14px; color:#333; margin-bottom:34px; font-weight:500;">Cooldown Level (±):</label>
               <div style="position:relative; margin-bottom:24px; width:100%;">
-                <input type="range" id="spikeAlertCooldownSlider" min="5" max="50" value="30" style="width:100%; height:6px; z-index:1; position:relative; background:#e0e0e0; border-radius:3px; outline:none;" />
+                <input type="range" id="spikeAlertCooldownSlider" min="0" max="50" value="30" style="width:100%; height:6px; z-index:1; position:relative; background:#e0e0e0; border-radius:3px; outline:none;" />
                 <div id="spikeAlertCooldownValueDisplay" style="position:absolute; top:-32px; left:0; font-size:12px; color:#222; background:white; padding:4px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0;">±30</div>
               </div>
               
@@ -3887,12 +3887,56 @@ function initTimeWindowSliderOnShow() {
 
 // === AUTO ENTRY INDICATOR FUNCTIONS ===
 
+// WebSocket connection for real-time auto entry status updates
+let autoEntryWebSocket = null;
+
+// Connect to WebSocket for auto entry indicator updates
+function connectAutoEntryWebSocket() {
+    try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/preferences`;
+        
+        autoEntryWebSocket = new WebSocket(wsUrl);
+        
+        autoEntryWebSocket.onopen = function() {
+            console.log('🔌 Auto entry WebSocket connected');
+        };
+        
+        autoEntryWebSocket.onmessage = function(event) {
+            try {
+                const message = JSON.parse(event.data);
+                if (message.type === 'auto_entry_indicator_change') {
+                    console.log('📡 Received auto entry indicator update:', message.data);
+                    updateAutoEntryIndicator(message.data);
+                }
+            } catch (error) {
+                console.error('Error parsing WebSocket message:', error);
+            }
+        };
+        
+        autoEntryWebSocket.onclose = function() {
+            console.log('🔌 Auto entry WebSocket disconnected, reconnecting...');
+            setTimeout(connectAutoEntryWebSocket, 1000);
+        };
+        
+        autoEntryWebSocket.onerror = function(error) {
+            console.error('🔌 Auto entry WebSocket error:', error);
+        };
+        
+    } catch (error) {
+        console.error('Error connecting to auto entry WebSocket:', error);
+    }
+}
+
 // Fetch initial auto entry indicator state
 async function fetchInitialAutoEntryIndicator() {
     try {
+        console.log('🔄 Fetching initial auto entry status...');
         const response = await fetch('/api/get_auto_entry_status');
         if (!response.ok) throw new Error('Failed to fetch auto entry status');
         const data = await response.json();
+        
+        console.log('📊 Initial auto entry status received:', data);
         
         // Update the indicator display
         updateAutoEntryIndicator(data);
@@ -3903,6 +3947,7 @@ async function fetchInitialAutoEntryIndicator() {
 
 // Update the auto entry indicator display
 function updateAutoEntryIndicator(data) {
+    console.log('🎯 Updating auto entry indicator with data:', data);
     const indicator = document.getElementById('autoEntryIndicator');
     if (!indicator) {
         console.error('Auto entry indicator element not found');
@@ -3964,6 +4009,7 @@ function updateAutoEntryIndicator(data) {
             break;
             
         case 'PAUSED':
+            console.log('⏸️ Setting PAUSED state with cooldown timer:', data.cooldown_timer);
             indicator.style.display = 'flex';
             indicator.style.backgroundColor = ''; // No background
             indicator.style.border = '';
@@ -3971,7 +4017,18 @@ function updateAutoEntryIndicator(data) {
                 indicatorDot.style.background = '#ff6b6b'; // Red dot
             }
             if (indicatorText) {
-                indicatorText.textContent = 'Auto Trade PAUSED';
+                // Display cooldown timer if available
+                const cooldownTimer = data.cooldown_timer || 0;
+                if (cooldownTimer > 0) {
+                    const minutes = Math.floor(cooldownTimer / 60);
+                    const seconds = cooldownTimer % 60;
+                    const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    indicatorText.textContent = `Auto Trade PAUSED (${timeString})`;
+                    console.log('⏰ Set cooldown timer display:', timeString);
+                } else {
+                    indicatorText.textContent = 'Auto Trade PAUSED';
+                    console.log('⏸️ Set PAUSED display without timer');
+                }
             }
             break;
             
@@ -3989,12 +4046,13 @@ function updateAutoEntryIndicator(data) {
     }
 }
 
-// Fetch initial state when page loads
+// Initialize auto entry indicator when page loads
 document.addEventListener('DOMContentLoaded', () => {
+    // Fetch initial state
     fetchInitialAutoEntryIndicator();
     
-    // Set up periodic refresh every 10 seconds (less aggressive to prevent flashing)
-    setInterval(fetchInitialAutoEntryIndicator, 10000);
+    // Connect to WebSocket for real-time updates
+    connectAutoEntryWebSocket();
 });
 
 // Also fetch initial state when live-data.js loads

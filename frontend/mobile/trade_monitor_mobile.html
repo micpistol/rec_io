@@ -2448,17 +2448,61 @@
 
         // === AUTO ENTRY INDICATOR FUNCTIONS ===
         
+        // WebSocket connection for real-time auto entry status updates
+        let autoEntryWebSocket = null;
+        
+        // Connect to WebSocket for auto entry indicator updates
+        function connectAutoEntryWebSocket() {
+            try {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws/preferences`;
+                
+                autoEntryWebSocket = new WebSocket(wsUrl);
+                
+                autoEntryWebSocket.onopen = function() {
+                    console.log('🔌 Auto entry WebSocket connected (mobile)');
+                };
+                
+                autoEntryWebSocket.onmessage = function(event) {
+                    try {
+                        const message = JSON.parse(event.data);
+                        if (message.type === 'auto_entry_indicator_change') {
+                            console.log('📡 Received auto entry indicator update (mobile):', message.data);
+                            updateAutoEntryIndicator(message.data);
+                        }
+                    } catch (error) {
+                        console.error('Error parsing WebSocket message (mobile):', error);
+                    }
+                };
+                
+                autoEntryWebSocket.onclose = function() {
+                    console.log('🔌 Auto entry WebSocket disconnected (mobile), reconnecting...');
+                    setTimeout(connectAutoEntryWebSocket, 1000);
+                };
+                
+                autoEntryWebSocket.onerror = function(error) {
+                    console.error('🔌 Auto entry WebSocket error (mobile):', error);
+                };
+                
+            } catch (error) {
+                console.error('Error connecting to auto entry WebSocket (mobile):', error);
+            }
+        }
+        
         // Fetch initial auto entry indicator state
         async function fetchInitialAutoEntryIndicator() {
             try {
-                const response = await fetch('/api/auto_entry_indicator');
-                if (!response.ok) throw new Error('Failed to fetch auto entry indicator');
+                console.log('🔄 Fetching initial auto entry status (mobile)...');
+                const response = await fetch('/api/get_auto_entry_status');
+                if (!response.ok) throw new Error('Failed to fetch auto entry status');
                 const data = await response.json();
+                
+                console.log('📊 Initial auto entry status received (mobile):', data);
                 
                 // Update the indicator display
                 updateAutoEntryIndicator(data);
             } catch (error) {
-                console.error('Error fetching initial auto entry indicator:', error);
+                console.error('Error fetching initial auto entry status (mobile):', error);
             }
         }
         
@@ -2474,60 +2518,88 @@
             const indicatorDot = indicator.querySelector('div');
             const indicatorText = indicator.querySelector('span');
             
-            // Check for SPIKE ALERT state first
-            if (data.spike_alert_active) {
-                // SPIKE ALERT MODE - Show red indicator
-                indicator.style.display = 'flex';
-                indicator.style.backgroundColor = '#dc3545'; // Red background
-                indicator.style.border = '1px solid #c82333';
-                
-                if (indicatorDot) {
-                    indicatorDot.style.background = '#ff6b6b'; // Red dot
+            // Always show the indicator
+            indicator.style.display = 'flex';
+            
+            // Handle both old and new endpoint responses
+            let status = 'UNKNOWN';
+            
+            if (data.status) {
+                // New endpoint response: {"status": "DISABLED"}
+                status = data.status;
+            } else if (data.enabled !== undefined) {
+                // Old endpoint response: complex object with enabled field
+                if (data.enabled && data.scanning_active) {
+                    status = 'ACTIVE';
+                } else if (data.enabled && !data.scanning_active) {
+                    status = 'INACTIVE';
+                } else {
+                    status = 'DISABLED';
                 }
-                
-                if (indicatorText) {
-                    const recoveryCountdown = data.spike_alert_recovery_countdown;
-                    if (recoveryCountdown !== null && recoveryCountdown > 0) {
-                        indicatorText.textContent = `SPIKE ALERT - AUTO TRADING PAUSED (${recoveryCountdown.toFixed(1)}m)`;
-                    } else {
-                        indicatorText.textContent = 'SPIKE ALERT - AUTO TRADING PAUSED';
-                    }
-                }
-                
-                console.log('🚨 SPIKE ALERT: Auto trading paused due to market spike');
-                return;
             }
             
-            // Use the new scanning_active field as the primary condition
-            // This provides the true system-wide scanning status
-            if (data.scanning_active) {
-                // Show the indicator when scanning is actually active
-                indicator.style.display = 'flex';
-                indicator.style.backgroundColor = ''; // Reset background
-                indicator.style.border = ''; // Reset border
-                
-                if (indicatorDot) {
-                    indicatorDot.style.background = '#00ff2f'; // Green dot
-                }
-                
-                if (indicatorText) {
-                    indicatorText.textContent = 'Auto ON';
-                }
-                
-                console.log('🔔 AUTOMATED TRADING ON: Scanning is active');
-            } else {
-                // Hide the indicator when scanning is not active
-                indicator.style.display = 'none';
-                console.log('🔔 AUTOMATED TRADING OFF: Scanning is not active');
-                
-                // Log additional debug info
-                if (data.enabled && !data.service_healthy) {
-                    console.log('⚠️ Auto entry enabled but service not healthy');
-                } else if (data.enabled && data.service_healthy && !data.ttc_within_window) {
-                    console.log('⚠️ Auto entry enabled and service healthy but TTC not in window');
-                } else if (!data.enabled) {
-                    console.log('⚠️ Auto entry not enabled');
-                }
+            // Set colors and text based on status (no background colors)
+            switch (status) {
+                case 'ACTIVE':
+                    indicator.style.display = 'flex';
+                    indicator.style.backgroundColor = ''; // No background
+                    indicator.style.border = '';
+                    if (indicatorDot) {
+                        indicatorDot.style.background = '#00ff2f'; // Green dot
+                    }
+                    if (indicatorText) {
+                        indicatorText.textContent = 'Auto ON';
+                    }
+                    break;
+                    
+                case 'INACTIVE':
+                    indicator.style.display = 'flex';
+                    indicator.style.backgroundColor = ''; // No background
+                    indicator.style.border = '';
+                    if (indicatorDot) {
+                        indicatorDot.style.background = '#ffc107'; // Yellow dot
+                    }
+                    if (indicatorText) {
+                        indicatorText.textContent = 'Auto OFF';
+                    }
+                    break;
+                    
+                case 'DISABLED':
+                    indicator.style.display = 'none'; // Hide completely when disabled
+                    break;
+                    
+                case 'PAUSED':
+                    indicator.style.display = 'flex';
+                    indicator.style.backgroundColor = ''; // No background
+                    indicator.style.border = '';
+                    if (indicatorDot) {
+                        indicatorDot.style.background = '#ff6b6b'; // Red dot
+                    }
+                    if (indicatorText) {
+                        // Display cooldown timer if available
+                        const cooldownTimer = data.cooldown_timer || 0;
+                        if (cooldownTimer > 0) {
+                            const minutes = Math.floor(cooldownTimer / 60);
+                            const seconds = cooldownTimer % 60;
+                            const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                            indicatorText.textContent = `PAUSED (${timeString})`;
+                        } else {
+                            indicatorText.textContent = 'PAUSED';
+                        }
+                    }
+                    break;
+                    
+                default:
+                    indicator.style.display = 'flex';
+                    indicator.style.backgroundColor = ''; // No background
+                    indicator.style.border = '';
+                    if (indicatorDot) {
+                        indicatorDot.style.background = '#6c757d'; // Gray dot
+                    }
+                    if (indicatorText) {
+                        indicatorText.textContent = `Auto ${status}`;
+                    }
+                    break;
             }
         }
         
@@ -2567,9 +2639,15 @@
             }
         }
         
-        // Fetch initial state when page loads
+        // Initialize auto entry indicator when page loads
         document.addEventListener('DOMContentLoaded', () => {
+            // Fetch initial state
             fetchInitialAutoEntryIndicator();
+            
+            // Connect to WebSocket for real-time updates
+            connectAutoEntryWebSocket();
+            
+            // Fetch initial active trades
             fetchInitialActiveTrades();
         });
         

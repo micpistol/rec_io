@@ -1722,7 +1722,7 @@ async def get_auto_trade_settings():
 
 @app.get("/api/get_auto_entry_status")
 async def get_auto_entry_status():
-    """Get current auto entry status from PostgreSQL"""
+    """Get current auto entry status and cooldown timer from PostgreSQL"""
     try:
         conn = psycopg2.connect(
             host="localhost",
@@ -1731,14 +1731,15 @@ async def get_auto_entry_status():
             password="rec_io_password"
         )
         with conn.cursor() as cursor:
-            cursor.execute("SELECT auto_entry_status FROM users.auto_trade_settings_0001 WHERE id = 1")
+            cursor.execute("SELECT auto_entry_status, cooldown_timer FROM users.auto_trade_settings_0001 WHERE id = 1")
             result = cursor.fetchone()
             status = result[0] if result else "DISABLED"
+            cooldown_timer = result[1] if result and result[1] is not None else 0
             conn.close()
-            return {"status": status}
+            return {"status": status, "cooldown_timer": cooldown_timer}
     except Exception as e:
         print(f"Error getting auto entry status: {e}")
-        return {"status": "DISABLED", "error": str(e)}
+        return {"status": "DISABLED", "cooldown_timer": 0, "error": str(e)}
 
 @app.get("/api/get_trade_preferences")
 async def get_trade_preferences():

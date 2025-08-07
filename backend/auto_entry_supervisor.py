@@ -189,8 +189,8 @@ def check_spike_alert_conditions():
             return
         
         spike_alert_enabled = settings["spike_alert_enabled"]
-        spike_threshold = settings["spike_alert_momentum_threshold"]
-        cooldown_threshold = settings["spike_alert_cooldown_threshold"]
+        spike_threshold = settings["spike_alert_momentum_threshold"] / 100.0  # Convert percentage to decimal
+        cooldown_threshold = settings["spike_alert_cooldown_threshold"] / 100.0  # Convert percentage to decimal
         cooldown_minutes = settings["spike_alert_cooldown_minutes"]
         
         # Skip spike alert if disabled
@@ -233,8 +233,12 @@ def check_spike_alert_conditions():
             state["spike_alert_momentum_value"] = current_momentum
             state["spike_alert_recovery_countdown"] = cooldown_minutes
             
+            # Set initial cooldown timer in seconds
+            cooldown_seconds = cooldown_minutes * 60
+            update_cooldown_timer_in_db(cooldown_seconds)
+            
             log(f"[SPIKE ALERT] 🚨 SPIKE DETECTED! Momentum: {current_momentum:.2f} (threshold: ±{spike_threshold})")
-            log(f"[SPIKE ALERT] Auto entry PAUSED for {cooldown_minutes} minutes")
+            log(f"[SPIKE ALERT] Auto entry PAUSED for {cooldown_minutes} minutes ({cooldown_seconds} seconds)")
             
         elif state["spike_alert_active"]:
             if recovery_conditions_met:
@@ -250,14 +254,21 @@ def check_spike_alert_conditions():
                         state["spike_alert_momentum_value"] = None
                         state["spike_alert_recovery_countdown"] = None
                         
+                        # Reset cooldown timer to 0
+                        update_cooldown_timer_in_db(0)
+                        
                         log(f"[SPIKE ALERT] ✅ RECOVERY COMPLETE! Auto entry RESUMED")
                         log(f"[SPIKE ALERT] Recovery time: {time_in_recovery:.1f} minutes")
                     else:
-                        # Still in recovery period
-                        remaining_time = cooldown_minutes - time_in_recovery
-                        state["spike_alert_recovery_countdown"] = max(0, remaining_time)
+                        # Still in recovery period - update countdown in seconds
+                        remaining_minutes = cooldown_minutes - time_in_recovery
+                        remaining_seconds = max(0, int(remaining_minutes * 60))
+                        state["spike_alert_recovery_countdown"] = remaining_minutes
                         
-                        log(f"[SPIKE ALERT] ⏳ Recovery in progress: {remaining_time:.1f} minutes remaining")
+                        # Update cooldown timer in database
+                        update_cooldown_timer_in_db(remaining_seconds)
+                        
+                        log(f"[SPIKE ALERT] ⏳ Recovery in progress: {remaining_minutes:.1f} minutes ({remaining_seconds} seconds) remaining")
                 else:
                     # Reset recovery countdown if start time is missing
                     state["spike_alert_recovery_countdown"] = cooldown_minutes
@@ -266,7 +277,11 @@ def check_spike_alert_conditions():
                 state["spike_alert_start_time"] = now.isoformat()
                 state["spike_alert_recovery_countdown"] = cooldown_minutes
                 
-                log(f"[SPIKE ALERT] ⚠️ Still in spike conditions: {current_momentum:.2f}")
+                # Reset cooldown timer to full duration
+                cooldown_seconds = cooldown_minutes * 60
+                update_cooldown_timer_in_db(cooldown_seconds)
+                
+                log(f"[SPIKE ALERT] ⚠️ Still in spike conditions: {current_momentum:.2f} - resetting timer to {cooldown_minutes} minutes")
         
         # Update global state for frontend
         auto_entry_indicator_state.update({
@@ -282,6 +297,27 @@ def check_spike_alert_conditions():
         
     except Exception as e:
         log(f"[SPIKE ALERT] Error checking spike conditions: {e}")
+
+def update_cooldown_timer_in_db(seconds):
+    """Update cooldown_timer in the database"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE users.auto_trade_settings_0001 SET cooldown_timer = %s, updated_at = NOW() WHERE id = 1",
+                (seconds,)
+            )
+            conn.commit()
+        conn.close()
+        log(f"[AUTO ENTRY] ✅ Updated cooldown_timer to {seconds} seconds in database")
+    except Exception as e:
+        log(f"[AUTO ENTRY] ❌ Error updating cooldown_timer: {e}")
 
 def update_auto_entry_status_in_db(status):
     """Update auto_entry_status in the database"""
@@ -353,8 +389,32 @@ def broadcast_auto_entry_indicator_change():
     global auto_entry_indicator_state, previous_indicator_state
     
     try:
-        # Check if state has actually changed
-        current_state = {
+        # Determine and update database status first
+        new_status = determine_auto_entry_status()
+        update_auto_entry_status_in_db(new_status)
+        
+        # Get cooldown timer from database
+        cooldown_timer = 0
+        try:
+            import psycopg2
+            conn = psycopg2.connect(
+                host="localhost",
+                database="rec_io_db",
+                user="rec_io_user",
+                password="rec_io_password"
+            )
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT cooldown_timer FROM users.auto_trade_settings_0001 WHERE id = 1")
+                result = cursor.fetchone()
+                cooldown_timer = result[0] if result and result[0] is not None else 0
+            conn.close()
+        except Exception as e:
+            log(f"[AUTO ENTRY] ❌ Error getting cooldown timer: {e}")
+        
+        # Create broadcast data with database status
+        broadcast_data = {
+            "status": new_status,
+            "cooldown_timer": cooldown_timer,
             "enabled": auto_entry_indicator_state["enabled"],
             "ttc_within_window": auto_entry_indicator_state["ttc_within_window"],
             "scanning_active": auto_entry_indicator_state["scanning_active"],
@@ -367,28 +427,26 @@ def broadcast_auto_entry_indicator_change():
         }
         
         log(f"[AUTO ENTRY DEBUG] 🔍 Checking indicator state change:")
-        log(f"[AUTO ENTRY DEBUG]   Current: {current_state}")
+        log(f"[AUTO ENTRY DEBUG]   Current status: {new_status}, cooldown: {cooldown_timer}")
         log(f"[AUTO ENTRY DEBUG]   Previous: {previous_indicator_state}")
         
-        if previous_indicator_state == current_state:
+        # Check if state has actually changed (compare with previous)
+        current_state_key = (new_status, cooldown_timer)
+        if previous_indicator_state == current_state_key:
             log(f"[AUTO ENTRY DEBUG]   No change detected, skipping broadcast")
             return  # No change, don't broadcast
         
         # Update previous state
-        previous_indicator_state = current_state.copy()
+        previous_indicator_state = current_state_key
         log(f"[AUTO ENTRY DEBUG]   State changed, broadcasting...")
-        
-        # Determine and update database status
-        new_status = determine_auto_entry_status()
-        update_auto_entry_status_in_db(new_status)
         
         # Send to main app for WebSocket broadcast
         try:
             port = get_port("main_app")
             url = f"http://localhost:{port}/api/broadcast_auto_entry_indicator"
-            response = requests.post(url, json=auto_entry_indicator_state, timeout=2)
+            response = requests.post(url, json=broadcast_data, timeout=2)
             if response.ok:
-                log(f"[AUTO ENTRY] ✅ Auto entry indicator change broadcasted: {current_state}")
+                log(f"[AUTO ENTRY] ✅ Auto entry indicator change broadcasted: status={new_status}, cooldown={cooldown_timer}")
             else:
                 log(f"[AUTO ENTRY] ⚠️ Failed to broadcast indicator change: {response.status_code}")
         except Exception as e:
