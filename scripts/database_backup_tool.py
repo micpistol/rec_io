@@ -193,7 +193,7 @@ class DatabaseBackupTool:
         for backup in backups:
             metadata = backup['metadata']
             size_mb = round(backup['size'] / (1024 * 1024), 2)
-            created = datetime.fromisoformat(metadata['created_at']).strftime("%Y-%m-%d %H:%M:%S")
+            created = datetime.fromisoformat(metadata.get('created_at', datetime.now().isoformat())).strftime("%Y-%m-%d %H:%M:%S")
             
             print(f"📦 {backup['file'].name}")
             print(f"   📅 Created: {created}")
