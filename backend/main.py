@@ -504,16 +504,15 @@ def get_user_credentials():
         )
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT user_id, first_name, last_name, email, phone, account_type, password_hash
+                SELECT user_id, first_name, last_name, email, phone, account_type
                 FROM users.user_info_0001 WHERE user_no = '0001'
             """)
             result = cursor.fetchone()
             if result:
-                user_id, first_name, last_name, email, phone, account_type, password_hash = result
+                user_id, first_name, last_name, email, phone, account_type = result
                 return {
                     "username": user_id,
-                    "password_hash": password_hash,
-                    "name": f"{first_name} {last_name}",
+                    "name": f"{first_name} {last_name}" if first_name and last_name else user_id,
                     "email": email,
                     "phone": phone,
                     "account_type": account_type
@@ -2679,6 +2678,24 @@ async def logout(request: Request):
     except Exception as e:
         print(f"[AUTH] Logout error: {e}")
         return {"success": False, "error": str(e)}
+
+@app.get("/api/user/info")
+async def get_user_info():
+    """Get current user information from database"""
+    try:
+        # Get user credentials from database
+        credentials = get_user_credentials()
+        
+        return {
+            "user_id": credentials.get("username"),
+            "name": credentials.get("name"),
+            "email": credentials.get("email"),
+            "phone": credentials.get("phone"),
+            "account_type": credentials.get("account_type")
+        }
+    except Exception as e:
+        print(f"[USER INFO] Error getting user info: {e}")
+        return {"error": "Failed to get user information"}
 
 # Startup and shutdown events
 @app.on_event("startup")

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Settings - REC.IO</title>
+    <link rel="stylesheet" href="/styles/global.css">
+    <style>
+        .user-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .info-label {
+            font-size: 12px;
+            color: #c4c4c4;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .info-value {
+            font-size: 14px;
+            color: white;
+            font-weight: 500;
+        }
+        
+        .logout-button {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 10px;
+        }
+        
+        .logout-button:hover {
+            background: #c0392b;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #c4c4c4;
+        }
+        
+        .error {
+            color: #e74c3c;
+            padding: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <!-- User Information Panel -->
+    <div class="panel-container" style="width: 600px;">
+        <div class="panel">
+            <div class="panel-header">User Information</div>
+            <div id="userInfo" class="user-info-grid">
+                <div class="loading">Loading user information...</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Session Management Panel -->
+    <div class="panel-container" style="width: 600px;">
+        <div class="panel">
+            <div class="panel-header">Session Management</div>
+            <button id="logoutButton" class="logout-button">Logout</button>
+        </div>
+    </div>
+
+    <script>
+        // Load user information from the server
+        async function loadUserInfo() {
+            try {
+                // First try to get user info directly from database
+                const userResponse = await fetch('/api/user/info');
+                let userInfo = {};
+                
+                if (userResponse.ok) {
+                    userInfo = await userResponse.json();
+                    displayUserInfo({}, userInfo);
+                    return;
+                }
+                
+                // If direct access fails, try with authentication
+                const token = localStorage.getItem('rec_auth_token');
+                const deviceId = localStorage.getItem('rec_device_id');
+                
+                if (!token || !deviceId) {
+                    throw new Error('No authentication token found');
+                }
+                
+                const response = await fetch('/api/auth/verify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ token, deviceId })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to verify authentication');
+                }
+                
+                const data = await response.json();
+                
+                if (data.authenticated) {
+                    displayUserInfo(data, userInfo);
+                } else {
+                    throw new Error('Authentication failed');
+                }
+            } catch (error) {
+                console.error('Error loading user info:', error);
+                document.getElementById('userInfo').innerHTML = `
+                    <div class="error">
+                        Failed to load user information. Please try refreshing the page.
+                    </div>
+                `;
+            }
+        }
+        
+        function displayUserInfo(authData, userInfo) {
+            const userInfoContainer = document.getElementById('userInfo');
+            
+            userInfoContainer.innerHTML = `
+                <div class="info-item">
+                    <div class="info-label">User ID</div>
+                    <div class="info-value">${userInfo.user_id || authData.username || 'N/A'}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Name</div>
+                    <div class="info-value">${userInfo.name || authData.name || 'N/A'}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Email</div>
+                    <div class="info-value">${userInfo.email || 'N/A'}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Account Type</div>
+                    <div class="info-value">${userInfo.account_type || 'N/A'}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Phone</div>
+                    <div class="info-value">${userInfo.phone || 'N/A'}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Login Status</div>
+                    <div class="info-value">Active</div>
+                </div>
+            `;
+        }
+        
+        // Logout functionality
+        document.getElementById('logoutButton').addEventListener('click', async () => {
+            const token = localStorage.getItem('rec_auth_token');
+            const deviceId = localStorage.getItem('rec_device_id');
+            
+            if (token && deviceId) {
+                try {
+                    await fetch('/api/auth/logout', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ token, deviceId })
+                    });
+                } catch (e) {
+                    console.log('Logout request failed:', e);
+                }
+            }
+            
+            // Clear local storage
+            localStorage.removeItem('rec_auth_token');
+            localStorage.removeItem('rec_device_id');
+            localStorage.removeItem('rec_local_bypass');
+            
+            // Redirect to login page
+            window.location.href = '/login';
+        });
+        
+        // Load user info when page loads
+        document.addEventListener('DOMContentLoaded', loadUserInfo);
+    </script>
+</body>
+</html>

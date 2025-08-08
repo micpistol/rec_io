@@ -329,16 +329,12 @@
       
       <!-- User Section -->
       <div class="user-section">
-        <a href="/tabs/settings.html" class="nav-item" data-page="settings" data-tooltip="Settings">
+        <a href="/tabs/user_settings.html" class="nav-item" data-page="user-settings" data-tooltip="User Settings">
           <span class="nav-icon">
-            <img src="/images/icons/user_icon.png" alt="Settings" style="width: 25px; height: 25px; object-fit: contain;">
+            <img src="/images/icons/user_icon.png" alt="User Settings" style="width: 25px; height: 25px; object-fit: contain;">
           </span>
-          <span class="nav-label">User ID</span>
+          <span class="nav-label" id="userDisplay">User ID</span>
         </a>
-        <button class="nav-item" id="logoutButton" data-tooltip="Logout" style="background: none; border: none; cursor: pointer; width: 100%; text-align: left;">
-          <span class="nav-icon">🚪</span>
-          <span class="nav-label">Logout</span>
-        </button>
       </div>
       
       <!-- Collapse/Expand Button -->
@@ -362,6 +358,7 @@
       <iframe id="tradeHistoryFrame" class="content-frame" src="/tabs/trade_history.html"></iframe>
       <iframe id="accountManagerFrame" class="content-frame" src="/tabs/account_manager.html"></iframe>
       <iframe id="settingsFrame" class="content-frame" src="/tabs/settings.html"></iframe>
+      <iframe id="userSettingsFrame" class="content-frame" src="/tabs/user_settings.html"></iframe>
     </div>
   </div>
 
@@ -377,7 +374,8 @@
       'trade-monitor': 'tradeMonitorFrame',
       'history': 'tradeHistoryFrame', 
       'account': 'accountManagerFrame',
-      'settings': 'settingsFrame'
+      'settings': 'settingsFrame',
+      'user-settings': 'userSettingsFrame'
     };
     
     // Toggle sidebar collapse/expand
@@ -418,40 +416,64 @@
 
 
     // Initialize with trade monitor active
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
       // All frames are preloaded, trade monitor is already active
       console.log('All tabs preloaded and ready');
       
-      
+      // Load and display user ID
+      await loadUserDisplay();
     });
     
-    // Logout functionality
-    document.getElementById('logoutButton').addEventListener('click', async () => {
-      const token = localStorage.getItem('rec_auth_token');
-      const deviceId = localStorage.getItem('rec_device_id');
-      
-      if (token && deviceId) {
-        try {
-          await fetch('/api/auth/logout', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ token, deviceId })
-          });
-        } catch (e) {
-          console.log('Logout request failed:', e);
+    // Load user information and display in sidebar
+    async function loadUserDisplay() {
+      try {
+        // Try to get user info directly from database first
+        const userResponse = await fetch('/api/user/info');
+        if (userResponse.ok) {
+          const userInfo = await userResponse.json();
+          const userDisplay = document.getElementById('userDisplay');
+          if (userDisplay) {
+            userDisplay.textContent = userInfo.user_id || 'ewais';
+          }
+          return;
         }
+        
+        // Fallback to authentication method
+        const token = localStorage.getItem('rec_auth_token');
+        const deviceId = localStorage.getItem('rec_device_id');
+        
+        if (!token || !deviceId) {
+          return;
+        }
+        
+        const response = await fetch('/api/auth/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token, deviceId })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.authenticated) {
+            // Get user info from database
+            const userResponse = await fetch('/api/user/info');
+            if (userResponse.ok) {
+              const userInfo = await userResponse.json();
+              const userDisplay = document.getElementById('userDisplay');
+              if (userDisplay) {
+                userDisplay.textContent = userInfo.user_id || data.username || 'ewais';
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user display:', error);
       }
-      
-      // Clear local storage
-      localStorage.removeItem('rec_auth_token');
-      localStorage.removeItem('rec_device_id');
-      localStorage.removeItem('rec_local_bypass');
-      
-      // Redirect to login page
-      window.location.href = '/login';
-    });
+    }
+    
+
   </script>
 
   <script>
