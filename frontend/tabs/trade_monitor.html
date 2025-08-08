@@ -234,33 +234,7 @@
   }
 </style>
 <style>
-  .trade-popup, .trade-closed-popup {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    color: white;
-    padding: 18px 30px;
-    border-radius: 6px;
-    font-weight: bold;
-    font-size: 21px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    display: none;
-    z-index: 9999;
-    opacity: 0;
-    transition: opacity 0.5s ease;
-  }
-  .trade-popup {
-    background-color: #28a745;
-  }
-  .trade-closed-popup {
-    background-color: #dc3545;
-  }
-  .trade-popup.show,
-  .trade-closed-popup.show {
-    display: block;
-    opacity: 1;
-    /* transition stays at default unless overridden in JS */
-  }
+
 </style>
 <style>
 #autoStopToggle {
@@ -966,17 +940,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.type === 'automated_trade_triggered') {
 
         
-        // Trigger the same audio/visual alerts as manual trades
-        if (typeof playSound === 'function') {
-          playSound('open');
+        // Refresh trade panels to show the new automated trade
+        if (typeof fetchAndRenderTrades === 'function') {
+          fetchAndRenderTrades();
         }
-        
-        if (typeof showTradeOpenedPopup === 'function') {
-          showTradeOpenedPopup();
+        if (typeof fetchAndRenderRecentTrades === 'function') {
+          fetchAndRenderRecentTrades();
         }
-        
-        // Show a special automated trade notification
-        showAutomatedTradeNotification(data.data);
         
         // Refresh trade panels to show the new automated trade
         if (typeof fetchAndRenderTrades === 'function') {
@@ -993,17 +963,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.type === 'automated_trade_closed') {
 
         
-        // Trigger the same audio/visual alerts as manual trade closes
-        if (typeof playSound === 'function') {
-          playSound('close');
+        // Refresh trade panels to show the closed trade
+        if (typeof fetchAndRenderTrades === 'function') {
+          fetchAndRenderTrades();
         }
-        
-        if (typeof showTradeClosedPopup === 'function') {
-          showTradeClosedPopup();
+        if (typeof fetchAndRenderRecentTrades === 'function') {
+          fetchAndRenderRecentTrades();
         }
-        
-        // Show a special automated trade close notification
-        showAutomatedTradeCloseNotification(data.data);
         
         // Refresh trade panels to show the closed trade
         if (typeof fetchAndRenderTrades === 'function') {
@@ -2088,27 +2054,7 @@ function getCurrentMomentumScore() {
   return "";
 }
 
-// Play a sound by type, allowing overlapping playback
-function playSound(type) {
-  const soundId = type === 'open' ? 'openTradeSound' : 'closeTradeSound';
-  const original = document.getElementById(soundId);
-  if (!original) return;
 
-  const clone = original.cloneNode(true); // Allow overlapping playback
-  clone.volume = type === 'open' ? 0.1 : 0.2; // Set volume inline
-  clone.play().catch(err => {});
-}
-
-// Open trade popup function
-function showTradeOpenedPopup() {
-  const popup = document.getElementById('tradeOpenedPopup');
-  if (popup) {
-    popup.style.display = 'block';
-    setTimeout(() => {
-      popup.style.display = 'none';
-    }, 3000);
-  }
-}
 
 async function showPopup(strike, side, price) {
   // showTradeOpenedPopup();   // popup disabled for test
@@ -2667,6 +2613,9 @@ function updateOpenPositionsTabCount(count) {
 }
 
 // === Positions Data Fetching and Rendering ===
+// Track previous positions count for new trade detection
+window.previousPositionsCount = window.previousPositionsCount || 0;
+
 async function fetchAndRenderPositions() {
   try {
     const response = await fetch('/api/db/positions', { cache: 'no-store' });
@@ -2689,14 +2638,115 @@ async function fetchAndRenderPositions() {
       noPositionsRow.innerHTML = '<td colspan="5" style="text-align: center; color: #ccc; padding: 20px;">No Open Positions</td>';
       openPositionsTableBody.appendChild(noPositionsRow);
       updateOpenPositionsTabCount(0);
+      window.previousPositionsCount = 0;
       return;
     }
     
     // Filter positions with non-zero positions
     const activePositions = positions.filter(p => p.position !== 0);
     
+    // Check if this is a new trade (count increased) or closed trade (count decreased)
+    const currentPositionsCount = activePositions.length;
+    const isNewTrade = currentPositionsCount > window.previousPositionsCount;
+    const isClosedTrade = currentPositionsCount < window.previousPositionsCount;
+    
     // Update the tab count
     updateOpenPositionsTabCount(activePositions.length);
+    
+    // Update previous count
+    window.previousPositionsCount = currentPositionsCount;
+    
+    // SIMPLE ALERT: If new trade detected, play sound and show popup
+    if (isNewTrade) {
+      // Play audio
+      const openSound = document.getElementById('openTradeSound');
+      if (openSound) {
+        const clone = openSound.cloneNode(true);
+        clone.volume = 0.1;
+        clone.play().catch(err => {});
+      }
+      
+      // Show green popup
+      const popup = document.createElement('div');
+      popup.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: #28a745;
+        color: white;
+        padding: 15px 25px;
+        border-radius: 6px;
+        font-weight: bold;
+        font-size: 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10000;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      `;
+      popup.textContent = 'Trade Opened';
+      document.body.appendChild(popup);
+      
+      // Show popup
+      setTimeout(() => {
+        popup.style.opacity = '1';
+      }, 100);
+      
+      // Hide popup after 3 seconds
+      setTimeout(() => {
+        popup.style.opacity = '0';
+        setTimeout(() => {
+          if (popup.parentNode) {
+            popup.parentNode.removeChild(popup);
+          }
+        }, 300);
+      }, 3000);
+    }
+    
+    // SIMPLE ALERT: If trade closed detected, play sound and show popup
+    if (isClosedTrade) {
+      // Play audio
+      const closeSound = document.getElementById('closeTradeSound');
+      if (closeSound) {
+        const clone = closeSound.cloneNode(true);
+        clone.volume = 0.2;
+        clone.play().catch(err => {});
+      }
+      
+      // Show red popup
+      const popup = document.createElement('div');
+      popup.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: #dc3545;
+        color: white;
+        padding: 15px 25px;
+        border-radius: 6px;
+        font-weight: bold;
+        font-size: 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10000;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      `;
+      popup.textContent = 'Trade Closed';
+      document.body.appendChild(popup);
+      
+      // Show popup
+      setTimeout(() => {
+        popup.style.opacity = '1';
+      }, 100);
+      
+      // Hide popup after 3 seconds
+      setTimeout(() => {
+        popup.style.opacity = '0';
+        setTimeout(() => {
+          if (popup.parentNode) {
+            popup.parentNode.removeChild(popup);
+          }
+        }, 300);
+      }, 3000);
+    }
     
     // Render positions data using the same logic as account_manager.html
     openPositionsTableBody.innerHTML = activePositions
@@ -2878,166 +2928,29 @@ function setupDatabaseChangeListener() {
 
 </script>
 <script>
-  function showTradeOpenedPopup() {
-    const popup = document.getElementById('tradeOpenedPopup');
-    if (!popup) return;
 
-    popup.style.transition = 'none';
-    popup.style.display = 'block';
-    popup.style.opacity = '1';
 
-    setTimeout(() => {
-      popup.style.transition = 'opacity 0.5s ease';
-      popup.style.opacity = '0';
-      setTimeout(() => {
-        popup.style.display = 'none';
-      }, 500);
-    }, 2000);
-  }
 
-  function showTradeClosedPopup() {
-    const popup = document.getElementById('tradeClosedPopup');
-    if (!popup) return;
 
-    popup.style.transition = 'none';
-    popup.style.display = 'block';
-    popup.style.opacity = '1';
 
-    setTimeout(() => {
-      popup.style.transition = 'opacity 0.5s ease';
-      popup.style.opacity = '0';
-      setTimeout(() => {
-        popup.style.display = 'none';
-      }, 500);
-    }, 2000);
-  }
-
-  function showAutomatedTradeNotification(tradeData) {
-    // Create a special automated trade notification popup
-    const notification = document.createElement('div');
-    notification.className = 'automated-trade-notification';
-    notification.style.cssText = `
-      position: fixed;
-      bottom: 20px;
-      right: 280px;
-      background: linear-gradient(135deg, #00ff88, #00cc66);
-      color: white;
-      padding: 15px 20px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: bold;
-      text-align: center;
-      box-shadow: 0 5px 15px rgba(0, 255, 136, 0.3);
-      z-index: 10000;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-      border: 2px solid #00ff88;
-      max-width: 250px;
-    `;
-    
-    // Create the notification content
-    const strike = tradeData.strike || 'Unknown';
-    const side = tradeData.side || 'Unknown';
-    const buyPrice = tradeData.buy_price ? `$${tradeData.buy_price.toFixed(2)}` : 'Unknown';
-    const probability = tradeData.probability ? `${tradeData.probability}%` : 'Unknown';
-    
-    notification.innerHTML = `
-      <div style="margin-bottom: 8px; font-size: 12px;">🤖 AUTO TRADE</div>
-      <div style="font-size: 11px; margin-bottom: 3px;">${strike} ${side.toUpperCase()}</div>
-      <div style="font-size: 11px; margin-bottom: 3px;">${buyPrice} (${probability})</div>
-    `;
-    
-    // Add to page
-    document.body.appendChild(notification);
-    
-    // Show the notification
-    setTimeout(() => {
-      notification.style.opacity = '1';
-    }, 100);
-    
-    // Hide after 4 seconds
-    setTimeout(() => {
-      notification.style.opacity = '0';
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
-        }
-      }, 300);
-    }, 4000);
-  }
-
-  function showAutomatedTradeCloseNotification(tradeData) {
-    // Create a special automated trade close notification popup
-    const notification = document.createElement('div');
-    notification.className = 'automated-trade-close-notification';
-    notification.style.cssText = `
-      position: fixed;
-      bottom: 20px;
-      right: 280px;
-      background: linear-gradient(135deg, #ff6b6b, #ee5a52);
-      color: white;
-      padding: 15px 20px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: bold;
-      text-align: center;
-      box-shadow: 0 5px 15px rgba(255, 107, 107, 0.3);
-      z-index: 10000;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-      border: 2px solid #ff6b6b;
-      max-width: 250px;
-    `;
-
-    // Create the notification content
-    const strike = tradeData.strike || 'Unknown';
-    const side = tradeData.side || 'Unknown';
-    const buyPrice = tradeData.buy_price ? `$${tradeData.buy_price.toFixed(2)}` : 'Unknown';
-    const sellPrice = tradeData.sell_price ? `$${tradeData.sell_price.toFixed(2)}` : 'Unknown';
-    const pnl = tradeData.pnl || 'Unknown';
-    
-    notification.innerHTML = `
-      <div style="margin-bottom: 8px; font-size: 12px;">🤖 AUTO CLOSE</div>
-      <div style="font-size: 11px; margin-bottom: 3px;">${strike} ${side.toUpperCase()}</div>
-      <div style="font-size: 11px; margin-bottom: 3px;">Buy: ${buyPrice} | Sell: ${sellPrice}</div>
-      <div style="font-size: 11px;">PnL: ${pnl}</div>
-    `;
-
-    // Add to page
-    document.body.appendChild(notification);
-
-    // Show the notification
-    setTimeout(() => {
-      notification.style.opacity = '1';
-    }, 100);
-
-    // Hide after 4 seconds
-    setTimeout(() => {
-      notification.style.opacity = '0';
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
-        }
-      }, 300);
-    }, 4000);
-  }
 </script>
 </script>
 </script>
 
   <!-- Trade Open/Closed Popups -->
-  <div id="tradeOpenedPopup" class="trade-popup">Trade Opened</div>
-  <div id="tradeClosedPopup" class="trade-closed-popup">Trade Closed</div>
 
 
 
-  <!-- Preload audio for trade open/close confirmations -->
+
+
+  <!-- Audio for trade confirmations -->
   <audio id="openTradeSound" preload="auto">
     <source src="/audio/sfx/open_trade_confirmation.wav" type="audio/wav">
   </audio>
   <audio id="closeTradeSound" preload="auto">
     <source src="/audio/sfx/close_trade_confirmation.wav" type="audio/wav">
   </audio>
+  
   <!-- === Staggered polling loops for main panels === -->
   <script>
   // NOTE: All polling is now handled by live-data.js module

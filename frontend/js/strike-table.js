@@ -746,15 +746,7 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
           const result = await response.json();
       
           
-          // Play audio alert for trade opening
-          if (typeof playSound === 'function') {
-            playSound('open');
-          }
-          
-          // Show visual popup
-          if (typeof showTradeOpenedPopup === 'function') {
-            showTradeOpenedPopup();
-          }
+
           
           // Refresh panels to show new trade
           if (typeof fetchAndRenderTrades === 'function') {
@@ -799,22 +791,7 @@ function getSelectedSymbol() {
 }
 
 
-function showTradeOpenedPopup() {
-  const popup = document.getElementById('tradePopup');
-  if (!popup) return;
 
-  popup.style.transition = 'none';
-  popup.style.display = 'block';
-  popup.style.opacity = '1';
-
-  setTimeout(() => {
-    popup.style.transition = 'opacity 0.5s ease';
-    popup.style.opacity = '0';
-    setTimeout(() => {
-      popup.style.display = 'none';
-    }, 500);
-  }, 2000);
-}
 
 // === STRIKE TABLE CONTAINER INITIALIZATION ===
 

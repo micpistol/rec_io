@@ -1631,10 +1631,7 @@
         
         async function prepareTradeData(target) {
             
-            // ✅ Add UI popup
-            if (typeof showTradeOpenedPopup === 'function') {
-                showTradeOpenedPopup();
-            }
+
             
             if (target?.disabled) {
                 return null;
@@ -1857,10 +1854,7 @@
             try {
                 console.log('[ACTIVE TRADE SUPERVISOR] Attempting to close trade:', tradeId);
                 
-                // ✅ Add UI popup (same as desktop)
-                if (typeof showTradeClosedPopup === 'function') {
-                    showTradeClosedPopup();
-                }
+
                 
                 // Get current BTC price for sell price (same as desktop)
                 const currentPrice = typeof getCurrentBTCTickerPrice === 'function' ? getCurrentBTCTickerPrice() : 0.5;
@@ -2368,61 +2362,7 @@
         
 
         
-        // Show trade opened popup (same as desktop)
-        function showTradeOpenedPopup() {
-            // Create a simple popup notification
-            const popup = document.createElement('div');
-            popup.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background-color: #28a745;
-                color: white;
-                padding: 12px 20px;
-                border-radius: 6px;
-                font-size: 14px;
-                font-weight: bold;
-                z-index: 10000;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            `;
-            popup.textContent = 'Trade Opened!';
-            document.body.appendChild(popup);
-            
-            // Remove after 3 seconds
-            setTimeout(() => {
-                if (popup.parentNode) {
-                    popup.parentNode.removeChild(popup);
-                }
-            }, 3000);
-        }
-        
-        // Show trade closed popup (same as desktop)
-        function showTradeClosedPopup() {
-            // Create a simple popup notification
-            const popup = document.createElement('div');
-            popup.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background-color: #dc3545;
-                color: white;
-                padding: 12px 20px;
-                border-radius: 6px;
-                font-size: 14px;
-                font-weight: bold;
-                z-index: 10000;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            `;
-            popup.textContent = 'Trade Closed!';
-            document.body.appendChild(popup);
-            
-            // Remove after 3 seconds
-            setTimeout(() => {
-                if (popup.parentNode) {
-                    popup.parentNode.removeChild(popup);
-                }
-            }, 3000);
-        }
+
 
         // === AUTO ENTRY INDICATOR FUNCTIONS ===
         

@@ -147,15 +147,7 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
 // and prepares it for sending to the trade_manager service
 
 window.prepareTradeData = async function(target) {
-  // 🎧 Sound confirmation - IMMEDIATE
-  if (typeof playSound === 'function') {
-    playSound('open');
-  }
 
-  // ✅ Add UI popup
-  if (typeof showTradeOpenedPopup === 'function') {
-    showTradeOpenedPopup();
-  }
 
   // Extract trade data from the button element
   const symbol = target.getAttribute('data-symbol') || 'BTC';

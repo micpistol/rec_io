@@ -472,15 +472,7 @@ function updateWatchlistBuyButton(spanEl, strike, side, askPrice, isActive, tick
           const result = await response.json();
       
           
-          // Play audio alert for trade opening
-          if (typeof playSound === 'function') {
-            playSound('open');
-          }
-          
-          // Show visual popup
-          if (typeof showTradeOpenedPopup === 'function') {
-            showTradeOpenedPopup();
-          }
+
           
           // Refresh panels to show new trade
           if (typeof fetchAndRenderTrades === 'function') {

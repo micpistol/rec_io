@@ -98,7 +98,7 @@ We will begin with the **System Overview** and prompt generation for **Component
 
 - [x] **Kalshi REST + WebSocket Contract Reference**  
   _Owner: AI (Cursor)_  
-  → Documents expected payloads, error codes, event triggers for live market data and trade execution.
+  → Documents expected payloads, error codes, event triggers for live maFRONTEND UPDATErket data and trade execution.
 
 - [x] **Coinbase Symbol Feed Contract**  
   _Owner: AI_  
