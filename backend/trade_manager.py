@@ -894,7 +894,6 @@ async def add_trade(request: Request):
                 import requests
                 executor_port = get_executor_port()
                 log(f"SENDING CLOSE TO EXECUTOR")
-                sell_price = data.get("buy_price")
                 close_payload = {
                     "ticker": ticker,
                     "side": data.get("side"),
@@ -902,7 +901,7 @@ async def add_trade(request: Request):
                     "action": "close",
                     "type": "market",
                     "time_in_force": "IOC",
-                    "buy_price": sell_price,
+                    "buy_price": 1.00,  # Set to 100 cents for unlimited close orders
                     "symbol_close": None,
                     "intent": "close"
                 }
