@@ -188,7 +188,7 @@ class DatabaseBackupTool:
             return
         
         # Sort by creation date
-        backups.sort(key=lambda x: x['metadata']['created_at'], reverse=True)
+        backups.sort(key=lambda x: x['metadata'].get('created_at', ''), reverse=True)
         
         for backup in backups:
             metadata = backup['metadata']
