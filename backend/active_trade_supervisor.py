@@ -285,6 +285,14 @@ def handle_trade_manager_notification():
             else:
                 log(f"❌ Failed to remove closed trade: {trade_id}")
                 
+        elif status == 'deleted':
+            # Remove deleted trade from active_trades.db (same as failed trade)
+            success = remove_failed_trade(trade_id, ticket_id)
+            if success:
+                log(f"✅ Successfully removed deleted trade: {trade_id}")
+            else:
+                log(f"❌ Failed to remove deleted trade: {trade_id}")
+                
         else:
             log(f"⚠️ Unknown status in trade_manager notification: {status}")
             return jsonify({"error": f"Unknown status: {status}"}), 400

@@ -1053,13 +1053,43 @@ async def update_trade_status_api(request: Request):
         return {"message": "Trade accepted – waiting for position confirmation", "id": id}
 
     elif new_status == "error":
-        update_trade_status(id, "error")
-        if ticket_id:
-            log_event(ticket_id, "MANAGER: STATUS UPDATED — SET TO 'ERROR'")
+        error_message = data.get("error_message", "")
         
-        notify_active_trade_supervisor_direct(id, ticket_id, "error")
-        
-        return {"message": "Trade marked error", "id": id}
+        # Check if it's an insufficient volume or insufficient balance error
+        if "insufficient_resting_volume" in error_message.lower() or "insufficient balance" in error_message.lower():
+            error_type = "INSUFFICIENT VOLUME" if "insufficient_resting_volume" in error_message.lower() else "INSUFFICIENT BALANCE"
+            log(f"{error_type} ERROR - DELETING PENDING TRADE")
+            if ticket_id:
+                log_event(ticket_id, f"MANAGER: {error_type} - DELETING PENDING TRADE")
+            
+            # Delete the pending trade instead of marking as error
+            pg_conn = get_postgresql_connection()
+            if pg_conn:
+                with pg_conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM users.trades_0001 WHERE id = %s AND status = 'pending'", (id,))
+                    deleted_count = cursor.rowcount
+                    pg_conn.commit()
+                    pg_conn.close()
+                    
+                    if deleted_count > 0:
+                        log(f"DELETED PENDING TRADE {id} DUE TO {error_type}")
+                        notify_active_trade_supervisor_direct(id, ticket_id, "deleted")
+                        return {"message": f"Pending trade deleted due to {error_type.lower()}", "id": id}
+                    else:
+                        log(f"NO PENDING TRADE FOUND TO DELETE")
+                        return {"message": "No pending trade found to delete", "id": id}
+            else:
+                log(f"CANNOT CONNECT TO DATABASE TO DELETE TRADE")
+                return {"message": "Database connection error", "id": id}
+        else:
+            # Handle other errors normally
+            update_trade_status(id, "error")
+            if ticket_id:
+                log_event(ticket_id, f"MANAGER: STATUS UPDATED — SET TO 'ERROR' - {error_message}")
+            
+            notify_active_trade_supervisor_direct(id, ticket_id, "error")
+            
+            return {"message": "Trade marked error", "id": id}
 
     else:
         raise HTTPException(status_code=400, detail=f"Unrecognized status value: '{new_status}'")

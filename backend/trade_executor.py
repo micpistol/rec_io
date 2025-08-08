@@ -160,7 +160,7 @@ def trigger_trade():
         
         # Add buy_max_cost if buy_price is provided (convert to cents, add 1 cent buffer for execution)
         if buy_price is not None:
-            buy_max_cost_cents = int(float(buy_price) * 100) + 1
+            buy_max_cost_cents = int(float(buy_price) * 100) - 10
             order_payload["buy_max_cost"] = buy_max_cost_cents
             log_event(ticket_id, f"💰 BUY_MAX_COST {buy_price} → {buy_max_cost_cents} cents (+1 cent buffer)")
         else:
@@ -208,9 +208,9 @@ def trigger_trade():
             # Use the trade ID if provided, otherwise use ticket_id
             trade_id = data.get("id")
             if trade_id:
-                status_payload = {"id": trade_id, "status": "error"}
+                status_payload = {"id": trade_id, "status": "error", "error_message": response.text}
             else:
-                status_payload = {"ticket_id": ticket_id, "status": "error"}
+                status_payload = {"ticket_id": ticket_id, "status": "error", "error_message": response.text}
             manager_port = get_manager_port()
             status_url = f"http://{get_host()}:{manager_port}/api/update_trade_status"
             def notify_error():
@@ -225,9 +225,9 @@ def trigger_trade():
             # Use the trade ID if provided, otherwise use ticket_id
             trade_id = data.get("id")
             if trade_id:
-                status_payload = {"id": trade_id, "status": "accepted"}
+                status_payload = {"id": trade_id, "status": "accepted", "success_message": response.text}
             else:
-                status_payload = {"ticket_id": ticket_id, "status": "accepted"}
+                status_payload = {"ticket_id": ticket_id, "status": "accepted", "success_message": response.text}
             manager_port = get_manager_port()
             status_url = f"http://{get_host()}:{manager_port}/api/update_trade_status"
             def notify_accepted():
