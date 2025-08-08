@@ -77,7 +77,7 @@ fi
 # Check 6: Required directories
 echo ""
 echo "📋 Check 6: Required directories"
-required_dirs=("logs" "backend/data" "backend/data/trade_history" "backend/data/accounts")
+required_dirs=("logs" "backend/data" "backend/data/users/user_0001/trade_history" "backend/data/users/user_0001/accounts")
 for dir in "${required_dirs[@]}"; do
     if [ -d "$dir" ]; then
         echo "✅ $dir exists"

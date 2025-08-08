@@ -19,13 +19,8 @@ def get_coinbase_data_dir():
 
 def get_accounts_data_dir():
     """Get the accounts data directory path."""
-    # Check for user-specific accounts first
-    user_accounts = os.path.join(get_data_dir(), "users", "user_0001", "accounts")
-    if os.path.exists(user_accounts):
-        return user_accounts
-    
-    # Fallback to legacy location
-    return os.path.join(get_data_dir(), "accounts")
+    # Only use user-specific accounts location
+    return os.path.join(get_data_dir(), "users", "user_0001", "accounts")
 
 def get_price_history_dir():
     """Get the price history directory path."""
@@ -37,23 +32,13 @@ def get_btc_price_history_dir():
 
 def get_trade_history_dir():
     """Get the trade history directory path."""
-    # Check for user-specific trade history first
-    user_trade_history = os.path.join(get_data_dir(), "users", "user_0001", "trade_history")
-    if os.path.exists(user_trade_history):
-        return user_trade_history
-    
-    # Fallback to legacy location
-    return os.path.join(get_data_dir(), "trade_history")
+    # Only use user-specific trade history location
+    return os.path.join(get_data_dir(), "users", "user_0001", "trade_history")
 
 def get_active_trades_dir():
     """Get the active trades directory path."""
-    # Check for user-specific active trades first
-    user_active_trades = os.path.join(get_data_dir(), "users", "user_0001", "active_trades")
-    if os.path.exists(user_active_trades):
-        return user_active_trades
-    
-    # Fallback to legacy location
-    return os.path.join(get_data_dir(), "active_trades")
+    # Only use user-specific active trades location
+    return os.path.join(get_data_dir(), "users", "user_0001", "active_trades")
 
 def get_logs_dir():
     """Get the logs directory path."""
@@ -109,13 +94,13 @@ def ensure_data_dirs():
     dirs = [
         get_data_dir(),
         get_kalshi_data_dir(),
-        get_accounts_data_dir(),
         get_price_history_dir(),
         get_btc_price_history_dir(),
-        get_trade_history_dir(),
-        os.path.join(get_accounts_data_dir(), "kalshi", "prod"),
-        os.path.join(get_accounts_data_dir(), "kalshi", "demo"),
         get_logs_dir(),
+        # User-specific directories
+        get_accounts_data_dir(),
+        get_trade_history_dir(),
+        get_active_trades_dir(),
         # User credentials directories
         os.path.join(get_data_dir(), "users", "user_0001", "credentials", "kalshi-credentials", "prod"),
         os.path.join(get_data_dir(), "users", "user_0001", "credentials", "kalshi-credentials", "demo"),

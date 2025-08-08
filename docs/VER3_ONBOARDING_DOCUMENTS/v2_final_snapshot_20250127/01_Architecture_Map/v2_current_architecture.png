@@ -1,0 +1,18 @@
+# REC.IO v2 Current Architecture Diagram
+# This is a placeholder for the actual architecture diagram
+# 
+# Components:
+# - Frontend (HTML/CSS/JS)
+# - Backend Services (Python)
+# - PostgreSQL Database
+# - External APIs (Kalshi, Coinbase)
+# - Supervisor Process Manager
+# - WebSocket Server
+# - Authentication System
+# - File System Storage
+#
+# Replace this file with an actual PNG diagram showing:
+# - Service relationships
+# - Data flow directions
+# - Port connections
+# - External integrations

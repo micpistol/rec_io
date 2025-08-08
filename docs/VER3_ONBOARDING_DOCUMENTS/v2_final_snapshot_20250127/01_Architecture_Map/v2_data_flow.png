@@ -1,0 +1,19 @@
+# REC.IO v2 Data Flow Diagram
+# This is a placeholder for the actual data flow diagram
+# 
+# Data Flow Components:
+# - Market Data Ingestion (Kalshi API → PostgreSQL)
+# - Price Data Stream (Coinbase API → BTC Price Watchdog)
+# - Trade Execution Flow (Frontend → Trade Manager → Trade Executor → Kalshi API)
+# - Position Updates (Kalshi Account Sync → PostgreSQL)
+# - Real-time Updates (WebSocket Server → Frontend)
+# - Authentication Flow (Login → Token Management → Session)
+# - Logging & Monitoring (All Services → Log Files → System Monitor)
+#
+# Replace this file with an actual PNG diagram showing:
+# - Data sources and sinks
+# - Transformation points
+# - Storage locations
+# - Real-time vs batch processing
+# - Error handling paths
+# - Backup and recovery flows

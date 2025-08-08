@@ -38,8 +38,8 @@ create_test_trades_data() {
     log "Creating test trades data..."
     
     # Ensure directories exist
-    mkdir -p backend/data/trade_history
-    mkdir -p backend/data/active_trades
+    mkdir -p backend/data/users/user_0001/trade_history
+    mkdir -p backend/data/users/user_0001/active_trades
     
     # Create Python script to generate test data
     cat > create_test_data.py << 'EOF'
@@ -58,7 +58,7 @@ def create_trades_database():
     print("Creating test trades database...")
     
     # Create database
-    conn = sqlite3.connect('backend/data/trade_history/trades.db')
+    conn = sqlite3.connect('backend/data/users/user_0001/trade_history/trades.db')
     cursor = conn.cursor()
     
     # Create trades table
@@ -261,8 +261,8 @@ verify_test_data() {
     log "Verifying test data..."
     
     # Check trades database
-    if [ -f "backend/data/trade_history/trades.db" ]; then
-        TRADES_COUNT=$(sqlite3 backend/data/trade_history/trades.db "SELECT COUNT(*) FROM trades;" 2>/dev/null || echo "0")
+    if [ -f "backend/data/users/user_0001/trade_history/trades.db" ]; then
+        TRADES_COUNT=$(sqlite3 backend/data/users/user_0001/trade_history/trades.db "SELECT COUNT(*) FROM trades;" 2>/dev/null || echo "0")
         success "Trades database: $TRADES_COUNT records"
     else
         error "Trades database not found"
