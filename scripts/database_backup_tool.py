@@ -198,8 +198,9 @@ class DatabaseBackupTool:
             print(f"📦 {backup['file'].name}")
             print(f"   📅 Created: {created}")
             print(f"   📊 Size: {size_mb} MB")
-            print(f"   🗄️  Database: {metadata['database_info']['size']}")
-            print(f"   📋 Tables: {len(metadata['database_info']['tables'])}")
+            db_info = metadata.get('database_info', {})
+            print(f"   🗄️  Database: {db_info.get('size', 'Unknown')}")
+            print(f"   📋 Tables: {len(db_info.get('tables', []))}")
             print()
     
     def restore_backup(self, backup_file, dry_run=False):
