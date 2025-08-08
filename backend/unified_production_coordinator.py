@@ -410,29 +410,11 @@ def load_auto_entry_settings() -> Dict[str, Any]:
                 print(f"📊 Loaded auto entry settings from PostgreSQL: {settings}")
                 return settings
             else:
-                print(f"⚠️ No auto entry settings found in PostgreSQL, using defaults")
-                return {
-                    "min_probability": 37,
-                    "min_differential": -5,
-                    "min_ttc_seconds": 60,
-                    "min_time": 120,
-                    "max_time": 905,
-                    "allow_re_entry": False,
-                    "watchlist_min_volume": 1000,
-                    "watchlist_max_ask": 98
-                }
+                print(f"⚠️ No auto entry settings found in PostgreSQL")
+                return None
     except Exception as e:
         print(f"⚠️ Error loading auto entry settings from PostgreSQL: {e}")
-        return {
-            "min_probability": 37,
-            "min_differential": -5,
-            "min_ttc_seconds": 60,
-            "min_time": 120,
-            "max_time": 905,
-            "allow_re_entry": False,
-            "watchlist_min_volume": 1000,
-            "watchlist_max_ask": 98
-        }
+        return None
 
 class PipelineStep(Enum):
     BTC_PRICE = "btc_price"
@@ -882,10 +864,13 @@ class UnifiedProductionCoordinator:
             
             # Load auto entry settings for filter parameters
             settings = load_auto_entry_settings()
+            if settings is None:
+                raise Exception("CRITICAL ERROR: Auto entry settings are None - server should catch on fire!")
+            
             min_volume = settings.get("watchlist_min_volume", 1000)
             max_ask = settings.get("watchlist_max_ask", 98)
-            min_probability = settings.get("min_probability", 37)  # Use actual setting from JSON
-            min_differential = settings.get("min_differential", -5)  # Use actual setting from JSON
+            min_probability = settings.get("min_probability") - 5  # Subtract 5 from min_probability
+            min_differential = settings.get("min_differential") - 3  # Subtract 3 from min_differential
             
             print(f"🔍 Watchlist filtering with settings: min_prob={min_probability}, min_diff={min_differential}")
             
@@ -922,6 +907,22 @@ class UnifiedProductionCoordinator:
                 volume_ok = volume >= min_volume
                 probability_ok = probability > min_probability
                 ask_ok = max_ask_price <= max_ask
+                
+                # Debug output for volume filtering
+                if not volume_ok:
+                    print(f"🔍 Volume debug for strike {strike.get('strike')}: volume={volume} (type: {type(volume)}), min_volume={min_volume} (type: {type(min_volume)})")
+                
+                # Debug output for probability filtering
+                if not probability_ok:
+                    print(f"🔍 Probability debug for strike {strike.get('strike')}: probability={probability} (type: {type(probability)}), min_probability={min_probability} (type: {type(min_probability)})")
+                
+                # Debug output for differential filtering
+                if not at_least_one_diff_ok:
+                    print(f"🔍 Differential debug for strike {strike.get('strike')}: yes_diff={yes_diff}, no_diff={no_diff}, min_differential={min_differential}")
+                
+                # Debug output for ask price filtering
+                if not ask_ok:
+                    print(f"🔍 Ask price debug for strike {strike.get('strike')}: max_ask_price={max_ask_price}, max_ask={max_ask}")
                 
                 if (volume_ok and probability_ok and ask_ok and at_least_one_diff_ok):
                     filtered_strikes.append(strike)
