@@ -160,7 +160,7 @@ def trigger_trade():
         
         # Add buy_max_cost if buy_price is provided (convert to cents, add 1 cent buffer for execution)
         if buy_price is not None:
-            buy_max_cost_cents = int(float(buy_price) * 100) - 10
+            buy_max_cost_cents = int(float(buy_price) * 100) + 1
             order_payload["buy_max_cost"] = buy_max_cost_cents
             log_event(ticket_id, f"💰 BUY_MAX_COST {buy_price} → {buy_max_cost_cents} cents (+1 cent buffer)")
         else:

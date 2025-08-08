@@ -53,9 +53,9 @@ class DatabaseBackupTool:
             
             # Get table information
             cursor.execute("""
-                SELECT schemaname, tablename, n_tup_ins as rows
+                SELECT schemaname, relname, n_tup_ins as rows
                 FROM pg_stat_user_tables
-                ORDER BY schemaname, tablename
+                ORDER BY schemaname, relname
             """)
             tables = cursor.fetchall()
             
