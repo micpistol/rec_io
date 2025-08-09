@@ -52,12 +52,25 @@ class SystemMonitor:
             "trade_manager": get_port("trade_manager"),
             "trade_executor": get_port("trade_executor"),
             "active_trade_supervisor": get_port("active_trade_supervisor"),
+            "auto_entry_supervisor": get_port("auto_entry_supervisor"),
             "btc_price_watchdog": get_port("btc_price_watchdog"),
+            "symbol_price_watchdog_btc": get_port("symbol_price_watchdog_btc"),
+            "symbol_price_watchdog_eth": get_port("symbol_price_watchdog_eth"),
             "kalshi_account_sync": get_port("kalshi_account_sync"),
             "kalshi_api_watchdog": get_port("kalshi_api_watchdog"),
             "unified_production_coordinator": get_port("unified_production_coordinator"),
-            "cascading_failure_detector": get_port("cascading_failure_detector")
+            "cascading_failure_detector": get_port("cascading_failure_detector"),
+            "system_monitor": get_port("system_monitor")
         }
+        
+        # Critical services that should never have duplicates running outside supervisor
+        self.critical_services = [
+            "auto_entry_supervisor",
+            "trade_manager", 
+            "trade_executor",
+            "active_trade_supervisor",
+            "unified_production_coordinator"
+        ]
     
     def check_service_health(self, service_name: str, port: int) -> Dict[str, Any]:
         """Check health of a specific service using supervisor status only."""
@@ -92,6 +105,98 @@ class SystemMonitor:
                 "timestamp": datetime.now().isoformat()
             }
     
+    def check_duplicate_processes(self) -> Dict[str, Any]:
+        """Check for duplicate processes running outside of supervisor."""
+        duplicate_report = {
+            "duplicates_found": False,
+            "duplicate_processes": [],
+            "actions_taken": []
+        }
+        
+        try:
+            # Get all Python processes
+            python_processes = []
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                try:
+                    if proc.info['name'] and 'python' in proc.info['name'].lower():
+                        cmdline = proc.info['cmdline']
+                        if cmdline:
+                            python_processes.append({
+                                'pid': proc.info['pid'],
+                                'cmdline': ' '.join(cmdline)
+                            })
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+            
+            # Check for duplicates of critical services
+            for service_name in self.critical_services:
+                service_script = f"{service_name}.py"
+                matching_processes = []
+                
+                for proc in python_processes:
+                    if service_script in proc['cmdline']:
+                        matching_processes.append(proc)
+                
+                # If we have more than one process for this service, we have duplicates
+                if len(matching_processes) > 1:
+                    duplicate_report["duplicates_found"] = True
+                    duplicate_report["duplicate_processes"].append({
+                        "service": service_name,
+                        "processes": matching_processes
+                    })
+                    
+                    # Kill all but the supervisor-managed one
+                    # Supervisor processes will have the project directory in their cmdline
+                    supervisor_process = None
+                    rogue_processes = []
+                    
+                    for proc in matching_processes:
+                        if '/Users/ericwais1/rec_io_20' in proc['cmdline']:
+                            supervisor_process = proc
+                        else:
+                            rogue_processes.append(proc)
+                    
+                    # Kill rogue processes
+                    for rogue_proc in rogue_processes:
+                        try:
+                            print(f"🚨 KILLING DUPLICATE {service_name} PROCESS: PID {rogue_proc['pid']}")
+                            sys.stdout.flush()
+                            
+                            # Kill the process
+                            os.kill(rogue_proc['pid'], 9)  # SIGKILL
+                            
+                            duplicate_report["actions_taken"].append({
+                                "action": "killed_duplicate",
+                                "service": service_name,
+                                "pid": rogue_proc['pid'],
+                                "cmdline": rogue_proc['cmdline']
+                            })
+                            
+                        except ProcessLookupError:
+                            # Process already dead
+                            pass
+                        except Exception as e:
+                            print(f"❌ Failed to kill duplicate {service_name} process {rogue_proc['pid']}: {e}")
+                            sys.stdout.flush()
+            
+            if duplicate_report["duplicates_found"]:
+                print(f"🚨 DUPLICATE PROCESSES DETECTED: {len(duplicate_report['duplicate_processes'])} services affected")
+                sys.stdout.flush()
+                
+                # Send notification
+                try:
+                    from scripts.user_notifications import send_sms_alert
+                    send_sms_alert(f"DUPLICATE PROCESSES DETECTED: {len(duplicate_report['duplicate_processes'])} services affected. Check system monitor logs.")
+                except Exception as e:
+                    print(f"Failed to send duplicate process alert: {e}")
+                    sys.stdout.flush()
+            
+        except Exception as e:
+            print(f"❌ Error checking for duplicate processes: {e}")
+            sys.stdout.flush()
+        
+        return duplicate_report
+
     def check_database_health(self) -> Dict[str, Any]:
         """Check PostgreSQL database connectivity and health."""
         db_health = {}
@@ -198,6 +303,8 @@ class SystemMonitor:
             
             # Price and data services
             "btc_price_watchdog",
+            "symbol_price_watchdog_btc",
+            "symbol_price_watchdog_eth",
             
             # Kalshi API services
             "kalshi_account_sync",
@@ -262,6 +369,7 @@ class SystemMonitor:
             "database_health": self.check_database_health(),
             "supervisor_status": self.check_supervisor_status(),
             "all_services_status": self.check_all_services_status(),
+            "duplicate_processes": self.check_duplicate_processes(),
             "services": {},
             "port_assignments": list_all_ports()
         }
@@ -343,6 +451,13 @@ class SystemMonitor:
                 supervisor_status = report.get("supervisor_status", {}).get("status", "unknown")
                 if supervisor_status != "running":
                     overall_status = "degraded"
+                
+                # Check for duplicate processes
+                duplicate_processes = report.get("duplicate_processes", {})
+                if duplicate_processes.get("duplicates_found", False):
+                    overall_status = "degraded"
+                    print(f"⚠️ System status degraded due to duplicate processes detected")
+                    sys.stdout.flush()
                 
                 # Extract system resource metrics
                 cpu_percent = None
