@@ -16,6 +16,7 @@ This package contains the complete v2 system snapshot from the system architect 
 - `notes.md` – Architect's raw v2 architecture notes
 - `System_Overview.md` – High-level architecture & service flow
 - `Component_Level_Documentation.md` – Detailed per-service description with purpose, inputs/outputs, error behavior, dependencies, startup/shutdown sequence, and failure recovery steps
+- `Frontend_Enhancements_Documentation.md` – Comprehensive frontend interface documentation including desktop/mobile interfaces, system monitoring, and admin controls
 - `v2_current_architecture.png` – Current architecture diagram (to be created)
 - `v3_target_architecture.png` – Target v3 architecture diagram (to be created)
 - `v2_data_flow.png` – Data flow diagram (to be created)

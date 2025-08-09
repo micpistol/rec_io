@@ -373,35 +373,44 @@ This document provides detailed documentation for all major services in the REC.
 ## Database Services
 
 ### 9. System Monitor (`backend/system_monitor.py`)
-**Purpose**: Monitors system health and database status
+**Purpose**: Comprehensive system health monitoring with duplicate process detection and resource tracking
 
 **Inputs**:
 - Database connection status
-- Service health checks
-- Performance metrics
+- Service health checks via HTTP endpoints
+- Performance metrics (CPU, memory, disk)
+- Process monitoring via psutil
+- System resource utilization
 
 **Outputs**:
-- Health status reports
-- Performance alerts
-- System status to frontend
+- Health status reports to PostgreSQL system.health_status table
+- Performance alerts and notifications
+- System status to frontend via API
+- Duplicate process detection and termination
+- SMS alerts for critical failures
 
 **Error Behavior**:
 - Continues monitoring with available data
 - Logs errors to `logs/system_monitor.err.log`
 - Alert system for critical failures
 - Graceful degradation for missing services
+- Automatic duplicate process cleanup
 
 **Dependencies**:
 - PostgreSQL database
-- All core services
+- All core services (via HTTP health checks)
+- psutil for process monitoring
+- SMS notification system
 - Log file access
 
 **Startup Sequence**:
 1. Initialize database connections
-2. Start health monitoring loop
-3. Initialize performance tracking
-4. Start alert system
-5. Load monitoring configuration
+2. Load service URLs from port configuration
+3. Initialize critical services list
+4. Start health monitoring loop (15-second intervals)
+5. Initialize performance tracking
+6. Start duplicate process detection
+7. Load monitoring configuration
 
 **Shutdown Sequence**:
 1. Save monitoring state
@@ -414,12 +423,325 @@ This document provides detailed documentation for all major services in the REC.
 - Service health recovery
 - Performance metric reset
 - Alert system recovery
+- Duplicate process cleanup on restart
+
+**Enhanced Features**:
+- **Duplicate Process Detection**: Monitors for rogue processes outside supervisor
+- **Resource Monitoring**: CPU, memory, disk usage tracking
+- **Service Health Checks**: HTTP-based health monitoring for all services
+- **SMS Alerts**: Critical failure notifications
+- **Status Degradation**: Overall status set to "degraded" when duplicates detected
+
+### 10. Auto Entry Supervisor (`backend/auto_entry_supervisor.py`)
+**Purpose**: Generates entry signals and trade recommendations based on market conditions
+
+**Inputs**:
+- Market data from price watchdogs
+- Technical indicators and momentum data
+- User configuration and risk parameters
+
+**Outputs**:
+- Trade entry signals
+- Market analysis reports
+- Risk assessment data
+
+**Error Behavior**:
+- Continues operation with available data
+- Logs errors to `logs/auto_entry_supervisor.err.log`
+- Graceful degradation for missing market data
+- Automatic restart via supervisor on critical failures
+
+**Dependencies**:
+- Price watchdog services
+- Trade Manager service
+- PostgreSQL database
+- User configuration files
+
+**Startup Sequence**:
+1. Load user configuration
+2. Initialize market data connections
+3. Start signal generation loop
+4. Initialize risk management
+5. Connect to trade manager
+
+**Shutdown Sequence**:
+1. Complete pending analysis
+2. Save current state
+3. Close market data connections
+4. Log shutdown completion
+
+**Failure Recovery**:
+- Market data reconnection logic
+- Configuration reload on errors
+- Signal generation recovery
+- Risk parameter reset
+
+---
+
+### 11. Symbol Price Watchdog BTC (`archive/old_scripts/symbol_price_watchdog.py`)
+**Purpose**: Monitors BTC symbol prices and market data
+
+**Inputs**:
+- BTC price feeds
+- Market data APIs
+- Configuration parameters
+
+**Outputs**:
+- Real-time BTC price updates
+- Market data to other services
+- Price alerts and notifications
+
+**Error Behavior**:
+- Continues monitoring with available feeds
+- Logs errors to `logs/symbol_price_watchdog_btc.err.log`
+- Automatic restart via supervisor
+- Fallback to alternative data sources
+
+**Dependencies**:
+- External price APIs
+- Database for price storage
+- Other watchdog services
+
+**Startup Sequence**:
+1. Initialize price feed connections
+2. Load configuration
+3. Start price monitoring loop
+4. Initialize data storage
+5. Connect to dependent services
+
+**Shutdown Sequence**:
+1. Close price feed connections
+2. Save current price state
+3. Complete data writes
+4. Log shutdown completion
+
+**Failure Recovery**:
+- Price feed reconnection
+- Configuration reload
+- Data source fallback
+- Service restart recovery
+
+---
+
+### 12. Symbol Price Watchdog ETH (`archive/old_scripts/symbol_price_watchdog.py`)
+**Purpose**: Monitors ETH symbol prices and market data
+
+**Inputs**:
+- ETH price feeds
+- Market data APIs
+- Configuration parameters
+
+**Outputs**:
+- Real-time ETH price updates
+- Market data to other services
+- Price alerts and notifications
+
+**Error Behavior**:
+- Continues monitoring with available feeds
+- Logs errors to `logs/symbol_price_watchdog_eth.err.log`
+- Automatic restart via supervisor
+- Fallback to alternative data sources
+
+**Dependencies**:
+- External price APIs
+- Database for price storage
+- Other watchdog services
+
+**Startup Sequence**:
+1. Initialize price feed connections
+2. Load configuration
+3. Start price monitoring loop
+4. Initialize data storage
+5. Connect to dependent services
+
+**Shutdown Sequence**:
+1. Close price feed connections
+2. Save current price state
+3. Complete data writes
+4. Log shutdown completion
+
+**Failure Recovery**:
+- Price feed reconnection
+- Configuration reload
+- Data source fallback
+- Service restart recovery
+
+---
+
+### 13. Cascading Failure Detector (`backend/cascading_failure_detector.py`)
+**Purpose**: Detects and prevents cascading service failures
+
+**Inputs**:
+- Service health status
+- Dependency relationships
+- Failure patterns
+
+**Outputs**:
+- Failure alerts
+- Service restart commands
+- Dependency analysis reports
+
+**Error Behavior**:
+- Continues monitoring with available services
+- Logs errors to `logs/cascading_failure_detector.err.log`
+- Automatic service recovery attempts
+- Alert system for critical failures
+
+**Dependencies**:
+- All core services
+- Supervisor for service management
+- Alert system
+
+**Startup Sequence**:
+1. Initialize service dependency mapping
+2. Start failure detection loop
+3. Initialize alert system
+4. Load recovery procedures
+5. Connect to supervisor
+
+**Shutdown Sequence**:
+1. Complete current failure analysis
+2. Save dependency state
+3. Close alert connections
+4. Log shutdown completion
+
+**Failure Recovery**:
+- Service dependency recovery
+- Alert system reconnection
+- Recovery procedure reload
+- Service restart coordination
 
 ---
 
 ## Frontend Services
 
-### 10. Frontend WebSocket Handler (`frontend/js/live-data.js`)
+### 14. Desktop Frontend Interface (`frontend/tabs/`)
+**Purpose**: Full-featured web interface with system monitoring and admin controls
+
+**Inputs**:
+- WebSocket messages from backend
+- User interface events
+- System health data
+- Supervisor status information
+
+**Outputs**:
+- Real-time UI updates
+- System health dashboard
+- Admin control interface
+- User interaction responses
+
+**Key Components**:
+- **System Status Panel** (`frontend/tabs/system.html`): Real-time health monitoring with resource usage
+- **User Management** (`frontend/tabs/account_manager.html`): User account and credential management
+- **Trade History** (`frontend/tabs/history.html`): Historical trade data and analysis
+- **Settings** (`frontend/tabs/settings.html`): System configuration and preferences
+
+**Enhanced Features**:
+- **Dynamic System Icons**: Status-based icon updates in navigation
+- **Resource Monitoring**: CPU, memory, disk usage with progress bars
+- **Admin Controls**: Supervisor management, terminal access, system restart
+- **Script Management**: Individual restart/log access for all supervisor processes
+- **Real-time Updates**: Live data streaming via WebSocket
+
+**Error Behavior**:
+- WebSocket reconnection on failures
+- Graceful UI degradation
+- User-friendly error messages
+- Fallback to polling if WebSocket fails
+- Dynamic error handling for admin functions
+
+**Dependencies**:
+- Backend WebSocket server
+- System health API endpoints
+- Supervisor control API
+- Authentication system
+
+**Startup Sequence**:
+1. Initialize WebSocket connection
+2. Load user configuration and permissions
+3. Start system health monitoring
+4. Initialize admin controls (if authorized)
+5. Connect to backend services
+
+**Shutdown Sequence**:
+1. Close WebSocket connection
+2. Save user state and preferences
+3. Complete UI updates
+4. Log shutdown completion
+
+**Failure Recovery**:
+- WebSocket reconnection logic
+- UI state recovery
+- Configuration reload
+- Error message display
+- Admin permission revalidation
+
+---
+
+### 15. Mobile Frontend Interface (`frontend/mobile/`)
+**Purpose**: Responsive mobile-optimized interface for system monitoring
+
+**Inputs**:
+- WebSocket messages from backend
+- Touch interface events
+- System health data
+- User authentication
+
+**Outputs**:
+- Mobile-optimized UI updates
+- Simplified system monitoring
+- Touch-friendly interactions
+- Real-time data display
+
+**Key Components**:
+- **Mobile Main Interface** (`frontend/mobile/index.html`): Tab-based navigation
+- **Mobile System Panel** (`frontend/mobile/system_mobile.html`): Simplified system monitoring
+- **Mobile User Panel** (`frontend/mobile/user_mobile.html`): User account management
+- **Mobile Trade History** (`frontend/mobile/trade_history_mobile.html`): Historical data
+
+**Mobile-Specific Features**:
+- **Responsive Design**: Optimized for mobile screen sizes
+- **Touch Interface**: Touch-friendly buttons and controls
+- **Simplified Monitoring**: Essential system status without complex controls
+- **Real-time Updates**: Live data streaming optimized for mobile
+- **Dynamic Icons**: Status-based navigation icon updates
+
+**Error Behavior**:
+- WebSocket reconnection on failures
+- Mobile-optimized error messages
+- Graceful UI degradation
+- Touch-friendly error handling
+- Offline state management
+
+**Dependencies**:
+- Backend WebSocket server
+- System health API endpoints
+- Mobile-responsive CSS
+- Touch event handling
+
+**Startup Sequence**:
+1. Initialize WebSocket connection
+2. Load mobile-specific configuration
+3. Start system health monitoring
+4. Initialize touch interface
+5. Connect to backend services
+
+**Shutdown Sequence**:
+1. Close WebSocket connection
+2. Save mobile state
+3. Complete UI updates
+4. Log shutdown completion
+
+**Failure Recovery**:
+- WebSocket reconnection logic
+- Mobile UI state recovery
+- Touch interface reset
+- Error message display
+- Offline mode activation
+
+---
+
+### 16. Frontend WebSocket Handler (`frontend/js/live-data.js`)
 **Purpose**: Handles real-time data updates to frontend
 
 **Inputs**:
@@ -466,7 +788,7 @@ This document provides detailed documentation for all major services in the REC.
 
 ## Utility Services
 
-### 11. Database Migration Tool (`scripts/migrate_data_to_postgresql.sh`)
+### 17. Database Migration Tool (`scripts/migrate_data_to_postgresql.sh`)
 **Purpose**: Migrates data from SQLite to PostgreSQL
 
 **Inputs**:

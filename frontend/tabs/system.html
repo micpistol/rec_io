@@ -149,6 +149,101 @@
             margin-top: 10px;
         }
         
+        /* Enhanced Resource Cards */
+        .resource-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        
+        .resource-card {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .resource-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .resource-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .resource-status {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .resource-status.low {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+        
+        .resource-status.medium {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+        
+        .resource-status.high {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        
+        .resource-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-fill.cpu {
+            background: linear-gradient(90deg, #22c55e, #f59e0b, #ef4444);
+        }
+        
+        .progress-fill.memory {
+            background: linear-gradient(90deg, #22c55e, #f59e0b, #ef4444);
+        }
+        
+        .progress-fill.disk {
+            background: linear-gradient(90deg, #22c55e, #f59e0b, #ef4444);
+        }
+        
+        .resource-details {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+        
         .admin-controls {
             display: flex;
             gap: 8px;
@@ -561,29 +656,37 @@
             }
             
             const status = data.overall_status || 'unknown';
-            const cpu = data.cpu_percent ? `${data.cpu_percent.toFixed(1)}%` : '--';
-            const memory = data.memory_percent ? `${data.memory_percent.toFixed(1)}%` : '--';
-            const disk = data.disk_percent ? `${data.disk_percent.toFixed(1)}%` : '--';
+            const cpuPercent = data.cpu_percent || 0;
+            const memoryPercent = data.memory_percent || 0;
+            const diskPercent = data.disk_percent || 0;
             const services = `${data.services_healthy || 0}/${data.services_total || 0}`;
             const timestamp = data.timestamp ? new Date(data.timestamp).toLocaleString() : 'Unknown';
+            
+            // Calculate storage details
+            const totalDiskGB = data.disk_total_gb || 500;
+            const usedDiskGB = data.disk_used_gb || (totalDiskGB * diskPercent / 100).toFixed(1);
+            const freeDiskGB = data.disk_free_gb || (totalDiskGB - usedDiskGB).toFixed(1);
+            
+            const totalMemoryGB = data.memory_total_gb || 16;
+            const usedMemoryGB = data.memory_used_gb || (totalMemoryGB * memoryPercent / 100).toFixed(1);
+            const freeMemoryGB = data.memory_available_gb || (totalMemoryGB - usedMemoryGB).toFixed(1);
+            
+            // Get status indicators
+            const getStatusClass = (percent) => {
+                if (percent < 50) return 'low';
+                if (percent < 80) return 'medium';
+                return 'high';
+            };
+            
+            const cpuStatus = getStatusClass(cpuPercent);
+            const memoryStatus = getStatusClass(memoryPercent);
+            const diskStatus = getStatusClass(diskPercent);
             
             content.innerHTML = `
                 <div class="health-grid">
                     <div class="health-card">
                         <div class="health-card-title">Overall Status</div>
-                        <div class="health-status ${status}">${status}</div>
-                    </div>
-                    <div class="health-card">
-                        <div class="health-card-title">CPU Usage</div>
-                        <div class="health-card-value">${cpu}</div>
-                    </div>
-                    <div class="health-card">
-                        <div class="health-card-title">Memory Usage</div>
-                        <div class="health-card-value">${memory}</div>
-                    </div>
-                    <div class="health-card">
-                        <div class="health-card-title">Disk Usage</div>
-                        <div class="health-card-value">${disk}</div>
+                        <div class="health-status ${status}">${status.toUpperCase()}</div>
                     </div>
                     <div class="health-card">
                         <div class="health-card-title">Database Status</div>
@@ -592,6 +695,49 @@
                     <div class="health-card">
                         <div class="health-card-title">Services Healthy</div>
                         <div class="health-card-value">${services}</div>
+                    </div>
+                </div>
+                
+                <div class="resource-grid" style="margin-top: 20px;">
+                    <div class="resource-card">
+                        <div class="resource-header">
+                            <span class="resource-title">CPU Usage</span>
+                            <span class="resource-status ${cpuStatus}">${cpuStatus.toUpperCase()}</span>
+                        </div>
+                        <div class="resource-value">${cpuPercent.toFixed(1)}%</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill cpu" style="width: ${cpuPercent}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="resource-card">
+                        <div class="resource-header">
+                            <span class="resource-title">Memory Usage</span>
+                            <span class="resource-status ${memoryStatus}">${memoryStatus.toUpperCase()}</span>
+                        </div>
+                        <div class="resource-value">${memoryPercent.toFixed(1)}%</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill memory" style="width: ${memoryPercent}%"></div>
+                        </div>
+                        <div class="resource-details">
+                            <span>Used: ${usedMemoryGB} GB</span>
+                            <span>Free: ${freeMemoryGB} GB</span>
+                        </div>
+                    </div>
+                    
+                    <div class="resource-card">
+                        <div class="resource-header">
+                            <span class="resource-title">Disk Usage</span>
+                            <span class="resource-status ${diskStatus}">${diskStatus.toUpperCase()}</span>
+                        </div>
+                        <div class="resource-value">${diskPercent.toFixed(1)}%</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill disk" style="width: ${diskPercent}%"></div>
+                        </div>
+                        <div class="resource-details">
+                            <span>Used: ${usedDiskGB} GB</span>
+                            <span>Free: ${freeDiskGB} GB</span>
+                        </div>
                     </div>
                 </div>
                 

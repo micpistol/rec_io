@@ -22,12 +22,15 @@ Single source of truth for service **ports**, **paths**, and **environment varia
 | trade_manager                   | 4000 |
 | trade_executor                  | 8001 |
 | btc_price_watchdog              | 8002 |
-| db_poller                       | 8003 |
+| symbol_price_watchdog_btc       | 8006 |
 | kalshi_account_sync             | 8004 |
 | kalshi_api_watchdog             | 8005 |
+| symbol_price_watchdog_eth       | 8008 |
 | active_trade_supervisor         | 8007 |
 | auto_entry_supervisor           | 8009 |
 | unified_production_coordinator  | 8010 |
+| cascading_failure_detector      | 8011 |
+| system_monitor                  | 8012 |
 
 > If any port changes, update **MASTER_PORT_MANIFEST.json** and redeploy. Do **not** patch code constants.
 
