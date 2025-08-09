@@ -920,6 +920,30 @@ async def serve_favicon():
     else:
         return {"error": "Favicon not found"}, 404
 
+# Serve terminal control page
+@app.get("/terminal-control.html", response_class=HTMLResponse)
+async def serve_terminal_control():
+    """Serve terminal control page."""
+    import os
+    file_path = "terminal-control.html"
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            return HTMLResponse(content=f.read())
+    else:
+        return HTMLResponse(content="<h1>Terminal Control not found</h1>", status_code=404)
+
+# Serve log viewer page
+@app.get("/log-viewer.html", response_class=HTMLResponse)
+async def serve_log_viewer():
+    """Serve log viewer page."""
+    import os
+    file_path = "log-viewer.html"
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            return HTMLResponse(content=f.read())
+    else:
+        return HTMLResponse(content="<h1>Log Viewer not found</h1>", status_code=404)
+
 # Serve CSS files with cache busting
 @app.get("/styles/{filename:path}")
 async def serve_css(filename: str):
@@ -1500,6 +1524,43 @@ def get_settlements():
     except Exception as e:
         print(f"Error getting settlements from PostgreSQL: {e}")
         return {"settlements": []}
+
+@app.get("/api/db/system_health")
+def get_system_health_from_db():
+    """Get current system health from database"""
+    try:
+        import psycopg2
+        
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT * FROM system.health_status WHERE id = 1")
+            result = cursor.fetchone()
+            
+            if result:
+                return {
+                    "overall_status": result[1],
+                    "cpu_percent": float(result[2]) if result[2] else None,
+                    "memory_percent": float(result[3]) if result[3] else None,
+                    "disk_percent": float(result[4]) if result[4] else None,
+                    "database_status": result[5],
+                    "supervisor_status": result[6],
+                    "services_healthy": result[7],
+                    "services_total": result[8],
+                    "failed_services": result[9] or [],
+                    "timestamp": result[11].isoformat() if result[11] else None
+                }
+            else:
+                return {"error": "No health data available"}
+                
+    except Exception as e:
+        print(f"[DB SYSTEM HEALTH] Error: {e}")
+        return {"error": "Database error"}
 
 @app.get("/api/db/trades")
 def get_trades_from_postgresql():
@@ -2697,6 +2758,48 @@ async def get_user_info():
         print(f"[USER INFO] Error getting user info: {e}")
         return {"error": "Failed to get user information"}
 
+@app.get("/api/system/health")
+async def get_system_health():
+    """Get current system health status from database"""
+    try:
+        import psycopg2
+        
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT * FROM system.health_status WHERE id = 1")
+            result = cursor.fetchone()
+            
+            if result:
+                # Unpack the result (adjust column order as needed)
+                id, overall_status, cpu_percent, memory_percent, disk_percent, \
+                database_status, supervisor_status, services_healthy, services_total, \
+                failed_services, health_details, timestamp = result
+                
+                return {
+                    "overall_status": overall_status,
+                    "cpu_percent": float(cpu_percent) if cpu_percent else None,
+                    "memory_percent": float(memory_percent) if memory_percent else None,
+                    "disk_percent": float(disk_percent) if disk_percent else None,
+                    "database_status": database_status,
+                    "supervisor_status": supervisor_status,
+                    "services_healthy": services_healthy,
+                    "services_total": services_total,
+                    "failed_services": failed_services or [],
+                    "timestamp": timestamp.isoformat() if timestamp else None
+                }
+            else:
+                return {"error": "No health data available"}
+                
+    except Exception as e:
+        print(f"[SYSTEM HEALTH] Error getting system health: {e}")
+        return {"error": "Failed to get system health information"}
+
 # Startup and shutdown events
 @app.on_event("startup")
 async def startup_event():
@@ -2708,6 +2811,202 @@ async def shutdown_event():
     """Called when the application shuts down."""
     print("[MAIN] 🛑 Main app shutting down")
     # No port release needed for static ports
+
+@app.post("/api/admin/supervisor-status")
+async def get_supervisor_status():
+    """Execute supervisorctl status command and return output"""
+    try:
+        import subprocess
+        import os
+        
+        # Change to the project directory
+        project_dir = "/Users/ericwais1/rec_io_20"
+        os.chdir(project_dir)
+        
+        # Use full path to supervisorctl and set environment
+        supervisorctl_path = "/opt/homebrew/bin/supervisorctl"
+        env = os.environ.copy()
+        
+        # Execute the supervisorctl command with full path
+        result = subprocess.run(
+            [supervisorctl_path, "-c", "backend/supervisord.conf", "status"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env=env,
+            cwd=project_dir
+        )
+        
+        if result.returncode == 0:
+            return {
+                "success": True,
+                "output": result.stdout
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"Command failed with return code {result.returncode}",
+                "output": result.stderr
+            }
+            
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "error": "Command timed out"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.post("/api/admin/execute-restart")
+async def execute_restart():
+    """Execute the restart script in background"""
+    try:
+        import subprocess
+        import os
+        
+        # Change to the project directory
+        project_dir = "/Users/ericwais1/rec_io_20"
+        os.chdir(project_dir)
+        
+        # Set up environment with proper PATH
+        env = os.environ.copy()
+        env['PATH'] = '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin'
+        
+        # Execute the restart script in background (don't wait for it)
+        subprocess.Popen(
+            ["/bin/bash", "./scripts/restart"],
+            cwd=project_dir,
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True
+        )
+        
+        # Return immediately - the script will run in background
+        return {
+            "success": True,
+            "message": "Restart script initiated in background"
+        }
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.post("/api/admin/execute-command")
+async def execute_command(request: dict):
+    """Execute arbitrary command at project level"""
+    try:
+        import subprocess
+        import os
+        
+        command = request.get("command", "")
+        if not command:
+            return {"success": False, "error": "No command provided"}
+        
+        # Change to the project directory
+        project_dir = "/Users/ericwais1/rec_io_20"
+        os.chdir(project_dir)
+        
+        # Set up environment with proper PATH
+        env = os.environ.copy()
+        env['PATH'] = '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin'
+        
+        # Execute the command
+        result = subprocess.run(
+            command.split(),
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
+            cwd=project_dir
+        )
+        
+        if result.returncode == 0:
+            return {"success": True, "output": result.stdout}
+        else:
+            return {"success": False, "error": f"Command failed with return code {result.returncode}", "output": result.stderr}
+            
+    except subprocess.TimeoutExpired:
+        return {"success": False, "error": "Command timed out after 30 seconds"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/admin/get-log-stream")
+async def get_log_stream(request: dict):
+    """Stream log output for a specific script."""
+    from fastapi.responses import StreamingResponse
+    import subprocess
+    import os
+    
+    script_name = request.get("script", "")
+    if not script_name:
+        return {"success": False, "error": "No script name provided"}
+    
+    # Determine log file path based on script name
+    log_file = f"logs/{script_name}.out.log"
+    project_dir = "/Users/ericwais1/rec_io_20"
+    
+    if not os.path.exists(os.path.join(project_dir, log_file)):
+        return {"success": False, "error": f"Log file not found: {log_file}"}
+    
+    def generate_log_stream():
+        try:
+            # Set up environment with proper PATH
+            env = os.environ.copy()
+            env['PATH'] = '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin'
+            
+            # First, get the last 100 lines of the log file
+            try:
+                result = subprocess.run(
+                    ["/usr/bin/tail", "-n", "100", log_file],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    cwd=project_dir,
+                    env=env
+                )
+                if result.returncode == 0 and result.stdout:
+                    # Send the last 100 lines first
+                    yield "=== Last 100 lines of log ===\n"
+                    yield result.stdout
+                    yield "\n=== Live tail starting ===\n"
+            except Exception as e:
+                yield f"Warning: Could not read existing log content: {str(e)}\n"
+                yield "=== Starting live tail ===\n"
+            
+            # Start tail -f process with full path for live streaming
+            process = subprocess.Popen(
+                ["/usr/bin/tail", "-f", log_file],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                cwd=project_dir,
+                env=env
+            )
+            
+            # Stream live output
+            while True:
+                line = process.stdout.readline()
+                if not line:
+                    break
+                yield line
+            
+        except Exception as e:
+            yield f"Error: {str(e)}\n"
+        finally:
+            if 'process' in locals():
+                process.terminate()
+    
+    return StreamingResponse(
+        generate_log_stream(),
+        media_type="text/plain",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+    )
 
 # Main entry point
 if __name__ == "__main__":

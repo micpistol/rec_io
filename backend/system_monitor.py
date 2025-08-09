@@ -291,7 +291,108 @@ class SystemMonitor:
         if len(self.health_history) > self.max_history:
             self.health_history.pop(0)
         
+        # Save health report to database
+        self.save_health_report_to_db(report)
+        
         return report
+    
+    def save_health_report_to_db(self, report: Dict[str, Any]):
+        """Save health report to PostgreSQL database."""
+        try:
+            import psycopg2
+            import json
+            
+            conn = psycopg2.connect(
+                host="localhost",
+                database="rec_io_db",
+                user="rec_io_user",
+                password="rec_io_password"
+            )
+            
+            with conn.cursor() as cursor:
+                # Determine overall status
+                overall_status = "healthy"
+                failed_services = []
+                
+                # Check system resources
+                resources = report.get("system_resources", {})
+                if "error" in resources:
+                    overall_status = "degraded"
+                
+                # Check database health
+                db_health = report.get("database_health", {})
+                db_status = "healthy"
+                for db_name, db_status_info in db_health.items():
+                    if db_status_info.get("status") != "healthy":
+                        db_status = "unhealthy"
+                        overall_status = "degraded"
+                
+                # Check services
+                services = report.get("services", {})
+                services_healthy = 0
+                services_total = len(services)
+                
+                for service_name, service_info in services.items():
+                    if service_info.get("status") == "healthy":
+                        services_healthy += 1
+                    else:
+                        failed_services.append(service_name)
+                        overall_status = "degraded"
+                
+                # Check supervisor status
+                supervisor_status = report.get("supervisor_status", {}).get("status", "unknown")
+                if supervisor_status != "running":
+                    overall_status = "degraded"
+                
+                # Extract system resource metrics
+                cpu_percent = None
+                memory_percent = None
+                disk_percent = None
+                
+                if "error" not in resources:
+                    cpu_percent = resources.get("cpu_percent")
+                    memory_percent = resources.get("memory_percent")
+                    disk_percent = resources.get("disk_percent")
+                
+                # Upsert into database - always maintain single current state
+                cursor.execute("""
+                    INSERT INTO system.health_status 
+                    (id, overall_status, cpu_percent, memory_percent, disk_percent, 
+                     database_status, supervisor_status, services_healthy, services_total, 
+                     failed_services, health_details, timestamp)
+                    VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT (id) DO UPDATE SET
+                        overall_status = EXCLUDED.overall_status,
+                        cpu_percent = EXCLUDED.cpu_percent,
+                        memory_percent = EXCLUDED.memory_percent,
+                        disk_percent = EXCLUDED.disk_percent,
+                        database_status = EXCLUDED.database_status,
+                        supervisor_status = EXCLUDED.supervisor_status,
+                        services_healthy = EXCLUDED.services_healthy,
+                        services_total = EXCLUDED.services_total,
+                        failed_services = EXCLUDED.failed_services,
+                        health_details = EXCLUDED.health_details,
+                        timestamp = CURRENT_TIMESTAMP
+                """, (
+                    overall_status,
+                    cpu_percent,
+                    memory_percent,
+                    disk_percent,
+                    db_status,
+                    supervisor_status,
+                    services_healthy,
+                    services_total,
+                    failed_services,
+                    json.dumps(report)
+                ))
+                
+                conn.commit()
+                print(f"💾 Health report saved to database: {overall_status} ({services_healthy}/{services_total} services healthy)")
+                sys.stdout.flush()
+                
+        except Exception as e:
+            print(f"❌ Error saving health report to database: {e}")
+            sys.stdout.flush()
     
     def trigger_master_restart(self):
         """Trigger a MASTER RESTART and send notification."""
