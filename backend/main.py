@@ -2837,7 +2837,9 @@ async def get_supervisor_status():
             cwd=project_dir
         )
         
-        if result.returncode == 0:
+        # supervisorctl returns non-zero exit codes when any process is stopped
+        # but the output is still valid, so we should return success if we got output
+        if result.stdout.strip():
             return {
                 "success": True,
                 "output": result.stdout

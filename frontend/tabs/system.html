@@ -844,10 +844,15 @@
             
             for (const line of lines) {
                 if (line.trim()) {
-                    // Parse supervisor status line: script_name RUNNING pid 12345, uptime 0:12:34
-                    const match = line.match(/^(\S+)\s+(\S+)\s+pid\s+(\d+),\s+uptime\s+(.+)$/);
-                    if (match) {
-                        const [, scriptName, status, pid, uptime] = match;
+                    // Parse supervisor status line: 
+                    // Running: script_name RUNNING pid 12345, uptime 0:12:34
+                    // Stopped: script_name STOPPED Aug 09 11:06 AM
+                    const runningMatch = line.match(/^(\S+)\s+(\S+)\s+pid\s+(\d+),\s+uptime\s+(.+)$/);
+                    const stoppedMatch = line.match(/^(\S+)\s+(\S+)\s+(.+)$/);
+                    
+                    if (runningMatch) {
+                        // Running process
+                        const [, scriptName, status, pid, uptime] = runningMatch;
                         const statusClass = status.toLowerCase();
                         
                         tableHTML += `
@@ -855,6 +860,22 @@
                                 <td class="script-name">${scriptName}</td>
                                 <td class="script-status ${statusClass}">${status}</td>
                                 <td class="script-uptime">${uptime}</td>
+                                <td class="script-actions">
+                                    <button class="script-btn log-btn" onclick="viewScriptLog('${scriptName}')">Log</button>
+                                    <button class="script-btn restart-btn" onclick="restartScript('${scriptName}')">Restart</button>
+                                </td>
+                            </tr>
+                        `;
+                    } else if (stoppedMatch) {
+                        // Stopped process
+                        const [, scriptName, status, timestamp] = stoppedMatch;
+                        const statusClass = status.toLowerCase();
+                        
+                        tableHTML += `
+                            <tr>
+                                <td class="script-name">${scriptName}</td>
+                                <td class="script-status ${statusClass}">${status}</td>
+                                <td class="script-uptime">${timestamp}</td>
                                 <td class="script-actions">
                                     <button class="script-btn log-btn" onclick="viewScriptLog('${scriptName}')">Log</button>
                                     <button class="script-btn restart-btn" onclick="restartScript('${scriptName}')">Restart</button>

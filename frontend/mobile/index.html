@@ -138,7 +138,10 @@
             <iframe id="account-frame" class="page-frame" src="account_manager_mobile.html"></iframe>
             
             <!-- User Page -->
-            <iframe id="user-frame" class="page-frame" src="about:blank"></iframe>
+            <iframe id="user-frame" class="page-frame" src="user_mobile.html"></iframe>
+            
+            <!-- System Page -->
+            <iframe id="system-frame" class="page-frame" src="system_mobile.html"></iframe>
         </div>
 
         <!-- Bottom Tab Navigation -->
@@ -158,6 +161,10 @@
             <a href="#" class="tab-item" data-tab="user">
                 <img src="../images/icons/user_icon.png" alt="User" class="tab-icon">
                 <span class="tab-label">User</span>
+            </a>
+            <a href="#" class="tab-item" data-tab="system">
+                <img src="../images/icons/system_icon_HEALTHY.png" alt="System" class="tab-icon">
+                <span class="tab-label">System</span>
             </a>
         </div>
     </div>
@@ -242,6 +249,67 @@
         
         // Initialize mobile iframe coordination
         setupMobileIframeCoordination();
+        
+        // System health monitoring for icon updates
+        let systemHealthInterval;
+        let lastSystemStatus = null;
+        
+        function startSystemHealthMonitoring() {
+            // Check immediately
+            updateSystemIcon();
+            
+            // Then check every 15 seconds (same as system monitor)
+            systemHealthInterval = setInterval(updateSystemIcon, 15000);
+        }
+        
+        async function updateSystemIcon() {
+            try {
+                const response = await fetch('/api/db/system_health');
+                if (response.ok) {
+                    const healthData = await response.json();
+                    const status = healthData.overall_status || 'offline';
+                    
+                    // Only update if status changed
+                    if (status !== lastSystemStatus) {
+                        lastSystemStatus = status;
+                        updateSystemIconInSidebar(status);
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating system icon:', error);
+                // If we can't reach the API, assume offline
+                if (lastSystemStatus !== 'offline') {
+                    lastSystemStatus = 'offline';
+                    updateSystemIconInSidebar('offline');
+                }
+            }
+        }
+        
+        function updateSystemIconInSidebar(status) {
+            const systemIcon = document.querySelector('[data-tab="system"] img');
+            if (systemIcon) {
+                let iconPath;
+                switch (status) {
+                    case 'healthy':
+                        iconPath = '../images/icons/system_icon_HEALTHY.png';
+                        break;
+                    case 'degraded':
+                    case 'unhealthy':
+                        iconPath = '../images/icons/system_icon_UNHEALTHY.png';
+                        break;
+                    case 'offline':
+                    default:
+                        iconPath = '../images/icons/system_icon_OFFLINE.png';
+                        break;
+                }
+                systemIcon.src = iconPath;
+            }
+        }
+        
+        // Start system health monitoring when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            startSystemHealthMonitoring();
+        });
     </script>
 </body>
 </html> 
