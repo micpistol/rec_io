@@ -866,7 +866,7 @@ async def read_root():
     """Serve the main application or login page based on authentication."""
     # For now, always serve the main app
     # In production, this would check authentication
-    with open("index.html", "r") as f:
+    with open(f"{frontend_dir}/index.html", "r") as f:
         content = f.read()
         return HTMLResponse(
             content=content,
@@ -880,7 +880,7 @@ async def read_root():
 @app.get("/app", response_class=HTMLResponse)
 async def serve_main_app():
     """Serve the main application (protected route)."""
-    with open("index.html", "r") as f:
+    with open(f"{frontend_dir}/index.html", "r") as f:
         content = f.read()
         return HTMLResponse(
             content=content,
@@ -895,7 +895,7 @@ async def serve_main_app():
 async def serve_login():
     """Serve the login page."""
     try:
-        with open("login.html", "r") as f:
+        with open(f"{frontend_dir}/login.html", "r") as f:
             content = f.read()
             return HTMLResponse(
                 content=content,
@@ -925,7 +925,7 @@ async def serve_favicon():
 async def serve_terminal_control():
     """Serve terminal control page."""
     import os
-    file_path = "terminal-control.html"
+    file_path = f"{frontend_dir}/terminal-control.html"
     if os.path.exists(file_path):
         with open(file_path, "r") as f:
             return HTMLResponse(content=f.read())
@@ -937,7 +937,7 @@ async def serve_terminal_control():
 async def serve_log_viewer():
     """Serve log viewer page."""
     import os
-    file_path = "log-viewer.html"
+    file_path = f"{frontend_dir}/log-viewer.html"
     if os.path.exists(file_path):
         with open(file_path, "r") as f:
             return HTMLResponse(content=f.read())

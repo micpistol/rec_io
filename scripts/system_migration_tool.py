@@ -212,7 +212,7 @@ print_error() {{
 }}
 
 # Check if we're in the correct directory
-if [ ! -f "backend/main.py" ] || [ ! -f "index.html" ]; then
+if [ ! -f "backend/main.py" ] || [ ! -f "frontend/index.html" ]; then
     print_error "Please run this script from within the REC.IO repository"
     print_error "Make sure you have cloned the git repository first:"
     print_error "  git clone <your-repo-url>"

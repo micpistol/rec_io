@@ -37,7 +37,7 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     
     # Copy logrotate configuration
     echo "📁 SETTING UP LOG ROTATION..."
-    cp logrotate.conf /etc/logrotate.d/trading-system
+    cp config/logrotate.conf /etc/logrotate.d/trading-system
     chmod 644 /etc/logrotate.d/trading-system
     echo "✅ Log rotation configured"
     
@@ -51,7 +51,7 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     fi
 else
     echo "⚠️  Log rotation setup skipped (not on Linux)"
-    echo "   - Configuration file created: logrotate.conf"
+    echo "   - Configuration file created: config/logrotate.conf"
     echo "   - Copy to /etc/logrotate.d/trading-system on Linux deployment"
 fi
 
@@ -208,7 +208,7 @@ echo "✅ Log rotation configuration ready for deployment"
 echo "✅ Deployment verification script created"
 echo ""
 echo "📝 NEXT STEPS FOR DIGITALOCEAN:"
-echo "1. Copy logrotate.conf to /etc/logrotate.d/trading-system"
+echo "1. Copy config/logrotate.conf to /etc/logrotate.d/trading-system"
 echo "2. Run swap file setup commands"
 echo "3. Install monitoring tools: sudo apt-get install htop iotop nethogs"
 echo "4. Run verification: ./scripts/verify_deployment.sh"

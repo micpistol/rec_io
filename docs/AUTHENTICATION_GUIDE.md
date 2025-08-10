@@ -166,7 +166,7 @@ backend/data/users/user_0001/
 ### Common Issues
 
 1. **Login Page Not Found**
-   - Ensure `login.html` exists in project root
+   - Ensure `frontend/login.html` exists in project
    - Check file permissions
 
 2. **Authentication Fails**

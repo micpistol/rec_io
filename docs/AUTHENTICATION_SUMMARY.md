@@ -24,7 +24,7 @@
 ### 📁 File Structure
 ```
 rec_io_20/
-├── login.html                           # Login page
+├── frontend/login.html                           # Login page
 ├── scripts/
 │   ├── setup_auth.py                   # Authentication setup
 │   └── test_auth.py                    # Authentication testing

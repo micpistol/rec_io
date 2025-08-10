@@ -3,6 +3,8 @@
 ## Overview
 This document provides detailed documentation for all major services in the REC.IO v2 system, including their purpose, inputs/outputs, error behavior, dependencies, and operational procedures.
 
+**🔄 RECENT UPDATES:** System has been migrated to PostgreSQL with centralized data architecture. Legacy SQLite services have been deprecated and archived.
+
 ---
 
 ## Core Services
@@ -51,6 +53,11 @@ This document provides detailed documentation for all major services in the REC.
 - WebSocket reconnection handling
 - Configuration fallback to defaults
 
+**Data Sources**:
+- **BTC Price:** PostgreSQL `live_data.btc_price_log` (migrated from SQLite)
+- **Momentum/Delta:** PostgreSQL `live_data.btc_price_log` (direct from database)
+- **Trade Data:** PostgreSQL `trades`, `fills`, `settlements` tables
+
 ---
 
 ### 2. Trade Manager (`backend/trade_manager.py`)
@@ -58,7 +65,7 @@ This document provides detailed documentation for all major services in the REC.
 
 **Inputs**:
 - Trade execution requests from Trade Executor
-- Market data from watchdogs
+- Market data from PostgreSQL `live_data.btc_price_log`
 - Account updates from Kalshi API
 
 **Outputs**:
@@ -97,6 +104,10 @@ This document provides detailed documentation for all major services in the REC.
 - Position recalculation on restart
 - Trade state recovery from database
 
+**Data Sources**:
+- **Market Data:** PostgreSQL `live_data.btc_price_log` (migrated from SQLite)
+- **Momentum Data:** PostgreSQL `live_data.btc_price_log` (direct from database)
+
 ---
 
 ### 3. Trade Executor (`backend/trade_executor.py`)
@@ -104,7 +115,7 @@ This document provides detailed documentation for all major services in the REC.
 
 **Inputs**:
 - Trade signals from strategies
-- Market data from watchdogs
+- Market data from PostgreSQL `live_data.btc_price_log`
 - Account balance from Kalshi API
 
 **Outputs**:
@@ -121,7 +132,7 @@ This document provides detailed documentation for all major services in the REC.
 **Dependencies**:
 - Kalshi API credentials
 - Trade Manager service
-- BTC Price Watchdog
+- PostgreSQL `live_data.btc_price_log`
 - Account balance validation
 
 **Startup Sequence**:
@@ -143,14 +154,17 @@ This document provides detailed documentation for all major services in the REC.
 - Balance reconciliation
 - Risk limit enforcement
 
+**Data Sources**:
+- **BTC Price:** PostgreSQL `live_data.btc_price_log` (migrated from SQLite)
+
 ---
 
 ### 4. Active Trade Supervisor (`backend/active_trade_supervisor.py`)
 **Purpose**: Monitors active trades and manages position risk
 
 **Inputs**:
-- Active trade data from database
-- Market price updates
+- Active trade data from PostgreSQL database
+- Market price updates from PostgreSQL `live_data.btc_price_log`
 - Risk management rules
 
 **Outputs**:
@@ -166,7 +180,7 @@ This document provides detailed documentation for all major services in the REC.
 
 **Dependencies**:
 - PostgreSQL database
-- BTC Price Watchdog
+- PostgreSQL `live_data.btc_price_log`
 - Trade Executor service
 - Risk management configuration
 
@@ -174,70 +188,125 @@ This document provides detailed documentation for all major services in the REC.
 1. Load active trades from database
 2. Initialize risk management rules
 3. Start monitoring loop
-4. Connect to price feeds
+4. Connect to PostgreSQL price feeds
 5. Initialize alert system
 
 **Shutdown Sequence**:
 1. Save current monitoring state
-2. Close price feed connections
+2. Close database connections
 3. Log final positions
 4. Complete shutdown
 
 **Failure Recovery**:
 - Position state recovery from database
 - Risk rule reinitialization
-- Price feed reconnection
+- Database reconnection
 - Emergency stop procedures
+
+**Data Sources**:
+- **BTC Price:** PostgreSQL `live_data.btc_price_log` (migrated from SQLite)
 
 ---
 
 ## Watchdog Services
 
-### 5. BTC Price Watchdog (`backend/api/coinbase-api/coinbase-btc/btc_price_watchdog.py`)
-**Purpose**: Monitors Bitcoin price and maintains price history
+### 5. Symbol Price Watchdog BTC (`backend/symbol_price_watchdog_btc.py`)
+**Purpose**: Monitors Bitcoin price and writes live data to PostgreSQL
 
 **Inputs**:
-- Coinbase API price data
-- Historical price data from SQLite
+- Coinbase API price data via WebSocket
+- Historical price data from PostgreSQL
 
 **Outputs**:
-- Real-time price updates to frontend
-- Price history to SQLite database
+- Real-time price updates to PostgreSQL `live_data.btc_price_log`
+- Live momentum and delta calculations to PostgreSQL
 - Price alerts to other services
 
 **Error Behavior**:
 - Continues operation with cached data
-- Logs errors to `logs/btc_price_watchdog.err.log`
+- Logs errors to `logs/symbol_price_watchdog_btc.err.log`
 - Automatic retry for API failures
 - Fallback to last known price
 
 **Dependencies**:
-- Coinbase API
-- SQLite price history database
+- Coinbase API WebSocket
+- PostgreSQL `live_data.btc_price_log`
 - Network connectivity
 
 **Startup Sequence**:
-1. Initialize SQLite database
+1. Initialize PostgreSQL connection
 2. Load historical price data
-3. Start API polling loop
-4. Initialize WebSocket connection
-5. Start price update broadcast
+3. Start WebSocket connection
+4. Initialize price update loop
+5. Start momentum/delta calculations
 
 **Shutdown Sequence**:
 1. Save current price state
-2. Close API connections
+2. Close WebSocket connections
 3. Complete database writes
 4. Log shutdown completion
 
 **Failure Recovery**:
-- API reconnection with backoff
+- WebSocket reconnection with backoff
 - Database recovery procedures
 - Price interpolation for gaps
 - Alert system for extended failures
 
+**Data Sources**:
+- **Live Data:** Coinbase WebSocket API
+- **Storage:** PostgreSQL `live_data.btc_price_log`
+
 ---
 
-### 6. Kalshi Account Sync (`backend/api/kalshi-api/kalshi_account_sync_ws.py`)
+### 6. Symbol Price Watchdog ETH (`backend/symbol_price_watchdog_eth.py`)
+**Purpose**: Monitors Ethereum price and writes live data to PostgreSQL
+
+**Inputs**:
+- Coinbase API price data via WebSocket
+- Historical price data from PostgreSQL
+
+**Outputs**:
+- Real-time price updates to PostgreSQL `live_data.eth_price_log`
+- Live momentum and delta calculations to PostgreSQL
+- Price alerts to other services
+
+**Error Behavior**:
+- Continues operation with cached data
+- Logs errors to `logs/symbol_price_watchdog_eth.err.log`
+- Automatic retry for API failures
+- Fallback to last known price
+
+**Dependencies**:
+- Coinbase API WebSocket
+- PostgreSQL `live_data.eth_price_log`
+- Network connectivity
+
+**Startup Sequence**:
+1. Initialize PostgreSQL connection
+2. Load historical price data
+3. Start WebSocket connection
+4. Initialize price update loop
+5. Start momentum/delta calculations
+
+**Shutdown Sequence**:
+1. Save current price state
+2. Close WebSocket connections
+3. Complete database writes
+4. Log shutdown completion
+
+**Failure Recovery**:
+- WebSocket reconnection with backoff
+- Database recovery procedures
+- Price interpolation for gaps
+- Alert system for extended failures
+
+**Data Sources**:
+- **Live Data:** Coinbase WebSocket API
+- **Storage:** PostgreSQL `live_data.eth_price_log`
+
+---
+
+### 7. Kalshi Account Sync (`backend/api/kalshi-api/kalshi_account_sync_ws.py`)
 **Purpose**: Synchronizes account data with Kalshi API
 
 **Inputs**:
@@ -245,7 +314,7 @@ This document provides detailed documentation for all major services in the REC.
 - REST API account queries
 
 **Outputs**:
-- Account balance updates to database
+- Account balance updates to PostgreSQL database
 - Position updates to Trade Manager
 - Account alerts to frontend
 
@@ -281,7 +350,7 @@ This document provides detailed documentation for all major services in the REC.
 
 ---
 
-### 7. Kalshi API Watchdog (`backend/api/kalshi-api/kalshi_api_watchdog.py`)
+### 8. Kalshi API Watchdog (`backend/api/kalshi-api/kalshi_api_watchdog.py`)
 **Purpose**: Monitors Kalshi API health and market data
 
 **Inputs**:
@@ -325,17 +394,17 @@ This document provides detailed documentation for all major services in the REC.
 
 ---
 
-### 8. Unified Production Coordinator (`backend/unified_production_coordinator.py`)
-**Purpose**: Coordinates data production and real-time updates
+### 9. Unified Production Coordinator (`backend/unified_production_coordinator.py`)
+**Purpose**: Coordinates data production and generates strike table JSON
 
 **Inputs**:
-- Data from all watchdogs
-- Database queries
-- Frontend requests
+- Momentum and delta data from PostgreSQL `live_data.btc_price_log`
+- Database queries for market data
+- Frontend requests for strike table
 
 **Outputs**:
-- Real-time data to frontend
-- Database updates
+- Strike table JSON to `backend/data/live_data/markets/kalshi/strike_tables/btc_strike_table.json`
+- Live probabilities JSON
 - System status reports
 
 **Error Behavior**:
@@ -345,34 +414,136 @@ This document provides detailed documentation for all major services in the REC.
 - Alert system for critical failures
 
 **Dependencies**:
-- All watchdog services
+- PostgreSQL `live_data.btc_price_log`
 - PostgreSQL database
-- Frontend WebSocket connections
+- File system for JSON outputs
 
 **Startup Sequence**:
-1. Initialize service connections
+1. Initialize PostgreSQL connection
 2. Start data coordination loop
-3. Initialize WebSocket server
+3. Initialize JSON file monitoring
 4. Load configuration
 5. Start status monitoring
 
 **Shutdown Sequence**:
-1. Close WebSocket connections
+1. Complete database operations
 2. Save coordination state
-3. Complete database operations
+3. Complete JSON file writes
 4. Log shutdown completion
 
 **Failure Recovery**:
-- Service reconnection logic
+- Database reconnection logic
 - Data coordination recovery
-- WebSocket reconnection
+- JSON file recovery
 - Status monitoring reset
+
+**Data Sources**:
+- **Momentum/Delta:** PostgreSQL `live_data.btc_price_log` (direct from database, migrated from `live_data_analysis.py`)
 
 ---
 
-## Database Services
+### 10. Auto Entry Supervisor (`backend/auto_entry_supervisor.py`)
+**Purpose**: Manages automated trade entries based on momentum signals
 
-### 9. System Monitor (`backend/system_monitor.py`)
+**Inputs**:
+- Momentum data from PostgreSQL `live_data.btc_price_log`
+- Trade signals from strategies
+- Market conditions
+
+**Outputs**:
+- Automated trade entry signals
+- Entry alerts to frontend
+- Trade status updates
+
+**Error Behavior**:
+- Continues operation with available data
+- Logs errors to `logs/auto_entry_supervisor.err.log`
+- Graceful degradation for missing market data
+- Disables auto-entry on critical failures
+
+**Dependencies**:
+- PostgreSQL `live_data.btc_price_log`
+- Trade Manager service
+- Risk management configuration
+
+**Startup Sequence**:
+1. Initialize PostgreSQL connection
+2. Load momentum data
+3. Start monitoring loop
+4. Initialize trade signals
+5. Start auto-entry logic
+
+**Shutdown Sequence**:
+1. Save current state
+2. Close database connections
+3. Log final status
+4. Complete shutdown
+
+**Failure Recovery**:
+- Database reconnection
+- Momentum data recovery
+- Trade signal reset
+- Auto-entry disable on critical failure
+
+**Data Sources**:
+- **Momentum Data:** PostgreSQL `live_data.btc_price_log` (migrated from `live_data_analysis.py`)
+
+---
+
+### 11. Cascading Failure Detector (`backend/cascading_failure_detector.py`)
+**Purpose**: Monitors critical services for failures and triggers recovery
+
+**Inputs**:
+- Service health checks via HTTP endpoints
+- Database connection status
+- System resource monitoring
+
+**Outputs**:
+- Failure alerts and notifications
+- Service restart commands
+- System status reports
+
+**Error Behavior**:
+- Continues monitoring with available services
+- Logs errors to `logs/cascading_failure_detector.err.log`
+- Alert system for critical failures
+- Automatic service restart on failures
+
+**Dependencies**:
+- All critical services
+- PostgreSQL database
+- Supervisor process management
+
+**Startup Sequence**:
+1. Initialize service monitoring
+2. Start health check loop
+3. Initialize alert system
+4. Load critical service list
+5. Start failure detection
+
+**Shutdown Sequence**:
+1. Save monitoring state
+2. Close service connections
+3. Log final status
+4. Complete shutdown
+
+**Failure Recovery**:
+- Service reconnection logic
+- Health check recovery
+- Alert system reset
+- Automatic restart procedures
+
+**Critical Services Monitored**:
+- `symbol_price_watchdog_btc` (replaced `btc_price_watchdog`)
+- `symbol_price_watchdog_eth`
+- `trade_manager`
+- `trade_executor`
+- `active_trade_supervisor`
+- `unified_production_coordinator`
+
+---
+
+### 12. System Monitor (`backend/system_monitor.py`)
 **Purpose**: Comprehensive system health monitoring with duplicate process detection and resource tracking
 
 **Inputs**:
@@ -398,478 +569,68 @@ This document provides detailed documentation for all major services in the REC.
 
 **Dependencies**:
 - PostgreSQL database
-- All core services (via HTTP health checks)
-- psutil for process monitoring
+- All system services
 - SMS notification system
-- Log file access
+- Process monitoring tools
 
 **Startup Sequence**:
-1. Initialize database connections
-2. Load service URLs from port configuration
-3. Initialize critical services list
-4. Start health monitoring loop (15-second intervals)
-5. Initialize performance tracking
-6. Start duplicate process detection
-7. Load monitoring configuration
+1. Initialize database connection
+2. Start service monitoring
+3. Initialize resource tracking
+4. Start duplicate process detection
+5. Initialize alert system
 
 **Shutdown Sequence**:
 1. Save monitoring state
 2. Close database connections
-3. Complete health checks
+3. Complete health reports
 4. Log shutdown completion
 
 **Failure Recovery**:
 - Database reconnection logic
-- Service health recovery
-- Performance metric reset
+- Service monitoring recovery
+- Resource tracking reset
 - Alert system recovery
-- Duplicate process cleanup on restart
 
-**Enhanced Features**:
-- **Duplicate Process Detection**: Monitors for rogue processes outside supervisor
-- **Resource Monitoring**: CPU, memory, disk usage tracking
-- **Service Health Checks**: HTTP-based health monitoring for all services
-- **SMS Alerts**: Critical failure notifications
-- **Status Degradation**: Overall status set to "degraded" when duplicates detected
-
-### 10. Auto Entry Supervisor (`backend/auto_entry_supervisor.py`)
-**Purpose**: Generates entry signals and trade recommendations based on market conditions
-
-**Inputs**:
-- Market data from price watchdogs
-- Technical indicators and momentum data
-- User configuration and risk parameters
-
-**Outputs**:
-- Trade entry signals
-- Market analysis reports
-- Risk assessment data
-
-**Error Behavior**:
-- Continues operation with available data
-- Logs errors to `logs/auto_entry_supervisor.err.log`
-- Graceful degradation for missing market data
-- Automatic restart via supervisor on critical failures
-
-**Dependencies**:
-- Price watchdog services
-- Trade Manager service
-- PostgreSQL database
-- User configuration files
-
-**Startup Sequence**:
-1. Load user configuration
-2. Initialize market data connections
-3. Start signal generation loop
-4. Initialize risk management
-5. Connect to trade manager
-
-**Shutdown Sequence**:
-1. Complete pending analysis
-2. Save current state
-3. Close market data connections
-4. Log shutdown completion
-
-**Failure Recovery**:
-- Market data reconnection logic
-- Configuration reload on errors
-- Signal generation recovery
-- Risk parameter reset
+**Monitored Services**:
+- All 12 active services (updated from previous list)
+- System resources (CPU, memory, disk)
+- Database connectivity
+- Network connectivity
 
 ---
 
-### 11. Symbol Price Watchdog BTC (`archive/old_scripts/symbol_price_watchdog.py`)
-**Purpose**: Monitors BTC symbol prices and market data
+## 🗂️ **Deprecated Services (Archived)**
 
-**Inputs**:
-- BTC price feeds
-- Market data APIs
-- Configuration parameters
+### BTC Price Watchdog (`archive/deprecated_services/btc_price_watchdog.py`)
+**Status**: DEPRECATED - Migrated to PostgreSQL
+**Replacement**: `symbol_price_watchdog_btc` with PostgreSQL storage
+**Migration Date**: Latest system update
+**Reason**: Centralized data architecture with PostgreSQL
 
-**Outputs**:
-- Real-time BTC price updates
-- Market data to other services
-- Price alerts and notifications
-
-**Error Behavior**:
-- Continues monitoring with available feeds
-- Logs errors to `logs/symbol_price_watchdog_btc.err.log`
-- Automatic restart via supervisor
-- Fallback to alternative data sources
-
-**Dependencies**:
-- External price APIs
-- Database for price storage
-- Other watchdog services
-
-**Startup Sequence**:
-1. Initialize price feed connections
-2. Load configuration
-3. Start price monitoring loop
-4. Initialize data storage
-5. Connect to dependent services
-
-**Shutdown Sequence**:
-1. Close price feed connections
-2. Save current price state
-3. Complete data writes
-4. Log shutdown completion
-
-**Failure Recovery**:
-- Price feed reconnection
-- Configuration reload
-- Data source fallback
-- Service restart recovery
+### Live Data Analysis (`archive/deprecated_services/live_data_analysis.py`)
+**Status**: DEPRECATED - Functionality migrated to PostgreSQL
+**Replacement**: Direct PostgreSQL queries for momentum/delta data
+**Migration Date**: Latest system update
+**Reason**: Redundant calculations, now using pre-calculated values from PostgreSQL
 
 ---
 
-### 12. Symbol Price Watchdog ETH (`archive/old_scripts/symbol_price_watchdog.py`)
-**Purpose**: Monitors ETH symbol prices and market data
+## 🔄 **Data Flow Architecture**
 
-**Inputs**:
-- ETH price feeds
-- Market data APIs
-- Configuration parameters
+### **Current Data Flow**
+1. **Coinbase WebSocket** → `symbol_price_watchdog_btc` → **PostgreSQL `live_data.btc_price_log`**
+2. **PostgreSQL `live_data.btc_price_log`** → All services (direct queries)
+3. **Kalshi API** → `kalshi_account_sync` → **PostgreSQL account tables**
+4. **PostgreSQL** → `unified_production_coordinator` → **Strike table JSON files**
 
-**Outputs**:
-- Real-time ETH price updates
-- Market data to other services
-- Price alerts and notifications
+### **Legacy Data Flow (Deprecated)**
+- ~~Coinbase API → `btc_price_watchdog` → SQLite `btc_price_history.db`~~
+- ~~SQLite → `live_data_analysis.py` → Momentum calculations~~
 
-**Error Behavior**:
-- Continues monitoring with available feeds
-- Logs errors to `logs/symbol_price_watchdog_eth.err.log`
-- Automatic restart via supervisor
-- Fallback to alternative data sources
-
-**Dependencies**:
-- External price APIs
-- Database for price storage
-- Other watchdog services
-
-**Startup Sequence**:
-1. Initialize price feed connections
-2. Load configuration
-3. Start price monitoring loop
-4. Initialize data storage
-5. Connect to dependent services
-
-**Shutdown Sequence**:
-1. Close price feed connections
-2. Save current price state
-3. Complete data writes
-4. Log shutdown completion
-
-**Failure Recovery**:
-- Price feed reconnection
-- Configuration reload
-- Data source fallback
-- Service restart recovery
-
----
-
-### 13. Cascading Failure Detector (`backend/cascading_failure_detector.py`)
-**Purpose**: Detects and prevents cascading service failures
-
-**Inputs**:
-- Service health status
-- Dependency relationships
-- Failure patterns
-
-**Outputs**:
-- Failure alerts
-- Service restart commands
-- Dependency analysis reports
-
-**Error Behavior**:
-- Continues monitoring with available services
-- Logs errors to `logs/cascading_failure_detector.err.log`
-- Automatic service recovery attempts
-- Alert system for critical failures
-
-**Dependencies**:
-- All core services
-- Supervisor for service management
-- Alert system
-
-**Startup Sequence**:
-1. Initialize service dependency mapping
-2. Start failure detection loop
-3. Initialize alert system
-4. Load recovery procedures
-5. Connect to supervisor
-
-**Shutdown Sequence**:
-1. Complete current failure analysis
-2. Save dependency state
-3. Close alert connections
-4. Log shutdown completion
-
-**Failure Recovery**:
-- Service dependency recovery
-- Alert system reconnection
-- Recovery procedure reload
-- Service restart coordination
-
----
-
-## Frontend Services
-
-### 14. Desktop Frontend Interface (`frontend/tabs/`)
-**Purpose**: Full-featured web interface with system monitoring and admin controls
-
-**Inputs**:
-- WebSocket messages from backend
-- User interface events
-- System health data
-- Supervisor status information
-
-**Outputs**:
-- Real-time UI updates
-- System health dashboard
-- Admin control interface
-- User interaction responses
-
-**Key Components**:
-- **System Status Panel** (`frontend/tabs/system.html`): Real-time health monitoring with resource usage
-- **User Management** (`frontend/tabs/account_manager.html`): User account and credential management
-- **Trade History** (`frontend/tabs/history.html`): Historical trade data and analysis
-- **Settings** (`frontend/tabs/settings.html`): System configuration and preferences
-
-**Enhanced Features**:
-- **Dynamic System Icons**: Status-based icon updates in navigation
-- **Resource Monitoring**: CPU, memory, disk usage with progress bars
-- **Admin Controls**: Supervisor management, terminal access, system restart
-- **Script Management**: Individual restart/log access for all supervisor processes
-- **Real-time Updates**: Live data streaming via WebSocket
-
-**Error Behavior**:
-- WebSocket reconnection on failures
-- Graceful UI degradation
-- User-friendly error messages
-- Fallback to polling if WebSocket fails
-- Dynamic error handling for admin functions
-
-**Dependencies**:
-- Backend WebSocket server
-- System health API endpoints
-- Supervisor control API
-- Authentication system
-
-**Startup Sequence**:
-1. Initialize WebSocket connection
-2. Load user configuration and permissions
-3. Start system health monitoring
-4. Initialize admin controls (if authorized)
-5. Connect to backend services
-
-**Shutdown Sequence**:
-1. Close WebSocket connection
-2. Save user state and preferences
-3. Complete UI updates
-4. Log shutdown completion
-
-**Failure Recovery**:
-- WebSocket reconnection logic
-- UI state recovery
-- Configuration reload
-- Error message display
-- Admin permission revalidation
-
----
-
-### 15. Mobile Frontend Interface (`frontend/mobile/`)
-**Purpose**: Responsive mobile-optimized interface for system monitoring
-
-**Inputs**:
-- WebSocket messages from backend
-- Touch interface events
-- System health data
-- User authentication
-
-**Outputs**:
-- Mobile-optimized UI updates
-- Simplified system monitoring
-- Touch-friendly interactions
-- Real-time data display
-
-**Key Components**:
-- **Mobile Main Interface** (`frontend/mobile/index.html`): Tab-based navigation
-- **Mobile System Panel** (`frontend/mobile/system_mobile.html`): Simplified system monitoring
-- **Mobile User Panel** (`frontend/mobile/user_mobile.html`): User account management
-- **Mobile Trade History** (`frontend/mobile/trade_history_mobile.html`): Historical data
-
-**Mobile-Specific Features**:
-- **Responsive Design**: Optimized for mobile screen sizes
-- **Touch Interface**: Touch-friendly buttons and controls
-- **Simplified Monitoring**: Essential system status without complex controls
-- **Real-time Updates**: Live data streaming optimized for mobile
-- **Dynamic Icons**: Status-based navigation icon updates
-
-**Error Behavior**:
-- WebSocket reconnection on failures
-- Mobile-optimized error messages
-- Graceful UI degradation
-- Touch-friendly error handling
-- Offline state management
-
-**Dependencies**:
-- Backend WebSocket server
-- System health API endpoints
-- Mobile-responsive CSS
-- Touch event handling
-
-**Startup Sequence**:
-1. Initialize WebSocket connection
-2. Load mobile-specific configuration
-3. Start system health monitoring
-4. Initialize touch interface
-5. Connect to backend services
-
-**Shutdown Sequence**:
-1. Close WebSocket connection
-2. Save mobile state
-3. Complete UI updates
-4. Log shutdown completion
-
-**Failure Recovery**:
-- WebSocket reconnection logic
-- Mobile UI state recovery
-- Touch interface reset
-- Error message display
-- Offline mode activation
-
----
-
-### 16. Frontend WebSocket Handler (`frontend/js/live-data.js`)
-**Purpose**: Handles real-time data updates to frontend
-
-**Inputs**:
-- WebSocket messages from backend
-- User interface events
-- Configuration updates
-
-**Outputs**:
-- UI updates to frontend
-- User interaction responses
-- Error messages to users
-
-**Error Behavior**:
-- WebSocket reconnection on failures
-- Graceful UI degradation
-- User-friendly error messages
-- Fallback to polling if WebSocket fails
-
-**Dependencies**:
-- Backend WebSocket server
-- Frontend UI components
-- Browser WebSocket API
-
-**Startup Sequence**:
-1. Initialize WebSocket connection
-2. Load user configuration
-3. Start UI update loop
-4. Initialize error handling
-5. Connect to backend services
-
-**Shutdown Sequence**:
-1. Close WebSocket connection
-2. Save user state
-3. Complete UI updates
-4. Log shutdown completion
-
-**Failure Recovery**:
-- WebSocket reconnection logic
-- UI state recovery
-- Configuration reload
-- Error message display
-
----
-
-## Utility Services
-
-### 17. Database Migration Tool (`scripts/migrate_data_to_postgresql.sh`)
-**Purpose**: Migrates data from SQLite to PostgreSQL
-
-**Inputs**:
-- SQLite database files
-- Migration configuration
-- User data files
-
-**Outputs**:
-- PostgreSQL database updates
-- Migration logs
-- Validation reports
-
-**Error Behavior**:
-- Rollback on critical failures
-- Logs errors to migration logs
-- Continues with partial migration
-- Validation checks after migration
-
-**Dependencies**:
-- SQLite databases
-- PostgreSQL database
-- File system access
-
-**Startup Sequence**:
-1. Validate source databases
-2. Initialize PostgreSQL connection
-3. Create target schemas
-4. Start migration process
-5. Initialize validation
-
-**Shutdown Sequence**:
-1. Complete migration operations
-2. Validate migrated data
-3. Close database connections
-4. Generate migration report
-
-**Failure Recovery**:
-- Migration rollback procedures
-- Data validation recovery
-- Connection retry logic
-- Report generation recovery
-
----
-
-## Service Dependencies Matrix
-
-| Service | Depends On | Provides To |
-|---------|------------|-------------|
-| Main App | Trade Manager, Active Trade Supervisor | Frontend |
-| Trade Manager | PostgreSQL, Kalshi API | Trade Executor, Frontend |
-| Trade Executor | Kalshi API, BTC Price Watchdog | Trade Manager |
-| Active Trade Supervisor | PostgreSQL, BTC Price Watchdog | Trade Executor, Frontend |
-| BTC Price Watchdog | Coinbase API | All services |
-| Kalshi Account Sync | Kalshi API, PostgreSQL | Trade Manager |
-| Kalshi API Watchdog | Kalshi API | System Monitor |
-| Unified Production Coordinator | All watchdogs, PostgreSQL | Frontend |
-| System Monitor | PostgreSQL, All services | Frontend |
-| Frontend WebSocket | Backend services | Users |
-
-## Startup Order
-1. PostgreSQL database
-2. System Monitor
-3. BTC Price Watchdog
-4. Kalshi API Watchdog
-5. Kalshi Account Sync
-6. Trade Manager
-7. Trade Executor
-8. Active Trade Supervisor
-9. Unified Production Coordinator
-10. Main App
-11. Frontend WebSocket
-
-## Shutdown Order
-1. Frontend WebSocket
-2. Main App
-3. Unified Production Coordinator
-4. Active Trade Supervisor
-5. Trade Executor
-6. Trade Manager
-7. Kalshi Account Sync
-8. Kalshi API Watchdog
-9. BTC Price Watchdog
-10. System Monitor
-11. PostgreSQL database
+### **Benefits of New Architecture**
+- **Single Source of Truth**: PostgreSQL `live_data.btc_price_log`
+- **Reduced Complexity**: No redundant calculations
+- **Better Performance**: Direct database queries
+- **Improved Consistency**: Centralized data storage
+- **Easier Maintenance**: Single data source to manage

@@ -197,7 +197,7 @@ class NewUserInstallation:
             
             # Run database schema
             print("Setting up database schema...")
-            schema_file = self.project_root / "create_user_0001_tables.sql"
+            schema_file = self.project_root / "scripts" / "create_user_0001_tables.sql"
             if schema_file.exists():
                 cmd = [
                     'psql',

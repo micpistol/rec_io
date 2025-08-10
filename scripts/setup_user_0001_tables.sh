@@ -20,7 +20,7 @@ fi
 
 # Step 2: Run the data migration
 echo "📊 Step 2: Migrating data from SQLite to PostgreSQL..."
-python3 migrate_user_0001_data.py
+python3 scripts/migrate_user_0001_data.py
 
 if [ $? -eq 0 ]; then
     echo "✅ Data migration completed successfully"
@@ -31,7 +31,7 @@ fi
 
 # Step 3: Validate the migration
 echo "🔍 Step 3: Validating migration..."
-python3 validate_user_0001_migration.py
+python3 scripts/validate_user_0001_migration.py
 
 if [ $? -eq 0 ]; then
     echo "✅ Migration validation completed"

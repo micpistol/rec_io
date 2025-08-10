@@ -173,7 +173,7 @@ def setup_postgresql_database():
         # Set up table structure
         print("📋 Creating table structure...")
         project_root = Path(__file__).parent.parent
-        schema_file = project_root / "create_user_0001_tables.sql"
+        schema_file = project_root / "scripts" / "create_user_0001_tables.sql"
         
         if not schema_file.exists():
             print(f"❌ Schema file not found: {schema_file}")
@@ -359,7 +359,7 @@ def print_completion_message():
     print("   • View Logs: tail -f logs/*.out.log")
     print("   • Database Access: psql -h localhost -U rec_io_user -d rec_io_db")
     print("\n📚 Documentation:")
-    print("   • Deployment Guide: DEPLOYMENT_GUIDE.md")
+    print("   • Deployment Guide: docs/DEPLOYMENT_GUIDE.md")
     print("   • Authentication Guide: docs/AUTHENTICATION_GUIDE.md")
     print("\n⚠️  Important Notes:")
     print("   • System starts in demo mode for safety")

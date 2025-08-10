@@ -58,7 +58,7 @@ rec_io_20/
 ├── docs/             # Documentation
 ├── scripts/          # Utility scripts
 ├── requirements.txt  # Python dependencies
-└── index.html        # Main entry point
+└── frontend/index.html        # Main entry point
 ```
 
 ### Step 2: Set Up Python Environment
@@ -419,11 +419,11 @@ supervisorctl -c backend/supervisord.conf status
 ### Step 10: Access the System
 ```bash
 # Open the web interface
-open index.html  # On macOS
+open frontend/index.html  # On macOS
 # or
-start index.html # On Windows
+start frontend/index.html # On Windows
 # or
-xdg-open index.html # On Linux
+xdg-open frontend/index.html # On Linux
 ```
 
 **Alternative Access:**
@@ -633,7 +633,7 @@ netstat -an | grep :3000
 - **Port Configuration**: `docs/COMPLETE_PORT_AUDIT.md`
 - **System Health**: `docs/HOUSEKEEPING_SUMMARY.md`
 - **Authentication**: `docs/AUTHENTICATION_GUIDE.md`
-- **Authentication Summary**: `AUTHENTICATION_SUMMARY.md`
+- **Authentication Summary**: `docs/AUTHENTICATION_SUMMARY.md`
 
 ### Logs Location
 - **Application logs**: `logs/`

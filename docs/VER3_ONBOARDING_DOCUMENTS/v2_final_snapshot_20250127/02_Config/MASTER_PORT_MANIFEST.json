@@ -1,6 +1,7 @@
 {
   "system_name": "REC.IO Trading System",
   "created": "2025-08-09",
+  "updated": "2025-01-27",
   "description": "MASTER PORT MANIFEST - Single source of truth for ALL port assignments",
   
   "core_services": {
@@ -15,7 +16,7 @@
       "status": "RUNNING"
     },
     "trade_executor": {
-      "port": 8001,
+      "port": 5000,
       "description": "Trade execution service",
       "status": "RUNNING"
     },
@@ -25,35 +26,30 @@
       "status": "RUNNING"
     },
     "auto_entry_supervisor": {
-      "port": 8009,
+      "port": 8008,
       "description": "Auto entry monitoring and indicators",
       "status": "RUNNING"
     }
   },
   
   "watchdog_services": {
-    "btc_price_watchdog": {
-      "port": 8002,
-      "description": "Bitcoin price monitoring",
-      "status": "RUNNING"
-    },
     "symbol_price_watchdog_btc": {
-      "port": 8006,
-      "description": "BTC symbol price monitoring",
+      "port": 8014,
+      "description": "BTC symbol price monitoring with PostgreSQL storage",
       "status": "RUNNING"
     },
     "symbol_price_watchdog_eth": {
-      "port": 8008,
-      "description": "ETH symbol price monitoring",
+      "port": 8015,
+      "description": "ETH symbol price monitoring with PostgreSQL storage",
       "status": "RUNNING"
     },
     "kalshi_account_sync": {
-      "port": 8004,
+      "port": 8012,
       "description": "Kalshi account synchronization",
       "status": "RUNNING"
     },
     "kalshi_api_watchdog": {
-      "port": 8005,
+      "port": 8013,
       "description": "Kalshi API monitoring",
       "status": "RUNNING"
     },
@@ -63,14 +59,24 @@
       "status": "RUNNING"
     },
     "cascading_failure_detector": {
-      "port": 8011,
+      "port": 8009,
       "description": "Cascading failure detection and prevention",
       "status": "RUNNING"
     },
     "system_monitor": {
-      "port": 8012,
+      "port": 8011,
       "description": "Comprehensive system health monitoring with duplicate process detection",
       "status": "RUNNING"
+    }
+  },
+  
+  "deprecated_services": {
+    "btc_price_watchdog": {
+      "port": 8002,
+      "description": "Bitcoin price monitoring (DEPRECATED - Migrated to PostgreSQL)",
+      "status": "ARCHIVED",
+      "archive_location": "archive/deprecated_services/",
+      "replacement": "symbol_price_watchdog_btc"
     }
   },
   
@@ -85,6 +91,9 @@
     "reason": "These ports conflict with macOS AirPlay, ControlCenter, and other system services",
     "frontend_enhancements": "Enhanced system monitoring and admin controls implemented",
     "mobile_interface": "Mobile-optimized interface available",
-    "duplicate_process_detection": "System monitor includes duplicate process detection and cleanup"
+    "duplicate_process_detection": "System monitor includes duplicate process detection and cleanup",
+    "postgresql_migration": "All services migrated to PostgreSQL data architecture",
+    "deprecated_services": "btc_price_watchdog and live_data_analysis.py archived",
+    "data_architecture": "Centralized PostgreSQL live_data schema for all market data"
   }
 } 
