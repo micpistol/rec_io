@@ -118,14 +118,33 @@ def save_auto_entry_state(state):
         return False
 
 def get_current_momentum():
-    """Get current BTC momentum using live_data_analysis"""
+    """Get current BTC momentum directly from PostgreSQL"""
     try:
-        from backend.live_data_analysis import LiveDataAnalyzer
-        analyzer = LiveDataAnalyzer()
-        momentum_analysis = analyzer.get_momentum_analysis()
-        momentum_score = momentum_analysis.get('weighted_momentum_score')
+        import psycopg2
         
-        if momentum_score is not None:
+        # PostgreSQL connection parameters
+        postgres_config = {
+            'host': os.getenv('POSTGRES_HOST', 'localhost'),
+            'port': int(os.getenv('POSTGRES_PORT', '5432')),
+            'database': os.getenv('POSTGRES_DB', 'rec_io_db'),
+            'user': os.getenv('POSTGRES_USER', 'rec_io_user'),
+            'password': os.getenv('POSTGRES_PASSWORD', '')
+        }
+        
+        conn = psycopg2.connect(**postgres_config)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT momentum FROM live_data.btc_price_log 
+            ORDER BY timestamp DESC 
+            LIMIT 1
+        """)
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result and result[0] is not None:
+            momentum_score = float(result[0])
             log(f"[AUTO ENTRY MOMENTUM] Current momentum: {momentum_score:.2f}")
             return momentum_score
         else:

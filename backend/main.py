@@ -1053,15 +1053,31 @@ async def test_mobile_path():
     """Test route for debugging mobile path."""
     return {"message": "Mobile path test route works!"}
 
+def get_ttc_data_from_postgresql() -> Dict[str, Any]:
+    """Get TTC data directly from PostgreSQL"""
+    try:
+        from datetime import datetime, timezone, timedelta
+        from zoneinfo import ZoneInfo
+        
+        # Calculate TTC (time to next hour)
+        now_est = datetime.now(ZoneInfo('US/Eastern'))
+        next_hour = now_est.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        ttc_seconds = int((next_hour - now_est).total_seconds())
+        
+        return {
+            'ttc_seconds': ttc_seconds,
+            'timestamp': now_est.isoformat(),
+            'current_time_est': now_est.strftime("%I:%M:%S %p EDT"),
+            'next_hour_est': next_hour.strftime("%I:%M:%S %p EDT")
+        }
+    except Exception as e:
+        print(f"Error calculating TTC: {e}")
+        return {"error": str(e)}
+
 @app.get("/api/ttc")
 async def get_ttc_data():
-    """Get time to close data from live data analyzer."""
-    try:
-        from live_data_analysis import get_ttc_data
-        return get_ttc_data()
-    except Exception as e:
-        print(f"Error getting TTC data: {e}")
-        return {"error": str(e)}
+    """Get time to close data directly from PostgreSQL."""
+    return get_ttc_data_from_postgresql()
 
 # Core data endpoint
 @app.get("/core")
@@ -1073,14 +1089,13 @@ async def get_core_data():
         date_str = now.strftime("%A, %B %d, %Y")
         time_str = now.strftime("%I:%M:%S %p EDT")
         
-        # Get TTC from live data analyzer
+        # Get TTC directly from PostgreSQL
         ttc_seconds = 0
         try:
-            from live_data_analysis import get_ttc_data
-            ttc_data = get_ttc_data()
+            ttc_data = get_ttc_data_from_postgresql()
             ttc_seconds = ttc_data.get('ttc_seconds', 0)
         except Exception as e:
-            print(f"Error getting TTC from live data analyzer: {e}")
+            print(f"Error getting TTC from PostgreSQL: {e}")
             # Fallback calculation
             close_time = now.replace(hour=16, minute=0, second=0, microsecond=0)
             if now.time() >= close_time.time():
@@ -1125,14 +1140,50 @@ async def get_core_data():
             except Exception as e2:
                 print(f"Emergency fallback also failed: {e2}")
         
-        # Get momentum data from live data analyzer
+        # Get momentum data directly from PostgreSQL
         momentum_data = {}
         try:
-            from live_data_analysis import get_momentum_data
-            momentum_data = get_momentum_data()
-            print(f"[MAIN] Momentum analysis: {momentum_data.get('weighted_momentum_score', 'N/A'):.4f}%")
+            import psycopg2
+            conn = psycopg2.connect(
+                host="localhost",
+                database="rec_io_db",
+                user="rec_io_user",
+                password="rec_io_password"
+            )
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT momentum, delta_1m, delta_2m, delta_3m, delta_4m, delta_15m, delta_30m
+                FROM live_data.btc_price_log 
+                ORDER BY timestamp DESC 
+                LIMIT 1
+            """)
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result:
+                momentum, delta_1m, delta_2m, delta_3m, delta_4m, delta_15m, delta_30m = result
+                momentum_data = {
+                    'weighted_momentum_score': float(momentum) if momentum is not None else 0.0,
+                    'delta_1m': float(delta_1m) if delta_1m is not None else None,
+                    'delta_2m': float(delta_2m) if delta_2m is not None else None,
+                    'delta_3m': float(delta_3m) if delta_3m is not None else None,
+                    'delta_4m': float(delta_4m) if delta_4m is not None else None,
+                    'delta_15m': float(delta_15m) if delta_15m is not None else None,
+                    'delta_30m': float(delta_30m) if delta_30m is not None else None
+                }
+                print(f"[MAIN] Momentum analysis: {momentum_data.get('weighted_momentum_score', 'N/A'):.4f}%")
+            else:
+                momentum_data = {
+                    'delta_1m': None,
+                    'delta_2m': None,
+                    'delta_3m': None,
+                    'delta_4m': None,
+                    'delta_15m': None,
+                    'delta_30m': None,
+                    'weighted_momentum_score': None
+                }
         except Exception as e:
-            print(f"Error getting momentum data: {e}")
+            print(f"Error getting momentum data from PostgreSQL: {e}")
             # Fallback to null momentum data
             momentum_data = {
                 'delta_1m': None,
@@ -1680,25 +1731,38 @@ async def get_current_fingerprint():
 
 @app.get("/api/momentum")
 async def get_current_momentum():
-    """Get current momentum score from the unified API."""
+    """Get current momentum score directly from PostgreSQL."""
     try:
-        # Get momentum data from live_data_analysis (the correct source)
-        from live_data_analysis import get_momentum_data
-        momentum_data = get_momentum_data()
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        cursor = conn.cursor()
+        cursor.execute("SELECT momentum FROM live_data.btc_price_log ORDER BY timestamp DESC LIMIT 1")
+        result = cursor.fetchone()
+        conn.close()
         
-        # Extract the weighted momentum score
-        momentum_score = momentum_data.get('weighted_momentum_score', 0)
-        
-        return {
-            "status": "ok",
-            "momentum_score": momentum_score
-        }
+        if result and result[0] is not None:
+            momentum_score = float(result[0])
+            return {
+                "status": "ok",
+                "momentum_score": momentum_score
+            }
+        else:
+            return {
+                "status": "error",
+                "momentum_score": 0,
+                "error": "No momentum data available"
+            }
     except Exception as e:
-        print(f"Error getting momentum from live_data_analysis: {e}")
+        print(f"Error getting momentum from PostgreSQL: {e}")
         return {
             "status": "error",
             "momentum_score": 0,
-            "error": "Unable to get momentum from live_data_analysis"
+            "error": "Unable to get momentum from PostgreSQL"
         }
 
 @app.get("/api/btc_price")
@@ -1730,23 +1794,44 @@ async def get_btc_price():
 
 @app.get("/api/momentum_score")
 async def get_momentum_score():
-    """Get current momentum score for mobile."""
+    """Get current momentum score for mobile directly from PostgreSQL."""
     try:
-        from live_data_analysis import get_momentum_data
-        momentum_data = get_momentum_data()
-        weighted_score = momentum_data.get('weighted_momentum_score', 0)
-        return {"weighted_score": weighted_score}
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        cursor = conn.cursor()
+        cursor.execute("SELECT momentum FROM live_data.btc_price_log ORDER BY timestamp DESC LIMIT 1")
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result and result[0] is not None:
+            weighted_score = float(result[0])
+            return {"weighted_score": weighted_score}
+        else:
+            return {"weighted_score": 0, "error": "No momentum data available"}
     except Exception as e:
         print(f"Error getting momentum score: {e}")
         return {"weighted_score": 0, "error": str(e)}
 
 @app.get("/api/strike_table")
 async def get_strike_table_mobile():
-    """Get strike table data for mobile."""
+    """Get strike table data for mobile directly from file."""
     try:
-        from live_data_analysis import get_strike_table_data
-        strike_data = get_strike_table_data()
-        return {"strikes": strike_data}
+        from backend.util.paths import get_data_dir
+        import os
+        
+        strike_table_path = os.path.join(get_data_dir(), "live_data", "markets", "kalshi", "strike_tables", "btc_strike_table.json")
+        
+        if os.path.exists(strike_table_path):
+            with open(strike_table_path, 'r') as f:
+                strike_data = json.load(f)
+            return {"strikes": strike_data.get("strikes", [])}
+        else:
+            return {"strikes": [], "error": "Strike table file not found"}
     except Exception as e:
         print(f"Error getting strike table: {e}")
         return {"strikes": [], "error": str(e)}

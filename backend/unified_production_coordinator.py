@@ -13,6 +13,7 @@ import asyncio
 import threading
 import requests
 import fcntl
+import psycopg2
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
@@ -23,8 +24,76 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.core.port_config import get_port, get_service_url
 from backend.util.paths import get_data_dir, get_kalshi_data_dir, get_price_history_dir
-from backend.live_data_analysis import LiveDataAnalyzer
 from backend.util.probability_calculator import generate_btc_live_probabilities_json
+
+# PostgreSQL connection parameters
+POSTGRES_CONFIG = {
+    'host': os.getenv('POSTGRES_HOST', 'localhost'),
+    'port': int(os.getenv('POSTGRES_PORT', '5432')),
+    'database': os.getenv('POSTGRES_DB', 'rec_io_db'),
+    'user': os.getenv('POSTGRES_USER', 'rec_io_user'),
+    'password': os.getenv('POSTGRES_PASSWORD', '')
+}
+
+def get_postgres_connection():
+    """Get a PostgreSQL connection"""
+    return psycopg2.connect(**POSTGRES_CONFIG)
+
+def get_momentum_data_from_postgresql() -> Dict[str, Any]:
+    """Get momentum data directly from PostgreSQL live_data.btc_price_log"""
+    try:
+        conn = get_postgres_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT momentum, delta_1m, delta_2m, delta_3m, delta_4m, delta_15m, delta_30m, price
+            FROM live_data.btc_price_log 
+            ORDER BY timestamp DESC 
+            LIMIT 1
+        """)
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            momentum, delta_1m, delta_2m, delta_3m, delta_4m, delta_15m, delta_30m, price = result
+            return {
+                'weighted_momentum_score': float(momentum) if momentum is not None else 0.0,
+                'delta_1m': float(delta_1m) if delta_1m is not None else None,
+                'delta_2m': float(delta_2m) if delta_2m is not None else None,
+                'delta_3m': float(delta_3m) if delta_3m is not None else None,
+                'delta_4m': float(delta_4m) if delta_4m is not None else None,
+                'delta_15m': float(delta_15m) if delta_15m is not None else None,
+                'delta_30m': float(delta_30m) if delta_30m is not None else None,
+                'current_price': float(price) if price is not None else None,
+                'timestamp': datetime.now().isoformat()
+            }
+        else:
+            return {
+                'weighted_momentum_score': 0.0,
+                'delta_1m': None,
+                'delta_2m': None,
+                'delta_3m': None,
+                'delta_4m': None,
+                'delta_15m': None,
+                'delta_30m': None,
+                'current_price': None,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+    except Exception as e:
+        print(f"Error getting momentum data from PostgreSQL: {e}")
+        return {
+            'weighted_momentum_score': 0.0,
+            'delta_1m': None,
+            'delta_2m': None,
+            'delta_3m': None,
+            'delta_4m': None,
+            'delta_15m': None,
+            'delta_30m': None,
+            'current_price': None,
+            'timestamp': datetime.now().isoformat()
+        }
 
 # Consolidated functions for unified data production
 def safe_write_json(data: dict, filepath: str, timeout: float = 0.1):
@@ -464,7 +533,7 @@ class UnifiedProductionCoordinator:
         self.max_consecutive_failures = 5
         
         # Initialize components
-        self.analyzer = LiveDataAnalyzer()
+        # LiveDataAnalyzer removed - now using direct PostgreSQL queries
         
         # Performance tracking
         self.performance_stats = {
@@ -513,7 +582,8 @@ class UnifiedProductionCoordinator:
         """Broadcast momentum data update via WebSocket to main app"""
         try:
             # Get complete momentum analysis
-            momentum_data = self.analyzer.get_momentum_analysis()
+            # momentum_data = self.analyzer.get_momentum_analysis() # Removed LiveDataAnalyzer
+            momentum_data = get_momentum_data_from_postgresql() # Get momentum data directly
             
             broadcast_data = {
                 "weighted_momentum_score": momentum_score,
@@ -730,7 +800,8 @@ class UnifiedProductionCoordinator:
         try:
             btc_price = btc_price_data["btc_price"]
             ttc_seconds = calculate_ttc(market_data.get("strike_date"))
-            momentum = self.analyzer.get_momentum_analysis().get('weighted_momentum_score', 0.0)
+            # momentum = self.analyzer.get_momentum_analysis().get('weighted_momentum_score', 0.0) # Removed LiveDataAnalyzer
+            momentum = get_momentum_data_from_postgresql().get('weighted_momentum_score', 0.0) # Get momentum data directly
             
             if ttc_seconds is None:
                 return PipelineResult(
@@ -807,7 +878,8 @@ class UnifiedProductionCoordinator:
                 print(f"⚠️ Error reading fingerprint from live probabilities: {e}")
             
             # Get momentum data
-            momentum_data = self.analyzer.get_momentum_analysis()
+            # momentum_data = self.analyzer.get_momentum_analysis() # Removed LiveDataAnalyzer
+            momentum_data = get_momentum_data_from_postgresql() # Get momentum data directly
             
             # Create output
             output = {

@@ -350,21 +350,23 @@
         }
         
         .modal-content {
-            background: var(--bg-primary);
+            background-color: #323c4e;
             border: 1px solid var(--border-color);
-            border-radius: 8px;
+            border-radius: 6px;
             padding: 24px;
             max-width: 400px;
             width: 90%;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            box-sizing: border-box;
         }
         
         .modal-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--text-primary);
+            font-size: 12px;
+            font-weight: bold;
+            color: #c4c4c4;
             margin-bottom: 16px;
             text-align: center;
+            padding-bottom: 8px;
         }
         
         .modal-body {
@@ -416,6 +418,12 @@
         .modal-button:disabled {
             opacity: 0.6;
             cursor: not-allowed;
+        }
+        
+        #countdown {
+            font-weight: bold;
+            color: #ff6b6b;
+            font-size: 1.1em;
         }
         
         .restart-terminal {
@@ -899,7 +907,7 @@
             
             // Change modal to "SYSTEM RESTARTING" state
             title.textContent = 'SYSTEM RESTARTING';
-            body.innerHTML = '<p>System restart in progress...</p><p>Please wait 30 seconds.</p>';
+            body.innerHTML = '<p>System restart in progress...</p><p>Please wait <span id="countdown">45</span> seconds.</p>';
             buttons.style.display = 'none';
             
             // Show terminal
@@ -924,11 +932,22 @@
                 terminalResponse.innerHTML = '<span class="restart-terminal-error">❌ Connection error during restart</span>';
             }
             
-            // Wait for the full 30 seconds to complete
-            await new Promise(resolve => setTimeout(resolve, 30000));
+            // Start countdown timer
+            let secondsRemaining = 45;
+            const countdownElement = document.getElementById('countdown');
             
-            // Refresh the page
-            window.location.reload();
+            const countdownInterval = setInterval(() => {
+                secondsRemaining--;
+                if (countdownElement) {
+                    countdownElement.textContent = secondsRemaining;
+                }
+                
+                if (secondsRemaining <= 0) {
+                    clearInterval(countdownInterval);
+                    // Refresh the page
+                    window.location.reload();
+                }
+            }, 1000);
         }
         
         function openTerminalControl() {

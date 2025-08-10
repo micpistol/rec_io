@@ -72,8 +72,7 @@ def insert_trade(trade):
     # Get current momentum from API and format it correctly for database
     momentum_for_db = 0
     try:
-        from live_data_analysis import get_momentum_data
-        momentum_data = get_momentum_data()
+        momentum_data = get_momentum_data_from_postgresql()
         momentum_score = momentum_data.get('weighted_momentum_score', 0)
         
         if momentum_score != 0:
