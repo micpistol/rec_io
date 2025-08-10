@@ -129,7 +129,7 @@ create_deployment_package() {
     cp -r "$PROJECT_DIR/scripts" "$DEPLOY_DIR/"
     cp -r "$PROJECT_DIR/config" "$DEPLOY_DIR/"
     cp "$PROJECT_DIR/requirements.txt" "$DEPLOY_DIR/"
-    cp "$PROJECT_DIR/index.html" "$DEPLOY_DIR/"
+    cp "$PROJECT_DIR/frontend/index.html" "$DEPLOY_DIR/"
     
     # Create deployment archive
     cd "$DEPLOY_DIR"
