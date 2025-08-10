@@ -53,7 +53,6 @@ class SystemMonitor:
             "trade_executor": get_port("trade_executor"),
             "active_trade_supervisor": get_port("active_trade_supervisor"),
             "auto_entry_supervisor": get_port("auto_entry_supervisor"),
-            "btc_price_watchdog": get_port("btc_price_watchdog"),
             "symbol_price_watchdog_btc": get_port("symbol_price_watchdog_btc"),
             "symbol_price_watchdog_eth": get_port("symbol_price_watchdog_eth"),
             "kalshi_account_sync": get_port("kalshi_account_sync"),
@@ -302,7 +301,6 @@ class SystemMonitor:
             "active_trade_supervisor",
             
             # Price and data services
-            "btc_price_watchdog",
             "symbol_price_watchdog_btc",
             "symbol_price_watchdog_eth",
             
@@ -561,7 +559,7 @@ class SystemMonitor:
             # Check supervisor status for all critical services
             critical_services = [
                 "main_app", "trade_manager", "trade_executor", 
-                "active_trade_supervisor", "btc_price_watchdog"
+                "active_trade_supervisor"
             ]
             
             all_running = True
@@ -641,7 +639,7 @@ class SystemMonitor:
                 # Group services by category
                 service_categories = {
                     "Core Trading": ["main_app", "trade_manager", "trade_executor", "auto_entry_supervisor", "active_trade_supervisor"],
-                    "Data Services": ["btc_price_watchdog"],
+                    "Data Services": ["symbol_price_watchdog_btc", "symbol_price_watchdog_eth"],
                     "Kalshi API": ["kalshi_account_sync", "kalshi_api_watchdog"],
                     "System Management": ["cascading_failure_detector", "unified_production_coordinator", "system_monitor"]
                 }
