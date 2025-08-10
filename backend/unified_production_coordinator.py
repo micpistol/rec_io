@@ -23,7 +23,7 @@ from enum import Enum
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.core.port_config import get_port, get_service_url
-from backend.util.paths import get_data_dir, get_kalshi_data_dir, get_price_history_dir
+from backend.util.paths import get_data_dir, get_kalshi_data_dir, get_price_history_dir, get_host
 from backend.util.probability_calculator import generate_btc_live_probabilities_json
 
 # PostgreSQL connection parameters
@@ -544,6 +544,11 @@ class UnifiedProductionCoordinator:
             "last_successful_cycle": None
         }
         
+        # Cache main app URL for broadcasting (performance optimization)
+        port = get_port("main_app")
+        host = get_host()
+        self._main_app_url = f"http://{host}:{port}"
+        
         print("🎯 Unified Production Coordinator initialized")
         print(f"📁 Data directories:")
         print(f"   - Live probabilities: {self.live_probabilities_path}")
@@ -554,7 +559,7 @@ class UnifiedProductionCoordinator:
         """Broadcast fingerprint display update (for debugging only)"""
         try:
             # Get current fingerprint for display only
-            from util.probability_calculator import get_probability_calculator
+            from backend.util.probability_calculator import get_probability_calculator
             calculator = get_probability_calculator()
             
             display_data = {
@@ -562,12 +567,8 @@ class UnifiedProductionCoordinator:
                 "timestamp": datetime.now().isoformat()
             }
             
-            # Send to main app via HTTP
-            from core.port_config import get_port
-            from util.paths import get_host
-            port = get_port("main_app")
-            host = get_host()
-            url = f"http://{host}:{port}/api/broadcast_fingerprint_display"
+            # Send to main app via HTTP using cached URL
+            url = f"{self._main_app_url}/api/broadcast_fingerprint_display"
             
             import requests
             response = requests.post(url, json=display_data, timeout=2)
@@ -598,12 +599,8 @@ class UnifiedProductionCoordinator:
                 "timestamp": datetime.now().isoformat()
             }
             
-            # Send to main app via HTTP
-            from core.port_config import get_port
-            from util.paths import get_host
-            port = get_port("main_app")
-            host = get_host()
-            url = f"http://{host}:{port}/api/broadcast_momentum_update"
+            # Send to main app via HTTP using cached URL
+            url = f"{self._main_app_url}/api/broadcast_momentum_update"
             
             import requests
             response = requests.post(url, json=broadcast_data, timeout=2)
