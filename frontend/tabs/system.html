@@ -671,13 +671,13 @@
             const timestamp = data.timestamp ? new Date(data.timestamp).toLocaleString() : 'Unknown';
             
             // Calculate storage details
-            const totalDiskGB = data.disk_total_gb || 500;
-            const usedDiskGB = data.disk_used_gb || (totalDiskGB * diskPercent / 100).toFixed(1);
-            const freeDiskGB = data.disk_free_gb || (totalDiskGB - usedDiskGB).toFixed(1);
+            const totalDiskGB = data.disk_total_gb || 0;
+            const usedDiskGB = data.disk_used_gb || 0;
+            const freeDiskGB = data.disk_free_gb || 0;
             
-            const totalMemoryGB = data.memory_total_gb || 16;
-            const usedMemoryGB = data.memory_used_gb || (totalMemoryGB * memoryPercent / 100).toFixed(1);
-            const freeMemoryGB = data.memory_available_gb || (totalMemoryGB - usedMemoryGB).toFixed(1);
+            const totalMemoryGB = data.memory_total_gb || 0;
+            const usedMemoryGB = data.memory_used_gb || 0;
+            const freeMemoryGB = data.memory_available_gb || 0;
             
             // Get status indicators
             const getStatusClass = (percent) => {
@@ -1093,7 +1093,7 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({ 
-                        command: `supervisorctl -c backend/supervisord.conf restart ${scriptName}` 
+                        command: `supervisorctl restart ${scriptName}` 
                     })
                 });
                 

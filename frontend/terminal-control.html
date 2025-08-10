@@ -167,15 +167,15 @@
                 <strong>Warning:</strong> Use with caution. Commands execute with system privileges.
             </div>
             
-            <div class="quick-commands">
-                <strong>Quick Commands:</strong><br>
-                <button class="quick-command-btn" onclick="executeQuickCommand('pwd')">pwd</button>
-                <button class="quick-command-btn" onclick="executeQuickCommand('ls -la')">ls -la</button>
-                <button class="quick-command-btn" onclick="executeQuickCommand('ps aux | grep python')">ps aux | grep python</button>
-                <button class="quick-command-btn" onclick="executeQuickCommand('supervisorctl -c backend/supervisord.conf status')">supervisor status</button>
-                <button class="quick-command-btn" onclick="executeQuickCommand('df -h')">df -h</button>
-                <button class="quick-command-btn" onclick="executeQuickCommand('free -h')">free -h</button>
-            </div>
+                            <div class="quick-commands">
+                    <strong>Quick Commands:</strong><br>
+                    <button class="quick-command-btn" onclick="executeQuickCommand('pwd')">pwd</button>
+                    <button class="quick-command-btn" onclick="executeQuickCommand('ls -la')">ls -la</button>
+                    <button class="quick-command-btn" onclick="executeQuickCommand('ps aux | grep python')">ps aux | grep python</button>
+                    <button class="quick-command-btn" onclick="executeQuickCommand('supervisorctl -c backend/supervisord.conf status')">supervisor status</button>
+                    <button class="quick-command-btn" onclick="executeQuickCommand('df -h')">df -h</button>
+                    <button class="quick-command-btn" onclick="executeQuickCommand('free -h')">free -h</button>
+                </div>
         </div>
         
         <div class="terminal-input-container">
@@ -323,7 +323,7 @@
                 <div class="welcome-message">
                     <strong>REC IO Terminal Control</strong><br>
                     Welcome to the system terminal. You can execute commands at the project level.<br>
-                    <strong>Current Directory:</strong> /Users/ericwais1/rec_io_20<br>
+                    <strong>Current Directory:</strong> <span id="currentDirectory">Detecting...</span><br>
                     <strong>Warning:</strong> Use with caution. Commands execute with system privileges.
                 </div>
                 

@@ -259,12 +259,28 @@ class SystemMonitor:
     def check_system_resources(self) -> Dict[str, Any]:
         """Check system resource usage."""
         try:
+            # Get memory information
+            memory = psutil.virtual_memory()
+            memory_total_gb = memory.total / (1024**3)  # Convert bytes to GB
+            memory_used_gb = memory.used / (1024**3)
+            memory_available_gb = memory.available / (1024**3)
+            
+            # Get disk information
+            disk = psutil.disk_usage('/')
+            disk_total_gb = disk.total / (1024**3)  # Convert bytes to GB
+            disk_used_gb = disk.used / (1024**3)
+            disk_free_gb = disk.free / (1024**3)
+            
             return {
                 "cpu_percent": psutil.cpu_percent(),
-                "memory_percent": psutil.virtual_memory().percent,
+                "memory_percent": memory.percent,
                 "disk_percent": psutil.disk_usage('/').percent,
-                "memory_available": psutil.virtual_memory().available,
-                "disk_free": psutil.disk_usage('/').free
+                "memory_total_gb": round(memory_total_gb, 1),
+                "memory_used_gb": round(memory_used_gb, 1),
+                "memory_available_gb": round(memory_available_gb, 1),
+                "disk_total_gb": round(disk_total_gb, 1),
+                "disk_used_gb": round(disk_used_gb, 1),
+                "disk_free_gb": round(disk_free_gb, 1)
             }
         except Exception as e:
             return {"error": str(e)}

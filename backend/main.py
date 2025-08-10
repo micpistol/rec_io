@@ -1608,9 +1608,22 @@ def get_settlements():
 
 @app.get("/api/db/system_health")
 def get_system_health_from_db():
-    """Get current system health from database"""
+    """Get current system health from database with real-time capacity data"""
     try:
         import psycopg2
+        import psutil
+        
+        # Get real-time system capacity data
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        
+        memory_total_gb = memory.total / (1024**3)  # Convert bytes to GB
+        memory_used_gb = memory.used / (1024**3)
+        memory_available_gb = memory.available / (1024**3)
+        
+        disk_total_gb = disk.total / (1024**3)  # Convert bytes to GB
+        disk_used_gb = disk.used / (1024**3)
+        disk_free_gb = disk.free / (1024**3)
         
         conn = psycopg2.connect(
             host="localhost",
@@ -1634,7 +1647,14 @@ def get_system_health_from_db():
                     "services_healthy": result[7],
                     "services_total": result[8],
                     "failed_services": result[9] or [],
-                    "timestamp": result[11].isoformat() if result[11] else None
+                    "timestamp": result[11].isoformat() if result[11] else None,
+                    # Add real-time capacity data
+                    "memory_total_gb": round(memory_total_gb, 1),
+                    "memory_used_gb": round(memory_used_gb, 1),
+                    "memory_available_gb": round(memory_available_gb, 1),
+                    "disk_total_gb": round(disk_total_gb, 1),
+                    "disk_used_gb": round(disk_used_gb, 1),
+                    "disk_free_gb": round(disk_free_gb, 1)
                 }
             else:
                 return {"error": "No health data available"}
