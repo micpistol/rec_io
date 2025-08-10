@@ -106,3 +106,5 @@ backend/data/historical_data/eth_historical/eth_1m_master_5y.csv
 rec_io_db_backup.sql
 *.sql
 !backend/data/historical_data/**
+backend/data/historical_data/eth_historical/eth_1m_master_5y.csv
+backend/data/historical_data/btc_historical/btc_1m_master_5y.csv

@@ -82,7 +82,6 @@ def get_momentum_data_from_postgresql() -> Dict[str, Any]:
             }
             
     except Exception as e:
-        print(f"Error getting momentum data from PostgreSQL: {e}")
         return {
             'weighted_momentum_score': 0.0,
             'delta_1m': None,
@@ -109,13 +108,11 @@ def safe_write_json(data: dict, filepath: str, timeout: float = 0.1):
         return True
     except (IOError, OSError) as e:
         # If locking fails, fall back to normal write (rare)
-        print(f"Warning: File locking failed for {filepath}: {e}")
         try:
             with open(filepath, 'w') as f:
                 json.dump(data, f, indent=2)
             return True
         except Exception as write_error:
-            print(f"Error writing JSON to {filepath}: {write_error}")
             return False
 
 def safe_read_json(filepath: str, timeout: float = 0.1):
@@ -130,12 +127,10 @@ def safe_read_json(filepath: str, timeout: float = 0.1):
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
     except (IOError, OSError) as e:
         # If locking fails, fall back to normal read (rare)
-        print(f"Warning: File locking failed for {filepath}: {e}")
         try:
             with open(filepath, 'r') as f:
                 return json.load(f)
         except Exception as read_error:
-            print(f"Error reading JSON from {filepath}: {read_error}")
             return None
 
 def get_btc_price() -> float:
@@ -146,7 +141,7 @@ def get_btc_price() -> float:
             data = response.json()
             return float(data["btc_price"])
     except Exception as e:
-        print(f"Error fetching BTC price from /core: {e}")
+        pass
     return None
 
 def detect_strike_tier_spacing(markets: List[Dict[str, Any]]) -> int:
@@ -184,7 +179,6 @@ def detect_strike_tier_spacing(markets: List[Dict[str, Any]]) -> int:
             raise ValueError("No valid strike differences found")
             
     except Exception as e:
-        print(f"Error detecting strike tier spacing: {e}")
         raise
 
 def get_kalshi_market_snapshot() -> Dict[str, Any]:
@@ -235,7 +229,6 @@ def get_kalshi_market_snapshot() -> Dict[str, Any]:
                 "markets": markets
             }
     except Exception as e:
-        print(f"Error reading Kalshi snapshot: {e}")
         raise
 
 def get_live_probabilities() -> Dict[str, float]:
@@ -266,7 +259,6 @@ def get_live_probabilities() -> Dict[str, float]:
         else:
             raise ValueError("No 'probabilities' key found in data")
     except Exception as e:
-        print(f"Error loading live probabilities: {e}")
         raise
 
 def calculate_ttc(strike_date: str) -> int:
@@ -288,7 +280,6 @@ def calculate_ttc(strike_date: str) -> int:
         # Ensure non-negative
         return max(0, seconds_remaining)
     except Exception as e:
-        print(f"Error calculating TTC: {e}")
         raise
 
 def build_strike_table_rows(base_price: float, strike_tier: int, num_levels: int = 10, probabilities: Dict[str, float] = None) -> list:
@@ -337,7 +328,6 @@ def build_strike_table_rows(base_price: float, strike_tier: int, num_levels: int
         print(f"🎯 Generated {len(strikes)} strikes from available probability data (tier: ${strike_tier:,})")
         return strikes
     except Exception as e:
-        print(f"Error building strike table rows: {e}")
         raise
 
 def calculate_strike_data(strike: int, current_price: float, probabilities: Dict[str, float], market_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -414,7 +404,6 @@ def calculate_strike_data(strike: int, current_price: float, probabilities: Dict
             "active_side": active_side
         }
     except Exception as e:
-        print(f"Error calculating strike data for strike {strike}: {e}")
         raise
 
 def get_unified_ttc(symbol: str = "btc") -> Dict[str, Any]:
@@ -548,12 +537,6 @@ class UnifiedProductionCoordinator:
         port = get_port("main_app")
         host = get_host()
         self._main_app_url = f"http://{host}:{port}"
-        
-        print("🎯 Unified Production Coordinator initialized")
-        print(f"📁 Data directories:")
-        print(f"   - Live probabilities: {self.live_probabilities_path}")
-        print(f"   - Strike table: {self.strike_table_path}")
-        print(f"   - Watchlist: {self.watchlist_path}")
     
     def _broadcast_fingerprint_display(self):
         """Broadcast fingerprint display update (for debugging only)"""
@@ -626,14 +609,12 @@ class UnifiedProductionCoordinator:
         self.running = True
         self.thread = threading.Thread(target=self._pipeline_loop, daemon=True)
         self.thread.start()
-        print("🚀 Unified production pipeline started")
     
     def stop_pipeline(self):
         """Stop the unified data pipeline orchestration"""
         self.running = False
         if self.thread:
             self.thread.join(timeout=5)
-        print("🛑 Unified production pipeline stopped")
     
     def _pipeline_loop(self):
         """Main pipeline orchestration loop"""
@@ -763,7 +744,6 @@ class UnifiedProductionCoordinator:
                     duration=time.time() - step_start
                 )
             
-            # print(f"📊 BTC Price: ${btc_price:,.2f}")
             return PipelineResult(
                 step=PipelineStep.BTC_PRICE,
                 success=True,
@@ -783,7 +763,6 @@ class UnifiedProductionCoordinator:
         step_start = time.time()
         try:
             market_snapshot = get_kalshi_market_snapshot()
-            # print(f"📊 Market Snapshot: {market_snapshot.get('event_ticker')} - {market_snapshot.get('market_status')}")
             return PipelineResult(
                 step=PipelineStep.MARKET_SNAPSHOT,
                 success=True,
@@ -1094,7 +1073,6 @@ def main():
             time.sleep(1)
             
     except KeyboardInterrupt:
-        print("\n🛑 Stopping unified production coordinator...")
         coordinator.stop_pipeline()
 
 if __name__ == "__main__":
