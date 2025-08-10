@@ -27,7 +27,7 @@
     "main_app": 3000,
     "trade_manager": 4000,
     "trade_executor": 8001,
-    "btc_price_watchdog": 8002,
+    "btc_price_watchdog": 8002,  // DEPRECATED: Migrated to PostgreSQL
     "db_poller": 8003,
     "kalshi_account_sync": 8004,
     "kalshi_api_watchdog": 8005,

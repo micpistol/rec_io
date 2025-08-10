@@ -638,10 +638,10 @@ def trigger_auto_entry_trade(strike_data):
         elif side == "no":
             converted_side = "N"
         
-        # Get current BTC price for symbol_open
+        # Get current BTC price for symbol_open from main app API
         try:
-            btc_port = get_port("btc_price_watchdog")
-            btc_url = f"http://localhost:{btc_port}/api/btc_price"
+            main_port = get_port("main_app")
+            btc_url = f"http://localhost:{main_port}/api/btc_price"
             btc_response = requests.get(btc_url, timeout=2)
             if btc_response.ok:
                 btc_data = btc_response.json()

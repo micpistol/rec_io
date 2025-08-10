@@ -33,11 +33,6 @@
   },
   
   "watchdog_services": {
-    "btc_price_watchdog": {
-      "port": 8002,
-      "description": "Bitcoin price monitoring",
-      "status": "RUNNING"
-    },
     "db_poller": {
       "port": 8003,
       "description": "Database polling service",

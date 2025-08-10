@@ -50,7 +50,8 @@ class CascadingFailureDetector:
             "trade_manager",       # Trade management
             "trade_executor",      # Trade execution
             "active_trade_supervisor",  # Active trade monitoring
-            "btc_price_watchdog", # Price data
+            "symbol_price_watchdog_btc", # BTC price data
+            "symbol_price_watchdog_eth", # ETH price data
             "kalshi_account_sync", # Kalshi API sync
             "kalshi_api_watchdog" # Kalshi API monitoring
         ]
@@ -324,7 +325,7 @@ class CascadingFailureDetector:
             # Check supervisor status for all critical services
             critical_services = [
                 "main_app", "trade_manager", "trade_executor", 
-                "active_trade_supervisor", "btc_price_watchdog"
+                "active_trade_supervisor"
             ]
             
             all_running = True
