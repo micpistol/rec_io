@@ -101,3 +101,8 @@ backup/new_user_installations/
 backup/database_backups/rec_io_db_backup_20250808_100409.tar.gz
 backend/data/historical_data/btc_historical/btc_1m_master_5y.csv
 backend/data/historical_data/eth_historical/eth_1m_master_5y.csv
+
+# Large database backup files
+rec_io_db_backup.sql
+*.sql
+!backend/data/historical_data/**

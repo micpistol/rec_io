@@ -271,11 +271,30 @@ show_status() {
     done
 }
 
+# Function to check for external connections
+check_external_connections() {
+    print_status "Checking for external connections that might interfere..."
+    
+    local external_connections=$(lsof -i | grep -E "(64\.23\.138\.71|digitalocean)" 2>/dev/null || true)
+    if [ -n "$external_connections" ]; then
+        print_warning "Found external connections to remote servers:"
+        echo "$external_connections"
+        print_warning "These connections will be terminated during restart"
+        echo ""
+    else
+        print_success "No external connections detected"
+        echo ""
+    fi
+}
+
 # Function to perform complete restart
 master_restart() {
     print_header
     print_status "Initiating MASTER RESTART sequence..."
     echo ""
+    
+    # Check for external connections first
+    check_external_connections
     
     # Step 1: Stop supervisor first to prevent auto-restart
     print_status "Step 1: Stopping supervisor..."
@@ -310,6 +329,14 @@ master_restart() {
     pkill -f "rec_io" || true
     pkill -f "rec_io_20" || true
     
+    # Kill external connections that might interfere with local system
+    print_warning "Killing external connections to remote servers..."
+    lsof -i | grep -E "(64\.23\.138\.71|digitalocean)" | awk '{print $2}' | xargs kill -9 2>/dev/null || true
+    
+    # Kill Chrome processes that might be maintaining persistent connections
+    print_warning "Killing Chrome processes with remote connections..."
+    ps aux | grep -i chrome | grep -E "(64\.23\.138\.71|digitalocean)" | awk '{print $2}' | xargs kill -9 2>/dev/null || true
+    
     # Kill any processes using our ports
     print_warning "Killing processes using our ports..."
     for port in "${PORTS[@]}"; do
@@ -319,6 +346,14 @@ master_restart() {
     # Kill any remaining Python processes that might be ours
     print_warning "Killing any remaining suspicious Python processes..."
     ps aux | grep python | grep -E "(backend|trade|kalshi|btc)" | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null || true
+    
+    # Kill external connections that might interfere with local system
+    print_warning "Killing external connections to remote servers..."
+    lsof -i | grep -E "(64\.23\.138\.71|digitalocean)" | awk '{print $2}' | xargs kill -9 2>/dev/null || true
+    
+    # Kill Chrome processes that might be maintaining persistent connections
+    print_warning "Killing Chrome processes with remote connections..."
+    ps aux | grep -i chrome | grep -E "(64\.23\.138\.71|digitalocean)" | awk '{print $2}' | xargs kill -9 2>/dev/null || true
     
     # Wait for processes to fully terminate
     /bin/sleep 5

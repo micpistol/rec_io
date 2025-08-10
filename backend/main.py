@@ -28,8 +28,13 @@ import hmac
 # Import the universal centralized port system
 import sys
 import os
+
+# Add the project root to Python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
+sys.path.insert(0, project_root)
+
 from backend.util.paths import get_project_root
-sys.path.append(get_project_root())
 
 # Use relative imports to avoid ModuleNotFoundError
 from backend.core.port_config import get_port, get_port_info
