@@ -74,9 +74,10 @@ class SystemMonitor:
     def check_service_health(self, service_name: str, port: int) -> Dict[str, Any]:
         """Check health of a specific service using supervisor status only."""
         try:
+            from backend.util.paths import get_supervisorctl_path, get_supervisor_config_path
             # Use supervisor status check instead of HTTP health endpoint
             result = subprocess.run(
-                ["supervisorctl", "-c", "backend/supervisord.conf", "status", service_name],
+                [get_supervisorctl_path(), "-c", get_supervisor_config_path(), "status", service_name],
                 capture_output=True, text=True, timeout=5
             )
             if "RUNNING" in result.stdout:
@@ -149,8 +150,11 @@ class SystemMonitor:
                     supervisor_process = None
                     rogue_processes = []
                     
+                    from backend.util.paths import get_dynamic_project_root
+                    project_root = get_dynamic_project_root()
+                    
                     for proc in matching_processes:
-                        if '/Users/ericwais1/rec_io_20' in proc['cmdline']:
+                        if project_root in proc['cmdline']:
                             supervisor_process = proc
                         else:
                             rogue_processes.append(proc)
@@ -318,8 +322,9 @@ class SystemMonitor:
         
         for service in all_services:
             try:
+                from backend.util.paths import get_supervisorctl_path, get_supervisor_config_path
                 result = subprocess.run(
-                    ["supervisorctl", "-c", "backend/supervisord.conf", "status", service],
+                    [get_supervisorctl_path(), "-c", get_supervisor_config_path(), "status", service],
                     capture_output=True, text=True, timeout=5
                 )
                 
@@ -566,8 +571,9 @@ class SystemMonitor:
             failed_services = []
             
             for service in critical_services:
+                from backend.util.paths import get_supervisorctl_path, get_supervisor_config_path
                 result = subprocess.run(
-                    ["supervisorctl", "-c", "backend/supervisord.conf", "status", service],
+                    [get_supervisorctl_path(), "-c", get_supervisor_config_path(), "status", service],
                     capture_output=True, text=True, timeout=5
                 )
                 if "RUNNING" not in result.stdout:
@@ -757,8 +763,9 @@ class SystemMonitor:
                         sys.stdout.flush()
                         
                         try:
+                            from backend.util.paths import get_supervisorctl_path, get_supervisor_config_path
                             result = subprocess.run(
-                                ["supervisorctl", "-c", "backend/supervisord.conf", "restart", service_name],
+                                [get_supervisorctl_path(), "-c", get_supervisor_config_path(), "restart", service_name],
                                 capture_output=True, text=True, timeout=30
                             )
                             
@@ -775,7 +782,7 @@ class SystemMonitor:
                                 for check_service in self.service_urls.keys():
                                     try:
                                         result = subprocess.run(
-                                            ["supervisorctl", "-c", "backend/supervisord.conf", "status", check_service],
+                                            [get_supervisorctl_path(), "-c", get_supervisor_config_path(), "status", check_service],
                                             capture_output=True,
                                             text=True,
                                             timeout=10

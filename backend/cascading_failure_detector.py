@@ -66,9 +66,10 @@ class CascadingFailureDetector:
         self.restart_completion_checked = False
         
         # Critical files that must exist
+        from backend.util.paths import get_supervisor_config_path
         self.critical_files = [
             "backend/core/config/MASTER_PORT_MANIFEST.json",
-            "backend/supervisord.conf",
+            get_supervisor_config_path(),
             "scripts/MASTER_RESTART.sh"
         ]
     
@@ -81,8 +82,9 @@ class CascadingFailureDetector:
     def check_service_health(self, service_name: str) -> Dict[str, Any]:
         """Check health of a specific service."""
         try:
+            from backend.util.paths import get_supervisorctl_path, get_supervisor_config_path
             result = subprocess.run(
-                ["supervisorctl", "-c", "backend/supervisord.conf", "status", service_name],
+                [get_supervisorctl_path(), "-c", get_supervisor_config_path(), "status", service_name],
                 capture_output=True, text=True, timeout=5
             )
             
@@ -332,8 +334,9 @@ class CascadingFailureDetector:
             failed_services = []
             
             for service in critical_services:
+                from backend.util.paths import get_supervisorctl_path, get_supervisor_config_path
                 result = subprocess.run(
-                    ["supervisorctl", "-c", "backend/supervisord.conf", "status", service],
+                    [get_supervisorctl_path(), "-c", get_supervisor_config_path(), "status", service],
                     capture_output=True, text=True, timeout=5
                 )
                 if "RUNNING" not in result.stdout:

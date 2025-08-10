@@ -72,16 +72,17 @@ def flush_ports():
 def restart_supervisor():
     """Restart the supervisor system."""
     try:
+        from backend.util.paths import get_supervisorctl_path, get_supervisor_config_path
         # Stop supervisor
-        subprocess.run(['supervisorctl', '-c', 'backend/supervisord.conf', 'shutdown'])
+        subprocess.run([get_supervisorctl_path(), '-c', get_supervisor_config_path(), 'shutdown'])
         time.sleep(2)
         
         # Start supervisor
-        subprocess.run(['supervisord', '-c', 'backend/supervisord.conf'])
+        subprocess.run(['supervisord', '-c', get_supervisor_config_path()])
         time.sleep(3)
         
         # Check status
-        result = subprocess.run(['supervisorctl', '-c', 'backend/supervisord.conf', 'status'],
+        result = subprocess.run([get_supervisorctl_path(), '-c', get_supervisor_config_path(), 'status'],
                               capture_output=True, text=True)
         print("Supervisor status:")
         print(result.stdout)

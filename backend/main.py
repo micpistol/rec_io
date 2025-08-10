@@ -1884,8 +1884,9 @@ async def set_auto_entry(request: Request):
             try:
                 import subprocess
                 import sys
+                from backend.util.paths import get_dynamic_project_root
                 # Import the auto_entry_supervisor module and call reload function
-                sys.path.append('/Users/ericwais1/rec_io_20')
+                sys.path.append(get_dynamic_project_root())
                 from backend.auto_entry_supervisor import log
                 log("[AUTO ENTRY] Settings updated via API - supervisor will reload on next check")
             except Exception as e:
@@ -2931,18 +2932,22 @@ async def get_supervisor_status():
     try:
         import subprocess
         import os
+        from backend.util.paths import get_dynamic_project_root, get_supervisorctl_path, get_supervisor_config_path
+        
+        # Get dynamic paths
+        project_dir = get_dynamic_project_root()
+        supervisorctl_path = get_supervisorctl_path()
+        supervisor_config_path = get_supervisor_config_path()
         
         # Change to the project directory
-        project_dir = "/Users/ericwais1/rec_io_20"
         os.chdir(project_dir)
         
-        # Use full path to supervisorctl and set environment
-        supervisorctl_path = "/opt/homebrew/bin/supervisorctl"
+        # Set up environment
         env = os.environ.copy()
         
-        # Execute the supervisorctl command with full path
+        # Execute the supervisorctl command with dynamic paths
         result = subprocess.run(
-            [supervisorctl_path, "-c", "backend/supervisord.conf", "status"],
+            [supervisorctl_path, "-c", supervisor_config_path, "status"],
             capture_output=True,
             text=True,
             timeout=10,
@@ -2981,13 +2986,15 @@ async def execute_restart():
     try:
         import subprocess
         import os
+        from backend.util.paths import get_dynamic_project_root
         
-        # Change to the project directory
-        project_dir = "/Users/ericwais1/rec_io_20"
+        # Get dynamic project directory
+        project_dir = get_dynamic_project_root()
         os.chdir(project_dir)
         
         # Set up environment with proper PATH
         env = os.environ.copy()
+        # Add common paths for both macOS and Ubuntu
         env['PATH'] = '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin'
         
         # Execute the restart script in background (don't wait for it)
@@ -3018,17 +3025,19 @@ async def execute_command(request: dict):
     try:
         import subprocess
         import os
+        from backend.util.paths import get_dynamic_project_root
         
         command = request.get("command", "")
         if not command:
             return {"success": False, "error": "No command provided"}
         
-        # Change to the project directory
-        project_dir = "/Users/ericwais1/rec_io_20"
+        # Get dynamic project directory
+        project_dir = get_dynamic_project_root()
         os.chdir(project_dir)
         
         # Set up environment with proper PATH
         env = os.environ.copy()
+        # Add common paths for both macOS and Ubuntu
         env['PATH'] = '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin'
         
         # Execute the command

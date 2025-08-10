@@ -163,7 +163,7 @@
             <div class="welcome-message">
                 <strong>REC IO Terminal Control</strong><br>
                 Welcome to the system terminal. You can execute commands at the project level.<br>
-                <strong>Current Directory:</strong> /Users/ericwais1/rec_io_20<br>
+                <strong>Current Directory:</strong> <span id="currentDirectory">Detecting...</span><br>
                 <strong>Warning:</strong> Use with caution. Commands execute with system privileges.
             </div>
             
@@ -189,7 +189,30 @@
         
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('terminalInput').focus();
+            detectCurrentDirectory();
         });
+        
+        async function detectCurrentDirectory() {
+            try {
+                const response = await fetch('/api/admin/execute-command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ command: 'pwd' })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        const directoryElement = document.getElementById('currentDirectory');
+                        directoryElement.textContent = result.output.trim();
+                    }
+                }
+            } catch (error) {
+                console.error('Error detecting current directory:', error);
+            }
+        }
         
         function handleKeyPress(event) {
             if (event.key === 'Enter') {

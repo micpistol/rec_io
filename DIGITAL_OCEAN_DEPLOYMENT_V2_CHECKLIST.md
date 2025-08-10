@@ -40,47 +40,47 @@
   - [ ] `backend/system_monitor.py` (Line 152)
   - [ ] Replace with dynamic detection calls
 
-### **1.2 Cross-Platform Supervisor Path Detection**
-- [ ] **File**: `backend/main.py` (Lines 2939, 2990, 3031, 3075)
-  - [ ] Replace `/opt/homebrew/bin/supervisorctl` with dynamic detection
-  - [ ] Add macOS vs Ubuntu path detection logic
-  - [ ] Update PATH environment variable handling
+### **1.2 Cross-Platform Supervisor Path Detection** ✅
+- [x] **File**: `backend/main.py` (Lines 2939, 2990, 3031, 3075)
+  - [x] Replace `/opt/homebrew/bin/supervisorctl` with dynamic detection
+  - [x] Add macOS vs Ubuntu path detection logic
+  - [x] Update PATH environment variable handling
 
-- [ ] **Files**: All supervisor config references
-  - [ ] `backend/system_monitor.py` (Lines 78, 321, 569, 760, 777)
-  - [ ] `backend/cascading_failure_detector.py` (Lines 84, 335)
-  - [ ] `backend/core/port_flush.py` (Lines 75, 79, 83)
-  - [ ] Replace `backend/supervisord.conf` with dynamic paths
+- [x] **Files**: All supervisor config references
+  - [x] `backend/system_monitor.py` (Lines 78, 321, 569, 760, 777)
+  - [x] `backend/cascading_failure_detector.py` (Lines 84, 335)
+  - [x] `backend/core/port_flush.py` (Lines 75, 79, 83)
+  - [x] Replace `backend/supervisord.conf` with dynamic paths
 
-### **1.3 Import Path Fixes**
-- [ ] **File**: `backend/main.py` (Line 31)
-  - [ ] Fix `from backend.util.paths import get_project_root`
-  - [ ] Ensure PYTHONPATH is set correctly
-  - [ ] Test import resolution on server environment
+### **1.3 Import Path Fixes** ✅
+- [x] **File**: `backend/main.py` (Line 31)
+  - [x] Fix `from backend.util.paths import get_project_root`
+  - [x] Ensure PYTHONPATH is set correctly
+  - [x] Test import resolution on server environment
 
-- [ ] **Files**: All relative imports
-  - [ ] Verify all `from backend.` imports work
-  - [ ] Test import resolution in virtual environment
-  - [ ] Ensure no circular import issues
+- [x] **Files**: All relative imports
+  - [x] Verify all `from backend.` imports work
+  - [x] Test import resolution in virtual environment
+  - [x] Ensure no circular import issues
 
-### **1.4 Process Detection Updates**
-- [ ] **File**: `backend/system_monitor.py` (Line 152)
-  - [ ] Replace hardcoded path check with dynamic detection
-  - [ ] Update process filtering logic for Ubuntu
-  - [ ] Test process detection on both environments
+### **1.4 Process Detection Updates** ✅
+- [x] **File**: `backend/system_monitor.py` (Line 152)
+  - [x] Replace hardcoded path check with dynamic detection
+  - [x] Update process filtering logic for Ubuntu
+  - [x] Test process detection on both environments
 
-### **1.5 Frontend Directory Display Fixes**
-- [ ] **File**: `frontend/terminal-control.html` (Lines 165, 302)
-  - [ ] Replace hardcoded directory display
-  - [ ] Add dynamic directory detection
-  - [ ] Test on both local and server environments
+### **1.5 Frontend Directory Display Fixes** ✅
+- [x] **File**: `frontend/terminal-control.html` (Lines 165, 302)
+  - [x] Replace hardcoded directory display
+  - [x] Add dynamic directory detection
+  - [x] Test on both local and server environments
 
-### **1.6 MASTER_RESTART.sh Cross-Platform Updates**
-- [ ] **File**: `scripts/MASTER_RESTART.sh`
-  - [ ] Add OS detection logic
-  - [ ] Update supervisor paths for Ubuntu
-  - [ ] Test on both macOS and Ubuntu
-  - [ ] Verify process killing works on both systems
+### **1.6 MASTER_RESTART.sh Cross-Platform Updates** ✅
+- [x] **File**: `scripts/MASTER_RESTART.sh`
+  - [x] Add OS detection logic
+  - [x] Update supervisor paths for Ubuntu
+  - [x] Test on both macOS and Ubuntu
+  - [x] Verify process killing works on both systems
 
 ---
 
