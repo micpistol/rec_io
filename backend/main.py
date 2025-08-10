@@ -1087,39 +1087,34 @@ async def get_core_data():
                 close_time += timedelta(days=1)
             ttc_seconds = int((close_time - now).total_seconds())
         
-        # Get BTC price from watchdog data
+        # Get BTC price from PostgreSQL live_data
         btc_price = 0
         try:
-            # First try to get the latest price from the watchdog's database
-            from backend.util.paths import get_btc_price_history_dir
-            btc_price_history_db = os.path.join(get_btc_price_history_dir(), "btc_price_history.db")
+            # Get the latest price from PostgreSQL live_data.btc_price_log
+            import psycopg2
+            conn = psycopg2.connect(
+                host="localhost",
+                database="rec_io_db",
+                user="rec_io_user",
+                password="rec_io_password"
+            )
+            cursor = conn.cursor()
+            cursor.execute("SELECT price FROM live_data.btc_price_log ORDER BY timestamp DESC LIMIT 1")
+            result = cursor.fetchone()
+            conn.close()
             
-            if os.path.exists(btc_price_history_db):
-                conn = sqlite3.connect(btc_price_history_db)
-                cursor = conn.cursor()
-                cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
-                result = cursor.fetchone()
-                conn.close()
-                
-                if result:
-                    btc_price = float(result[0])
-                    print(f"[MAIN] Using watchdog BTC price: ${btc_price:,.2f}")
-                else:
-                    # Fallback to direct API call if no watchdog data
-                    response = requests.get("https://api.kraken.com/0/public/Ticker?pair=BTCUSD", timeout=5)
-                    if response.status_code == 200:
-                        data = response.json()
-                        btc_price = float(data['result']['XXBTZUSD']['c'][0])
-                        print(f"[MAIN] Using fallback API BTC price: ${btc_price:,.2f}")
+            if result:
+                btc_price = float(result[0])
+                print(f"[MAIN] Using PostgreSQL BTC price: ${btc_price:,.2f}")
             else:
-                # Fallback to direct API call if watchdog DB doesn't exist
+                # Fallback to direct API call if no PostgreSQL data
                 response = requests.get("https://api.kraken.com/0/public/Ticker?pair=BTCUSD", timeout=5)
                 if response.status_code == 200:
                     data = response.json()
                     btc_price = float(data['result']['XXBTZUSD']['c'][0])
                     print(f"[MAIN] Using fallback API BTC price: ${btc_price:,.2f}")
         except Exception as e:
-            print(f"Error fetching BTC price: {e}")
+            print(f"Error fetching BTC price from PostgreSQL: {e}")
             # Final fallback to direct API call
             try:
                 response = requests.get("https://api.kraken.com/0/public/Ticker?pair=BTCUSD", timeout=5)
@@ -1343,25 +1338,60 @@ async def create_trade(trade_data: dict):
 # Additional endpoints for other data
 @app.get("/btc_price_changes")
 async def get_btc_changes():
-    """Get BTC price changes from btc_price_change.json if available, else fallback."""
+    """Get BTC price changes from PostgreSQL live_data.btc_price_log."""
     try:
-        from backend.util.paths import get_btc_price_history_dir
-        import json as _json
-        import os as _os
-        change_path = _os.path.join(get_btc_price_history_dir(), "btc_price_change.json")
-        if _os.path.exists(change_path):
-            with open(change_path, "r") as f:
-                data = _json.load(f)
-            return {
-                "change1h": data.get("change1h"),
-                "change3h": data.get("change3h"),
-                "change1d": data.get("change1d"),
-                "timestamp": data.get("timestamp")
-            }
+        import psycopg2
+        from datetime import datetime, timedelta
+        from zoneinfo import ZoneInfo
+        
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        cursor = conn.cursor()
+        
+        # Get current price
+        cursor.execute("SELECT price FROM live_data.btc_price_log ORDER BY timestamp DESC LIMIT 1")
+        current_result = cursor.fetchone()
+        
+        if not current_result:
+            return {"change1h": None, "change3h": None, "change1d": None, "timestamp": None}
+        
+        current_price = float(current_result[0])
+        
+        # Calculate changes for different time periods
+        now = datetime.now(ZoneInfo("America/New_York"))
+        
+        changes = {}
+        for period, minutes in [("1h", 60), ("3h", 180), ("1d", 1440)]:
+            target_time = now - timedelta(minutes=minutes)
+            target_timestamp = target_time.strftime("%Y-%m-%dT%H:%M:%S")
+            
+            cursor.execute("""
+                SELECT price FROM live_data.btc_price_log 
+                WHERE timestamp <= %s 
+                ORDER BY timestamp DESC 
+                LIMIT 1
+            """, (target_timestamp,))
+            
+            result = cursor.fetchone()
+            if result:
+                old_price = float(result[0])
+                change = ((current_price - old_price) / old_price) * 100
+                changes[f"change{period}"] = change
+            else:
+                changes[f"change{period}"] = None
+        
+        conn.close()
+        
+        changes["timestamp"] = now.isoformat()
+        return changes
+        
     except Exception as e:
-        print(f"[btc_price_changes API] Error reading btc_price_change.json: {e}")
-    # fallback: return nulls if file missing or error
-    return {"change1h": None, "change3h": None, "change1d": None, "timestamp": None}
+        print(f"[btc_price_changes API] Error reading from PostgreSQL: {e}")
+        return {"change1h": None, "change3h": None, "change1d": None, "timestamp": None}
 
 @app.get("/kalshi_market_snapshot")
 async def get_kalshi_snapshot():
@@ -1673,31 +1703,29 @@ async def get_current_momentum():
 
 @app.get("/api/btc_price")
 async def get_btc_price():
-    """Get current BTC price directly from btc_price_watchdog database."""
+    """Get current BTC price directly from PostgreSQL live_data.btc_price_log."""
     try:
-        from backend.util.paths import get_btc_price_history_dir
-        import sqlite3
-        import os
+        import psycopg2
         
-        btc_price_history_db = os.path.join(get_btc_price_history_dir(), "btc_price_history.db")
-        
-        if not os.path.exists(btc_price_history_db):
-            return {"price": None, "error": "BTC price database not found"}
-        
-        conn = sqlite3.connect(btc_price_history_db)
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
         cursor = conn.cursor()
-        cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
+        cursor.execute("SELECT price FROM live_data.btc_price_log ORDER BY timestamp DESC LIMIT 1")
         result = cursor.fetchone()
         conn.close()
         
         if result:
             price = float(result[0])
-            return {"price": price, "source": "btc_price_watchdog"}
+            return {"price": price, "source": "postgresql_live_data"}
         else:
             return {"price": None, "error": "No price data available"}
             
     except Exception as e:
-        print(f"Error getting BTC price: {e}")
+        print(f"Error getting BTC price from PostgreSQL: {e}")
         return {"price": None, "error": str(e)}
 
 @app.get("/api/momentum_score")

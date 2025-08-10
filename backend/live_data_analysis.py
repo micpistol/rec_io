@@ -9,7 +9,7 @@ import sys
 import time
 import json
 import requests
-import sqlite3
+import psycopg2
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from typing import Dict, Any, List, Optional
@@ -18,35 +18,43 @@ from typing import Dict, Any, List, Optional
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from backend.core.port_config import get_port, get_port_info
-from backend.util.paths import get_data_dir, get_kalshi_data_dir, get_btc_price_history_dir
 from backend.core.config.settings import config
+
+# PostgreSQL connection parameters
+POSTGRES_CONFIG = {
+    'host': os.getenv('POSTGRES_HOST', 'localhost'),
+    'port': int(os.getenv('POSTGRES_PORT', '5432')),
+    'database': os.getenv('POSTGRES_DB', 'rec_io_db'),
+    'user': os.getenv('POSTGRES_USER', 'rec_io_user'),
+    'password': os.getenv('POSTGRES_PASSWORD', '')
+}
+
+def get_postgres_connection():
+    """Get a PostgreSQL connection"""
+    return psycopg2.connect(**POSTGRES_CONFIG)
 
 class LiveDataAnalyzer:
     def __init__(self):
-        self.price_history_db = os.path.join(get_btc_price_history_dir(), "btc_price_history.db")
         self.cache = {}
         self.last_update = None
         # Use EST timezone for all calculations
         self.est_tz = ZoneInfo('US/Eastern')
         
     def get_price_at_offset(self, minutes_ago: int) -> Optional[float]:
-        """Get price from X minutes ago using the watchdog database"""
+        """Get price from X minutes ago using PostgreSQL database"""
         try:
-            if not os.path.exists(self.price_history_db):
-                return None
-                
-            conn = sqlite3.connect(self.price_history_db)
+            conn = get_postgres_connection()
             cursor = conn.cursor()
             
             # Calculate timestamp for X minutes ago in EST
             now_est = datetime.now(self.est_tz)
             target_time = now_est - timedelta(minutes=minutes_ago)
-            target_timestamp = target_time.isoformat()
+            target_timestamp = target_time.strftime("%Y-%m-%dT%H:%M:%S")
             
             # Get the closest price before the target time
             cursor.execute("""
-                SELECT price FROM price_log 
-                WHERE timestamp <= ? 
+                SELECT price FROM live_data.btc_price_log 
+                WHERE timestamp <= %s 
                 ORDER BY timestamp DESC 
                 LIMIT 1
             """, (target_timestamp,))
@@ -63,14 +71,11 @@ class LiveDataAnalyzer:
             return None
     
     def get_current_price(self) -> Optional[float]:
-        """Get the most recent price from watchdog database"""
+        """Get the most recent price from PostgreSQL database"""
         try:
-            if not os.path.exists(self.price_history_db):
-                return None
-                
-            conn = sqlite3.connect(self.price_history_db)
+            conn = get_postgres_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT price FROM price_log ORDER BY timestamp DESC LIMIT 1")
+            cursor.execute("SELECT price FROM live_data.btc_price_log ORDER BY timestamp DESC LIMIT 1")
             result = cursor.fetchone()
             conn.close()
             
@@ -208,23 +213,21 @@ if __name__ == "__main__":
     print("Testing Live Data Analyzer...")
     
     # Check if watchdog database exists
-    if os.path.exists(analyzer.price_history_db):
-        print(f"✅ Found price history database: {analyzer.price_history_db}")
+    # The price history database check is removed as we are now using PostgreSQL
+    # if os.path.exists(analyzer.price_history_db):
+    #     print(f"✅ Found price history database: {analyzer.price_history_db}")
         
-        # Get current price
-        current_price = analyzer.get_current_price()
-        print(f"Current BTC price: ${current_price:,.2f}" if current_price else "No current price available")
-        
-        # Get momentum analysis
-        analysis = analyzer.get_momentum_analysis()
-        print("\nMomentum Analysis:")
-        for key, value in analysis.items():
-            if key.startswith('delta_'):
-                print(f"  {key}: {value:.4f}%" if value is not None else f"  {key}: None")
-            elif key == 'weighted_momentum_score':
-                print(f"  {key}: {value:.4f}%" if value is not None else f"  {key}: None")
-            else:
-                print(f"  {key}: {value}")
-    else:
-        print(f"❌ Price history database not found: {analyzer.price_history_db}")
-        print("Make sure the btc_price_watchdog service is running and collecting data.") 
+    # Get current price
+    current_price = analyzer.get_current_price()
+    print(f"Current BTC price: ${current_price:,.2f}" if current_price else "No current price available")
+    
+    # Get momentum analysis
+    analysis = analyzer.get_momentum_analysis()
+    print("\nMomentum Analysis:")
+    for key, value in analysis.items():
+        if key.startswith('delta_'):
+            print(f"  {key}: {value:.4f}%" if value is not None else f"  {key}: None")
+        elif key == 'weighted_momentum_score':
+            print(f"  {key}: {value:.4f}%" if value is not None else f"  {key}: None")
+        else:
+            print(f"  {key}: {value}") 
