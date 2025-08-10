@@ -178,7 +178,7 @@ def detect_strike_tier_spacing(markets: List[Dict[str, Any]]) -> int:
             # Use the first difference as the tier spacing
             # (assuming consistent spacing across all strikes)
             tier_spacing = int(differences[0])
-            print(f"🔍 Detected strike tier spacing: ${tier_spacing:,}")
+            # print(f"🔍 Detected strike tier spacing: ${tier_spacing:,}")
             return tier_spacing
         else:
             raise ValueError("No valid strike differences found")
@@ -224,7 +224,7 @@ def get_kalshi_market_snapshot() -> Dict[str, Any]:
             # Detect strike tier spacing
             strike_tier = detect_strike_tier_spacing(markets)
             
-            print(f"📊 Loaded live market snapshot - Event: {event_ticker}, Status: {first_status}, Tier: ${strike_tier:,}")
+            # print(f"📊 Loaded live market snapshot - Event: {event_ticker}, Status: {first_status}, Tier: ${strike_tier:,}")
             
             return {
                 "event_ticker": event_ticker,
@@ -261,7 +261,7 @@ def get_live_probabilities() -> Dict[str, float]:
             if not probabilities:
                 raise ValueError("No probabilities found in data")
                 
-            print(f"📊 Loaded {len(probabilities)} live probabilities from {live_prob_file}")
+            # print(f"📊 Loaded {len(probabilities)} live probabilities from {live_prob_file}")
             return probabilities
         else:
             raise ValueError("No 'probabilities' key found in data")
@@ -382,7 +382,7 @@ def calculate_strike_data(strike: int, current_price: float, probabilities: Dict
                 if yes_ask is None or no_ask is None:
                     raise ValueError(f"Missing ask prices for strike {strike}")
                     
-                print(f"📊 Found market data for strike {strike}: YES={yes_ask}, NO={no_ask}, VOL={volume}, TICKER={ticker}")
+                # print(f"📊 Found market data for strike {strike}: YES={yes_ask}, NO={no_ask}, VOL={volume}, TICKER={ticker}")
                 break
         else:
             raise ValueError(f"No market found for strike {strike} (looked for {snapshot_strike})")
@@ -476,13 +476,13 @@ def load_auto_entry_settings() -> Dict[str, Any]:
                     "watchlist_min_volume": 1000,  # Default value
                     "watchlist_max_ask": 98  # Default value
                 }
-                print(f"📊 Loaded auto entry settings from PostgreSQL: {settings}")
+                # print(f"📊 Loaded auto entry settings from PostgreSQL: {settings}")
                 return settings
             else:
-                print(f"⚠️ No auto entry settings found in PostgreSQL")
+                # print(f"⚠️ No auto entry settings found in PostgreSQL")
                 return None
     except Exception as e:
-        print(f"⚠️ Error loading auto entry settings from PostgreSQL: {e}")
+        # print(f"⚠️ Error loading auto entry settings from PostgreSQL: {e}")
         return None
 
 class PipelineStep(Enum):
@@ -573,11 +573,14 @@ class UnifiedProductionCoordinator:
             import requests
             response = requests.post(url, json=display_data, timeout=2)
             if response.ok:
-                print(f"✅ Fingerprint display update broadcasted: {display_data['fingerprint']}")
+                # print(f"✅ Fingerprint display update broadcasted: {display_data['fingerprint']}")
+                pass
             else:
-                print(f"⚠️ Failed to broadcast fingerprint display: {response.status_code}")
+                # print(f"⚠️ Failed to broadcast fingerprint display: {response.status_code}")
+                pass
         except Exception as e:
-            print(f"❌ Error broadcasting fingerprint display: {e}")
+            # print(f"❌ Error broadcasting fingerprint display: {e}")
+            pass
     
     def _broadcast_momentum_update(self, momentum_score):
         """Broadcast momentum data update via WebSocket to main app"""
@@ -605,16 +608,19 @@ class UnifiedProductionCoordinator:
             import requests
             response = requests.post(url, json=broadcast_data, timeout=2)
             if response.ok:
-                print(f"✅ Momentum update broadcasted: {momentum_score:.3f}")
+                # print(f"✅ Momentum update broadcasted: {momentum_score:.3f}")
+                pass
             else:
-                print(f"⚠️ Failed to broadcast momentum update: {response.status_code}")
+                # print(f"⚠️ Failed to broadcast momentum update: {response.status_code}")
+                pass
         except Exception as e:
-            print(f"❌ Error broadcasting momentum update: {e}")
+            # print(f"❌ Error broadcasting momentum update: {e}")
+            pass
     
     def start_pipeline(self):
         """Start the unified data pipeline orchestration"""
         if self.running:
-            print("⚠️ Pipeline already running")
+            # print("⚠️ Pipeline already running")
             return
         
         self.running = True
@@ -631,7 +637,7 @@ class UnifiedProductionCoordinator:
     
     def _pipeline_loop(self):
         """Main pipeline orchestration loop"""
-        print("🔄 Starting unified production pipeline loop...")
+        # print("🔄 Starting unified production pipeline loop...")
         
         while self.running:
             try:
@@ -663,11 +669,12 @@ class UnifiedProductionCoordinator:
                 
                 # Log performance
                 if cycle_time > self.cycle_interval:
-                    print(f"⚠️ Pipeline cycle {self.current_cycle} took {cycle_time:.2f}s (exceeded {self.cycle_interval}s)")
+                    # print(f"⚠️ Pipeline cycle {self.current_cycle} took {cycle_time:.2f}s (exceeded {self.cycle_interval}s)")
+                    pass
                 
                 # Check for consecutive failures
                 if self.consecutive_failures >= self.max_consecutive_failures:
-                    print(f"❌ Too many consecutive failures ({self.consecutive_failures}), pausing pipeline...")
+                    # print(f"❌ Too many consecutive failures ({self.consecutive_failures}), pausing pipeline...")
                     time.sleep(10)  # Pause for 10 seconds
                     self.consecutive_failures = 0  # Reset counter
                 
@@ -677,25 +684,25 @@ class UnifiedProductionCoordinator:
                     time.sleep(sleep_time)
                     
             except Exception as e:
-                print(f"❌ Critical error in pipeline loop: {e}")
+                # print(f"❌ Critical error in pipeline loop: {e}")
                 self.consecutive_failures += 1
                 time.sleep(self.cycle_interval)
     
     def _execute_pipeline_cycle(self) -> bool:
         """Execute one complete pipeline cycle"""
         try:
-            print(f"🔄 Pipeline cycle {self.current_cycle} starting...")
+            # print(f"🔄 Pipeline cycle {self.current_cycle} starting...")
             
             # Step 1: Get BTC price
             btc_price_result = self._step_get_btc_price()
             if not btc_price_result.success:
-                print(f"❌ BTC price step failed: {btc_price_result.error}")
+                # print(f"❌ BTC price step failed: {btc_price_result.error}")
                 return False
             
             # Step 2: Get market snapshot
             market_snapshot_result = self._step_get_market_snapshot()
             if not market_snapshot_result.success:
-                print(f"❌ Market snapshot step failed: {market_snapshot_result.error}")
+                # print(f"❌ Market snapshot step failed: {market_snapshot_result.error}")
                 return False
             
             # Step 3: Generate probabilities (depends on BTC price and market data)
@@ -704,7 +711,7 @@ class UnifiedProductionCoordinator:
                 market_snapshot_result.data
             )
             if not probabilities_result.success:
-                print(f"❌ Probabilities step failed: {probabilities_result.error}")
+                # print(f"❌ Probabilities step failed: {probabilities_result.error}")
                 return False
             
             # Step 4: Generate strike table (depends on all previous steps)
@@ -714,7 +721,7 @@ class UnifiedProductionCoordinator:
                 probabilities_result.data
             )
             if not strike_table_result.success:
-                print(f"❌ Strike table step failed: {strike_table_result.error}")
+                # print(f"❌ Strike table step failed: {strike_table_result.error}")
                 return False
             
             # Step 5: Generate watchlist (depends on strike table)
@@ -724,7 +731,7 @@ class UnifiedProductionCoordinator:
                 strike_table_result.data
             )
             if not watchlist_result.success:
-                print(f"❌ Watchlist step failed: {watchlist_result.error}")
+                # print(f"❌ Watchlist step failed: {watchlist_result.error}")
                 return False
             
             # Store results
@@ -736,11 +743,11 @@ class UnifiedProductionCoordinator:
                 watchlist_result
             ]
             
-            print(f"✅ Pipeline cycle {self.current_cycle} completed successfully")
+            # print(f"✅ Pipeline cycle {self.current_cycle} completed successfully")
             return True
             
         except Exception as e:
-            print(f"❌ Pipeline cycle failed: {e}")
+            # print(f"❌ Pipeline cycle failed: {e}")
             return False
     
     def _step_get_btc_price(self) -> PipelineResult:
@@ -756,7 +763,7 @@ class UnifiedProductionCoordinator:
                     duration=time.time() - step_start
                 )
             
-            print(f"📊 BTC Price: ${btc_price:,.2f}")
+            # print(f"📊 BTC Price: ${btc_price:,.2f}")
             return PipelineResult(
                 step=PipelineStep.BTC_PRICE,
                 success=True,
@@ -776,7 +783,7 @@ class UnifiedProductionCoordinator:
         step_start = time.time()
         try:
             market_snapshot = get_kalshi_market_snapshot()
-            print(f"📊 Market Snapshot: {market_snapshot.get('event_ticker')} - {market_snapshot.get('market_status')}")
+            # print(f"📊 Market Snapshot: {market_snapshot.get('event_ticker')} - {market_snapshot.get('market_status')}")
             return PipelineResult(
                 step=PipelineStep.MARKET_SNAPSHOT,
                 success=True,
@@ -817,7 +824,7 @@ class UnifiedProductionCoordinator:
                 num_steps=10
             )
             
-            print(f"📊 Probabilities: Price=${btc_price:,.2f}, TTC={ttc_seconds}s, Momentum={momentum:.3f}")
+            # print(f"📊 Probabilities: Price=${btc_price:,.2f}, TTC={ttc_seconds}s, Momentum={momentum:.3f}")
             return PipelineResult(
                 step=PipelineStep.PROBABILITIES,
                 success=True,
@@ -866,13 +873,16 @@ class UnifiedProductionCoordinator:
                     live_prob_data = safe_read_json(live_probabilities_path)
                     if live_prob_data and "fingerprint_csv" in live_prob_data:
                         fingerprint_filename = live_prob_data["fingerprint_csv"]
-                        print(f"✅ Read fingerprint from live probabilities: {fingerprint_filename}")
+                        # print(f"✅ Read fingerprint from live probabilities: {fingerprint_filename}")
                     else:
-                        print(f"⚠️ No fingerprint_csv found in live probabilities file")
+                        # print(f"⚠️ No fingerprint_csv found in live probabilities file")
+                        pass
                 else:
-                    print(f"⚠️ Live probabilities file not found: {live_probabilities_path}")
+                    # print(f"⚠️ Live probabilities file not found: {live_probabilities_path}")
+                    pass
             except Exception as e:
-                print(f"⚠️ Error reading fingerprint from live probabilities: {e}")
+                # print(f"⚠️ Error reading fingerprint from live probabilities: {e}")
+                pass
             
             # Get momentum data
             # momentum_data = self.analyzer.get_momentum_analysis() # Removed LiveDataAnalyzer
@@ -908,7 +918,7 @@ class UnifiedProductionCoordinator:
             # Write to file
             safe_write_json(output, self.strike_table_path)
             
-            print(f"📊 Strike Table: {len(strike_data)} strikes, TTC={ttc_seconds}s")
+            # print(f"📊 Strike Table: {len(strike_data)} strikes, TTC={ttc_seconds}s")
             return PipelineResult(
                 step=PipelineStep.STRIKE_TABLE,
                 success=True,
@@ -941,7 +951,7 @@ class UnifiedProductionCoordinator:
             min_probability = settings.get("min_probability") - 5  # Subtract 5 from min_probability
             min_differential = settings.get("min_differential") - 3  # Subtract 3 from min_differential
             
-            print(f"🔍 Watchlist filtering with settings: min_prob={min_probability}, min_diff={min_differential}")
+            # print(f"🔍 Watchlist filtering with settings: min_prob={min_probability}, min_diff={min_differential}")
             
             # Filter strikes for watchlist
             filtered_strikes = []
@@ -979,24 +989,29 @@ class UnifiedProductionCoordinator:
                 
                 # Debug output for volume filtering
                 if not volume_ok:
-                    print(f"🔍 Volume debug for strike {strike.get('strike')}: volume={volume} (type: {type(volume)}), min_volume={min_volume} (type: {type(min_volume)})")
+                    # print(f"🔍 Volume debug for strike {strike.get('strike')}: volume={volume} (type: {type(volume)}), min_volume={min_volume} (type: {type(min_volume)})")
+                    pass
                 
                 # Debug output for probability filtering
                 if not probability_ok:
-                    print(f"🔍 Probability debug for strike {strike.get('strike')}: probability={probability} (type: {type(probability)}), min_probability={min_probability} (type: {type(min_probability)})")
+                    # print(f"🔍 Probability debug for strike {strike.get('strike')}: probability={probability} (type: {type(probability)}), min_probability={min_probability} (type: {type(min_probability)})")
+                    pass
                 
                 # Debug output for differential filtering
                 if not at_least_one_diff_ok:
-                    print(f"🔍 Differential debug for strike {strike.get('strike')}: yes_diff={yes_diff}, no_diff={no_diff}, min_differential={min_differential}")
+                    # print(f"🔍 Differential debug for strike {strike.get('strike')}: yes_diff={yes_diff}, no_diff={no_diff}, min_differential={min_differential}")
+                    pass
                 
                 # Debug output for ask price filtering
                 if not ask_ok:
-                    print(f"🔍 Ask price debug for strike {strike.get('strike')}: max_ask_price={max_ask_price}, max_ask={max_ask}")
+                    # print(f"🔍 Ask price debug for strike {strike.get('strike')}: max_ask_price={max_ask_price}, max_ask={max_ask}")
+                    pass
                 
                 if (volume_ok and probability_ok and ask_ok and at_least_one_diff_ok):
                     filtered_strikes.append(strike)
                 else:
-                    print(f"❌ Strike {strike.get('strike')} filtered out: vol={volume_ok}, prob={probability_ok}, ask={ask_ok}, diff={at_least_one_diff_ok}")
+                    # print(f"❌ Strike {strike.get('strike')} filtered out: vol={volume_ok}, prob={probability_ok}, ask={ask_ok}, diff={at_least_one_diff_ok}")
+                    pass
             
             # Sort by probability (highest to lowest)
             filtered_strikes.sort(key=lambda x: x.get("probability", 0), reverse=True)
@@ -1018,7 +1033,7 @@ class UnifiedProductionCoordinator:
             # Write watchlist to file
             safe_write_json(watchlist_output, self.watchlist_path)
             
-            print(f"📊 Watchlist: {len(filtered_strikes)} filtered strikes")
+            # print(f"📊 Watchlist: {len(filtered_strikes)} filtered strikes")
             return PipelineResult(
                 step=PipelineStep.WATCHLIST,
                 success=True,

@@ -152,6 +152,22 @@
   - [x] No hardcoded values for total memory/disk capacity
   - [x] Resource monitoring works on any system (macOS/Ubuntu)
 
+### **2.6 Droplet Cleanup** ✅
+- [x] **Stop all running processes**
+  - [x] Stop all supervisor services
+  - [x] Kill any remaining Python processes
+  - [x] Verify no trading system processes are running
+
+- [x] **Remove all project files**
+  - [x] Delete /opt/trading_system directory
+  - [x] Delete /opt/digitalocean directory
+  - [x] Clean up macOS metadata files
+
+- [x] **Clean up system configuration**
+  - [x] Remove supervisor configuration files
+  - [x] Remove environment files
+  - [x] Update supervisor to remove process groups
+
 ---
 
 ## 🚀 **PHASE 3: SERVER PREPARATION**
