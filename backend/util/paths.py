@@ -1,4 +1,6 @@
 import os
+import platform
+from pathlib import Path
 
 def get_project_root():
     """Get the absolute path to the project root directory."""
@@ -106,4 +108,91 @@ def ensure_data_dirs():
         os.path.join(get_data_dir(), "users", "user_0001", "credentials", "kalshi-credentials", "demo"),
     ]
     for dir_path in dirs:
-        os.makedirs(dir_path, exist_ok=True) 
+        os.makedirs(dir_path, exist_ok=True)
+
+# NEW FUNCTIONS FOR DEPLOYMENT COMPATIBILITY
+
+def get_supervisorctl_path():
+    """
+    Get supervisorctl path for current system.
+    Works on both macOS (Homebrew) and Ubuntu.
+    """
+    # Check common locations
+    possible_paths = [
+        "/opt/homebrew/bin/supervisorctl",  # macOS Homebrew
+        "/usr/bin/supervisorctl",           # Ubuntu/Debian
+        "/usr/local/bin/supervisorctl",     # macOS/Ubuntu alternative
+        "supervisorctl"                     # Fallback to PATH
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            return path
+    
+    # If not found, return the command name and let the shell find it
+    return "supervisorctl"
+
+
+def get_system_type():
+    """
+    Detect the current system type for path adaptations.
+    """
+    system = platform.system().lower()
+    if system == "darwin":
+        return "macos"
+    elif system == "linux":
+        return "ubuntu"
+    else:
+        return "unknown"
+
+
+def get_dynamic_project_root():
+    """
+    Get the project root directory dynamically.
+    Works on both macOS and Ubuntu environments.
+    """
+    # Method 1: Check if we're already in the project root
+    current_dir = os.getcwd()
+    if os.path.exists(os.path.join(current_dir, 'backend', 'main.py')):
+        return current_dir
+    
+    # Method 2: Check if we're in a subdirectory of the project
+    current_path = Path(current_dir)
+    for parent in current_path.parents:
+        if os.path.exists(os.path.join(parent, 'backend', 'main.py')):
+            return str(parent)
+    
+    # Method 3: Check if we're running from within the backend directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(os.path.dirname(script_dir))
+    if os.path.exists(os.path.join(project_root, 'backend', 'main.py')):
+        return project_root
+    
+    # Method 4: Fallback - try to find the project by looking for key files
+    for root, dirs, files in os.walk(os.path.expanduser('~')):
+        if 'backend' in dirs and 'main.py' in os.listdir(os.path.join(root, 'backend')):
+            return root
+    
+    # Method 5: Fallback to original method
+    return get_project_root()
+
+
+def get_environment_paths():
+    """
+    Get environment-specific paths and configurations.
+    """
+    system_type = get_system_type()
+    project_root = get_dynamic_project_root()
+    
+    paths = {
+        'project_root': project_root,
+        'backend_dir': os.path.join(project_root, 'backend'),
+        'frontend_dir': os.path.join(project_root, 'frontend'),
+        'logs_dir': os.path.join(project_root, 'logs'),
+        'data_dir': os.path.join(project_root, 'backend', 'data'),
+        'supervisor_config': get_supervisor_config_path(),
+        'supervisorctl_path': get_supervisorctl_path(),
+        'system_type': system_type
+    }
+    
+    return paths 
