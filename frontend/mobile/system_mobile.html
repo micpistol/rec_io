@@ -644,7 +644,7 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({ 
-                        command: `supervisorctl -c backend/supervisord.conf restart ${scriptName}` 
+                        command: `supervisorctl restart ${scriptName}` 
                     })
                 });
                 

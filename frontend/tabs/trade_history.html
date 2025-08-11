@@ -605,10 +605,10 @@
           <td>${trade.side === 'Yes' || trade.side === 'Y' ? 'Y' : trade.side === 'No' || trade.side === 'N' ? 'N' : ''}</td>
           <td>${trade.prob !== null && trade.prob !== undefined && trade.prob !== '' ? (Number(trade.prob) / 100).toFixed(2) : ''}</td>
           <td>${plusSign(trade.diff)}</td>
-          <td>${trade.buy_price !== null ? (Number(trade.buy_price) / 100).toFixed(2) : ''}</td>
-          <td>${trade.sell_price !== null ? (Number(trade.sell_price) / 100).toFixed(2) : ''}</td>
+          <td>${trade.buy_price !== null ? Number(trade.buy_price).toFixed(2) : ''}</td>
+          <td>${trade.sell_price !== null ? Number(trade.sell_price).toFixed(2) : ''}</td>
           <td>${trade.position !== null ? trade.position : ''}</td>
-          <td>${trade.fees !== null ? (Number(trade.fees) / 100).toFixed(2) : ''}</td>
+          <td>${trade.fees !== null ? Number(trade.fees).toFixed(2) : ''}</td>
           <td>${trade.pnl !== null && trade.pnl !== undefined && trade.pnl !== '' ? Number(trade.pnl).toFixed(2) : ''}</td>
           <td>${trade.closed_at !== null ? trade.closed_at : ''}</td>
           <td>${trade.symbol_open !== null ? '$' + Math.round(trade.symbol_open).toLocaleString() : ''}</td>

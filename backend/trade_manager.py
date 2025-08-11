@@ -20,6 +20,7 @@ from backend.core.port_config import get_port, get_port_info
 from backend.util.paths import get_project_root, get_trade_history_dir, get_logs_dir, get_host, get_data_dir
 from backend.account_mode import get_account_mode
 from backend.util.paths import get_accounts_data_dir
+from backend.unified_production_coordinator import get_momentum_data_from_postgresql
 
 # Get port from centralized system
 TRADE_MANAGER_PORT = get_port("trade_manager")
@@ -187,9 +188,6 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
                     else:
                         diff_formatted = None
                     
-                    # Update trade status to open (this will also update PostgreSQL)
-                    update_trade_status(id, 'open')
-                    
                     # Get current symbol price for symbol_open (same as symbol_close logic)
                     symbol_open = None
                     try:
@@ -211,7 +209,7 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
                         log_event(ticket_id, f"MANAGER: Failed to get current symbol price from unified endpoint: {e}")
                         symbol_open = None
                     
-                    # Also update additional fields in PostgreSQL
+                    # Update additional fields in PostgreSQL BEFORE status change
                     try:
                         pg_conn = get_postgresql_connection()
                         if pg_conn:
@@ -253,9 +251,10 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
                     except Exception as pg_err:
                         print(f"❌ Failed to update trade additional fields in PostgreSQL: {pg_err}")
                     
+                    # Update trade status to open (this will also update PostgreSQL and notify ATS)
+                    update_trade_status(id, 'open')
+                    
                     log_event(ticket_id, f"MANAGER: OPEN TRADE CONFIRMED — pos={pos}, price={price}, fees={fees}, diff={diff_formatted}")
-                    notify_active_trade_supervisor_direct(id, ticket_id, "open")
-                    notify_frontend_trade_change()
                     # Notify strike table for display update (lowest priority)
                     notify_strike_table_trade_change(id, "open")
                     break

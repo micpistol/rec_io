@@ -229,9 +229,9 @@
           .map(p => `
             <tr>
               <td>${p.ticker}</td>
-              <td>${p.market_exposure && p.position !== 0 ? (p.market_exposure / p.position / 100).toFixed(2) : "0.00"}</td>
+              <td>${p.market_exposure && p.position !== 0 ? (p.market_exposure / p.position / 10000).toFixed(2) : "0.00"}</td>
               <td>${p.position}</td>
-              <td>${(p.fees_paid / 100).toFixed(2)}</td>
+              <td>${(p.fees_paid / 10000).toFixed(2)}</td>
               <td>${new Date(p.last_updated_ts).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
             </tr>
           `).join("");

@@ -3050,14 +3050,17 @@ async def execute_command(request: dict):
     try:
         import subprocess
         import os
-        from backend.util.paths import get_dynamic_project_root
+        from backend.util.paths import get_dynamic_project_root, get_supervisorctl_path, get_supervisor_config_path
         
         command = request.get("command", "")
         if not command:
             return {"success": False, "error": "No command provided"}
         
-        # Get dynamic project directory
+        # Get dynamic project directory and supervisor paths
         project_dir = get_dynamic_project_root()
+        supervisorctl_path = get_supervisorctl_path()
+        supervisor_config_path = get_supervisor_config_path()
+        
         os.chdir(project_dir)
         
         # Set up environment with proper PATH
@@ -3065,15 +3068,45 @@ async def execute_command(request: dict):
         # Add common paths for both macOS and Ubuntu
         env['PATH'] = '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin'
         
-        # Execute the command
-        result = subprocess.run(
-            command.split(),
-            capture_output=True,
-            text=True,
-            timeout=30,
-            env=env,
-            cwd=project_dir
-        )
+        # Check if this is a supervisorctl command
+        if command.startswith('supervisorctl'):
+            # Parse the supervisorctl command
+            parts = command.split()
+            if len(parts) >= 2:
+                action = parts[1]  # restart, status, etc.
+                if len(parts) >= 3:
+                    script_name = parts[2]  # script name
+                    # Execute with proper supervisor configuration
+                    result = subprocess.run(
+                        [supervisorctl_path, "-c", supervisor_config_path, action, script_name],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                        env=env,
+                        cwd=project_dir
+                    )
+                else:
+                    # No script name specified (e.g., "supervisorctl status")
+                    result = subprocess.run(
+                        [supervisorctl_path, "-c", supervisor_config_path, action],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                        env=env,
+                        cwd=project_dir
+                    )
+            else:
+                return {"success": False, "error": "Invalid supervisorctl command"}
+        else:
+            # Execute other commands normally
+            result = subprocess.run(
+                command.split(),
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env=env,
+                cwd=project_dir
+            )
         
         if result.returncode == 0:
             return {"success": True, "output": result.stdout}

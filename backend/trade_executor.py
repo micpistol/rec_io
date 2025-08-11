@@ -194,7 +194,21 @@ def trigger_trade():
             log_event(ticket_id, f"📥 RESPONSE BODY: {response.text}")
         except requests.exceptions.RequestException as e:
             log_event(ticket_id, f"❌ REQUEST FAILED: {type(e).__name__}: {str(e)}")
-            raise
+            # Handle timeout/network errors the same as 400+ errors
+            trade_id = data.get("id")
+            if trade_id:
+                status_payload = {"id": trade_id, "status": "error", "error_message": f"timeout: {str(e)}"}
+            else:
+                status_payload = {"ticket_id": ticket_id, "status": "error", "error_message": f"timeout: {str(e)}"}
+            manager_port = get_manager_port()
+            status_url = f"http://{get_host()}:{manager_port}/api/update_trade_status"
+            def notify_error():
+                try:
+                    resp = requests.post(status_url, json=status_payload, timeout=5)
+                except Exception as e:
+                    pass
+            threading.Thread(target=notify_error, daemon=True).start()
+            return jsonify({"status": "rejected", "error": f"timeout: {str(e)}"}), 500
 
         if response.status_code >= 400:
             log_event(ticket_id, f"❌ TRADE REJECTED - Status: {response.status_code}, Response: {response.text}")
