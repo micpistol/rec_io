@@ -190,19 +190,8 @@ ask_about_existing_data() {
         print_status "Found existing data package, will restore it"
         DATA_PACKAGE_FOUND=true
     else
-        print_status "No data package found"
-        print_status ""
-        print_status "TO UPLOAD YOUR EXISTING DATA:"
-        print_status "1. On your local machine, create data package:"
-        print_status "   ./scripts/package_user_data.sh"
-        print_status ""
-        print_status "2. Upload to this server:"
-        print_status "   scp -r backup/user_data_package_YYYYMMDD_HHMMSS root@$(hostname -I | awk '{print $1}'):/root/"
-        print_status ""
-        print_status "3. Then run this deployment again:"
-        print_status "   curl -sSL https://raw.githubusercontent.com/betaclone1/rec_io/main/scripts/one_click_deploy.sh | bash"
-        print_status ""
-        print_status "Starting deployment as NEW USER..."
+        print_status "No data package found - setting up as NEW USER"
+        print_status "After deployment, you can restore your data with: ./scripts/restore_user_data.sh"
         DATA_PACKAGE_FOUND=false
     fi
     
@@ -217,32 +206,10 @@ ask_about_existing_data() {
 setup_new_user() {
     print_status "Setting up new user..."
     
-    cd /opt/rec_io
-    
-    # Create basic user structure
-    mkdir -p backend/data/users/user_0001/credentials
-    mkdir -p backend/data/users/user_0001/preferences
-    
-    # Create basic .env file
-    cat > .env << EOF
-# PostgreSQL Connection Settings
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-POSTGRES_DB=rec_io_db
-POSTGRES_USER=rec_io_user
-POSTGRES_PASSWORD=
-
-# Trading System Configuration
-TRADING_SYSTEM_HOST=localhost
-REC_BIND_HOST=localhost
-REC_TARGET_HOST=localhost
-EOF
-    
-    # Set up database schema (skip for now - will be handled during data restoration)
-    print_status "Database schema will be set up during data restoration"
+    # Create basic user structure (will be done after repository is cloned)
+    print_status "User structure will be created after repository setup"
     
     print_success "New user setup completed"
-    print_status "Database schema created"
     print_status "You can add Kalshi credentials later to enable trading services"
 }
 
