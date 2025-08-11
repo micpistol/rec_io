@@ -179,28 +179,30 @@ generate_supervisor_config() {
     print_success "Supervisor configuration generated"
 }
 
-# Ask user about existing data
+# Check for existing data and handle deployment
 ask_about_existing_data() {
     echo ""
     print_status "REC.IO ONE-CLICK DEPLOYMENT"
     print_status ""
-    print_status "This will deploy the complete REC.IO trading system."
-    print_status ""
-    print_status "If you have existing data, upload it to this server first:"
-    print_status "  scp -r backup/user_data_package_YYYYMMDD_HHMMSS root@$(hostname -I | awk '{print $1}'):/root/"
-    print_status ""
-    print_status "Then run this deployment script again."
-    print_status ""
-    print_status "Starting deployment..."
-    echo ""
     
     # Check if there's a data package already uploaded
     if [ -d "/root/user_data_package_"* ] || [ -f "/root/user_data_package_"*.tar.gz ]; then
         print_status "Found existing data package, will restore it"
         DATA_PACKAGE_FOUND=true
     else
-        print_status "No data package found, setting up as new user"
-        print_status "After deployment, run: ./scripts/restore_user_data.sh to upload and restore your data"
+        print_status "No data package found"
+        print_status ""
+        print_status "TO UPLOAD YOUR EXISTING DATA:"
+        print_status "1. On your local machine, create data package:"
+        print_status "   ./scripts/package_user_data.sh"
+        print_status ""
+        print_status "2. Upload to this server:"
+        print_status "   scp -r backup/user_data_package_YYYYMMDD_HHMMSS root@$(hostname -I | awk '{print $1}'):/root/"
+        print_status ""
+        print_status "3. Then run this deployment again:"
+        print_status "   curl -sSL https://raw.githubusercontent.com/betaclone1/rec_io/main/scripts/one_click_deploy.sh | bash"
+        print_status ""
+        print_status "Starting deployment as NEW USER..."
         DATA_PACKAGE_FOUND=false
     fi
     
