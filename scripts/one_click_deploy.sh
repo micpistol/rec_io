@@ -242,15 +242,34 @@ restore_existing_data() {
     print_status "Restoring existing user data..."
     
     echo ""
-    print_status "Please provide the path to your data package:"
-    print_status "Options:"
-    print_status "  - Full path to package directory (e.g., /root/user_data_package_20250101_120000)"
-    print_status "  - Full path to compressed package (e.g., /root/user_data_package_20250101_120000.tar.gz)"
+    print_status "You need to upload your data package to this server first."
+    print_status ""
+    print_status "STEP 1: On your local machine, create the data package:"
+    print_status "  ./scripts/package_user_data.sh"
+    print_status ""
+    print_status "STEP 2: Upload the package to this server using one of these methods:"
+    print_status ""
+    print_status "Method A - Upload directory:"
+    print_status "  scp -r backup/user_data_package_YYYYMMDD_HHMMSS root@$(hostname -I | awk '{print $1}'):/root/"
+    print_status ""
+    print_status "Method B - Upload compressed file:"
+    print_status "  scp backup/user_data_package_YYYYMMDD_HHMMSS.tar.gz root@$(hostname -I | awk '{print $1}'):/root/"
+    print_status ""
+    print_status "STEP 3: Once uploaded, provide the path below:"
+    print_status "  - For directory: /root/user_data_package_YYYYMMDD_HHMMSS"
+    print_status "  - For compressed: /root/user_data_package_YYYYMMDD_HHMMSS.tar.gz"
     echo ""
-    read -p "Enter package path: " package_path
+    read -p "Enter package path (or press Enter to skip for now): " package_path
+    
+    if [ -z "$package_path" ]; then
+        print_warning "Skipping data restoration for now"
+        print_status "You can restore data later with: ./scripts/restore_user_data.sh"
+        return
+    fi
     
     if [ ! -e "$package_path" ]; then
         print_error "Package path not found: $package_path"
+        print_status "Please upload your data package first, then run this script again"
         exit 1
     fi
     
