@@ -20,35 +20,48 @@ This guide provides step-by-step instructions for deploying the REC.IO trading s
 - Git (for cloning the repository)
 - Supervisor (for process management)
 
-## Quick Deployment
+## Quick Deployment (Complete System Mirror)
 
-### 1. Clone and Setup
-
-```bash
-# Clone the repository
-git clone <repository-url> rec_io_20
-cd rec_io_20
-
-# Run the bootstrap script
-./scripts/bootstrap_venv.sh
-```
-
-### 2. Database Setup
+### 1. Create Complete Backup (Local Machine)
 
 ```bash
-# Setup database (creates user, database, and .env file)
-./scripts/setup_database.sh
-
-# Test database connectivity
-./scripts/test_database.sh
+# Create a complete backup of your local system
+./scripts/create_complete_backup.sh
 ```
 
-### 3. Start the System
+This creates a complete backup including:
+- Database with all data
+- Project files and code
+- User data and credentials
+- Environment configuration
+- Automated deployment script
+
+### 2. Upload to Server
 
 ```bash
-# Start all services
-./scripts/MASTER_RESTART.sh
+# Upload the backup to your server
+scp -r backup/complete_system_backup_YYYYMMDD_HHMMSS root@YOUR_SERVER_IP:/root/
 ```
+
+### 3. Deploy on Server
+
+```bash
+# SSH into your server
+ssh root@YOUR_SERVER_IP
+
+# Go to backup directory
+cd /root/complete_system_backup_YYYYMMDD_HHMMSS
+
+# Run the automated deployment
+./deploy.sh
+```
+
+### 4. Access Your System
+
+- **Web Interface**: `http://YOUR_SERVER_IP:3000`
+- **Health Check**: `http://YOUR_SERVER_IP:3000/health`
+
+**That's it!** Your complete system is now running on the remote server.
 
 ## Detailed Deployment Steps
 
