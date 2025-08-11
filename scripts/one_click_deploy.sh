@@ -182,15 +182,27 @@ generate_supervisor_config() {
 # Ask user about existing data
 ask_about_existing_data() {
     echo ""
-    print_status "Is this a new installation or do you have existing data?"
-    echo "1. New User - Fresh installation (no existing data)"
-    echo "2. Existing User - I have a data package to restore"
-    echo ""
-    print_status "For ONE-CLICK deployment, setting up as NEW USER"
-    print_status "After deployment, you can restore your data with: ./scripts/restore_user_data.sh"
+    print_status "Do you have existing data to upload?"
+    echo "1. No - Fresh installation (no existing data)"
+    echo "2. Yes - I have a data package to upload"
     echo ""
     
-    setup_new_user
+    # For curl | bash, we need to handle this differently
+    # We'll check if there's a data package already uploaded
+    if [ -d "/root/user_data_package_"* ] || [ -f "/root/user_data_package_"*.tar.gz ]; then
+        print_status "Found existing data package, will restore it"
+        DATA_PACKAGE_FOUND=true
+    else
+        print_status "No data package found, setting up as new user"
+        print_status "After deployment, run: ./scripts/restore_user_data.sh to upload and restore your data"
+        DATA_PACKAGE_FOUND=false
+    fi
+    
+    if [ "$DATA_PACKAGE_FOUND" = true ]; then
+        restore_existing_data_auto
+    else
+        setup_new_user
+    fi
 }
 
 # Setup new user
@@ -226,7 +238,34 @@ EOF
     print_status "You can add Kalshi credentials later to enable trading services"
 }
 
-# Restore existing data
+# Restore existing data automatically (for one-click deployment)
+restore_existing_data_auto() {
+    print_status "Automatically restoring existing user data..."
+    
+    # Find the data package
+    if [ -d "/root/user_data_package_"* ]; then
+        package_dir=$(find /root -name "user_data_package_*" -type d | head -1)
+        print_status "Found data package directory: $package_dir"
+    elif [ -f "/root/user_data_package_"*.tar.gz ]; then
+        package_path=$(find /root -name "user_data_package_*.tar.gz" | head -1)
+        print_status "Found compressed data package: $package_path"
+        
+        # Extract it
+        print_status "Extracting compressed package..."
+        tar -xzf "$package_path" -C /tmp/
+        package_dir=$(find /tmp -name "user_data_package_*" -type d | head -1)
+    else
+        print_error "No data package found"
+        exit 1
+    fi
+    
+    # Store the package path for later restoration
+    echo "$package_dir" > /tmp/data_package_path
+    
+    print_success "Data package found and ready for restoration"
+}
+
+# Restore existing data (interactive version)
 restore_existing_data() {
     print_status "Restoring existing user data..."
     
@@ -359,6 +398,88 @@ restore_existing_data() {
     print_status "Database schema verified"
 }
 
+# Restore data from a specific package (for one-click deployment)
+restore_data_from_package() {
+    local package_dir="$1"
+    print_status "Restoring data from package: $package_dir"
+    
+    cd /opt/rec_io
+    
+    # Restore database
+    if [ -f "$package_dir/database_backup.sql" ]; then
+        print_status "Restoring database..."
+        
+        # Load environment variables from the package
+        if [ -f "$package_dir/.env" ]; then
+            source "$package_dir/.env"
+        fi
+        
+        # Set PostgreSQL password if available
+        if [ -n "$POSTGRES_PASSWORD" ]; then
+            export PGPASSWORD="$POSTGRES_PASSWORD"
+        fi
+        
+        # Try multiple restoration methods
+        print_status "Attempting database restoration..."
+        
+        # Method 1: Try with user credentials
+        if psql -h localhost -U rec_io_user -d postgres < "$package_dir/database_backup.sql" 2>/dev/null; then
+            print_success "Database restored successfully"
+        else
+            print_warning "Method 1 failed, trying as postgres superuser..."
+            
+            # Method 2: Try as postgres superuser
+            if sudo -u postgres psql < "$package_dir/database_backup.sql" 2>/dev/null; then
+                print_success "Database restored successfully (as postgres user)"
+            else
+                print_warning "Method 2 failed, trying to fix user permissions..."
+                
+                # Method 3: Fix user and try again
+                sudo -u postgres psql -c "ALTER USER rec_io_user WITH PASSWORD NULL;" 2>/dev/null || true
+                sudo -u postgres psql -c "ALTER USER rec_io_user CREATEDB;" 2>/dev/null || true
+                
+                if psql -h localhost -U rec_io_user -d postgres < "$package_dir/database_backup.sql" 2>/dev/null; then
+                    print_success "Database restored successfully (after fixing permissions)"
+                else
+                    print_error "Database restoration failed - but continuing with setup"
+                    print_status "You may need to manually restore the database later"
+                fi
+            fi
+        fi
+    else
+        print_warning "No database backup found"
+    fi
+    
+    # Restore user data
+    if [ -d "$package_dir/user_data" ]; then
+        print_status "Restoring user data..."
+        mkdir -p backend/data
+        cp -r "$package_dir/user_data"/* backend/data/
+        print_success "User data restored"
+    else
+        print_warning "No user data found"
+    fi
+    
+    # Restore .env file
+    if [ -f "$package_dir/.env" ]; then
+        print_status "Restoring environment configuration..."
+        cp "$package_dir/.env" .
+        print_success "Environment configuration restored"
+    else
+        print_warning "No .env file found"
+    fi
+    
+    # Set up database schema (in case it's missing)
+    print_status "Verifying database schema..."
+    if [ -f "scripts/setup_database.sh" ]; then
+        ./scripts/setup_database.sh
+    else
+        print_warning "Database setup script not found, schema may need manual setup"
+    fi
+    
+    print_success "Data restoration completed"
+}
+
 # Start core services
 start_core_services() {
     print_status "Starting core services..."
@@ -422,6 +543,15 @@ deploy_system() {
     setup_postgresql
     clone_repository
     setup_python
+    
+    # Restore data if package was found
+    if [ -f "/tmp/data_package_path" ]; then
+        package_dir=$(cat /tmp/data_package_path)
+        print_status "Restoring data from: $package_dir"
+        restore_data_from_package "$package_dir"
+        rm -f /tmp/data_package_path
+    fi
+    
     generate_supervisor_config
     start_core_services
     show_next_steps
