@@ -62,8 +62,7 @@ class ConfigManager:
                             print(f"⚠️  Warning: Invalid port for agent '{agent_name}', using default...")
                             agent_config["port"] = self._get_default_port(agent_name)
             
-            # Save validated config
-            self.save()
+            # Config validation complete (no auto-save to preserve portability)
             
         except Exception as e:
             print(f"❌ Error validating configuration: {e}")

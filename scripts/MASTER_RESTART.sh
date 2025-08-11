@@ -49,6 +49,7 @@ fi
 # Set environment variables for supervisor
 export PROJECT_ROOT="$PROJECT_ROOT"
 export VENV_PATH="$VENV_PATH"
+export TRADING_SYSTEM_HOST="localhost"
 
 # Port assignments from MASTER_PORT_MANIFEST.json
 PORTS=(3000 4000 6000 8001 8002 8003 8004 8005 8008)

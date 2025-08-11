@@ -58,6 +58,9 @@ backend/api/kalshi-api/kalshi-credentials/
 *.pem
 .env
 
+# Local configuration overrides
+backend/core/config/config.local.json
+
 # Log and debug files
 *.sqlite3
 backend/api/coinbase-api/coinbase-btc/data/btc_logger_heartbeat.txt

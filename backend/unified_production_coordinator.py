@@ -23,7 +23,8 @@ from enum import Enum
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.core.port_config import get_port, get_service_url
-from backend.util.paths import get_data_dir, get_kalshi_data_dir, get_price_history_dir, get_host
+from backend.util.paths import get_data_dir, get_kalshi_data_dir, get_price_history_dir
+from backend.core.config.config_manager import config
 from backend.util.probability_calculator import generate_btc_live_probabilities_json
 
 # PostgreSQL connection parameters
@@ -535,7 +536,7 @@ class UnifiedProductionCoordinator:
         
         # Cache main app URL for broadcasting (performance optimization)
         port = get_port("main_app")
-        host = get_host()
+        host = config.get('runtime.target_host', '127.0.0.1')
         self._main_app_url = f"http://{host}:{port}"
     
     def _broadcast_fingerprint_display(self):
