@@ -187,37 +187,21 @@ ask_about_existing_data() {
     echo "2. Existing User - I have a data package to restore"
     echo ""
     
-    # Check if we're running via curl | bash (non-interactive)
-    if [ -t 0 ]; then
-        # Interactive mode - we can read input
-        read -p "Enter your choice (1 or 2): " choice
-        
-        case $choice in
-            1)
-                setup_new_user
-                ;;
-            2)
-                restore_existing_data
-                ;;
-            *)
-                print_error "Invalid choice. Please run the script again."
-                exit 1
-                ;;
-        esac
-    else
-        # Non-interactive mode (curl | bash)
-        print_status "Running in non-interactive mode"
-        print_status "To restore existing data, run this script directly:"
-        print_status "  wget https://raw.githubusercontent.com/betaclone1/rec_io/main/scripts/one_click_deploy.sh"
-        print_status "  chmod +x one_click_deploy.sh"
-        print_status "  ./one_click_deploy.sh"
-        echo ""
-        print_status "For now, setting up as NEW USER"
-        print_status "After deployment, run: ./scripts/restore_user_data.sh to restore your data"
-        echo ""
-        
-        setup_new_user
-    fi
+    # Always try to read input, regardless of mode
+    read -p "Enter your choice (1 or 2): " choice
+    
+    case $choice in
+        1)
+            setup_new_user
+            ;;
+        2)
+            restore_existing_data
+            ;;
+        *)
+            print_error "Invalid choice. Please run the script again."
+            exit 1
+            ;;
+    esac
 }
 
 # Setup new user
@@ -245,13 +229,8 @@ REC_BIND_HOST=localhost
 REC_TARGET_HOST=localhost
 EOF
     
-    # Set up database schema
-    print_status "Setting up database schema..."
-    if [ -f "scripts/setup_database.sh" ]; then
-        ./scripts/setup_database.sh
-    else
-        print_warning "Database setup script not found, schema may need manual setup"
-    fi
+    # Set up database schema (skip for now - will be handled during data restoration)
+    print_status "Database schema will be set up during data restoration"
     
     print_success "New user setup completed"
     print_status "Database schema created"
@@ -425,13 +404,13 @@ deploy_system() {
     echo ""
 
     check_root
+    ask_about_existing_data
     configure_package_manager
     update_system
     install_dependencies
     setup_postgresql
     clone_repository
     setup_python
-    ask_about_existing_data
     generate_supervisor_config
     start_core_services
     show_next_steps
