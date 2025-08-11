@@ -105,7 +105,8 @@ setup_postgresql() {
     sudo -u postgres psql -c "CREATE DATABASE rec_io_db;" 2>/dev/null || print_warning "Database may already exist"
     sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE rec_io_db TO rec_io_user;" 2>/dev/null || print_warning "Privileges may already be granted"
     
-    print_success "PostgreSQL setup completed"
+    print_success "PostgreSQL basic setup completed"
+    print_status "Database schema and data will be set up after user data is configured"
 }
 
 # Clone repository
@@ -205,7 +206,16 @@ REC_BIND_HOST=localhost
 REC_TARGET_HOST=localhost
 EOF
     
+    # Set up database schema
+    print_status "Setting up database schema..."
+    if [ -f "scripts/setup_database.sh" ]; then
+        ./scripts/setup_database.sh
+    else
+        print_warning "Database setup script not found, schema may need manual setup"
+    fi
+    
     print_success "New user setup completed"
+    print_status "Database schema created"
     print_status "You can add Kalshi credentials later to enable trading services"
 }
 
@@ -279,7 +289,16 @@ restore_existing_data() {
         rm -rf "$package_dir"
     fi
     
+    # Set up database schema (in case it's missing)
+    print_status "Verifying database schema..."
+    if [ -f "scripts/setup_database.sh" ]; then
+        ./scripts/setup_database.sh
+    else
+        print_warning "Database setup script not found, schema may need manual setup"
+    fi
+    
     print_success "Existing data restored successfully"
+    print_status "Database schema verified"
 }
 
 # Start core services
@@ -288,16 +307,14 @@ start_core_services() {
     
     cd /opt/rec_io
     
-    # Start supervisor
+    # Start supervisor (but don't start any programs yet)
     supervisord -c backend/supervisord.conf
     
-    # Wait for services to start
-    sleep 5
+    # Wait for supervisor to start
+    sleep 3
     
-    # Check status
-    supervisorctl -c backend/supervisord.conf status
-    
-    print_success "Core services started"
+    print_success "Supervisor started (no services running yet)"
+    print_status "Services will be started manually after database setup and credential configuration"
 }
 
 # Provide next steps
@@ -307,20 +324,21 @@ show_next_steps() {
     echo ""
     print_status "System Information:"
     print_status "  Installation Directory: /opt/rec_io"
-    print_status "  Web Interface: http://$(hostname -I | awk '{print $1}'):3000"
-    print_status "  Health Check: http://$(hostname -I | awk '{print $1}'):3000/health"
+    print_status "  Supervisor: Running (no services started yet)"
     echo ""
     print_status "Next Steps:"
-    print_status "  1. Access the web interface to verify it's working"
-    print_status "  2. If you want to enable trading services:"
-    print_status "     - Add Kalshi credentials to /opt/rec_io/backend/data/users/user_0001/credentials/"
-    print_status "     - Start trading services: supervisorctl -c backend/supervisord.conf start active_trade_supervisor kalshi_account_sync"
+    print_status "  1. Set up database and credentials:"
+    print_status "     - For new users: Add Kalshi credentials to /opt/rec_io/backend/data/users/user_0001/credentials/"
+    print_status "     - For existing users: Verify credentials are in place"
+    print_status "  2. Start the system:"
+    print_status "     - Run: cd /opt/rec_io && ./scripts/MASTER_RESTART.sh"
+    print_status "     - This will start all services with proper database and credentials"
     echo ""
     print_status "Useful Commands:"
     print_status "  Check status: supervisorctl -c backend/supervisord.conf status"
-    print_status "  View logs: tail -f /opt/rec_io/logs/*.out.log"
-    print_status "  Restart: cd /opt/rec_io && ./scripts/MASTER_RESTART.sh"
+    print_status "  Start all services: cd /opt/rec_io && ./scripts/MASTER_RESTART.sh"
     print_status "  Test DB: cd /opt/rec_io && ./scripts/test_database.sh"
+    print_status "  View logs: tail -f /opt/rec_io/logs/*.out.log"
 }
 
 # Main deployment function
@@ -336,8 +354,8 @@ deploy_system() {
     setup_postgresql
     clone_repository
     setup_python
-    generate_supervisor_config
     ask_about_existing_data
+    generate_supervisor_config
     start_core_services
     show_next_steps
 }
