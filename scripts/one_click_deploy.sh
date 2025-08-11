@@ -49,18 +49,46 @@ check_root() {
     fi
 }
 
+# Configure package manager to avoid interactive prompts
+configure_package_manager() {
+    print_status "Configuring package manager for non-interactive installation..."
+    
+    # Set environment variables for non-interactive installation
+    export DEBIAN_FRONTEND=noninteractive
+    export DEBCONF_NONINTERACTIVE_SEEN=true
+    
+    # Configure any pending package configurations
+    dpkg --configure -a
+    
+    print_success "Package manager configured"
+}
+
 # Update system packages
 update_system() {
     print_status "Updating system packages..."
+    
+    # Configure debconf to avoid interactive prompts
+    export DEBIAN_FRONTEND=noninteractive
+    export DEBCONF_NONINTERACTIVE_SEEN=true
+    
+    # Pre-configure packages to avoid SSH config prompts
+    echo "openssh-server openssh-server/sshd_config_keep_local boolean true" | debconf-set-selections
+    echo "openssh-server openssh-server/sshd_config_install boolean false" | debconf-set-selections
+    
     apt update -y
-    apt upgrade -y
+    apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
     print_success "System packages updated"
 }
 
 # Install dependencies
 install_dependencies() {
     print_status "Installing system dependencies..."
-    apt install -y python3 python3-pip python3-venv postgresql postgresql-client supervisor git curl wget rsync
+    
+    # Configure debconf to avoid interactive prompts
+    export DEBIAN_FRONTEND=noninteractive
+    export DEBCONF_NONINTERACTIVE_SEEN=true
+    
+    apt install -y python3 python3-pip python3-venv postgresql postgresql-client supervisor git curl wget rsync -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
     print_success "Dependencies installed"
 }
 
@@ -300,8 +328,9 @@ deploy_system() {
     print_header
     print_status "Starting REC.IO one-click deployment..."
     echo ""
-    
+
     check_root
+    configure_package_manager
     update_system
     install_dependencies
     setup_postgresql
