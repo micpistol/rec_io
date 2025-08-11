@@ -20,14 +20,8 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration - Use portable paths
-SCRIPT_DIR="$(pwd)"
-# If we're in the project root, use current directory
-# If we're in the scripts directory, go up one level
-if [ -f "scripts/MASTER_RESTART.sh" ]; then
-    PROJECT_ROOT="$(pwd)"
-else
-    PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-fi
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SUPERVISOR_CONFIG="$PROJECT_ROOT/backend/supervisord.conf"
 SUPERVISOR_SOCKET="/tmp/supervisord.sock"
 SUPERVISOR_PID="/tmp/supervisord.pid"
@@ -292,6 +286,12 @@ check_external_connections() {
 master_restart() {
     print_header
     print_status "Initiating MASTER RESTART sequence..."
+    echo ""
+    
+    # Create logs directory if it doesn't exist
+    print_status "Ensuring logs directory exists..."
+    mkdir -p "$PROJECT_ROOT/logs"
+    print_success "Logs directory ready"
     echo ""
     
     # Check for external connections first

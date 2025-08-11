@@ -20,26 +20,25 @@ from backend.util.paths import get_project_root, get_data_dir
 
 
 def safe_write_json(data: dict, filepath: str, timeout: float = 0.1):
-    """Write JSON data with file locking to prevent race conditions"""
+    """Write JSON data with atomic file operations for better performance"""
     try:
-        with open(filepath, 'w') as f:
-            # Try to acquire a lock with timeout
-            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            try:
-                json.dump(data, f, indent=2)
-            finally:
-                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        # Create temporary file in same directory for atomic write
+        temp_filepath = filepath + '.tmp'
+        with open(temp_filepath, 'w') as f:
+            json.dump(data, f, indent=2)
+        
+        # Atomic rename operation
+        os.replace(temp_filepath, filepath)
         return True
-    except (IOError, OSError) as e:
-        # If locking fails, fall back to normal write (rare)
-        print(f"Warning: File locking failed for {filepath}: {e}")
+    except Exception as write_error:
+        # Clean up temp file if it exists
         try:
-            with open(filepath, 'w') as f:
-                json.dump(data, f, indent=2)
-            return True
-        except Exception as write_error:
-            print(f"Error writing JSON to {filepath}: {write_error}")
-            return False
+            if os.path.exists(temp_filepath):
+                os.remove(temp_filepath)
+        except:
+            pass
+        print(f"Error writing JSON to {filepath}: {write_error}")
+        return False
 
 
 class ProbabilityCalculator:
@@ -198,15 +197,19 @@ class ProbabilityCalculator:
         return int(round(momentum_score * 100))
     
     def _switch_to_momentum_fingerprint(self, momentum_score: float):
-        """Switch to the appropriate momentum fingerprint based on score."""
+        """Switch to the appropriate momentum fingerprint based on score with caching."""
         momentum_bucket = self._get_momentum_bucket(momentum_score)
         available_buckets = list(self.momentum_fingerprints.keys())
         if not available_buckets:
             raise RuntimeError("No momentum fingerprints available! The system cannot operate.")
         # Find the closest available bucket
         closest_bucket = min(available_buckets, key=lambda x: abs(x - momentum_bucket))
+        
+        # Return early if already using the correct bucket (caching optimization)
         if self.current_momentum_bucket == closest_bucket:
             return
+            
+        # Switch to new fingerprint (only happens when momentum changes significantly)
         fingerprint_data = self.momentum_fingerprints[closest_bucket]
         self.ttc_values = fingerprint_data['ttc_values']
         self.positive_move_percentages = fingerprint_data['positive_move_percentages']

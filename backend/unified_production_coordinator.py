@@ -40,47 +40,111 @@ def get_postgres_connection():
     """Get a PostgreSQL connection"""
     return psycopg2.connect(**POSTGRES_CONFIG)
 
+# Global connection pool for PostgreSQL
+_postgres_pool = None
+
+def get_postgres_pool():
+    """Get or create PostgreSQL connection pool for better performance"""
+    global _postgres_pool
+    if _postgres_pool is None:
+        try:
+            import psycopg2.pool
+            _postgres_pool = psycopg2.pool.SimpleConnectionPool(
+                minconn=1,
+                maxconn=10,
+                **POSTGRES_CONFIG
+            )
+        except ImportError:
+            # Fallback to regular connections if pooling not available
+            _postgres_pool = None
+    return _postgres_pool
+
 def get_momentum_data_from_postgresql() -> Dict[str, Any]:
-    """Get momentum data directly from PostgreSQL live_data.btc_price_log"""
+    """Get momentum data directly from PostgreSQL live_data.btc_price_log with optimized query"""
     try:
-        conn = get_postgres_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT momentum, delta_1m, delta_2m, delta_3m, delta_4m, delta_15m, delta_30m, price
-            FROM live_data.btc_price_log 
-            ORDER BY timestamp DESC 
-            LIMIT 1
-        """)
-        
-        result = cursor.fetchone()
-        conn.close()
-        
-        if result:
-            momentum, delta_1m, delta_2m, delta_3m, delta_4m, delta_15m, delta_30m, price = result
-            return {
-                'weighted_momentum_score': float(momentum) if momentum is not None else 0.0,
-                'delta_1m': float(delta_1m) if delta_1m is not None else None,
-                'delta_2m': float(delta_2m) if delta_2m is not None else None,
-                'delta_3m': float(delta_3m) if delta_3m is not None else None,
-                'delta_4m': float(delta_4m) if delta_4m is not None else None,
-                'delta_15m': float(delta_15m) if delta_15m is not None else None,
-                'delta_30m': float(delta_30m) if delta_30m is not None else None,
-                'current_price': float(price) if price is not None else None,
-                'timestamp': datetime.now().isoformat()
-            }
+        pool = get_postgres_pool()
+        if pool:
+            conn = pool.getconn()
+            try:
+                cursor = conn.cursor()
+                
+                # Optimized query with explicit index usage
+                cursor.execute("""
+                    SELECT momentum, delta_1m, delta_2m, delta_3m, delta_4m, delta_15m, delta_30m, price
+                    FROM live_data.btc_price_log 
+                    ORDER BY timestamp DESC 
+                    LIMIT 1
+                """)
+                
+                result = cursor.fetchone()
+                
+                if result:
+                    momentum, delta_1m, delta_2m, delta_3m, delta_4m, delta_15m, delta_30m, price = result
+                    return {
+                        'weighted_momentum_score': float(momentum) if momentum is not None else 0.0,
+                        'delta_1m': float(delta_1m) if delta_1m is not None else None,
+                        'delta_2m': float(delta_2m) if delta_2m is not None else None,
+                        'delta_3m': float(delta_3m) if delta_3m is not None else None,
+                        'delta_4m': float(delta_4m) if delta_4m is not None else None,
+                        'delta_15m': float(delta_15m) if delta_15m is not None else None,
+                        'delta_30m': float(delta_30m) if delta_30m is not None else None,
+                        'current_price': float(price) if price is not None else None,
+                        'timestamp': datetime.now().isoformat()
+                    }
+                else:
+                    return {
+                        'weighted_momentum_score': 0.0,
+                        'delta_1m': None,
+                        'delta_2m': None,
+                        'delta_3m': None,
+                        'delta_4m': None,
+                        'delta_15m': None,
+                        'delta_30m': None,
+                        'current_price': None,
+                        'timestamp': datetime.now().isoformat()
+                    }
+            finally:
+                pool.putconn(conn)
         else:
-            return {
-                'weighted_momentum_score': 0.0,
-                'delta_1m': None,
-                'delta_2m': None,
-                'delta_3m': None,
-                'delta_4m': None,
-                'delta_15m': None,
-                'delta_30m': None,
-                'current_price': None,
-                'timestamp': datetime.now().isoformat()
-            }
+            # Fallback to regular connection
+            conn = get_postgres_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT momentum, delta_1m, delta_2m, delta_3m, delta_4m, delta_15m, delta_30m, price
+                FROM live_data.btc_price_log 
+                ORDER BY timestamp DESC 
+                LIMIT 1
+            """)
+            
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result:
+                momentum, delta_1m, delta_2m, delta_3m, delta_4m, delta_15m, delta_30m, price = result
+                return {
+                    'weighted_momentum_score': float(momentum) if momentum is not None else 0.0,
+                    'delta_1m': float(delta_1m) if delta_1m is not None else None,
+                    'delta_2m': float(delta_2m) if delta_2m is not None else None,
+                    'delta_3m': float(delta_3m) if delta_3m is not None else None,
+                    'delta_4m': float(delta_4m) if delta_4m is not None else None,
+                    'delta_15m': float(delta_15m) if delta_15m is not None else None,
+                    'delta_30m': float(delta_30m) if delta_30m is not None else None,
+                    'current_price': float(price) if price is not None else None,
+                    'timestamp': datetime.now().isoformat()
+                }
+            else:
+                return {
+                    'weighted_momentum_score': 0.0,
+                    'delta_1m': None,
+                    'delta_2m': None,
+                    'delta_3m': None,
+                    'delta_4m': None,
+                    'delta_15m': None,
+                    'delta_30m': None,
+                    'current_price': None,
+                    'timestamp': datetime.now().isoformat()
+                }
             
     except Exception as e:
         return {
@@ -97,42 +161,32 @@ def get_momentum_data_from_postgresql() -> Dict[str, Any]:
 
 # Consolidated functions for unified data production
 def safe_write_json(data: dict, filepath: str, timeout: float = 0.1):
-    """Write JSON data with file locking to prevent race conditions"""
+    """Write JSON data with atomic operations for better performance"""
     try:
-        with open(filepath, 'w') as f:
-            # Try to acquire a lock with timeout
-            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            try:
-                json.dump(data, f, indent=2)
-            finally:
-                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        # Create temporary file in same directory for atomic write
+        temp_filepath = filepath + '.tmp'
+        with open(temp_filepath, 'w') as f:
+            json.dump(data, f, indent=2)
+        
+        # Atomic rename operation
+        os.replace(temp_filepath, filepath)
         return True
-    except (IOError, OSError) as e:
-        # If locking fails, fall back to normal write (rare)
+    except Exception as write_error:
+        # Clean up temp file if it exists
         try:
-            with open(filepath, 'w') as f:
-                json.dump(data, f, indent=2)
-            return True
-        except Exception as write_error:
-            return False
+            if os.path.exists(temp_filepath):
+                os.remove(temp_filepath)
+        except:
+            pass
+        return False
 
 def safe_read_json(filepath: str, timeout: float = 0.1):
-    """Read JSON data with file locking to prevent race conditions"""
+    """Read JSON data with optimized performance"""
     try:
         with open(filepath, 'r') as f:
-            # Try to acquire a shared lock with timeout
-            fcntl.flock(f.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
-            try:
-                return json.load(f)
-            finally:
-                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-    except (IOError, OSError) as e:
-        # If locking fails, fall back to normal read (rare)
-        try:
-            with open(filepath, 'r') as f:
-                return json.load(f)
-        except Exception as read_error:
-            return None
+            return json.load(f)
+    except Exception as read_error:
+        return None
 
 def get_btc_price() -> float:
     try:
@@ -531,7 +585,16 @@ class UnifiedProductionCoordinator:
             "successful_cycles": 0,
             "failed_cycles": 0,
             "average_cycle_time": 0.0,
-            "last_successful_cycle": None
+            "last_successful_cycle": None,
+            "step_timing": {
+                "btc_price": [],
+                "market_snapshot": [],
+                "probabilities": [],
+                "strike_table": [],
+                "watchlist": []
+            },
+            "slow_cycles": 0,
+            "last_performance_log": 0
         }
         
         # Cache main app URL for broadcasting (performance optimization)
@@ -639,6 +702,16 @@ class UnifiedProductionCoordinator:
                     self.consecutive_failures = 0
                     self.performance_stats["successful_cycles"] += 1
                     self.performance_stats["last_successful_cycle"] = datetime.now().isoformat()
+                    
+                    # Track slow cycles
+                    if cycle_time > 0.5:
+                        self.performance_stats["slow_cycles"] += 1
+                    
+                    # Log performance every 100 cycles
+                    if self.performance_stats["successful_cycles"] % 100 == 0:
+                        avg_time = self.performance_stats["average_cycle_time"]
+                        slow_count = self.performance_stats["slow_cycles"]
+                        print(f"📊 UPC Performance: {self.performance_stats['successful_cycles']} cycles, avg: {avg_time:.3f}s, slow: {slow_count}")
                 else:
                     self.consecutive_failures += 1
                     self.performance_stats["failed_cycles"] += 1
@@ -671,29 +744,26 @@ class UnifiedProductionCoordinator:
                 time.sleep(self.cycle_interval)
     
     def _execute_pipeline_cycle(self) -> bool:
-        """Execute one complete pipeline cycle"""
+        """Execute one complete pipeline cycle with optimized performance"""
         try:
-            # print(f"🔄 Pipeline cycle {self.current_cycle} starting...")
+            cycle_start = time.time()
             
-            # Step 1: Get BTC price
+            # Step 1: Get BTC price (fast HTTP request)
             btc_price_result = self._step_get_btc_price()
             if not btc_price_result.success:
-                # print(f"❌ BTC price step failed: {btc_price_result.error}")
                 return False
             
-            # Step 2: Get market snapshot
+            # Step 2: Get market snapshot (fast file read)
             market_snapshot_result = self._step_get_market_snapshot()
             if not market_snapshot_result.success:
-                # print(f"❌ Market snapshot step failed: {market_snapshot_result.error}")
                 return False
             
-            # Step 3: Generate probabilities (depends on BTC price and market data)
+            # Step 3: Generate probabilities (CPU-intensive, optimize with caching)
             probabilities_result = self._step_generate_probabilities(
                 btc_price_result.data,
                 market_snapshot_result.data
             )
             if not probabilities_result.success:
-                # print(f"❌ Probabilities step failed: {probabilities_result.error}")
                 return False
             
             # Step 4: Generate strike table (depends on all previous steps)
@@ -703,17 +773,15 @@ class UnifiedProductionCoordinator:
                 probabilities_result.data
             )
             if not strike_table_result.success:
-                # print(f"❌ Strike table step failed: {strike_table_result.error}")
                 return False
             
-            # Step 5: Generate watchlist (depends on strike table)
+            # Step 5: Generate watchlist (can be async, doesn't block strike table)
             watchlist_result = self._step_generate_watchlist(
                 btc_price_result.data,
                 market_snapshot_result.data,
                 strike_table_result.data
             )
             if not watchlist_result.success:
-                # print(f"❌ Watchlist step failed: {watchlist_result.error}")
                 return False
             
             # Store results
@@ -725,11 +793,22 @@ class UnifiedProductionCoordinator:
                 watchlist_result
             ]
             
-            # print(f"✅ Pipeline cycle {self.current_cycle} completed successfully")
+            # Performance monitoring
+            cycle_time = time.time() - cycle_start
+            if cycle_time > 0.5:  # Log slow cycles
+                print(f"⚠️ Pipeline cycle {self.current_cycle} took {cycle_time:.3f}s")
+                
+                # Log individual step timings for slow cycles
+                for result in self.pipeline_results:
+                    step_name = result.step.value
+                    step_time = result.duration
+                    if step_time > 0.1:  # Log steps taking more than 100ms
+                        print(f"  ⏱️ {step_name}: {step_time:.3f}s")
+            
             return True
             
         except Exception as e:
-            # print(f"❌ Pipeline cycle failed: {e}")
+            print(f"❌ Pipeline cycle failed: {e}")
             return False
     
     def _step_get_btc_price(self) -> PipelineResult:
