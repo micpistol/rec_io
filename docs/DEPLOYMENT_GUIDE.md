@@ -20,43 +20,43 @@ This guide provides step-by-step instructions for deploying the REC.IO trading s
 - Git (for cloning the repository)
 - Supervisor (for process management)
 
-## Quick Deployment (Complete System Mirror)
+## Quick Deployment (One Command)
 
-### 1. Create Complete Backup (Local Machine)
-
-```bash
-# Create a complete backup of your local system
-./scripts/create_complete_backup.sh
-```
-
-This creates a complete backup including:
-- Database with all data
-- Project files and code
-- User data and credentials
-- Environment configuration
-- Automated deployment script
-
-### 2. Upload to Server
+### For New Users
 
 ```bash
-# Upload the backup to your server
-scp -r backup/complete_system_backup_YYYYMMDD_HHMMSS root@YOUR_SERVER_IP:/root/
+# One command on any new server
+curl -sSL https://raw.githubusercontent.com/betaclone1/rec_io/main/scripts/one_click_deploy.sh | bash
 ```
 
-### 3. Deploy on Server
+### For Existing Users
+
+#### 1. Package Your Data (Local Machine)
 
 ```bash
-# SSH into your server
-ssh root@YOUR_SERVER_IP
-
-# Go to backup directory
-cd /root/complete_system_backup_YYYYMMDD_HHMMSS
-
-# Run the automated deployment
-./deploy.sh
+# Package your database and credentials
+./scripts/package_user_data.sh
 ```
 
-### 4. Access Your System
+#### 2. Upload Package to Server
+
+```bash
+# Upload the package to your server
+scp -r backup/user_data_package_YYYYMMDD_HHMMSS root@YOUR_SERVER_IP:/root/
+```
+
+#### 3. Deploy with Data Restoration
+
+```bash
+# One command on your new server
+curl -sSL https://raw.githubusercontent.com/betaclone1/rec_io/main/scripts/one_click_deploy.sh | bash
+
+# When prompted:
+# - Choose "Existing User"
+# - Provide the package path: /root/user_data_package_YYYYMMDD_HHMMSS
+```
+
+### Access Your System
 
 - **Web Interface**: `http://YOUR_SERVER_IP:3000`
 - **Health Check**: `http://YOUR_SERVER_IP:3000/health`
