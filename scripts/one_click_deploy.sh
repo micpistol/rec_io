@@ -182,13 +182,19 @@ generate_supervisor_config() {
 # Ask user about existing data
 ask_about_existing_data() {
     echo ""
-    print_status "Do you have existing data to upload?"
-    echo "1. No - Fresh installation (no existing data)"
-    echo "2. Yes - I have a data package to upload"
+    print_status "REC.IO ONE-CLICK DEPLOYMENT"
+    print_status ""
+    print_status "This will deploy the complete REC.IO trading system."
+    print_status ""
+    print_status "If you have existing data, upload it to this server first:"
+    print_status "  scp -r backup/user_data_package_YYYYMMDD_HHMMSS root@$(hostname -I | awk '{print $1}'):/root/"
+    print_status ""
+    print_status "Then run this deployment script again."
+    print_status ""
+    print_status "Starting deployment..."
     echo ""
     
-    # For curl | bash, we need to handle this differently
-    # We'll check if there's a data package already uploaded
+    # Check if there's a data package already uploaded
     if [ -d "/root/user_data_package_"* ] || [ -f "/root/user_data_package_"*.tar.gz ]; then
         print_status "Found existing data package, will restore it"
         DATA_PACKAGE_FOUND=true
