@@ -186,22 +186,11 @@ ask_about_existing_data() {
     echo "1. New User - Fresh installation (no existing data)"
     echo "2. Existing User - I have a data package to restore"
     echo ""
+    print_status "For ONE-CLICK deployment, setting up as NEW USER"
+    print_status "After deployment, you can restore your data with: ./scripts/restore_user_data.sh"
+    echo ""
     
-    # Always try to read input, regardless of mode
-    read -p "Enter your choice (1 or 2): " choice
-    
-    case $choice in
-        1)
-            setup_new_user
-            ;;
-        2)
-            restore_existing_data
-            ;;
-        *)
-            print_error "Invalid choice. Please run the script again."
-            exit 1
-            ;;
-    esac
+    setup_new_user
 }
 
 # Setup new user
@@ -396,19 +385,22 @@ show_next_steps() {
     print_status "  Supervisor: Running (no services started yet)"
     echo ""
     print_status "Next Steps:"
-    print_status "  1. Start the system:"
+    print_status "  1. If you have existing data to restore:"
+    print_status "     - Run: cd /opt/rec_io && ./scripts/restore_user_data.sh"
+    print_status "     - This will walk you through uploading and restoring your data"
+    print_status "  2. Start the system:"
     print_status "     - Run: cd /opt/rec_io && ./scripts/MASTER_RESTART.sh"
     print_status "     - This will start all services with proper database and credentials"
-    print_status "  2. Verify everything is working:"
+    print_status "  3. Verify everything is working:"
     print_status "     - Check web interface: http://$(hostname -I | awk '{print $1}'):3000"
     print_status "     - Check service status: supervisorctl -c backend/supervisord.conf status"
     echo ""
     print_status "Useful Commands:"
+    print_status "  Restore data: cd /opt/rec_io && ./scripts/restore_user_data.sh"
     print_status "  Start all services: cd /opt/rec_io && ./scripts/MASTER_RESTART.sh"
     print_status "  Check status: supervisorctl -c backend/supervisord.conf status"
     print_status "  Test DB: cd /opt/rec_io && ./scripts/test_database.sh"
     print_status "  View logs: tail -f /opt/rec_io/logs/*.out.log"
-    print_status "  Restart system: cd /opt/rec_io && ./scripts/MASTER_RESTART.sh"
     echo ""
     print_status "If you encounter any issues:"
     print_status "  - Check logs: tail -f /opt/rec_io/logs/*.out.log"
