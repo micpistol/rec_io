@@ -100,10 +100,31 @@ setup_postgresql() {
     systemctl start postgresql
     systemctl enable postgresql
     
-    # Create database user and database
-    sudo -u postgres psql -c "CREATE USER rec_io_user WITH PASSWORD '';" 2>/dev/null || print_warning "User may already exist"
-    sudo -u postgres psql -c "CREATE DATABASE rec_io_db;" 2>/dev/null || print_warning "Database may already exist"
+    # Create database user and database with proper permissions
+    print_status "Creating database user and database..."
+    sudo -u postgres psql -c "CREATE USER rec_io_user WITH PASSWORD NULL CREATEDB;" 2>/dev/null || print_warning "User may already exist"
+    sudo -u postgres psql -c "CREATE DATABASE rec_io_db OWNER rec_io_user;" 2>/dev/null || print_warning "Database may already exist"
     sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE rec_io_db TO rec_io_user;" 2>/dev/null || print_warning "Privileges may already be granted"
+    
+    # Configure PostgreSQL to allow local connections without password
+    print_status "Configuring PostgreSQL authentication..."
+    sudo -u postgres psql -c "ALTER USER rec_io_user WITH PASSWORD NULL;" 2>/dev/null || true
+    
+    # Update pg_hba.conf to allow local connections without password
+    if [ -f /etc/postgresql/*/main/pg_hba.conf ]; then
+        PG_CONF_DIR=$(find /etc/postgresql -name "pg_hba.conf" | head -1 | xargs dirname)
+        sudo sed -i 's/local.*all.*all.*peer/local   all             all                                     trust/' "$PG_CONF_DIR/pg_hba.conf" 2>/dev/null || true
+        sudo sed -i 's/local.*all.*all.*md5/local   all             all                                     trust/' "$PG_CONF_DIR/pg_hba.conf" 2>/dev/null || true
+        systemctl reload postgresql 2>/dev/null || true
+    fi
+    
+    # Test the connection
+    print_status "Testing database connection..."
+    if psql -h localhost -U rec_io_user -d postgres -c "SELECT 1;" 2>/dev/null; then
+        print_success "PostgreSQL connection test successful"
+    else
+        print_warning "PostgreSQL connection test failed - will retry during data restoration"
+    fi
     
     print_success "PostgreSQL basic setup completed"
     print_status "Database schema and data will be set up after user data is configured"
@@ -272,11 +293,43 @@ restore_existing_data() {
     # Restore database
     if [ -f "$package_dir/database_backup.sql" ]; then
         print_status "Restoring database..."
-        if psql -h localhost -U rec_io_user -d postgres < "$package_dir/database_backup.sql"; then
+        
+        # Load environment variables from the package
+        if [ -f "$package_dir/.env" ]; then
+            source "$package_dir/.env"
+        fi
+        
+        # Set PostgreSQL password if available
+        if [ -n "$POSTGRES_PASSWORD" ]; then
+            export PGPASSWORD="$POSTGRES_PASSWORD"
+        fi
+        
+        # Try multiple restoration methods
+        print_status "Attempting database restoration..."
+        
+        # Method 1: Try with user credentials
+        if psql -h localhost -U rec_io_user -d postgres < "$package_dir/database_backup.sql" 2>/dev/null; then
             print_success "Database restored successfully"
         else
-            print_error "Database restoration failed"
-            exit 1
+            print_warning "Method 1 failed, trying as postgres superuser..."
+            
+            # Method 2: Try as postgres superuser
+            if sudo -u postgres psql < "$package_dir/database_backup.sql" 2>/dev/null; then
+                print_success "Database restored successfully (as postgres user)"
+            else
+                print_warning "Method 2 failed, trying to fix user permissions..."
+                
+                # Method 3: Fix user and try again
+                sudo -u postgres psql -c "ALTER USER rec_io_user WITH PASSWORD NULL;" 2>/dev/null || true
+                sudo -u postgres psql -c "ALTER USER rec_io_user CREATEDB;" 2>/dev/null || true
+                
+                if psql -h localhost -U rec_io_user -d postgres < "$package_dir/database_backup.sql" 2>/dev/null; then
+                    print_success "Database restored successfully (after fixing permissions)"
+                else
+                    print_error "Database restoration failed - but continuing with setup"
+                    print_status "You may need to manually restore the database later"
+                fi
+            fi
         fi
     else
         print_warning "No database backup found"
@@ -345,18 +398,24 @@ show_next_steps() {
     print_status "  Supervisor: Running (no services started yet)"
     echo ""
     print_status "Next Steps:"
-    print_status "  1. Set up database and credentials:"
-    print_status "     - For new users: Add Kalshi credentials to /opt/rec_io/backend/data/users/user_0001/credentials/"
-    print_status "     - For existing users: Verify credentials are in place"
-    print_status "  2. Start the system:"
+    print_status "  1. Start the system:"
     print_status "     - Run: cd /opt/rec_io && ./scripts/MASTER_RESTART.sh"
     print_status "     - This will start all services with proper database and credentials"
+    print_status "  2. Verify everything is working:"
+    print_status "     - Check web interface: http://$(hostname -I | awk '{print $1}'):3000"
+    print_status "     - Check service status: supervisorctl -c backend/supervisord.conf status"
     echo ""
     print_status "Useful Commands:"
-    print_status "  Check status: supervisorctl -c backend/supervisord.conf status"
     print_status "  Start all services: cd /opt/rec_io && ./scripts/MASTER_RESTART.sh"
+    print_status "  Check status: supervisorctl -c backend/supervisord.conf status"
     print_status "  Test DB: cd /opt/rec_io && ./scripts/test_database.sh"
     print_status "  View logs: tail -f /opt/rec_io/logs/*.out.log"
+    print_status "  Restart system: cd /opt/rec_io && ./scripts/MASTER_RESTART.sh"
+    echo ""
+    print_status "If you encounter any issues:"
+    print_status "  - Check logs: tail -f /opt/rec_io/logs/*.out.log"
+    print_status "  - Test database: cd /opt/rec_io && ./scripts/test_database.sh"
+    print_status "  - Restart services: cd /opt/rec_io && ./scripts/MASTER_RESTART.sh"
 }
 
 # Main deployment function

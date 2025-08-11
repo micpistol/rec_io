@@ -46,13 +46,13 @@ print_header() {
 
 # Create package directory
 create_package_dir() {
-    print_status "Creating package directory..."
+    print_status "Creating package directory..." >&2
     
     TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
     PACKAGE_DIR="$PROJECT_ROOT/backup/user_data_package_${TIMESTAMP}"
     mkdir -p "$PACKAGE_DIR"
     
-    print_success "Package directory: $PACKAGE_DIR"
+    print_success "Package directory: $PACKAGE_DIR" >&2
     echo "$PACKAGE_DIR"
 }
 
