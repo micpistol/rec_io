@@ -151,12 +151,6 @@ class ConfigManager:
                     "weights": [0.3, 0.25, 0.2, 0.15, 0.05, 0.05]
                 }
             },
-            "trading": {
-                "default_position_size": 100,
-                "max_position_size": 1000,
-                "auto_stop_enabled": False,
-                "account_mode": "demo"  # demo or prod
-            }
         }
     
     def get(self, key: str, default: Any = None) -> Any:

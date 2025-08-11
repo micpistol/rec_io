@@ -40,7 +40,12 @@ function decorateChange(el, val) {
 // Fetch core data (momentum score only - BTC price now handled by strike table)
 function fetchCore() {
   fetch('/core')
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
     .then(data => {
       // Update weighted momentum score
       window.momentumData.weightedScore = data.weighted_momentum_score;
@@ -58,7 +63,9 @@ function fetchCore() {
         updateMomentumPanel();
       }
     })
-    .catch(console.error);
+    .catch(error => {
+      console.error('Error fetching momentum data:', error);
+    });
 }
 
 // Fetch BTC price changes from backend API and update ticker panel
@@ -157,6 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchBTCPriceChanges();
 
   // Set up polling intervals
+  setInterval(fetchCore, 5000);                 // Momentum data every 5 seconds for live updates
   setInterval(fetchBTCPriceChanges, 60000);    // Price changes every minute (unchanged frequency)
 });
 

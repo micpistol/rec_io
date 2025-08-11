@@ -158,13 +158,6 @@ def trigger_trade():
             "client_order_id": str(uuid.uuid4())
         }
         
-        # Add buy_max_cost if buy_price is provided (convert to cents, add 1 cent buffer for execution)
-        if buy_price is not None:
-            buy_max_cost_cents = int(float(buy_price) * 100) + 1
-            order_payload["buy_max_cost"] = buy_max_cost_cents
-            log_event(ticket_id, f"💰 BUY_MAX_COST {buy_price} → {buy_max_cost_cents} cents (+1 cent buffer)")
-        else:
-            log_event(ticket_id, f"⚠️ NO BUY_PRICE PROVIDED - UNLIMITED COST")
 
         timestamp = str(int(time.time() * 1000))
         path = "/portfolio/orders"

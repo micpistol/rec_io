@@ -10,10 +10,97 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 
 # Add project root to path for imports
-from backend.util.paths import get_project_root
-sys.path.insert(0, get_project_root())
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+from backend.util.paths import get_project_root, get_data_dir
 
-from backend.util.paths import get_data_dir
+# Database imports
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    PSYCOPG2_AVAILABLE = True
+except ImportError:
+    PSYCOPG2_AVAILABLE = False
+    print("Warning: psycopg2 not available. PostgreSQL database operations will be skipped.")
+
+def get_postgresql_connection():
+    """Get a connection to the PostgreSQL database."""
+    if not PSYCOPG2_AVAILABLE:
+        return None
+    
+    try:
+        from backend.core.config.database import get_postgresql_connection as get_db_conn
+        return get_db_conn()
+    except Exception as e:
+        print(f"❌ Failed to connect to PostgreSQL: {e}")
+        return None
+
+def create_analytics_schema(conn):
+    """Create analytics schema if it doesn't exist."""
+    try:
+        cursor = conn.cursor()
+        cursor.execute("CREATE SCHEMA IF NOT EXISTS analytics")
+        conn.commit()
+        cursor.close()
+        print("✅ Analytics schema created/verified")
+    except Exception as e:
+        print(f"❌ Failed to create analytics schema: {e}")
+
+def create_fingerprint_table(conn, table_name, columns):
+    """Create or replace fingerprint table in analytics schema."""
+    try:
+        cursor = conn.cursor()
+        
+        # Drop table if exists to overwrite
+        cursor.execute(f"DROP TABLE IF EXISTS analytics.{table_name}")
+        
+        # Create table with time_to_close column first, then all threshold columns
+        column_definitions = ['"time_to_close" TEXT']
+        for col in columns:
+            # All threshold columns are numeric rates (DECIMAL(5,2) for 2 decimal places)
+            column_definitions.append(f'"{col}" DECIMAL(5,2)')
+        
+        create_sql = f"""
+        CREATE TABLE analytics.{table_name} (
+            {', '.join(column_definitions)}
+        )
+        """
+        
+        cursor.execute(create_sql)
+        conn.commit()
+        cursor.close()
+        print(f"✅ Created table analytics.{table_name}")
+        
+    except Exception as e:
+        print(f"❌ Failed to create table analytics.{table_name}: {e}")
+
+def insert_fingerprint_data(conn, table_name, df):
+    """Insert fingerprint data into PostgreSQL table."""
+    try:
+        cursor = conn.cursor()
+        
+        # Prepare data for insertion
+        for index, row in df.iterrows():
+            # Convert index to time_to_close column
+            row_data = [index] + row.tolist()
+            
+            # Create placeholders for SQL
+            placeholders = ', '.join(['%s'] * len(row_data))
+            columns = ['time_to_close'] + list(df.columns)
+            column_names = ', '.join([f'"{col}"' for col in columns])
+            
+            insert_sql = f"""
+            INSERT INTO analytics.{table_name} ({column_names})
+            VALUES ({placeholders})
+            """
+            
+            cursor.execute(insert_sql, row_data)
+        
+        conn.commit()
+        cursor.close()
+        print(f"✅ Inserted {len(df)} rows into analytics.{table_name}")
+        
+    except Exception as e:
+        print(f"❌ Failed to insert data into analytics.{table_name}: {e}")
 
 def generate_directional_fingerprint(df, momentum_value=None, description=""):
     """
@@ -170,6 +257,14 @@ Examples:
     output_dir = os.path.join(get_data_dir(), "historical_data", f"{symbol}_historical", "symbol_fingerprints")
     os.makedirs(output_dir, exist_ok=True)
 
+    # Setup PostgreSQL connection
+    db_conn = get_postgresql_connection()
+    if db_conn:
+        create_analytics_schema(db_conn)
+        print("✅ PostgreSQL database connection established")
+    else:
+        print("⚠️ PostgreSQL database connection failed - CSV files only will be generated")
+
     # Determine what to generate
     generate_baseline = not args.momentum_only
     generate_momentum = not args.baseline_only and momentum_available
@@ -183,6 +278,12 @@ Examples:
             baseline_path = os.path.join(output_dir, baseline_filename)
             baseline_df.to_csv(baseline_path)
             print(f"Baseline directional fingerprint saved to {baseline_path}")
+            
+            # Write to PostgreSQL database
+            if db_conn:
+                table_name = f"{symbol}_fingerprint_directional_baseline"
+                create_fingerprint_table(db_conn, table_name, baseline_df.columns)
+                insert_fingerprint_data(db_conn, table_name, baseline_df)
 
     # Generate momentum-bucket fingerprints
     if generate_momentum:
@@ -207,6 +308,17 @@ Examples:
                 momentum_path = os.path.join(output_dir, momentum_filename)
                 bucket_df.to_csv(momentum_path)
                 print(f"Momentum {momentum_value} directional fingerprint saved to {momentum_path}")
+                
+                # Write to PostgreSQL database
+                if db_conn:
+                    table_name = f"{symbol}_fingerprint_directional_momentum_{momentum_value:03d}"
+                    create_fingerprint_table(db_conn, table_name, bucket_df.columns)
+                    insert_fingerprint_data(db_conn, table_name, bucket_df)
+
+    # Close database connection
+    if db_conn:
+        db_conn.close()
+        print("✅ Database connection closed")
 
     print("All directional fingerprint generation complete!")
 

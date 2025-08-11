@@ -36,7 +36,6 @@
         <div class="panel">
       <div class="panel-header">Account Information</div>
       
-      <span id="account-status" style="font-weight: bold; color: #00ff00; margin-left: 10px;"></span>
       <div class="panel-body">
         <div style="font-weight: bold; margin-bottom: 4px;">Balance</div>
         <span id="account-balance">Loading...</span>
@@ -185,9 +184,8 @@
             const settlementsBody = document.getElementById("settlements-body");
       if (settlementsBody) {
         settlementsBody.innerHTML = settlements.map(s => {
-        // Convert revenue from cents to dollars
-        const revenueInDollars = s.revenue / 100;
-        const formattedRevenue = revenueInDollars.toLocaleString(undefined, { 
+        // Revenue is already in whole dollars, display as is
+        const formattedRevenue = s.revenue.toLocaleString(undefined, { 
           minimumFractionDigits: 0, 
           maximumFractionDigits: 0 
         });
@@ -208,13 +206,8 @@
             const fillsBody = document.getElementById("fills-body");
       if (fillsBody) {
         fillsBody.innerHTML = fills.map(f => {
-        // Convert price from cents to dollars
+        // Get price based on side with no formatting
         const price = f.side === "yes" ? f.yes_price : f.no_price;
-        const priceInDollars = price / 100;
-        const formattedPrice = priceInDollars.toLocaleString(undefined, { 
-          minimumFractionDigits: 2, 
-          maximumFractionDigits: 2 
-        });
         
         return `
           <tr>
@@ -222,7 +215,7 @@
             <td>${f.side === "yes" ? "Y" : "N"}</td>
             <td>${f.action.toUpperCase()}</td>
             <td>${f.count}</td>
-            <td>${formattedPrice}</td>
+            <td>${price}</td>
             <td>${new Date(f.created_time).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
           </tr>
         `;

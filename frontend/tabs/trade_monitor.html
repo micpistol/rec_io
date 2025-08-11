@@ -1569,6 +1569,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateMomentumPanel() {
       const { deltas, weightedScore } = window.momentumData;
 
+      // Debug logging
+      console.log('updateMomentumPanel called with:', { deltas, weightedScore });
+
       // Ensure rollingScores array exists
       if (!window.momentumData.rollingScores) {
         window.momentumData.rollingScores = [];
@@ -1617,10 +1620,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Chart.js-based momentum bar chart (flicker-free: update data in place)
     let momentumBarChart = null;
     function renderMomentumBarChart(deltas) {
+      console.log('renderMomentumBarChart called with deltas:', deltas);
       const ctx = document.getElementById('momentumBarChartCanvas').getContext('2d');
       const keys = ['4m', '3m', '2m', '1m'];
       const values = keys.map(k => deltas[k] * 100);
       const bgColors = values.map(v => v >= 0 ? 'rgba(40,167,69,0.7)' : 'rgba(220,53,69,0.7)');
+      console.log('Chart values:', values);
 
       if (!momentumBarChart) {
         // Initial render
