@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+"""
+PostgreSQL Fingerprint Generator
+Generates fingerprint tables directly in PostgreSQL from master price data.
+This is separate from the existing CSV-based fingerprint generator.
+"""
+
 from datetime import datetime
 import os
 import sys
@@ -80,37 +87,6 @@ def create_fingerprint_table(conn, table_name, df):
         """
         
         cursor.execute(create_sql)
-        
-        # Create column mapping table
-        mapping_table_name = f"{table_name}_column_mapping"
-        cursor.execute(f"DROP TABLE IF EXISTS analytics.\"{mapping_table_name}\"")
-        
-        mapping_sql = f"""
-        CREATE TABLE analytics."{mapping_table_name}" (
-            "column_index" INTEGER PRIMARY KEY,
-            "original_name" TEXT NOT NULL,
-            "clean_name" TEXT NOT NULL
-        )
-        """
-        
-        cursor.execute(mapping_sql)
-        
-        # Insert column mappings
-        for i, col in enumerate(df.columns):
-            if '>=' in col and '+' in col and '%' in col:
-                percent_str = col.split('+')[1].split('%')[0]
-                clean_name = f"pos_{percent_str.replace('.', '_')}"
-            elif '<=' in col and '-' in col and '%' in col:
-                percent_str = col.split('-')[1].split('%')[0]
-                clean_name = f"neg_{percent_str.replace('.', '_')}"
-            else:
-                clean_name = f"col_{i}"
-            
-            cursor.execute(
-                f'INSERT INTO analytics."{mapping_table_name}" ("column_index", "original_name", "clean_name") VALUES (%s, %s, %s)',
-                (i, col, clean_name)
-            )
-        
         conn.commit()
         cursor.close()
         print(f"✅ Created table analytics.\"{table_name}\" with clean column names")
@@ -281,35 +257,23 @@ def generate_directional_fingerprint(df, momentum_value=None, description=""):
     
     return output_df
 
-def get_fingerprint_dir(symbol):
-    """Return the directory for a given symbol's fingerprints."""
-    base_dir = os.path.join(get_data_dir(), "historical_data", f"{symbol.lower()}_historical", "symbol_fingerprints")
-    return os.path.join(base_dir, symbol.lower())
-
-def get_fingerprint_filename(symbol, bucket):
-    """Return the full path for a given symbol and momentum bucket."""
-    return os.path.join(get_fingerprint_dir(symbol), f"{symbol.lower()}_fingerprint_directional_momentum_{int(bucket):03d}.csv")
-
-def get_baseline_fingerprint_filename(symbol):
-    return os.path.join(get_fingerprint_dir(symbol), f"{symbol.lower()}_fingerprint_directional_baseline.csv")
-
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate directional fingerprint matrices tracking both positive and negative price movements.",
+        description="Generate PostgreSQL fingerprint tables from master price data.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Generate baseline fingerprint only
-  python fingerprint_generator_directional.py data.csv --baseline-only
+  python fingerprint_generator_postgresql.py data.csv --baseline-only
   
   # Generate momentum fingerprints only (requires momentum column)
-  python fingerprint_generator_directional.py data.csv --momentum-only
+  python fingerprint_generator_postgresql.py data.csv --momentum-only
   
   # Generate both baseline and momentum fingerprints (default)
-  python fingerprint_generator_directional.py data.csv
+  python fingerprint_generator_postgresql.py data.csv
   
   # Generate momentum fingerprints for specific range
-  python fingerprint_generator_directional.py data.csv --momentum-only --momentum-range -10 10
+  python fingerprint_generator_postgresql.py data.csv --momentum-only --momentum-range -10 10
         """
     )
     parser.add_argument("csv_path", help="Path to input CSV file with price data")
@@ -348,8 +312,6 @@ Examples:
 
     # Create symbol-specific output directory using centralized paths
     symbol = os.path.basename(args.csv_path).split('_')[0].lower()
-    output_dir = os.path.join(get_data_dir(), "historical_data", f"{symbol}_historical", "symbol_fingerprints")
-    os.makedirs(output_dir, exist_ok=True)
 
     # Setup PostgreSQL connection
     db_conn = get_postgresql_connection()
@@ -357,7 +319,8 @@ Examples:
         create_analytics_schema(db_conn)
         print("✅ PostgreSQL database connection established")
     else:
-        print("⚠️ PostgreSQL database connection failed - CSV files only will be generated")
+        print("❌ PostgreSQL database connection failed - cannot proceed")
+        return
 
     # Determine what to generate
     generate_baseline = not args.momentum_only
@@ -368,16 +331,10 @@ Examples:
         print("Generating baseline directional fingerprint...")
         baseline_df = generate_directional_fingerprint(df, description="baseline")
         if baseline_df is not None:
-            baseline_filename = f"{symbol}_fingerprint_directional_baseline.csv"
-            baseline_path = os.path.join(output_dir, baseline_filename)
-            baseline_df.to_csv(baseline_path)
-            print(f"Baseline directional fingerprint saved to {baseline_path}")
-            
             # Write to PostgreSQL database
-            if db_conn:
-                table_name = f"{symbol}_fingerprint_directional_baseline"
-                create_fingerprint_table(db_conn, table_name, baseline_df)
-                insert_fingerprint_data(db_conn, table_name, baseline_df)
+            table_name = f"{symbol}_fingerprint_directional_baseline"
+            create_fingerprint_table(db_conn, table_name, baseline_df)
+            insert_fingerprint_data(db_conn, table_name, baseline_df)
 
     # Generate momentum-bucket fingerprints
     if generate_momentum:
@@ -397,24 +354,17 @@ Examples:
             bucket_df = generate_directional_fingerprint(df, momentum_value, f"momentum {momentum_value}")
             
             if bucket_df is not None:
-                # Create filename with momentum value (no date)
-                momentum_filename = f"{symbol}_fingerprint_directional_momentum_{momentum_value:03d}.csv"
-                momentum_path = os.path.join(output_dir, momentum_filename)
-                bucket_df.to_csv(momentum_path)
-                print(f"Momentum {momentum_value} directional fingerprint saved to {momentum_path}")
-                
                 # Write to PostgreSQL database
-                if db_conn:
-                    table_name = f"{symbol}_fingerprint_directional_momentum_{momentum_value:03d}"
-                    create_fingerprint_table(db_conn, table_name, bucket_df)
-                    insert_fingerprint_data(db_conn, table_name, bucket_df)
+                table_name = f"{symbol}_fingerprint_directional_momentum_{momentum_value:03d}"
+                create_fingerprint_table(db_conn, table_name, bucket_df)
+                insert_fingerprint_data(db_conn, table_name, bucket_df)
 
     # Close database connection
     if db_conn:
         db_conn.close()
         print("✅ Database connection closed")
 
-    print("All directional fingerprint generation complete!")
+    print("All PostgreSQL fingerprint generation complete!")
 
 if __name__ == "__main__":
-    main() 
+    main()
