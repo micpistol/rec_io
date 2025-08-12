@@ -102,6 +102,10 @@ backend/supervisord.conf.backup
 .idea/
 *.xcodeproj/xcuserdata/
 
+# iOS WebView App (exclude from git)
+rec_webview_app/
+rec_webview_app/**
+
 # Archive and backup folders (completely excluded - may contain sensitive data)
 archive/
 archive/**
