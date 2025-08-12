@@ -2,159 +2,178 @@
 
 A comprehensive trading system with real-time market data, trade execution, and portfolio management.
 
-## 🔄 **Recent Major Updates**
+## 🚀 Quick Start
+
+### **New Users - 3 Steps to Get Started**
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/betaclone1/rec_io.git
+   cd rec_io
+   ```
+
+2. **Run the installation script:**
+   ```bash
+   python3 install.py
+   ```
+
+3. **Start the system:**
+   ```bash
+   ./scripts/MASTER_RESTART.sh
+   ```
+
+**That's it!** Your complete trading system will be ready to use at http://localhost:3000
+
+## 📋 What's Included
+
+### **Core Features**
+- **Real-time market data** from multiple sources
+- **Automated trading** with configurable strategies
+- **Portfolio management** with comprehensive tracking
+- **Risk management** with automatic stop-losses
+- **Web-based interface** for easy monitoring
+- **Mobile-responsive** design for on-the-go access
+
+### **Supported Platforms**
+- **Kalshi** - Prediction markets trading
+- **Coinbase** - Cryptocurrency price data
+- **PostgreSQL** - Robust data storage
+- **Supervisor** - Process management
+
+## 🔒 Security Features
+
+- ✅ **No personal data in repository** - All user files excluded from git
+- ✅ **Secure credential storage** - Proper file permissions and isolation
+- ✅ **User data protection** - Complete separation between users
+- ✅ **Environment variables** - No hardcoded credentials
+
+## 📚 Documentation
+
+### **Installation & Setup**
+- **[Quick Install Guide](QUICK_INSTALL_GUIDE.md)** - Get started in 3 steps
+- **[New User Setup](docs/NEW_USER_SETUP_GUIDE.md)** - Detailed setup instructions
+- **[Security Overview](docs/SECURITY_OVERVIEW.md)** - Security features and best practices
+
+### **System Management**
+- **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md)** - Production deployment instructions
+- **[Service Management](docs/SERVICE_MANAGEMENT.md)** - Managing system services
+
+## 🛠️ System Requirements
+
+### **Minimum Requirements**
+- **Operating System**: Linux (Ubuntu 20.04+), macOS (10.15+), or Windows with WSL
+- **Python**: 3.8 or higher
+- **Memory**: 4GB RAM (8GB recommended)
+- **Storage**: 10GB free space
+- **Network**: Internet connection for dependencies
+
+### **Supported Platforms**
+- ✅ **macOS**: Full support with Homebrew
+- ✅ **Ubuntu/Debian**: Full support with apt
+- ✅ **CentOS/RHEL**: Full support with yum
+- ⚠️ **Windows**: Limited support (WSL recommended)
+
+## 🔧 System Management
+
+### **Start/Stop Services**
+```bash
+# Start all services
+./scripts/MASTER_RESTART.sh
+
+# Stop all services
+supervisorctl -c backend/supervisord.conf stop all
+
+# Check service status
+supervisorctl -c backend/supervisord.conf status
+```
+
+### **View Logs**
+```bash
+# View all logs
+tail -f logs/*.out.log
+
+# View specific service logs
+tail -f logs/main_app.out.log
+```
+
+### **Database Management**
+```bash
+# Test database connection
+./scripts/test_database.sh
+
+# Create backup
+./scripts/backup_database.sh backup
+```
+
+## 🌐 Access Your System
+
+After installation, access the system at:
+- **Main Application**: http://localhost:3000
+- **Health Check**: http://localhost:3000/health
+- **Login Page**: http://localhost:3000/login
+
+## 🔑 Adding Trading Credentials
+
+### **During Installation**
+The installation script will ask if you want to set up Kalshi credentials. If you choose yes:
+1. Get your API credentials from [Kalshi Trading Platform](https://trading.kalshi.com/settings/api)
+2. Enter your email, API key, and private key when prompted
+3. Credentials will be securely stored with proper permissions
+
+### **After Installation**
+If you skipped credential setup, you can add them later:
+```bash
+# Run the user setup script
+python3 scripts/setup_new_user.py
+
+# Or manually create credential files
+mkdir -p backend/data/users/user_0001/credentials/kalshi-credentials/prod
+echo "your_email@example.com" > backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
+echo "your_api_key" >> backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
+chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
+```
+
+## 🚨 Troubleshooting
+
+### **Common Issues**
+1. **Check the logs**: `tail -f logs/*.out.log`
+2. **Test database**: `./scripts/test_database.sh`
+3. **Restart services**: `./scripts/MASTER_RESTART.sh`
+4. **Review documentation**: Check the docs/ directory
+
+### **Getting Help**
+- Review the [Quick Install Guide](QUICK_INSTALL_GUIDE.md)
+- Check the troubleshooting section in the documentation
+- Verify system requirements
+- Test with the provided verification commands
+
+## 📈 Recent Updates
 
 ### **PostgreSQL Migration Complete**
-- **✅ Migrated:** All BTC price data from legacy SQLite to PostgreSQL `live_data.btc_price_log`
-- **✅ Retired:** `btc_price_watchdog` service (archived to `archive/deprecated_services/`)
-- **✅ Retired:** `live_data_analysis.py` module (archived to `archive/deprecated_services/`)
-- **✅ Updated:** All services now read BTC price, momentum, and delta data directly from PostgreSQL
-- **✅ Enhanced:** `symbol_price_watchdog_btc` now writes live BTC price, momentum, and delta values to PostgreSQL
+- **✅ Migrated:** All BTC price data from legacy SQLite to PostgreSQL
+- **✅ Retired:** Legacy services (archived to `archive/deprecated_services/`)
+- **✅ Enhanced:** Centralized data architecture with PostgreSQL
 
-### **System Architecture Updates**
-- **Active Services:** 12 services running under supervisor
-- **Data Architecture:** Centralized PostgreSQL `live_data` schema
-- **Frontend Enhancements:** Panel styling for system restart modals with countdown timers
+### **Security Enhancements**
+- **✅ User data protection:** Complete exclusion from git repository
+- **✅ Credential security:** Proper file permissions and isolation
+- **✅ Archive protection:** All backup and archive folders excluded
 
-## Project Structure
+### **Simplified Installation**
+- **✅ One-command installation:** `python3 install.py`
+- **✅ Guided setup:** Step-by-step user configuration
+- **✅ Cross-platform support:** macOS, Linux, and Windows (WSL)
 
-```
-rec_io/
-├── backend/           # Backend services and API
-├── frontend/          # Web interface and UI components
-├── docs/             # Documentation and architecture files
-├── scripts/          # Utility and maintenance scripts
-├── tests/            # Test files and utilities
-├── logs/             # System logs and output files
-├── backup/           # System backups and snapshots
-├── archive/          # Archived services and legacy data
-│   └── deprecated_services/  # Deprecated services (btc_price_watchdog, live_data_analysis.py)
-├── public/           # Static assets
-├── rec_webview_app/  # iOS webview application
-├── venv/             # Python virtual environment
-├── frontend/index.html        # Main web application entry point
-└── requirements.txt  # Python dependencies
-```
+## 🤝 Contributing
 
-## Quick Start
+This is a private trading system. For questions or support, please refer to the documentation or contact the development team.
 
-1. **Activate the virtual environment:**
-   ```bash
-   source venv/bin/activate
-   ```
+## 📄 License
 
-2. **Start the system:**
-   ```bash
-   supervisord -c backend/supervisord.conf
-   ```
+This project is proprietary software. All rights reserved.
 
-3. **Check system status:**
-   ```bash
-   supervisorctl -c backend/supervisord.conf status
-   ```
+---
 
-4. **Access the web interface:**
-   Open `frontend/index.html` in your browser
+**🎉 Ready to start trading?**
 
-## System Services
-
-The system runs 12 core services managed by supervisor with **centralized port management**:
-
-### Core Services
-- **main_app** (port 3000) - Main web application with enhanced system monitoring
-- **trade_manager** (port 4000) - Trade management and monitoring
-- **trade_executor** (port 5000) - Trade execution service
-- **active_trade_supervisor** (port 8007) - Active trade monitoring
-- **auto_entry_supervisor** (port 8008) - Automated trade entry based on momentum signals
-
-### Watchdog Services
-- **symbol_price_watchdog_btc** (port 8014) - BTC price monitoring with PostgreSQL storage
-- **symbol_price_watchdog_eth** (port 8015) - ETH price monitoring with PostgreSQL storage
-- **kalshi_account_sync** (port 8012) - Account synchronization
-- **kalshi_api_watchdog** (port 8013) - API health monitoring
-
-### System Services
-- **unified_production_coordinator** (port 8010) - Data production coordination and strike table generation
-- **cascading_failure_detector** (port 8009) - System health monitoring and failure detection
-- **system_monitor** (port 8011) - Comprehensive system health monitoring with duplicate process detection
-
-### Deprecated Services (Archived)
-- **btc_price_watchdog** (port 8002) - Archived to `archive/deprecated_services/`
-- **live_data_analysis.py** - Archived to `archive/deprecated_services/`
-
-## Data Architecture
-
-### **Current Data Flow**
-1. **Coinbase WebSocket** → `symbol_price_watchdog_btc` → **PostgreSQL `live_data.btc_price_log`**
-2. **PostgreSQL `live_data.btc_price_log`** → All services (direct queries)
-3. **Kalshi API** → `kalshi_account_sync` → **PostgreSQL account tables**
-4. **PostgreSQL** → `unified_production_coordinator` → **Strike table JSON files**
-
-### **Benefits Achieved**
-- **Single Source of Truth**: PostgreSQL `live_data` schema
-- **Reduced Complexity**: No redundant calculations
-- **Better Performance**: Direct database queries
-- **Improved Consistency**: Centralized data storage
-- **Easier Maintenance**: Single data source to manage
-
-## Port Management
-
-All port assignments are managed through a **single source of truth**:
-
-- `backend/core/config/MASTER_PORT_MANIFEST.json` - **Master port manifest**
-- `backend/core/port_config.py` - Centralized port management functions
-- `frontend/js/globals.js` - Frontend port configuration (loads from API)
-
-### Port Management Features
-- ✅ **Single Source of Truth**: All ports managed from MASTER_PORT_MANIFEST.json
-- ✅ **No Configuration Drift**: All components read from same file
-- ✅ **No Hardcoded Fallbacks**: System fails properly if centralized config unavailable
-- ✅ **Consistent API**: All services use same port management interface
-
-## Documentation
-
-### **Core Documentation**
-- **VER3_ONBOARDING_DOCUMENTS/**: Complete v2 system snapshot and onboarding package
-- **DEPLOYMENT_GUIDE.md**: Comprehensive deployment procedures
-- **AUTHENTICATION_GUIDE.md**: Authentication and security setup
-
-### **Migration & Architecture**
-- **POSTGRESQL_MIGRATION_PLAN.md**: PostgreSQL migration strategy (COMPLETED)
-- **SYSTEM_CLEANUP_PLAN.md**: System cleanup and optimization
-- **PORTABILITY_AUDIT_REPORT.md**: System portability analysis
-
-### **Database & Schema**
-- **BACKEND_SQLITE_MIGRATION_CHECKLIST.md**: SQLite migration checklist (COMPLETED)
-- **LEGACY_SQLITE_DEPRECATION_CHECKLIST.md**: Legacy cleanup procedures
-
-## Scripts
-
-- **CAPTURE_CURRENT_STATE.sh** - System state backup
-- **RESTORE_TO_CURRENT_STATE.sh** - System state restoration (uses centralized ports)
-- **MASTER_RESTART.sh** - Complete system restart with 45-second countdown
-
-## Development
-
-- **Test files**: `tests/`
-- **Logs**: `logs/`
-- **Backups**: `backup/`
-- **Archived Services**: `archive/deprecated_services/`
-
-## System Health
-
-Monitor system health with:
-```bash
-python backend/system_monitor.py
-```
-
-Or access the web interface at `frontend/tabs/system.html` for real-time monitoring with:
-- Resource usage (CPU, memory, disk)
-- Service health status
-- Admin controls with panel-styled modals
-- 45-second countdown for master restart
-
-## 🚨 **Critical Safety Notice**
-
-> **NO AI AGENTS OR TEAM MEMBERS ARE PERMITTED TO PLACE LIVE TRADES FOR TESTING OR ANY OTHER PURPOSES.**  
-> **NO AI AGENTS OR TEAM MEMBERS ARE PERMITTED TO ENABLE AUTOMATED TRADING FUNCTIONS FOR TESTING OR ANY OTHER PURPOSES.**  
-> All testing must be performed in **read-only** or **simulation** modes only. 
+Follow the [Quick Install Guide](QUICK_INSTALL_GUIDE.md) to get started in just 3 steps! 

@@ -102,20 +102,38 @@ backend/supervisord.conf.backup
 .idea/
 *.xcodeproj/xcuserdata/
 
-# Backup and migration files (sensitive data)
+# Archive and backup folders (completely excluded - may contain sensitive data)
+archive/
+archive/**
 backup/
+backup/**
+
+# Archive and backup files
+*.tar.gz
+*.tar
+*.zip
+*.gz
+*.backup
+*.bak
+*.archive
+
+# Specific archive and backup exclusions (for reference)
+archive/old_trade_logs/
+archive/old_scripts/
+archive/old_services/
+archive/old_logs/
+archive/deprecated_services/
 backup/database_backups/
 backup/system_migrations/
 backup/new_user_installations/
-*.tar.gz
-!backend/data/historical_data/**
-backup/database_backups/rec_io_db_backup_20250808_100409.tar.gz
-backend/data/historical_data/btc_historical/btc_1m_master_5y.csv
-backend/data/historical_data/eth_historical/eth_1m_master_5y.csv
+backup/user_data_package_*/
+backup/rec_io_db_backup_*
 
 # Large database backup files
 rec_io_db_backup.sql
 *.sql
 !backend/data/historical_data/**
+
+# Large historical data files (excluded from git due to size)
 backend/data/historical_data/eth_historical/eth_1m_master_5y.csv
 backend/data/historical_data/btc_historical/btc_1m_master_5y.csv

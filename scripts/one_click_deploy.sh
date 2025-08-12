@@ -206,11 +206,12 @@ ask_about_existing_data() {
 setup_new_user() {
     print_status "Setting up new user..."
     
-    # Create basic user structure (will be done after repository is cloned)
-    print_status "User structure will be created after repository setup"
+    # This will be called after repository is cloned
+    # The actual setup will happen in the main deployment function
+    print_status "New user setup will be completed after repository setup"
     
-    print_success "New user setup completed"
-    print_status "You can add Kalshi credentials later to enable trading services"
+    print_success "New user setup initiated"
+    print_status "You'll be prompted to configure your user profile after installation"
 }
 
 # Restore existing data automatically (for one-click deployment)
@@ -488,6 +489,68 @@ start_core_services() {
     print_status "Services will be started manually after database setup and credential configuration"
 }
 
+# Setup new user profile
+setup_new_user_profile() {
+    print_status "Setting up new user profile..."
+    
+    cd /opt/rec_io
+    
+    # Check if Python setup script exists
+    if [ -f "scripts/setup_new_user_simple.py" ]; then
+        print_status "Running new user setup script..."
+        
+        # Activate virtual environment and run setup
+        source venv/bin/activate
+        
+        # Run the setup script
+        if python3 scripts/setup_new_user_simple.py; then
+            print_success "New user profile created successfully"
+        else
+            print_warning "User setup script failed, creating basic structure"
+            create_basic_user_structure
+        fi
+    else
+        print_warning "User setup script not found, creating basic structure"
+        create_basic_user_structure
+    fi
+}
+
+# Create basic user structure as fallback
+create_basic_user_structure() {
+    print_status "Creating basic user structure..."
+    
+    cd /opt/rec_io
+    
+    # Create basic user directories
+    mkdir -p backend/data/users/user_0001/credentials/kalshi-credentials/prod
+    mkdir -p backend/data/users/user_0001/credentials/kalshi-credentials/demo
+    mkdir -p backend/data/users/user_0001/preferences
+    mkdir -p backend/data/users/user_0001/trade_history
+    mkdir -p backend/data/users/user_0001/active_trades
+    mkdir -p backend/data/users/user_0001/accounts
+    
+    # Set proper permissions
+    chmod -R 700 backend/data/users/user_0001/credentials
+    
+    # Create basic .env file
+    cat > .env << 'EOF'
+# PostgreSQL Connection Settings
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=rec_io_db
+POSTGRES_USER=rec_io_user
+POSTGRES_PASSWORD=rec_io_password
+
+# Trading System Configuration
+TRADING_SYSTEM_HOST=localhost
+REC_BIND_HOST=localhost
+REC_TARGET_HOST=localhost
+EOF
+    
+    print_success "Basic user structure created"
+    print_status "You'll need to add your credentials manually"
+}
+
 # Provide next steps
 show_next_steps() {
     echo ""
@@ -498,13 +561,16 @@ show_next_steps() {
     print_status "  Supervisor: Running (no services started yet)"
     echo ""
     print_status "Next Steps:"
-    print_status "  1. If you have existing data to restore:"
+    print_status "  1. Configure your user profile (if not already done):"
+    print_status "     - Run: cd /opt/rec_io && python3 scripts/setup_new_user_simple.py"
+    print_status "     - This will set up your user info and basic configuration"
+    print_status "  2. If you have existing data to restore:"
     print_status "     - Run: cd /opt/rec_io && ./scripts/restore_user_data.sh"
     print_status "     - This will walk you through uploading and restoring your data"
-    print_status "  2. Start the system:"
+    print_status "  3. Start the system:"
     print_status "     - Run: cd /opt/rec_io && ./scripts/MASTER_RESTART.sh"
     print_status "     - This will start all services with proper database and credentials"
-    print_status "  3. Verify everything is working:"
+    print_status "  4. Verify everything is working:"
     print_status "     - Check web interface: http://$(hostname -I | awk '{print $1}'):3000"
     print_status "     - Check service status: supervisorctl -c backend/supervisord.conf status"
     echo ""
@@ -542,6 +608,9 @@ deploy_system() {
         print_status "Restoring data from: $package_dir"
         restore_data_from_package "$package_dir"
         rm -f /tmp/data_package_path
+    else
+        # Set up new user if no existing data
+        setup_new_user_profile
     fi
     
     generate_supervisor_config

@@ -29,6 +29,11 @@ This guide provides step-by-step instructions for deploying the REC.IO trading s
 curl -sSL https://raw.githubusercontent.com/betaclone1/rec_io/main/scripts/one_click_deploy.sh | bash
 ```
 
+**After installation, new users will be prompted to:**
+1. Set up their user profile with `python3 scripts/setup_new_user.py`
+2. Configure Kalshi credentials (optional)
+3. Start the system with `./scripts/MASTER_RESTART.sh`
+
 ### For Existing Users
 
 #### 1. Package Your Data (Local Machine)
@@ -163,9 +168,47 @@ This script will:
 ./scripts/test_database.sh --quick
 ```
 
-### Phase 4: System Configuration
+### Phase 4: New User Setup (For New Users Only)
 
-#### 4.1 Environment Variables
+#### 4.1 User Profile Configuration
+
+After installation, new users need to set up their profile:
+
+```bash
+# Run the new user setup script
+python3 scripts/setup_new_user_simple.py
+```
+
+This script will:
+- Collect your personal information (name, email, phone)
+- Set up your user ID and account type
+- Configure Kalshi API credentials (optional)
+- Create necessary directories and files
+- Set proper file permissions
+
+#### 4.2 Kalshi Credentials (Optional)
+
+If you want to use trading features, you'll need Kalshi API credentials:
+
+1. **Get API credentials** from [Kalshi Trading Platform](https://trading.kalshi.com/settings/api)
+2. **Run the setup script** and provide your credentials when prompted
+3. **Or manually create** credential files:
+
+```bash
+# Create credentials directory
+mkdir -p backend/data/users/user_0001/credentials/kalshi-credentials/prod
+
+# Add your Kalshi credentials
+echo "your_kalshi_email" > backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
+echo "your_kalshi_api_key" >> backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
+
+# Set proper permissions
+chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
+```
+
+### Phase 5: System Configuration
+
+#### 5.1 Environment Variables
 
 The system uses environment variables for configuration. Create a `.env` file in the project root:
 
@@ -183,7 +226,7 @@ REC_BIND_HOST=localhost
 REC_TARGET_HOST=localhost
 ```
 
-#### 4.2 Kalshi Credentials
+#### 5.2 Kalshi Credentials
 
 Set up Kalshi API credentials:
 
@@ -196,16 +239,16 @@ echo "your_kalshi_email" > backend/data/users/user_0001/credentials/kalshi-crede
 echo "your_kalshi_password" >> backend/data/users/user_0001/credentials/kalshi-credentials
 ```
 
-### Phase 5: System Startup
+### Phase 6: System Startup
 
-#### 5.1 Generate Supervisor Configuration
+#### 6.1 Generate Supervisor Configuration
 
 ```bash
 # Generate supervisor config with absolute paths
 ./scripts/generate_supervisor_config.sh
 ```
 
-#### 5.2 Start All Services
+#### 6.2 Start All Services
 
 ```bash
 # Start the entire system
@@ -219,7 +262,7 @@ This script will:
 - Start all 12 trading system services
 - Verify all services are running
 
-#### 5.3 Verify System Status
+#### 6.3 Verify System Status
 
 ```bash
 # Check service status

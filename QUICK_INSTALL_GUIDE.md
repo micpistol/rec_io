@@ -1,287 +1,299 @@
 # 🚀 REC.IO Trading System - Quick Install Guide
 
-## Two Installation Options
+## **One-Command Installation for New Users**
 
-The REC.IO trading system provides **two different installation methods** depending on your needs:
+The REC.IO trading system now provides a **single, comprehensive installation script** that handles everything automatically.
 
-### **Option 1: New User Installation** (Fresh Setup)
-For brand new users who want to start from scratch:
+## **Quick Start (3 Steps)**
 
+### **Step 1: Clone the Repository**
 ```bash
-./scripts/install_new_user.sh
+git clone https://github.com/betaclone1/rec_io.git
+cd rec_io
 ```
 
-### **Option 2: System Migration** (Existing Users)
-For existing users who want to move their complete system to a new machine:
-
+### **Step 2: Run the Installation Script**
 ```bash
-# On current machine - create migration package
-./scripts/migrate_system.sh create
-
-# Upload to cloud storage, then on new machine:
-git clone <your-repo-url>
-cd rec_io_20
-# Download migration package as migration.tar.gz
-tar -xzf migration.tar.gz
-cd migration
-./install_on_new_machine.sh
+python3 install.py
 ```
 
-## Which Option Should You Use?
-
-### **Use New User Installation When**:
-- ✅ You're a brand new user
-- ✅ You want to start from scratch
-- ✅ You don't have any existing data
-- ✅ You want a clean, fresh setup
-
-### **Use System Migration When**:
-- ✅ You have an existing REC.IO system
-- ✅ You want to move to a new machine
-- ✅ You want to preserve all your data and settings
-- ✅ You want to backup your complete system
-
-## What Each Tool Does
-
-### **New User Installation** (`./scripts/install_new_user.sh`):
-1. **System Requirements Check**
-   - Python 3.8+ verification
-   - PostgreSQL availability check
-   - Project structure validation
-
-2. **System Dependencies Installation**
-   - Installs PostgreSQL, Python, supervisor
-   - Sets up Python virtual environment
-   - Installs all required packages
-
-3. **Database Setup**
-   - Creates fresh PostgreSQL database
-   - Sets up database user and permissions
-   - Creates database schema
-
-4. **User Configuration**
-   - Prompts for user information (name, email)
-   - Sets up database configuration
-   - Configures trading platform credentials (optional)
-   - Sets system preferences
-
-5. **Service Configuration**
-   - Installs and configures supervisor
-   - Sets up service management
-   - Creates desktop shortcuts (optional)
-
-### **System Migration** (`./scripts/migrate_system.sh`):
-1. **System Analysis**
-   - Collects complete system information
-   - Creates file inventory
-   - Analyzes database structure
-
-2. **Database Backup**
-   - Creates complete PostgreSQL dump
-   - Compresses database (90% reduction)
-   - Includes all user data and trading history
-
-3. **Package Creation**
-   - Packages all project files
-   - Includes database backup
-   - Creates cross-platform installation script
-   - Generates comprehensive documentation
-
-4. **Cloud Storage Ready**
-   - Creates compressed package (510MB)
-   - Ready for upload to Google Drive, Dropbox, etc.
-   - Self-contained with all necessary files
-
-## System Migration (For Existing Users)
-
-If you have an existing REC.IO system and want to move it to a new machine:
-
-### **Step 1: Create Migration Package**
+### **Step 3: Start the System**
 ```bash
-# On your current machine
-./scripts/migrate_system.sh create
-# → Creates: backup/system_migrations/rec_io_system_migration_*.tar.gz (510MB)
-```
-
-### **Step 2: Upload to Cloud Storage**
-- Upload the migration package to Google Drive, Dropbox, or any cloud storage
-- Note the download link for the new machine
-
-### **Step 3: Restore on New Machine**
-```bash
-# Clone the repository
-git clone <your-repo-url>
-cd rec_io_20
-
-# Download migration package and place as migration.tar.gz
-tar -xzf migration.tar.gz
-cd migration
-./install_on_new_machine.sh
-```
-
-### **What Gets Migrated**:
-- ✅ **Complete database** with all trading history
-- ✅ **All user settings** and preferences
-- ✅ **Trading platform credentials**
-- ✅ **System configuration** and ports
-- ✅ **All project files** and source code
-
-## Database Backups (For Existing Users)
-
-For existing users who want to create regular backups:
-
-### **Create Database Backup**
-```bash
-./scripts/backup_database.sh backup
-# → Creates: backup/database_backups/rec_io_db_backup_*.tar.gz (210MB)
-```
-
-### **List Available Backups**
-```bash
-./scripts/backup_database.sh list
-```
-
-### **Verify Backup Integrity**
-```bash
-./scripts/backup_database.sh verify -f backup/database_backups/rec_io_db_backup_*.tar.gz
-```
-
-### **Restore from Backup**
-```bash
-./scripts/backup_database.sh restore -f backup/database_backups/rec_io_db_backup_*.tar.gz
-```
-
-## System Access
-
-After installation, access the system at:
-
-- **Main Application**: http://localhost:3000
-- **Login Page**: http://localhost:3000/login
-- **Health Check**: http://localhost:3000/health
-
-## Default Credentials
-
-- **Username**: Your user ID (e.g., `ewais`)
-- **Password**: The password you set during installation
-- **Local Bypass**: Available for development testing
-
-## SMTP Configuration
-
-For system notifications to work, set up SMTP environment variables:
-
-```bash
-# Set SMTP credentials
-export GMAIL_USER="rec.io.alerts@gmail.com"
-export GMAIL_PASSWORD="jfnc adxj ubfz lrtw"
-
-# Or create .env file
-echo "GMAIL_USER=rec.io.alerts@gmail.com" > .env
-echo "GMAIL_PASSWORD=jfnc adxj ubfz lrtw" >> .env
-```
-
-**For Remote Deployment:**
-- Set these environment variables on your server
-- Or add them to your system's environment configuration
-- The system will use these for all email notifications
-
-## Management Commands
-
-```bash
-# Restart the entire system
 ./scripts/MASTER_RESTART.sh
+```
 
-# Check service status
-supervisorctl -c backend/supervisord.conf status
+**That's it!** Your complete trading system will be ready to use.
 
-# View logs
-tail -f logs/*.out.log
+## **What the Installation Script Does**
+
+The `install.py` script provides a **guided, step-by-step installation** that handles everything:
+
+### **🔍 Step 1: System Requirements Check**
+- ✅ Verifies Python 3.8+ is installed
+- ✅ Checks operating system compatibility
+- ✅ Validates project structure
+
+### **📦 Step 2: Dependencies Installation**
+- ✅ Installs PostgreSQL, Python, supervisor, git
+- ✅ Sets up Python virtual environment
+- ✅ Installs all required Python packages
+
+### **🗄️ Step 3: PostgreSQL Setup**
+- ✅ Starts PostgreSQL service
+- ✅ Creates database user and database
+- ✅ Sets up proper permissions
+
+### **🐍 Step 4: Python Environment**
+- ✅ Creates virtual environment
+- ✅ Installs all dependencies from requirements.txt
+
+### **👤 Step 5: User Profile Setup**
+- ✅ Collects your name and email
+- ✅ Creates user directory structure
+- ✅ Sets up default preferences
+
+### **🔑 Step 6: Kalshi Credentials (Optional)**
+- ✅ Prompts for Kalshi API credentials
+- ✅ Securely stores credentials with proper permissions
+- ✅ Can be skipped and added later
+
+### **⚙️ Step 7: Environment Configuration**
+- ✅ Creates .env file with database settings
+- ✅ Configures system environment variables
+
+### **🗄️ Step 8: Database Schema**
+- ✅ Sets up all database tables
+- ✅ Creates necessary indexes and constraints
+
+### **⚙️ Step 9: Supervisor Configuration**
+- ✅ Generates supervisor configuration
+- ✅ Sets up service management
+
+### **✅ Step 10: Completion**
+- ✅ Shows next steps and useful commands
+- ✅ Provides troubleshooting information
+
+## **System Requirements**
+
+### **Minimum Requirements**
+- **Operating System**: Linux (Ubuntu 20.04+), macOS (10.15+), or Windows with WSL
+- **Python**: 3.8 or higher
+- **Memory**: 4GB RAM (8GB recommended)
+- **Storage**: 10GB free space
+- **Network**: Internet connection for dependencies
+
+### **Supported Platforms**
+- ✅ **macOS**: Full support with Homebrew
+- ✅ **Ubuntu/Debian**: Full support with apt
+- ✅ **CentOS/RHEL**: Full support with yum
+- ⚠️ **Windows**: Limited support (WSL recommended)
+
+## **Post-Installation Setup**
+
+### **Access Your System**
+- **Web Interface**: http://localhost:3000
+- **Health Check**: http://localhost:3000/health
+- **Login Page**: http://localhost:3000/login
+
+### **Default Configuration**
+- **Database**: PostgreSQL with your chosen credentials
+- **User Profile**: Created with your name and email
+- **Trading Mode**: Demo mode (safe for testing)
+- **Authentication**: Enabled by default
+
+## **Adding Trading Credentials**
+
+### **During Installation**
+The script will ask if you want to set up Kalshi credentials. If you choose yes:
+1. Get your API credentials from [Kalshi Trading Platform](https://trading.kalshi.com/settings/api)
+2. Enter your email, API key, and private key when prompted
+3. Credentials will be securely stored with proper permissions
+
+### **After Installation**
+If you skipped credential setup, you can add them later:
+```bash
+# Run the user setup script
+python3 scripts/setup_new_user.py
+
+# Or manually create credential files
+mkdir -p backend/data/users/user_0001/credentials/kalshi-credentials/prod
+echo "your_email@example.com" > backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
+echo "your_api_key" >> backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
+chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
+```
+
+## **System Management**
+
+### **Start/Stop Services**
+```bash
+# Start all services
+./scripts/MASTER_RESTART.sh
 
 # Stop all services
 supervisorctl -c backend/supervisord.conf stop all
+
+# Check service status
+supervisorctl -c backend/supervisord.conf status
 ```
 
-## Troubleshooting
-
-### New User Installation Fails
+### **View Logs**
 ```bash
-# Check system requirements
-./scripts/install_new_user.sh --check-requirements
+# View all logs
+tail -f logs/*.out.log
 
+# View specific service logs
+tail -f logs/main_app.out.log
+tail -f logs/unified_production_coordinator.out.log
+```
+
+### **Database Management**
+```bash
+# Test database connection
+./scripts/test_database.sh
+
+# Create backup
+./scripts/backup_database.sh backup
+
+# Restore from backup
+./scripts/backup_database.sh restore -f backup/database_backups/rec_io_db_backup_*.tar.gz
+```
+
+## **Troubleshooting**
+
+### **Installation Issues**
+
+#### **Python Version Too Old**
+```bash
 # Check Python version
-python --version
+python3 --version
 
-# Ensure you're in the project directory
-ls -la
-
-# Try non-interactive installation
-./scripts/install_new_user.sh --non-interactive
+# Install Python 3.8+ if needed
+# macOS: brew install python@3.8
+# Ubuntu: sudo apt install python3.8
 ```
 
-### Migration Package Creation Fails
+#### **PostgreSQL Installation Fails**
 ```bash
-# Check PostgreSQL is running
-pg_isready -h localhost -p 5432
+# macOS
+brew services start postgresql
 
-# Check database connection
-psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT 1;"
-
-# Check disk space
-df -h
+# Ubuntu
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
 ```
 
-### Services Not Starting
+#### **Permission Issues**
+```bash
+# Fix file permissions
+chmod +x install.py
+chmod +x scripts/*.sh
+```
+
+### **Runtime Issues**
+
+#### **Services Not Starting**
 ```bash
 # Check supervisor status
 supervisorctl -c backend/supervisord.conf status
 
-# Restart supervisor
-supervisorctl -c backend/supervisord.conf restart all
+# Restart all services
+./scripts/MASTER_RESTART.sh
 
 # Check logs for errors
-tail -f logs/main_app.out.log
+tail -f logs/*.out.log
 ```
 
-### Authentication Issues
+#### **Database Connection Issues**
 ```bash
-# Re-run authentication setup
-python scripts/setup_auth.py
+# Test database connection
+./scripts/test_database.sh
 
-# Test authentication
-python scripts/test_auth.py
+# Check PostgreSQL status
+pg_isready -h localhost -p 5432
 ```
 
-## Cross-Platform Support
+#### **Web Interface Not Accessible**
+```bash
+# Check if main app is running
+curl http://localhost:3000/health
 
-The installation script works on:
-- ✅ macOS
-- ✅ Linux
-- ✅ Windows (with WSL recommended)
+# Check port usage
+lsof -i :3000
 
-## Security Notes
+# Restart main app
+supervisorctl -c backend/supervisord.conf restart main_app
+```
 
-- System starts in demo mode for safety
-- Authentication is enabled by default
-- Credentials are stored securely
-- Change to production mode when ready
+## **Security Features**
 
-## Next Steps
+### **Built-in Security**
+- ✅ **No personal data in repository** - All user files excluded from git
+- ✅ **Secure credential storage** - Proper file permissions (600/700)
+- ✅ **User data isolation** - Each user's data completely separate
+- ✅ **Environment variables** - No hardcoded credentials
 
-### **For New Users**:
-1. **Test the system** with demo trades
-2. **Configure your preferences** in the web interface
-3. **Add trading platform credentials** in Account Manager
-4. **Switch to production mode** when ready
+### **Verification Commands**
+```bash
+# Verify no user data in git
+git ls-files | grep "backend/data/users"
 
-### **For Existing Users**:
-1. **Create regular backups** using `./scripts/backup_database.sh backup`
-2. **Upload backups to cloud storage** for security
-3. **Test migration packages** on similar systems
-4. **Set up automated backups** via crontab
+# Check credential file permissions
+ls -la backend/data/users/user_0001/credentials/
+
+# Verify .gitignore effectiveness
+git check-ignore backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
+```
+
+## **Next Steps After Installation**
+
+### **1. Test the System**
+- Open http://localhost:3000
+- Verify all services are running
+- Check the health endpoint
+
+### **2. Configure Your Profile**
+- Set up trading preferences
+- Configure risk tolerance
+- Set position sizes
+
+### **3. Add Trading Credentials**
+- Get Kalshi API credentials
+- Add them to the system
+- Test with demo trades first
+
+### **4. Switch to Production**
+- Test thoroughly in demo mode
+- Switch to production when ready
+- Monitor system performance
+
+## **Documentation**
+
+### **Guides**
+- **New User Setup**: `docs/NEW_USER_SETUP_GUIDE.md`
+- **Security Overview**: `docs/SECURITY_OVERVIEW.md`
+- **Deployment Guide**: `docs/DEPLOYMENT_GUIDE.md`
+
+### **Scripts**
+- **Installation**: `install.py` (this guide)
+- **User Setup**: `scripts/setup_new_user.py`
+- **System Management**: `scripts/MASTER_RESTART.sh`
+
+## **Support**
+
+### **Common Issues**
+1. **Check the logs**: `tail -f logs/*.out.log`
+2. **Test database**: `./scripts/test_database.sh`
+3. **Restart services**: `./scripts/MASTER_RESTART.sh`
+4. **Review documentation**: Check the docs/ directory
+
+### **Getting Help**
+- Review this guide and the documentation
+- Check the troubleshooting section
+- Verify system requirements
+- Test with the provided verification commands
 
 ---
 
-**For detailed documentation**: 
-- **New User Installation**: See `scripts/README_new_user_installation.md`
-- **System Migration**: See `scripts/README_system_migration.md`
-- **Database Backups**: See `scripts/README_database_backup.md`
-- **Complete System**: See `scripts/COMPLETE_TWO_TOOL_SYSTEM_SUMMARY.md` 
+**🎉 You're ready to start trading!**
+
+The REC.IO trading system is now installed and ready to use. Start with demo mode to familiarize yourself with the system, then add your credentials when you're ready to trade. 
