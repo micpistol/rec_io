@@ -120,10 +120,41 @@ backup_user_data() {
     USER_DATA_DIR="$backup_dir/user_data"
     mkdir -p "$USER_DATA_DIR"
     
-    # Copy user data if it exists
+    # Copy user data structure (excluding credentials and personal info)
     if [ -d "$PROJECT_ROOT/backend/data/users" ]; then
-        cp -r "$PROJECT_ROOT/backend/data/users" "$USER_DATA_DIR/"
-        print_success "User data backed up"
+        # Create user data directory structure without sensitive files
+        mkdir -p "$USER_DATA_DIR/users"
+        
+        # Copy only non-sensitive user data (trade history, accounts, etc.)
+        for user_dir in "$PROJECT_ROOT/backend/data/users"/*; do
+            if [ -d "$user_dir" ]; then
+                user_name=$(basename "$user_dir")
+                mkdir -p "$USER_DATA_DIR/users/$user_name"
+                
+                # Copy trade history (if exists)
+                if [ -d "$user_dir/trade_history" ]; then
+                    cp -r "$user_dir/trade_history" "$USER_DATA_DIR/users/$user_name/"
+                fi
+                
+                # Copy accounts data (if exists, excluding credentials)
+                if [ -d "$user_dir/accounts" ]; then
+                    cp -r "$user_dir/accounts" "$USER_DATA_DIR/users/$user_name/"
+                fi
+                
+                # Copy active trades (if exists)
+                if [ -d "$user_dir/active_trades" ]; then
+                    cp -r "$user_dir/active_trades" "$USER_DATA_DIR/users/$user_name/"
+                fi
+                
+                # Copy monitors (if exists)
+                if [ -d "$user_dir/monitors" ]; then
+                    cp -r "$user_dir/monitors" "$USER_DATA_DIR/users/$user_name/"
+                fi
+                
+                # DO NOT copy credentials, auth_tokens, device_tokens, or user_info.json
+                print_success "User data backed up (excluding credentials and personal info)"
+            fi
+        done
     else
         print_warning "No user data found to backup"
     fi

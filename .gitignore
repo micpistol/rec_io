@@ -76,6 +76,14 @@ changes.patch
 
 # User-specific data (credentials, accounts, etc.)
 backend/data/users/
+backend/data/users/**/user_info.json
+backend/data/users/**/auth_tokens.json
+backend/data/users/**/device_tokens.json
+backend/data/users/**/credentials/
+backend/data/users/**/credentials/**
+*.pem
+*.key
+*.env
 
 # Backup and swap files
 *.bak

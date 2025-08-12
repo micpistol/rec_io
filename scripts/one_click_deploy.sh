@@ -425,12 +425,29 @@ restore_data_from_package() {
         print_warning "No database backup found"
     fi
     
-    # Restore user data
+    # Restore user data (excluding credentials and personal info)
     if [ -d "$package_dir/user_data" ]; then
-        print_status "Restoring user data..."
+        print_status "Restoring user data (excluding credentials)..."
         mkdir -p backend/data
-        cp -r "$package_dir/user_data"/* backend/data/
-        print_success "User data restored"
+        
+        # Restore only non-sensitive user data
+        if [ -d "$package_dir/user_data/users" ]; then
+            for user_dir in "$package_dir/user_data/users"/*; do
+                if [ -d "$user_dir" ]; then
+                    user_name=$(basename "$user_dir")
+                    mkdir -p "backend/data/users/$user_name"
+                    
+                    # Restore trade history, accounts, active trades, monitors
+                    for subdir in trade_history accounts active_trades monitors; do
+                        if [ -d "$user_dir/$subdir" ]; then
+                            cp -r "$user_dir/$subdir" "backend/data/users/$user_name/"
+                        fi
+                    done
+                fi
+            done
+        fi
+        
+        print_success "User data restored (credentials excluded - must be added manually)"
     else
         print_warning "No user data found"
     fi

@@ -1,0 +1,142 @@
+{
+  "timestamp": "2025-08-12T09:19:23.265370",
+  "symbol": "BTC",
+  "current_price": 120000,
+  "base_strike": 120000,
+  "ttc_seconds": 300,
+  "momentum_score": 0.0,
+  "strikes": [
+    118750,
+    119000,
+    119250,
+    119500,
+    119750,
+    120000,
+    120250,
+    120500,
+    120750,
+    121000,
+    121250
+  ],
+  "lookup_probabilities": [],
+  "live_probabilities": [
+    {
+      "strike": 118750.0,
+      "buffer": 1250.0,
+      "move_percent": 1.04,
+      "prob_beyond": 0.02,
+      "prob_within": 99.98,
+      "direction": "below",
+      "positive_prob": 0.02,
+      "negative_prob": 0.02
+    },
+    {
+      "strike": 119000.0,
+      "buffer": 1000.0,
+      "move_percent": 0.83,
+      "prob_beyond": 0.05,
+      "prob_within": 99.95,
+      "direction": "below",
+      "positive_prob": 0.05,
+      "negative_prob": 0.05
+    },
+    {
+      "strike": 119250.0,
+      "buffer": 750.0,
+      "move_percent": 0.62,
+      "prob_beyond": 0.14,
+      "prob_within": 99.86,
+      "direction": "below",
+      "positive_prob": 0.13,
+      "negative_prob": 0.14
+    },
+    {
+      "strike": 119500.0,
+      "buffer": 500.0,
+      "move_percent": 0.42,
+      "prob_beyond": 0.48,
+      "prob_within": 99.52,
+      "direction": "below",
+      "positive_prob": 0.46,
+      "negative_prob": 0.48
+    },
+    {
+      "strike": 119750.0,
+      "buffer": 250.0,
+      "move_percent": 0.21,
+      "prob_beyond": 2.92,
+      "prob_within": 97.08,
+      "direction": "below",
+      "positive_prob": 2.84,
+      "negative_prob": 2.92
+    },
+    {
+      "strike": 120000.0,
+      "buffer": 0.0,
+      "move_percent": 0.0,
+      "prob_beyond": 50.14,
+      "prob_within": 49.86,
+      "direction": "below",
+      "positive_prob": 49.97,
+      "negative_prob": 50.14
+    },
+    {
+      "strike": 120250.0,
+      "buffer": 250.0,
+      "move_percent": 0.21,
+      "prob_beyond": 2.84,
+      "prob_within": 97.16,
+      "direction": "above",
+      "positive_prob": 2.84,
+      "negative_prob": 2.92
+    },
+    {
+      "strike": 120500.0,
+      "buffer": 500.0,
+      "move_percent": 0.42,
+      "prob_beyond": 0.46,
+      "prob_within": 99.54,
+      "direction": "above",
+      "positive_prob": 0.46,
+      "negative_prob": 0.48
+    },
+    {
+      "strike": 120750.0,
+      "buffer": 750.0,
+      "move_percent": 0.62,
+      "prob_beyond": 0.13,
+      "prob_within": 99.87,
+      "direction": "above",
+      "positive_prob": 0.13,
+      "negative_prob": 0.14
+    },
+    {
+      "strike": 121000.0,
+      "buffer": 1000.0,
+      "move_percent": 0.83,
+      "prob_beyond": 0.05,
+      "prob_within": 99.95,
+      "direction": "above",
+      "positive_prob": 0.05,
+      "negative_prob": 0.05
+    },
+    {
+      "strike": 121250.0,
+      "buffer": 1250.0,
+      "move_percent": 1.04,
+      "prob_beyond": 0.02,
+      "prob_within": 99.98,
+      "direction": "above",
+      "positive_prob": 0.02,
+      "negative_prob": 0.02
+    }
+  ],
+  "performance": {
+    "lookup_time_ms": 0.02002716064453125,
+    "live_time_ms": 273.21696281433105,
+    "speed_improvement": 13642.32142857143
+  },
+  "comparison": {
+    "error": "Missing probability data"
+  }
+}

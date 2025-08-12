@@ -233,20 +233,17 @@ EOF
 
 # Function to transfer credentials
 transfer_credentials() {
-    log "PHASE 6: TRANSFERRING CREDENTIALS"
+    log "PHASE 6: SETTING UP CREDENTIALS STRUCTURE"
     
-    # Transfer credentials securely
-    scp -r backend/data/users/user_0001/credentials/kalshi-credentials/prod/* "$SERVER_USER@$SERVER_IP:$DEPLOY_DIR/backend/data/users/user_0001/credentials/kalshi-credentials/prod/"
-    scp -r backend/data/users/user_0001/credentials/kalshi-credentials/demo/* "$SERVER_USER@$SERVER_IP:$DEPLOY_DIR/backend/data/users/user_0001/credentials/kalshi-credentials/demo/"
-    
-    # Set proper permissions on server
+    # Create credential directories on server (without transferring actual credentials)
     ssh "$SERVER_USER@$SERVER_IP" << 'EOF'
-        chmod -R 600 /opt/trading_system/backend/data/users/user_0001/credentials/kalshi-credentials/*/.env
-        chmod -R 600 /opt/trading_system/backend/data/users/user_0001/credentials/kalshi-credentials/*/kalshi.pem
-        echo "Credentials transferred and secured"
+        mkdir -p /opt/trading_system/backend/data/users/user_0001/credentials/kalshi-credentials/prod
+        mkdir -p /opt/trading_system/backend/data/users/user_0001/credentials/kalshi-credentials/demo
+        chmod -R 700 /opt/trading_system/backend/data/users/user_0001/credentials
+        echo "Credential directories created - you must manually add your credentials"
 EOF
     
-    success "Credentials transferred and secured"
+    success "Credential structure created - manual credential setup required"
 }
 
 # Function to configure environment
