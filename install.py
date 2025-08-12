@@ -13,6 +13,9 @@ import platform
 from pathlib import Path
 import shutil
 
+# Global variable to track scipy installation status
+scipy_installed = True
+
 def print_banner():
     """Print installation banner."""
     print("=" * 70)
@@ -102,10 +105,19 @@ def install_dependencies():
         # Detect package manager
         if shutil.which("apt"):
             pkg_mgr = "apt"
-            deps = ["python3", "python3-pip", "python3-venv", "postgresql", "postgresql-client", "supervisor", "git"]
+            deps = [
+                "python3", "python3-pip", "python3-venv", 
+                "postgresql", "postgresql-client", "supervisor", "git",
+                "build-essential", "gfortran", "libopenblas-dev", "liblapack-dev",
+                "pkg-config", "python3-dev"
+            ]
         elif shutil.which("yum"):
             pkg_mgr = "yum"
-            deps = ["python3", "python3-pip", "postgresql", "postgresql-server", "supervisor", "git"]
+            deps = [
+                "python3", "python3-pip", "postgresql", "postgresql-server", 
+                "supervisor", "git", "gcc", "gcc-gfortran", "openblas-devel", 
+                "lapack-devel", "pkgconfig", "python3-devel"
+            ]
         else:
             print("❌ Unsupported package manager")
             return False
@@ -145,10 +157,16 @@ def setup_postgresql():
     # Create database user and database
     print("👤 Creating database user...")
     
-    # Get database configuration
-    db_user = get_user_input("Enter database username [rec_io_user]: ") or "rec_io_user"
-    db_password = get_user_input("Enter database password [rec_io_password]: ", password=True) or "rec_io_password"
-    db_name = get_user_input("Enter database name [rec_io_db]: ") or "rec_io_db"
+    # Use default database configuration for new users
+    db_user = "rec_io_user"
+    db_password = "rec_io_password"
+    db_name = "rec_io_db"
+    
+    print(f"🗄️  Using default database configuration:")
+    print(f"   Database: {db_name}")
+    print(f"   Username: {db_user}")
+    print(f"   Password: {db_password}")
+    print("   (You can change these later if needed)")
     
     # Create user and database
     create_user_cmd = f"CREATE USER {db_user} WITH PASSWORD '{db_password}';"
@@ -184,9 +202,64 @@ def setup_python_environment():
     
     print("📦 Installing Python dependencies...")
     pip_cmd = "venv/bin/pip" if platform.system() != "Windows" else "venv\\Scripts\\pip"
-    if subprocess.run([pip_cmd, "install", "-r", "requirements.txt"]).returncode != 0:
-        print("❌ Failed to install Python dependencies")
-        return False
+    
+    # First, upgrade pip
+    print("📦 Upgrading pip...")
+    subprocess.run([pip_cmd, "install", "--upgrade", "pip"])
+    
+    # Try to install all dependencies
+    print("📦 Installing all dependencies...")
+    result = subprocess.run([pip_cmd, "install", "-r", "requirements.txt"])
+    
+    if result.returncode != 0:
+        print("⚠️  Some dependencies failed to install. Trying alternative approach...")
+        
+        # Try installing scipy separately with pre-built wheels
+        print("📦 Installing scipy with pre-built wheels...")
+        scipy_result = subprocess.run([pip_cmd, "install", "scipy", "--only-binary=scipy"])
+        
+        if scipy_result.returncode != 0:
+            global scipy_installed
+            scipy_installed = False
+            print("⚠️  Scipy installation failed. Installing core dependencies only...")
+            
+            # Install core dependencies from requirements-core.txt
+            if Path("requirements-core.txt").exists():
+                print("📦 Installing core dependencies...")
+                core_result = subprocess.run([pip_cmd, "install", "-r", "requirements-core.txt"])
+                if core_result.returncode == 0:
+                    print("✅ Core dependencies installed successfully")
+                    print("⚠️  Note: scipy not available. Some advanced features may be limited.")
+                else:
+                    print("⚠️  Core dependencies installation failed. Trying individual packages...")
+                    # Fallback to individual packages
+                    core_deps = [
+                        "fastapi", "uvicorn", "requests", "python-dotenv", 
+                        "psycopg2-binary", "pandas", "numpy", "supervisor", 
+                        "flask-cors", "pydantic", "websockets", "aiohttp"
+                    ]
+                    
+                    for dep in core_deps:
+                        print(f"📦 Installing {dep}...")
+                        if subprocess.run([pip_cmd, "install", dep]).returncode != 0:
+                            print(f"⚠️  Failed to install {dep}, continuing...")
+            else:
+                print("⚠️  requirements-core.txt not found. Trying individual packages...")
+                # Fallback to individual packages
+                core_deps = [
+                    "fastapi", "uvicorn", "requests", "python-dotenv", 
+                    "psycopg2-binary", "pandas", "numpy", "supervisor", 
+                    "flask-cors", "pydantic", "websockets", "aiohttp"
+                ]
+                
+                for dep in core_deps:
+                    print(f"📦 Installing {dep}...")
+                    if subprocess.run([pip_cmd, "install", dep]).returncode != 0:
+                        print(f"⚠️  Failed to install {dep}, continuing...")
+        else:
+            # Try installing remaining dependencies
+            print("📦 Installing remaining dependencies...")
+            subprocess.run([pip_cmd, "install", "-r", "requirements.txt"])
     
     print("✅ Python environment setup completed")
     return True
@@ -344,6 +417,16 @@ def show_completion():
     print_step(10, "INSTALLATION COMPLETED")
     
     print("🎉 REC.IO Trading System installation completed successfully!")
+    
+    # Show scipy status
+    if not scipy_installed:
+        print()
+        print("⚠️  Note: scipy was not installed due to compilation issues.")
+        print("   The system will work with core functionality, but some advanced")
+        print("   features may be limited. You can install scipy later with:")
+        print("   sudo apt install gfortran libopenblas-dev liblapack-dev")
+        print("   source venv/bin/activate && pip install scipy")
+    
     print()
     print("📋 Next Steps:")
     print("1. Start the system:")
