@@ -1,0 +1,39 @@
+{
+  "method": "lookup_table",
+  "timestamp": "2025-08-12T20:59:48.833695+00:00",
+  "parameters": {
+    "current_price": 120000,
+    "ttc_seconds": 1800,
+    "momentum_score": 0.0,
+    "strikes": [
+      119750,
+      120000,
+      120250
+    ]
+  },
+  "calculation_time_seconds": 0.026243925094604492,
+  "probabilities": [
+    {
+      "strike": 119750,
+      "positive_prob": 30.22,
+      "negative_prob": 29.64,
+      "prob_within": 59.86,
+      "prob_beyond": 40.14
+    },
+    {
+      "strike": 120000,
+      "positive_prob": 50.28,
+      "negative_prob": 49.73,
+      "prob_within": 100.00999999999999,
+      "prob_beyond": -0.009999999999990905
+    },
+    {
+      "strike": 120250,
+      "positive_prob": 30.22,
+      "negative_prob": 29.64,
+      "prob_within": 59.86,
+      "prob_beyond": 40.14
+    }
+  ],
+  "fingerprint_csv": "lookup_table_test"
+}
