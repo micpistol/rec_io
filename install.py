@@ -23,6 +23,9 @@ def print_banner():
     print("=" * 70)
     print("This script will guide you through setting up the REC.IO trading system.")
     print("It will install dependencies, set up PostgreSQL, and configure your user profile.")
+    print()
+    print("⚠️  If you see package configuration dialogs, select 'Ok' to continue.")
+    print("   The script will handle most prompts automatically.")
     print("=" * 70)
 
 def print_step(step_num, title, description=""):
@@ -126,11 +129,25 @@ def install_dependencies():
         print("📦 Updating package list...")
         subprocess.run([pkg_mgr, "update", "-y"])
         
-        # Install dependencies
+        # Install dependencies with automatic configuration
         for dep in deps:
             print(f"📦 Installing {dep}...")
-            if subprocess.run([pkg_mgr, "install", "-y", dep]).returncode != 0:
+            # Use DEBIAN_FRONTEND=noninteractive to avoid prompts
+            env = os.environ.copy()
+            env['DEBIAN_FRONTEND'] = 'noninteractive'
+            env['UCF_FORCE_CONFNEW'] = '1'
+            env['UCF_FORCE_CONFOLD'] = '1'
+            
+            result = subprocess.run(
+                [pkg_mgr, "install", "-y", dep], 
+                env=env,
+                input=b'\n',  # Send newline to accept defaults
+                capture_output=True
+            )
+            
+            if result.returncode != 0:
                 print(f"❌ Failed to install {dep}")
+                print(f"Error: {result.stderr.decode()}")
                 return False
     
     else:
@@ -151,8 +168,12 @@ def setup_postgresql():
     if system == "Darwin":
         subprocess.run(["brew", "services", "start", "postgresql"])
     else:
-        subprocess.run(["sudo", "systemctl", "start", "postgresql"])
-        subprocess.run(["sudo", "systemctl", "enable", "postgresql"])
+        # Use non-interactive environment for systemctl
+        env = os.environ.copy()
+        env['DEBIAN_FRONTEND'] = 'noninteractive'
+        
+        subprocess.run(["sudo", "systemctl", "start", "postgresql"], env=env)
+        subprocess.run(["sudo", "systemctl", "enable", "postgresql"], env=env)
     
     # Create database user and database
     print("👤 Creating database user...")
@@ -179,10 +200,13 @@ def setup_postgresql():
         subprocess.run(["psql", "-d", db_name, "-c", create_user_cmd], check=False)
         subprocess.run(["psql", "-d", db_name, "-c", grant_cmd], check=False)
     else:
-        # Linux PostgreSQL setup
-        subprocess.run(["sudo", "-u", "postgres", "psql", "-c", create_user_cmd])
-        subprocess.run(["sudo", "-u", "postgres", "psql", "-c", create_db_cmd])
-        subprocess.run(["sudo", "-u", "postgres", "psql", "-c", grant_cmd])
+        # Linux PostgreSQL setup with non-interactive environment
+        env = os.environ.copy()
+        env['DEBIAN_FRONTEND'] = 'noninteractive'
+        
+        subprocess.run(["sudo", "-u", "postgres", "psql", "-c", create_user_cmd], env=env)
+        subprocess.run(["sudo", "-u", "postgres", "psql", "-c", create_db_cmd], env=env)
+        subprocess.run(["sudo", "-u", "postgres", "psql", "-c", grant_cmd], env=env)
     
     print("✅ PostgreSQL setup completed")
     return {
