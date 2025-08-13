@@ -319,12 +319,21 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                 now_est = datetime.now(ZoneInfo("America/New_York"))
                 closed_at = now_est.strftime("%H:%M:%S")
                 
-                with pg_conn.cursor() as cursor_pos:
-                    cursor_pos.execute("SELECT fees_paid FROM users.positions_0001 WHERE ticker = %s", (expected_ticker,))
-                    fees_row = cursor_pos.fetchone()
+                # Calculate total fees from orders table (opening + closing orders)
+                total_fees_paid = None
+                pg_conn_orders = get_postgresql_connection()
+                if pg_conn_orders:
+                    with pg_conn_orders.cursor() as cursor_orders:
+                        cursor_orders.execute("""
+                            SELECT SUM(taker_fees) as total_fees
+                            FROM users.orders_0001 
+                            WHERE ticker = %s AND action = 'buy'
+                        """, (expected_ticker,))
+                        fees_row = cursor_orders.fetchone()
+                        total_fees_paid = float(fees_row[0]) if fees_row and fees_row[0] is not None else None
+                    pg_conn_orders.close()
                 
-                total_fees_paid = float(fees_row[0]) if fees_row and fees_row[0] is not None else None
-                # log(f"[CONFIRM_CLOSE] Total fees paid: {total_fees_paid}")
+                log_event(ticket_id, f"MANAGER: Calculated total fees from orders: {total_fees_paid}")
                 
                 pg_conn = get_postgresql_connection()
                 if pg_conn:
