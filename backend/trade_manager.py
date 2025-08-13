@@ -2,21 +2,19 @@
 import threading
 import time
 import os
+import sys
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import re
 import requests
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from backend.core.config.settings import config
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
 
 # Import the universal centralized port system
-import sys
-import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from backend.core.port_config import get_port, get_port_info
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from backend.util.paths import get_project_root, get_trade_history_dir, get_logs_dir, get_host, get_data_dir
 from backend.account_mode import get_account_mode
 from backend.util.paths import get_accounts_data_dir
