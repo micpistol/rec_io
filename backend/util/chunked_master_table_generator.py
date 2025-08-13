@@ -36,7 +36,7 @@ class ChunkedMasterTableGenerator:
         # Generation parameters (practical range)
         self.ttc_range = (0, 900)  # 0-15 minutes
         self.buffer_range = (0, 1500)  # 0-1500 points
-        self.momentum_range = (-31, 30)  # -31 to +30
+        self.momentum_range = (-30, 30)  # -30 to +30 (61 buckets total)
         
         # Chunk configuration
         self.num_chunks = 10
@@ -126,7 +126,7 @@ class ChunkedMasterTableGenerator:
         try:
             # Format table name
             if momentum_bucket < 0:
-                table_name = f"{self.fingerprint_table_prefix}-{abs(momentum_bucket):02d}"
+                table_name = f"{self.fingerprint_table_prefix}_-{abs(momentum_bucket):02d}"
             else:
                 table_name = f"{self.fingerprint_table_prefix}_{momentum_bucket:03d}"
             

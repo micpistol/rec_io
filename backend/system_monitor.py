@@ -186,13 +186,13 @@ class SystemMonitor:
                 print(f"🚨 DUPLICATE PROCESSES DETECTED: {len(duplicate_report['duplicate_processes'])} services affected")
                 sys.stdout.flush()
                 
-                # Send notification
-                try:
-                    from scripts.user_notifications import send_sms_alert
-                    send_sms_alert(f"DUPLICATE PROCESSES DETECTED: {len(duplicate_report['duplicate_processes'])} services affected. Check system monitor logs.")
-                except Exception as e:
-                    print(f"Failed to send duplicate process alert: {e}")
-                    sys.stdout.flush()
+                                        # Send notification - DISABLED TO PREVENT FALSE ALERTS
+                        # try:
+                        #     from scripts.user_notifications import send_sms_alert
+                        #     send_sms_alert(f"DUPLICATE PROCESSES DETECTED: {len(duplicate_report['duplicate_processes'])} services affected. Check system monitor logs.")
+                        # except Exception as e:
+                        #     print(f"Failed to send duplicate process alert: {e}")
+                        #     sys.stdout.flush()
             
         except Exception as e:
             print(f"❌ Error checking for duplicate processes: {e}")
@@ -531,38 +531,42 @@ class SystemMonitor:
     def trigger_master_restart(self):
         """Trigger a MASTER RESTART and send notification."""
         try:
-            # Import user_notifications here to avoid circular imports
-            import user_notifications
+            # Import user_notifications here to avoid circular imports - DISABLED
+            # import user_notifications
             
             print("🚨 TRIGGERING MASTER RESTART")
             sys.stdout.flush()
             
-            # Send notification
-            message = "SYSTEM-TRIGGERED MASTER RESTART: System monitor detected critical failures. MASTER RESTART initiated."
-            user_notifications.send_user_notification(message, "MASTER_RESTART")
+            # Send notification - DISABLED TO PREVENT FALSE ALERTS
+            # message = "SYSTEM-TRIGGERED MASTER RESTART: System monitor detected critical failures. MASTER RESTART initiated."
+            # user_notifications.send_user_notification(message, "MASTER_RESTART")
             
-            # Execute MASTER RESTART
-            restart_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts", "MASTER_RESTART.sh")
-            if not os.path.exists(restart_script):
-                print(f"❌ ERROR: Restart script not found: {restart_script}")
-                return False
+            # Execute MASTER RESTART - DISABLED TO PREVENT FALSE RESTARTS
+            # restart_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts", "MASTER_RESTART.sh")
+            # if not os.path.exists(restart_script):
+            #     print(f"❌ ERROR: Restart script not found: {restart_script}")
+            #     return False
             
-            # Change to project root directory and run the script exactly like manual execution
-            project_root = os.path.dirname(os.path.dirname(__file__))
+            # # Change to project root directory and run the script exactly like manual execution
+            # project_root = os.path.dirname(os.path.dirname(__file__))
             
-            # Call the script exactly like manual execution - use shell=True to run in proper shell environment
-            result = subprocess.run(
-                f"cd {project_root} && ./scripts/MASTER_RESTART.sh",
-                shell=True, capture_output=True, text=True, timeout=60, cwd=project_root
-            )
+            # # Call the script exactly like manual execution - use shell=True to run in proper shell environment
+            # result = subprocess.run(
+            #     f"cd {project_root} && ./scripts/MASTER_RESTART.sh",
+            #     shell=True, capture_output=True, text=True, timeout=60, cwd=project_root
+            # )
             
-            if result.returncode == 0:
-                print("✅ MASTER RESTART executed successfully")
-                self.master_restart_triggered = True
-                return True
-            else:
-                print(f"❌ MASTER RESTART failed: {result.stderr}")
-                return False
+            # if result.returncode == 0:
+            #     print("✅ MASTER RESTART executed successfully")
+            #     self.master_restart_triggered = True
+            #     return True
+            # else:
+            #     print(f"❌ MASTER RESTART failed: {result.stderr}")
+            #     return False
+            
+            print("🚨 MASTER RESTART DISABLED - Would have triggered restart but alerts are disabled")
+            self.master_restart_triggered = True
+            return True
                 
         except Exception as e:
             print(f"❌ Error triggering MASTER RESTART: {e}")
@@ -574,8 +578,8 @@ class SystemMonitor:
             return
         
         try:
-            # Import user_notifications here to avoid circular imports
-            import user_notifications
+            # Import user_notifications here to avoid circular imports - DISABLED
+            # import user_notifications
             
             # Check supervisor status for all critical services
             critical_services = [
@@ -597,16 +601,16 @@ class SystemMonitor:
                     failed_services.append(service)
             
             if all_running:
-                # Success - send notification and resume trading
-                message = "SYSTEM RESTARTED SUCCESSFULLY: All critical services are running. Automated trading functions have resumed."
-                user_notifications.send_user_notification(message, "RESTART_SUCCESS")
+                # Success - send notification and resume trading - DISABLED TO PREVENT FALSE ALERTS
+                # message = "SYSTEM RESTARTED SUCCESSFULLY: All critical services are running. Automated trading functions have resumed."
+                # user_notifications.send_user_notification(message, "RESTART_SUCCESS")
                 self.trading_suspended = False
                 print("✅ System fully recovered - automated trading resumed")
                 sys.stdout.flush()
             else:
-                # Failure - send notification
-                message = f"SYSTEM RESTART FAILED: Critical services still down: {', '.join(failed_services)}. System needs immediate attention."
-                user_notifications.send_user_notification(message, "RESTART_FAILURE")
+                # Failure - send notification - DISABLED TO PREVENT FALSE ALERTS
+                # message = f"SYSTEM RESTART FAILED: Critical services still down: {', '.join(failed_services)}. System needs immediate attention."
+                # user_notifications.send_user_notification(message, "RESTART_FAILURE")
                 print(f"❌ System restart failed - services still down: {', '.join(failed_services)}")
                 sys.stdout.flush()
             

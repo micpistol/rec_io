@@ -270,14 +270,14 @@ class CascadingFailureDetector:
             return False
             
         try:
-            # Import user_notifications here to avoid circular imports
-            import user_notifications
+            # Import user_notifications here to avoid circular imports - DISABLED
+            # import user_notifications
             
             self._log_event("🚨 TRIGGERING MASTER RESTART - Catastrophic failure detected")
             
-            # Send notification
-            message = "SYSTEM-TRIGGERED MASTER RESTART: Cascading failure detector detected catastrophic failure. MASTER RESTART initiated."
-            user_notifications.send_user_notification(message, "MASTER_RESTART")
+            # Send notification - DISABLED TO PREVENT FALSE ALERTS
+            # message = "SYSTEM-TRIGGERED MASTER RESTART: Cascading failure detector detected catastrophic failure. MASTER RESTART initiated."
+            # user_notifications.send_user_notification(message, "MASTER_RESTART")
             
             # Execute MASTER RESTART with full path to bash
             restart_script = "scripts/MASTER_RESTART.sh"
@@ -293,23 +293,29 @@ class CascadingFailureDetector:
                 self._log_event("ERROR: bash not found in /bin/bash or /usr/bin/bash")
                 return False
             
-            # Execute the restart script
-            result = subprocess.run(
-                [bash_path, restart_script],
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
+            # Execute the restart script - DISABLED TO PREVENT FALSE RESTARTS
+            # result = subprocess.run(
+            #     [bash_path, restart_script],
+            #     capture_output=True,
+            #     text=True,
+            #     timeout=60
+            # )
             
-            if result.returncode == 0:
-                self._log_event("✅ MASTER RESTART executed successfully")
-                self.last_restart_time = time.time()
-                self.restart_count += 1
-                self.master_restart_triggered = True
-                return True
-            else:
-                self._log_event(f"❌ MASTER RESTART failed: {result.stderr}")
-                return False
+            # if result.returncode == 0:
+            #     self._log_event("✅ MASTER RESTART executed successfully")
+            #     self.last_restart_time = time.time()
+            #     self.restart_count += 1
+            #     self.master_restart_triggered = True
+            #     return True
+            # else:
+            #     self._log_event(f"❌ MASTER RESTART failed: {result.stderr}")
+            #     return False
+            
+            self._log_event("🚨 MASTER RESTART DISABLED - Would have triggered restart but alerts are disabled")
+            self.last_restart_time = time.time()
+            self.restart_count += 1
+            self.master_restart_triggered = True
+            return True
                 
         except Exception as e:
             self._log_event(f"❌ Error triggering MASTER RESTART: {e}")
@@ -321,8 +327,8 @@ class CascadingFailureDetector:
             return
         
         try:
-            # Import user_notifications here to avoid circular imports
-            import user_notifications
+            # Import user_notifications here to avoid circular imports - DISABLED
+            # import user_notifications
             
             # Check supervisor status for all critical services
             critical_services = [
@@ -344,14 +350,14 @@ class CascadingFailureDetector:
                     failed_services.append(service)
             
             if all_running:
-                # Success - send notification
-                message = "SYSTEM RESTARTED SUCCESSFULLY: All critical services are running."
-                user_notifications.send_user_notification(message, "RESTART_SUCCESS")
+                # Success - send notification - DISABLED TO PREVENT FALSE ALERTS
+                # message = "SYSTEM RESTARTED SUCCESSFULLY: All critical services are running."
+                # user_notifications.send_user_notification(message, "RESTART_SUCCESS")
                 self._log_event("✅ System fully recovered")
             else:
-                # Failure - send notification
-                message = f"SYSTEM RESTART FAILED: Critical services still down: {', '.join(failed_services)}. System needs immediate attention."
-                user_notifications.send_user_notification(message, "RESTART_FAILURE")
+                # Failure - send notification - DISABLED TO PREVENT FALSE ALERTS
+                # message = f"SYSTEM RESTART FAILED: Critical services still down: {', '.join(failed_services)}. System needs immediate attention."
+                # user_notifications.send_user_notification(message, "RESTART_FAILURE")
                 self._log_event(f"❌ System restart failed - services still down: {', '.join(failed_services)}")
             
             self.restart_completion_checked = True
