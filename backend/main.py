@@ -1211,7 +1211,7 @@ async def get_core_data():
                 password="rec_io_password"
             )
             with conn.cursor() as cursor:
-                cursor.execute("SELECT buy_price FROM users.trades_0001 ORDER BY date DESC, time DESC LIMIT 1")
+                cursor.execute("SELECT buy_price FROM users.trades_0001 WHERE test_filter IS NULL OR test_filter = FALSE ORDER BY date DESC, time DESC LIMIT 1")
                 result = cursor.fetchone()
                 if result:
                     latest_db_price = result[0]

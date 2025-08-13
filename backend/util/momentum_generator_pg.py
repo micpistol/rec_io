@@ -50,9 +50,9 @@ def calculate_momentum(df):
                 ((P_now - P_4m)  / P_4m)  * 0.15 +
                 ((P_now - P_15m) / P_15m) * 0.05 +
                 ((P_now - P_30m) / P_30m) * 0.05
-            ) * 10000
+            ) * 100
 
-            momentum_scores.iloc[i] = int(round(score))
+            momentum_scores.iloc[i] = round(score, 4)
     
     print("Momentum calculation complete!")
     return momentum_scores
@@ -157,7 +157,7 @@ def update_momentum_in_db(symbol: str, df: pd.DataFrame, indices_to_update=None)
                         UPDATE historical_data.{table_name}
                         SET momentum = %s
                         WHERE timestamp = %s
-                    """, (int(row['momentum']), row['timestamp']))
+                    """, (float(row['momentum']), row['timestamp']))
                     updated_count += cursor.rowcount
             
             # Commit each batch
@@ -216,9 +216,9 @@ def fill_missing_momentum_in_db(symbol: str, start_date: str = None, end_date: s
             ((P_now - P_4m)  / P_4m)  * 0.15 +
             ((P_now - P_15m) / P_15m) * 0.05 +
             ((P_now - P_30m) / P_30m) * 0.05
-        ) * 10000
+        ) * 100
         
-        df.at[i, 'momentum'] = int(round(score))
+        df.at[i, 'momentum'] = round(score, 4)
         calculated_indices.append(i)
     
     # Update database with calculated momentum values (only the ones we calculated)

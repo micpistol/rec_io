@@ -8,7 +8,18 @@ import os
 from typing import Dict, Optional
 
 # Import the universal host system
-from backend.util.paths import get_host, get_service_url
+try:
+    from backend.util.paths import get_host, get_service_url
+except ImportError as e:
+    print(f"Warning: Could not import get_host or get_service_url from backend.util.paths: {e}")
+    # Fallback implementations
+    def get_host():
+        """Fallback host function"""
+        return "localhost"
+    
+    def get_service_url(port: int) -> str:
+        """Fallback service URL function"""
+        return f"http://localhost:{port}"
 
 # Central port configuration file - now using MASTER_PORT_MANIFEST.json
 PORT_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config", "MASTER_PORT_MANIFEST.json")

@@ -14,9 +14,12 @@ This dramatically reduces API calls while maintaining full functionality.
 
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+
+# Set up Python path to ensure imports work correctly
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+sys.path.insert(0, project_root)
+os.environ['PYTHONPATH'] = project_root
 from backend.util.paths import get_project_root
-from backend.core.config.settings import config
 from backend.account_mode import get_account_mode
 import requests
 import json
@@ -47,7 +50,19 @@ from backend.util.paths import get_project_root
 sys.path.insert(0, get_project_root())
 
 from backend.util.paths import get_kalshi_data_dir, get_accounts_data_dir, ensure_data_dirs, get_kalshi_credentials_dir
-from backend.core.port_config import get_port
+
+# Import get_port directly to avoid circular import issues
+try:
+    from backend.core.port_config import get_port
+except ImportError:
+    # Fallback if import fails
+    def get_port(service_name: str) -> int:
+        """Fallback port function if port_config import fails"""
+        default_ports = {
+            "trade_manager": 4000,
+            "main_app": 3000,
+        }
+        return default_ports.get(service_name, 3000)
 
 # Ensure all data directories exist
 ensure_data_dirs()
@@ -149,10 +164,17 @@ def notify_frontend_db_change(db_name: str, change_data: dict = None):
     try:
         # Use requests instead of aiohttp to avoid event loop conflicts
         import requests
-        from backend.util.paths import get_host
-        from backend.core.config.settings import config
         
-        notification_url = f"http://{get_host()}:{config.get('main_app_port', 3000)}/api/notify_db_change"
+        # Try to import get_host, with fallback
+        try:
+            from backend.util.paths import get_host
+            host = get_host()
+        except ImportError:
+            host = "localhost"  # Fallback to localhost
+        
+        # Use get_port function to get main_app port
+        main_app_port = get_port("main_app")
+        notification_url = f"http://{host}:{main_app_port}/api/notify_db_change"
         payload = {
             "db_name": db_name,
             "timestamp": time.time(),
@@ -627,70 +649,71 @@ def sync_orders():
         print(f"🕒 Orders range — newest: {latest_time}, oldest: {oldest_time}, total: {len(all_orders)}")
     else:
         print("⚠️ API returned zero orders.")
+    
     # ------------------------------------------------------------
     # Write to PostgreSQL
-        try:
-            pg_conn = get_postgresql_connection()
-            if pg_conn:
-                with pg_conn.cursor() as cursor:
-                    # Get existing order_ids from PostgreSQL
-                    cursor.execute("SELECT order_id FROM users.orders_0001")
-                    pg_existing_ids = set(row[0] for row in cursor.fetchall())
+    try:
+        pg_conn = get_postgresql_connection()
+        if pg_conn:
+            with pg_conn.cursor() as cursor:
+                # Get existing order_ids from PostgreSQL
+                cursor.execute("SELECT order_id FROM users.orders_0001")
+                pg_existing_ids = set(row[0] for row in cursor.fetchall())
+                
+                pg_new_count = 0
+                for order in all_orders:
+                    order_id = order.get("order_id")
+                    if not order_id or order_id in pg_existing_ids:
+                        continue  # Skip if already exists in PostgreSQL
                     
-                    pg_new_count = 0
-                    for order in all_orders:
-                        order_id = order.get("order_id")
-                        if not order_id or order_id in pg_existing_ids:
-                            continue  # Skip if already exists in PostgreSQL
-                        
-                        try:
-                            cursor.execute("""
-                                INSERT INTO users.orders_0001
-                                (order_id, user_id, ticker, status, action, side, type, yes_price, no_price,
-                                 initial_count, remaining_count, fill_count, created_time, expiration_time,
-                                 last_update_time, client_order_id, order_group_id, queue_position,
-                                 self_trade_prevention_type, maker_fees, taker_fees, maker_fill_cost,
-                                 taker_fill_cost, raw_json)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                            """, (
-                                order_id,
-                                order.get("user_id"),
-                                order.get("ticker"),
-                                order.get("status"),
-                                order.get("action"),
-                                order.get("side"),
-                                order.get("type"),
-                                order.get("yes_price"),
-                                order.get("no_price"),
-                                order.get("initial_count"),
-                                order.get("remaining_count"),
-                                order.get("fill_count"),
-                                order.get("created_time"),
-                                order.get("expiration_time"),
-                                order.get("last_update_time"),
-                                order.get("client_order_id"),
-                                order.get("order_group_id"),
-                                order.get("queue_position"),
-                                order.get("self_trade_prevention_type"),
-                                order.get("maker_fees"),
-                                order.get("taker_fees"),
-                                order.get("maker_fill_cost"),
-                                order.get("taker_fill_cost"),
-                                json.dumps(order)
-                            ))
-                            pg_new_count += 1
-                        except Exception as e:
-                            print(f"❌ Failed to insert order {order_id} to PostgreSQL: {e}")
-                    
-                    pg_conn.commit()
-                    print(f"💾 {pg_new_count} new orders also written to PostgreSQL users.orders_0001")
-                pg_conn.close()
-            else:
-                print(f"⚠️ Skipping PostgreSQL write - no connection available")
-        except Exception as pg_err:
-            print(f"❌ Failed to write orders to PostgreSQL: {pg_err}")
-        
-        # JSON writing removed - PostgreSQL only
+                    try:
+                        cursor.execute("""
+                            INSERT INTO users.orders_0001
+                            (order_id, user_id, ticker, status, action, side, type, yes_price, no_price,
+                             initial_count, remaining_count, fill_count, created_time, expiration_time,
+                             last_update_time, client_order_id, order_group_id, queue_position,
+                             self_trade_prevention_type, maker_fees, taker_fees, maker_fill_cost,
+                             taker_fill_cost, raw_json)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            order_id,
+                            order.get("user_id"),
+                            order.get("ticker"),
+                            order.get("status"),
+                            order.get("action"),
+                            order.get("side"),
+                            order.get("type"),
+                            order.get("yes_price"),
+                            order.get("no_price"),
+                            order.get("initial_count"),
+                            order.get("remaining_count"),
+                            order.get("fill_count"),
+                            order.get("created_time"),
+                            order.get("expiration_time"),
+                            order.get("last_update_time"),
+                            order.get("client_order_id"),
+                            order.get("order_group_id"),
+                            order.get("queue_position"),
+                            order.get("self_trade_prevention_type"),
+                            order.get("maker_fees"),
+                            order.get("taker_fees"),
+                            order.get("maker_fill_cost"),
+                            order.get("taker_fill_cost"),
+                            json.dumps(order)
+                        ))
+                        pg_new_count += 1
+                    except Exception as e:
+                        print(f"❌ Failed to insert order {order_id} to PostgreSQL: {e}")
+                
+                pg_conn.commit()
+                print(f"💾 {pg_new_count} new orders also written to PostgreSQL users.orders_0001")
+            pg_conn.close()
+        else:
+            print(f"⚠️ Skipping PostgreSQL write - no connection available")
+    except Exception as pg_err:
+        print(f"❌ Failed to write orders to PostgreSQL: {pg_err}")
+    
+    # JSON writing removed - PostgreSQL only
     print(f"💾 Orders written to PostgreSQL only")
 
     notify_frontend_db_change("orders", {"orders": len(all_orders)})

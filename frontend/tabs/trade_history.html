@@ -626,7 +626,11 @@
 
     function applyFilters() {
       const dateFilterPicker = document.getElementById('date-filter-picker');
-      let filtered = filterTradesByDate(trades, dateFilterPicker ? dateFilterPicker.value : 'TODAY');
+      
+      // Filter out test trades (where test_filter is TRUE)
+      let filtered = trades.filter(trade => !trade.test_filter);
+      
+      filtered = filterTradesByDate(filtered, dateFilterPicker ? dateFilterPicker.value : 'TODAY');
       filtered = filterTradesByWinLoss(filtered);
       filtered = filterTradesByTTC(filtered);
       
