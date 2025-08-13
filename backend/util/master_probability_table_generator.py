@@ -28,7 +28,7 @@ import time
 import pandas as pd
 
 # Add backend to path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from backend.util.paths import get_data_dir
 
