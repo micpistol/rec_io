@@ -20,9 +20,11 @@ This script addresses ALL issues found in previous installation attempts and pro
 **⏱️ Installation Time**: ~7 minutes  
 **🔄 Fallback**: Manual installation process available if automated script fails
 
-**🔐 CRITICAL**: The installation script will prompt you to set up Kalshi credentials during installation. This is **ESSENTIAL** for full system functionality. Without credentials, 3 trading services will be in FATAL state.
+**🔐 CRITICAL**: The installation script will prompt you to set up Kalshi credentials during installation. This is **MANDATORY** for system operation. Without credentials, the system will get stuck in a restart loop and never complete installation.
 
 **⚠️ IMPORTANT**: Database initialization is critical and will stop installation if it fails. Service verification failures are non-blocking, but database setup must succeed for the system to function.
+
+**🔄 CRITICAL FIX**: Installation now prompts for Kalshi credentials BEFORE starting trading services, preventing the restart loop issue that previously caused installations to stall.
 
 ---
 
@@ -103,8 +105,8 @@ mkdir -p backend/api/kalshi-api/kalshi-credentials/demo
 mkdir -p logs
 ```
 
-### **6. 🔐 SETUP KALSHI CREDENTIALS (CRITICAL)**
-**⚠️ CRITICAL**: Trading services require Kalshi credentials to function. Without these, 3 services will be in FATAL state.
+### **6. 🔐 SETUP KALSHI CREDENTIALS (MANDATORY)**
+**🚨 MANDATORY**: Kalshi credentials are REQUIRED for system operation! Without credentials, the system will get stuck in a restart loop and never complete installation.
 
 ```bash
 # Edit credential files with your Kalshi information

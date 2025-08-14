@@ -315,9 +315,9 @@ SELECT
     fi
 }
 
-# Start the system
+# Start the system (non-trading services only)
 start_system() {
-    log_info "Starting the system..."
+    log_info "Starting the system (non-trading services only)..."
     
     # Check if supervisor is already running
     if pgrep supervisord > /dev/null; then
@@ -329,14 +329,27 @@ start_system() {
     # Start supervisor
     supervisord -c backend/supervisord.conf
     
+    # Wait for supervisor to be ready
+    log_info "Waiting for supervisor to be ready..."
+    sleep 3
+    
+    # Start only non-trading services initially
+    log_info "Starting non-trading services..."
+    supervisorctl -c backend/supervisord.conf start main || true
+    supervisorctl -c backend/supervisord.conf start symbol_price_watchdog_btc || true
+    supervisorctl -c backend/supervisord.conf start strike_table_generator || true
+    supervisorctl -c backend/supervisord.conf start system_monitor || true
+    
     # Wait for services to start
-    log_info "Waiting for services to start..."
-    sleep 5
+    log_info "Waiting for non-trading services to start..."
+    sleep 3
     
-    # Check status
-    supervisorctl -c backend/supervisord.conf status
+    # Check status of non-trading services
+    log_info "Non-trading services status:"
+    supervisorctl -c backend/supervisord.conf status | grep -v -E "(kalshi|trade|unified)" || true
     
-    log_success "System started"
+    log_success "Non-trading services started"
+    log_info "Trading services will be started after credential setup"
 }
 
 # Verify services
@@ -372,15 +385,18 @@ setup_kalshi_credentials() {
     echo "  • trade_manager (trade execution management)"
     echo "  • unified_production_coordinator (production coordination)"
     echo ""
-    echo "You can either:"
-    echo "1. Set up credentials now (RECOMMENDED - enables full functionality)"
-    echo "2. Skip for now and set up later (services will be in FATAL state)"
+    echo "CRITICAL: Kalshi credentials are REQUIRED for system operation!"
+    echo ""
+    echo "Without credentials, the system will:"
+    echo "  • Get stuck in a restart loop"
+    echo "  • Never complete installation"
+    echo "  • Be completely non-functional"
+    echo ""
+    echo "You MUST set up credentials now to proceed with installation."
     echo ""
     
-    read -p "Would you like to set up Kalshi credentials now? (y/n): " -n 1 -r
+    read -p "Press Enter to continue with credential setup..."
     echo ""
-    
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
         log_info "Setting up Kalshi credentials..."
         
         # Get user input for credentials
@@ -449,27 +465,19 @@ EOF
         
         log_success "Kalshi credentials set up successfully"
         
-        # Restart trading services
-        log_info "Restarting trading services with new credentials..."
-        supervisorctl -c backend/supervisord.conf restart kalshi_account_sync || true
-        supervisorctl -c backend/supervisord.conf restart trade_manager || true
-        supervisorctl -c backend/supervisord.conf restart unified_production_coordinator || true
+        # Start trading services with credentials now in place
+        log_info "Starting trading services with credentials..."
+        supervisorctl -c backend/supervisord.conf start kalshi_account_sync || true
+        supervisorctl -c backend/supervisord.conf start trade_manager || true
+        supervisorctl -c backend/supervisord.conf start unified_production_coordinator || true
         
         sleep 3
         
-        # Check service status
+        # Check trading service status
         log_info "Checking trading service status..."
         supervisorctl -c backend/supervisord.conf status | grep -E "(kalshi|trade|unified)"
         
-        log_success "Trading services restarted with credentials"
-        
-    else
-        log_warning "Skipping credential setup"
-        echo ""
-        echo "⚠️  NOTE: Trading services will not function without credentials."
-        echo "   You can set up credentials later by running:"
-        echo "   nano backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt"
-        echo ""
+        log_success "Trading services started with credentials"
     fi
 }
 
@@ -501,14 +509,14 @@ main() {
     # Verify database setup
     verify_database
     
-    # Start the system
+    # Setup Kalshi credentials BEFORE starting trading services
+    setup_kalshi_credentials
+    
+    # Start the system (now with credentials in place)
     start_system
     
     # Verify services
     verify_services
-    
-    # Setup Kalshi credentials
-    setup_kalshi_credentials
     
     log_success "Installation completed successfully!"
     log_info "Next steps:"

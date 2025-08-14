@@ -122,11 +122,13 @@ def insert_trade(trade):
 
 def confirm_open_trade(id: int, ticket_id: str) -> None:
     """Confirms a PENDING trade has been opened in the market account"""
+    # Get initial trade info
     pg_conn = get_postgresql_connection()
     if pg_conn:
         with pg_conn.cursor() as cursor:
             cursor.execute("SELECT ticker FROM users.trades_0001 WHERE id = %s", (id,))
             row = cursor.fetchone()
+        pg_conn.close()
     else:
         row = None
     
@@ -137,16 +139,23 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
     expected_ticker = row[0]
     mode = get_account_mode()
     
-            # Read from PostgreSQL positions table
-    pg_conn = get_postgresql_connection()
-    if not pg_conn:
-        log_event(ticket_id, f"MANAGER: Cannot connect to PostgreSQL positions table")
-        return
-    
     deadline = time.time() + 30  # 30 second timeout
+    connection_refresh_time = time.time() + 10  # Refresh connection every 10 seconds
     
     while time.time() < deadline:
         try:
+            # Refresh connection every 10 seconds to prevent stale connections
+            if time.time() >= connection_refresh_time:
+                pg_conn = get_postgresql_connection()
+                connection_refresh_time = time.time() + 10
+            else:
+                pg_conn = get_postgresql_connection()
+            
+            if not pg_conn:
+                log_event(ticket_id, f"MANAGER: Cannot connect to PostgreSQL positions table")
+                time.sleep(1)
+                continue
+            
             with pg_conn.cursor() as cursor_pos:
                 cursor_pos.execute("SELECT position, market_exposure, fees_paid FROM users.positions_0001 WHERE ticker = %s", (expected_ticker,))
                 row = cursor_pos.fetchone()
@@ -157,21 +166,25 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
                 fees_paid = float(row[2]) if row[2] is not None else None
                 price = round(float(exposure) / float(pos) / 100, 2) if pos > 0 else 0.0
                 
-                pg_conn = get_postgresql_connection()
-                if pg_conn:
-                    with pg_conn.cursor() as cursor:
+                # Get current status with fresh connection
+                pg_conn_status = get_postgresql_connection()
+                if pg_conn_status:
+                    with pg_conn_status.cursor() as cursor:
                         cursor.execute("SELECT status FROM users.trades_0001 WHERE id = %s", (id,))
                         status_row = cursor.fetchone()
                         current_status = status_row[0] if status_row else None
+                    pg_conn_status.close()
                 else:
                     current_status = None
                 
                 if current_status == "pending" and pos > 0 and exposure > 0:
-                    pg_conn = get_postgresql_connection()
-                    if pg_conn:
-                        with pg_conn.cursor() as cursor:
+                    # Get probability with fresh connection
+                    pg_conn_prob = get_postgresql_connection()
+                    if pg_conn_prob:
+                        with pg_conn_prob.cursor() as cursor:
                             cursor.execute("SELECT prob FROM users.trades_0001 WHERE id = %s", (id,))
                             prob_row = cursor.fetchone()
+                        pg_conn_prob.close()
                     else:
                         prob_row = None
                     
@@ -209,9 +222,9 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
                     
                     # Update additional fields in PostgreSQL BEFORE status change
                     try:
-                        pg_conn = get_postgresql_connection()
-                        if pg_conn:
-                            with pg_conn.cursor() as cursor:
+                        pg_conn_update = get_postgresql_connection()
+                        if pg_conn_update:
+                            with pg_conn_update.cursor() as cursor:
                                 # First try to update by ID
                                 cursor.execute("""
                                     UPDATE users.trades_0001
@@ -242,8 +255,8 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
                                 else:
                                     print(f"💾 Trade additional fields also updated in PostgreSQL users.trades_0001")
                                 
-                                pg_conn.commit()
-                            pg_conn.close()
+                                pg_conn_update.commit()
+                            pg_conn_update.close()
                         else:
                             print(f"⚠️ Skipping PostgreSQL additional fields update - no connection available")
                     except Exception as pg_err:
@@ -252,7 +265,7 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
                     # Update trade status to open (this will also update PostgreSQL and notify ATS)
                     update_trade_status(id, 'open')
                     
-                    log_event(ticket_id, f"MANAGER: OPEN TRADE CONFIRMED — pos={pos}, price={price}, fees={fees}, diff={diff_formatted}")
+                    log_event(ticket_id, f"MANAGER: OPEN TRADE CONFIRMED — pos={pos}, price={price}, fees={fees_paid}, diff={diff_formatted}")
                     # Notify strike table for display update (lowest priority)
                     notify_strike_table_trade_change(id, "open")
                     break
@@ -262,15 +275,20 @@ def confirm_open_trade(id: int, ticket_id: str) -> None:
         
         time.sleep(1)
     
-    pg_conn.close()
+    # Close the main polling connection
+    if 'pg_conn' in locals() and pg_conn:
+        pg_conn.close()
+    
     log_event(ticket_id, f"MANAGER: OPEN TRADE polling complete for ticker: {expected_ticker}")
     
-    pg_conn = get_postgresql_connection()
-    if pg_conn:
-        with pg_conn.cursor() as cursor:
+    # Final status check with fresh connection
+    pg_conn_final = get_postgresql_connection()
+    if pg_conn_final:
+        with pg_conn_final.cursor() as cursor:
             cursor.execute("SELECT status FROM users.trades_0001 WHERE id = %s", (id,))
             status_row = cursor.fetchone()
             current_status = status_row[0] if status_row else None
+        pg_conn_final.close()
     else:
         current_status = None
     

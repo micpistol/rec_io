@@ -89,7 +89,37 @@ fi
 - ✅ Comprehensive database connection and schema verification
 - ✅ Fallback verification using direct SQL queries
 
-### **Fix 3: Enhanced Error Handling**
+### **Fix 3: Critical Service Sequencing**
+
+#### **Problem**
+```bash
+# OLD SEQUENCE (caused restart loop):
+start_system()  # ← Started all services including trading services
+setup_kalshi_credentials()  # ← Credentials set up AFTER services started
+
+# Result: Trading services failed immediately and got stuck in restart loop
+# Script never reached credential setup phase
+```
+
+#### **Solution**
+Fixed service sequencing to set up credentials BEFORE starting trading services:
+
+```bash
+# NEW SEQUENCE (prevents restart loop):
+verify_database()
+setup_kalshi_credentials()  # ← Credentials set up FIRST
+start_system()  # ← Only non-trading services started initially
+# Trading services started in setup_kalshi_credentials() after credentials are ready
+```
+
+**Changes**:
+- ✅ Credential setup happens BEFORE trading services start
+- ✅ Non-trading services start first (main, price watchdog, etc.)
+- ✅ Trading services start only after credentials are configured
+- ✅ Prevents restart loop that previously caused installations to stall
+- ✅ **MANDATORY credential setup** - users cannot skip (prevents system failure)
+
+### **Fix 4: Enhanced Error Handling**
 
 #### **Robust Installation Flow**
 ```bash
@@ -192,13 +222,14 @@ verify_database() {
 - ✅ **95%+ automated installation success**
 - ✅ **Robust database initialization** with proper error handling
 - ✅ **Critical database verification** ensures system functionality
-- ✅ **Interactive credential setup always reached** (if database succeeds)
-- ✅ Trading services operational with credentials
+- ✅ **MANDATORY credential setup** - users cannot skip (prevents system failure)
+- ✅ **No more restart loops** - trading services start only after credentials are ready
+- ✅ Trading services operational with valid credentials
 - ✅ Complete user experience from single command
 
 ### **Success Rate Transformation**
 - **Automated Installation**: 0% → 95%+
-- **Credential Setup**: Never reached → Always available
+- **Credential Setup**: Never reached → **MANDATORY** (prevents system failure)
 - **Trading Functionality**: Never enabled → Fully operational
 - **User Experience**: Broken → Complete
 
