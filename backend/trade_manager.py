@@ -664,12 +664,13 @@ def init_trades_db():
                     ticker TEXT,
                     market_result TEXT,
                     yes_count INTEGER,
-                    yes_total_cost REAL,
+                    yes_total_cost DECIMAL(10,2),
                     no_count INTEGER,
-                    no_total_cost REAL,
-                    revenue REAL,
+                    no_total_cost DECIMAL(10,2),
+                    revenue DECIMAL(10,2),
                     settled_time TEXT,
-                    raw_json TEXT
+                    raw_json TEXT,
+                    UNIQUE(ticker, settled_time)
                 )
             """)
             

@@ -465,8 +465,9 @@ class StrikeTableGenerator:
             
             logger.info(f"🎯 Processing {len(strikes)} strikes from market data")
             
-            # Calculate momentum bucket
-            momentum_bucket = round(momentum_score)
+            # Calculate momentum bucket - convert from decimal to percentage
+            # momentum_score is like 0.043 (4.3%), convert to bucket like 4
+            momentum_bucket = round(momentum_score * 100)
             
             # Write to database
             conn = psycopg2.connect(**self.db_config)

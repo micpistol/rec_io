@@ -183,7 +183,10 @@
 
             const settlementsBody = document.getElementById("settlements-body");
       if (settlementsBody) {
-        settlementsBody.innerHTML = settlements.map(s => {
+        // Sort settlements by settled_time in descending order (newest first)
+        const sortedSettlements = settlements.sort((a, b) => new Date(b.settled_time) - new Date(a.settled_time));
+        
+        settlementsBody.innerHTML = sortedSettlements.map(s => {
         // Revenue is already in whole dollars, display as is
         const formattedRevenue = s.revenue.toLocaleString(undefined, { 
           minimumFractionDigits: 0, 

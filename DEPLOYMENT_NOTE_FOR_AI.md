@@ -20,6 +20,8 @@ This script addresses ALL issues found in previous installation attempts and pro
 **⏱️ Installation Time**: ~7 minutes  
 **🔄 Fallback**: Manual installation process available if automated script fails
 
+**🔐 CRITICAL**: The installation script will prompt you to set up Kalshi credentials during installation. This is **ESSENTIAL** for full system functionality. Without credentials, 3 trading services will be in FATAL state.
+
 ---
 
 ## 🔧 **MANUAL STEP-BY-STEP INSTALLATION (ALTERNATIVE)**
@@ -63,7 +65,7 @@ PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -f scri
 python3 -m venv venv
 source venv/bin/activate
 
-# Install dependencies
+# Install dependencies (includes scipy for probability calculations)
 pip install --upgrade pip
 pip install -r requirements-core.txt
 ```
@@ -86,8 +88,12 @@ EOF
 
 # Create credential files (user fills in later)
 touch backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
-touch backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.pem
-chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.pem
+touch backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
+chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
+
+# Create system-expected credential locations
+mkdir -p backend/api/kalshi-api/kalshi-credentials/prod
+mkdir -p backend/api/kalshi-api/kalshi-credentials/demo
 ```
 
 ### **5. CREATE LOGS DIRECTORY**
@@ -95,14 +101,49 @@ chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalsh
 mkdir -p logs
 ```
 
-### **6. VERIFY DATABASE SETUP**
+### **6. 🔐 SETUP KALSHI CREDENTIALS (CRITICAL)**
+**⚠️ CRITICAL**: Trading services require Kalshi credentials to function. Without these, 3 services will be in FATAL state.
+
+```bash
+# Edit credential files with your Kalshi information
+nano backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
+```
+
+**File format for kalshi-auth.txt:**
+```
+email:your_email@example.com
+key:your_api_key_here
+```
+
+```bash
+# If you have a Kalshi certificate file, copy it:
+# cp /path/to/your/kalshi.pem backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
+# chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
+
+# Copy credentials to system-expected locations
+cp backend/data/users/user_0001/credentials/kalshi-credentials/prod/* backend/api/kalshi-api/kalshi-credentials/prod/
+cp backend/api/kalshi-api/kalshi-credentials/prod/* backend/api/kalshi-api/kalshi-credentials/demo/
+
+# Create .env file for environment configuration
+cat > backend/data/users/user_0001/credentials/kalshi-credentials/prod/.env << EOF
+KALSHI_API_KEY_ID=your_api_key_here
+KALSHI_PRIVATE_KEY_PATH=kalshi.pem
+KALSHI_EMAIL=your_email@example.com
+EOF
+
+# Copy .env to system locations
+cp backend/data/users/user_0001/credentials/kalshi-credentials/prod/.env backend/api/kalshi-api/kalshi-credentials/prod/
+cp backend/api/kalshi-api/kalshi-credentials/prod/.env backend/api/kalshi-api/kalshi-credentials/demo/
+```
+
+### **7. VERIFY DATABASE SETUP**
 ```bash
 # Run database verification script
 source venv/bin/activate
 python3 scripts/verify_database_setup.py
 ```
 
-### **7. START THE SYSTEM**
+### **8. START THE SYSTEM**
 ```bash
 # Start supervisor
 supervisord -c backend/supervisord.conf
@@ -112,7 +153,18 @@ sleep 5
 supervisorctl -c backend/supervisord.conf status
 ```
 
-### **8. VERIFY ALL SERVICES**
+### **9. 🔐 RESTART TRADING SERVICES (if credentials provided)**
+```bash
+# Restart trading services with credentials
+supervisorctl -c backend/supervisord.conf restart kalshi_account_sync
+supervisorctl -c backend/supervisord.conf restart trade_manager
+supervisorctl -c backend/supervisord.conf restart unified_production_coordinator
+
+# Check status
+supervisorctl -c backend/supervisord.conf status | grep -E "(kalshi|trade|unified)"
+```
+
+### **10. VERIFY ALL SERVICES**
 ```bash
 # Run comprehensive service verification
 source venv/bin/activate
@@ -134,6 +186,7 @@ Your installation is successful when:
 - ✅ All required ports are listening
 - ✅ Credential setup completed (if chosen during installation)
 - ✅ Trading services operational (if credentials provided)
+- ✅ All dependencies installed (including scipy)
 
 ---
 
@@ -157,6 +210,9 @@ Your installation is successful when:
 - ✅ Database schema fallback implemented
 - ✅ Missing ETH price log table auto-created
 - ✅ Enhanced error handling added
+- ✅ **Interactive credential setup integrated**
+- ✅ **Missing scipy dependency added**
+- ✅ **Dual credential location support implemented**
 
 ---
 

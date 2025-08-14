@@ -300,10 +300,16 @@ setup_kalshi_credentials() {
     echo "🔐 KALSHI CREDENTIALS SETUP"
     echo "=========================="
     echo ""
-    echo "To enable trading functionality, you need to set up your Kalshi credentials."
+    echo "⚠️  CRITICAL: Trading services require Kalshi credentials to function!"
+    echo ""
+    echo "Without credentials, 3 critical services will fail:"
+    echo "  • kalshi_account_sync (account synchronization)"
+    echo "  • trade_manager (trade execution management)"
+    echo "  • unified_production_coordinator (production coordination)"
+    echo ""
     echo "You can either:"
-    echo "1. Set up credentials now (recommended)"
-    echo "2. Skip for now and set up later"
+    echo "1. Set up credentials now (RECOMMENDED - enables full functionality)"
+    echo "2. Skip for now and set up later (services will be in FATAL state)"
     echo ""
     
     read -p "Would you like to set up Kalshi credentials now? (y/n): " -n 1 -r
@@ -328,12 +334,10 @@ setup_kalshi_credentials() {
         # Create credential files
         log_info "Creating credential files..."
         
-        # Create auth.txt file
+        # Create auth.txt file with proper format
         cat > backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt << EOF
-email=${kalshi_email}
-password=${kalshi_password}
-api_key=${kalshi_api_key}
-api_secret=${kalshi_api_secret}
+email:${kalshi_email}
+key:${kalshi_api_key}
 EOF
         
         # Create PEM file (if user has one)
@@ -344,19 +348,39 @@ EOF
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             read -p "Enter the path to your .pem file: " pem_file_path
             if [[ -f "$pem_file_path" ]]; then
-                cp "$pem_file_path" backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.pem
-                chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.pem
+                cp "$pem_file_path" backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
+                chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
                 log_success "Certificate file copied"
             else
                 log_warning "Certificate file not found, creating empty file"
-                touch backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.pem
-                chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.pem
+                touch backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
+                chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
             fi
         else
             log_info "Creating empty certificate file"
-            touch backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.pem
-            chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.pem
+            touch backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
+            chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
         fi
+        
+        # Create system-expected directory structure and copy credentials
+        log_info "Setting up system-expected credential locations..."
+        mkdir -p backend/api/kalshi-api/kalshi-credentials/prod
+        mkdir -p backend/api/kalshi-api/kalshi-credentials/demo
+        
+        # Copy credentials to system-expected locations
+        cp backend/data/users/user_0001/credentials/kalshi-credentials/prod/* backend/api/kalshi-api/kalshi-credentials/prod/
+        cp backend/api/kalshi-api/kalshi-credentials/prod/* backend/api/kalshi-api/kalshi-credentials/demo/
+        
+        # Create .env file for environment configuration
+        cat > backend/data/users/user_0001/credentials/kalshi-credentials/prod/.env << EOF
+KALSHI_API_KEY_ID=${kalshi_api_key}
+KALSHI_PRIVATE_KEY_PATH=kalshi.pem
+KALSHI_EMAIL=${kalshi_email}
+EOF
+        
+        # Copy .env to system locations
+        cp backend/data/users/user_0001/credentials/kalshi-credentials/prod/.env backend/api/kalshi-api/kalshi-credentials/prod/
+        cp backend/api/kalshi-api/kalshi-credentials/prod/.env backend/api/kalshi-api/kalshi-credentials/demo/
         
         log_success "Kalshi credentials set up successfully"
         

@@ -570,6 +570,23 @@ def sync_settlements():
         pg_conn = get_postgresql_connection()
         if pg_conn:
             with pg_conn.cursor() as cursor:
+                # Ensure settlements table has proper structure with unique constraint
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS users.settlements_0001 (
+                        id SERIAL PRIMARY KEY,
+                        ticker TEXT,
+                        market_result TEXT,
+                        yes_count INTEGER,
+                        yes_total_cost DECIMAL(10,2),
+                        no_count INTEGER,
+                        no_total_cost DECIMAL(10,2),
+                        revenue DECIMAL(10,2),
+                        settled_time TEXT,
+                        raw_json TEXT,
+                        UNIQUE(ticker, settled_time)
+                    )
+                """)
+                
                 for settlement in all_settlements:
                     try:
                         ticker = settlement.get("ticker")
@@ -586,6 +603,7 @@ def sync_settlements():
                             INSERT INTO users.settlements_0001
                             (ticker, market_result, yes_count, yes_total_cost, no_count, no_total_cost, revenue, settled_time, raw_json)
                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (ticker, settled_time) DO NOTHING
                         """, (ticker, market_result, yes_count, yes_total_cost, no_count, no_total_cost, revenue, settled_time, raw_json))
                     except Exception as e:
                         print(f"❌ Failed to insert settlement {settlement.get('ticker')} to PostgreSQL: {e}")
