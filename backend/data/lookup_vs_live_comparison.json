@@ -1,0 +1,2560 @@
+{
+  "summary": {
+    "total_cases": 100,
+    "total_time_seconds": 3.2038562297821045,
+    "differences": {
+      "positive": {
+        "mean": 3.488357999999999,
+        "max": 20.726000000000006,
+        "min": 0.011399999999982813,
+        "std_dev": 4.817424011506151
+      },
+      "negative": {
+        "mean": 3.2316599999999993,
+        "max": 19.509200000000007,
+        "min": 0.0,
+        "std_dev": 4.437621379928666
+      },
+      "max_diff": {
+        "mean": 3.867671999999999,
+        "max": 20.726000000000006,
+        "min": 0.04000000000000625
+      },
+      "avg_diff": {
+        "mean": 3.360008999999999,
+        "max": 17.23350000000001,
+        "min": 0.030699999999989985
+      }
+    },
+    "performance": {
+      "live_calculator": {
+        "mean_time_ms": 24.6462082862854,
+        "max_time_ms": 30.026912689208984,
+        "min_time_ms": 23.223876953125
+      },
+      "lookup_calculator": {
+        "mean_time_ms": 7.386941909790039,
+        "max_time_ms": 26.890039443969727,
+        "min_time_ms": 2.8450489044189453
+      }
+    }
+  },
+  "detailed_results": [
+    {
+      "test_case": {
+        "id": 1,
+        "ttc_seconds": 3031,
+        "buffer_points": 872,
+        "momentum_score": -7.459429289114368,
+        "momentum_bucket": -7
+      },
+      "live_results": {
+        "positive": 2.96,
+        "negative": 4.25,
+        "time_ms": 26.43108367919922
+      },
+      "lookup_results": {
+        "positive": 5.1795999999999935,
+        "negative": 5.7635999999999825,
+        "time_ms": 26.890039443969727
+      },
+      "differences": {
+        "positive_diff": 2.2195999999999936,
+        "negative_diff": 1.5135999999999825,
+        "max_diff": 2.2195999999999936,
+        "avg_diff": 1.866599999999988
+      }
+    },
+    {
+      "test_case": {
+        "id": 2,
+        "ttc_seconds": 2393,
+        "buffer_points": 1512,
+        "momentum_score": -8.706789835114638,
+        "momentum_bucket": -9
+      },
+      "live_results": {
+        "positive": 1.53,
+        "negative": 2.88,
+        "time_ms": 25.515079498291016
+      },
+      "lookup_results": {
+        "positive": 1.309999999999988,
+        "negative": 1.7759999999999962,
+        "time_ms": 7.56382942199707
+      },
+      "differences": {
+        "positive_diff": 0.22000000000001196,
+        "negative_diff": 1.1040000000000036,
+        "max_diff": 1.1040000000000036,
+        "avg_diff": 0.6620000000000078
+      }
+    },
+    {
+      "test_case": {
+        "id": 3,
+        "ttc_seconds": 2134,
+        "buffer_points": 379,
+        "momentum_score": -24.035542128804373,
+        "momentum_bucket": -24
+      },
+      "live_results": {
+        "positive": 13.1,
+        "negative": 13.98,
+        "time_ms": 24.47986602783203
+      },
+      "lookup_results": {
+        "positive": 30.915800000000004,
+        "negative": 25.648200000000003,
+        "time_ms": 6.609201431274414
+      },
+      "differences": {
+        "positive_diff": 17.815800000000003,
+        "negative_diff": 11.668200000000002,
+        "max_diff": 17.815800000000003,
+        "avg_diff": 14.742000000000003
+      }
+    },
+    {
+      "test_case": {
+        "id": 4,
+        "ttc_seconds": 184,
+        "buffer_points": 731,
+        "momentum_score": 18.52767283613344,
+        "momentum_bucket": 19
+      },
+      "live_results": {
+        "positive": 0.17,
+        "negative": 0.03,
+        "time_ms": 26.46493911743164
+      },
+      "lookup_results": {
+        "positive": 1.2719999999999771,
+        "negative": 0.4421999999999997,
+        "time_ms": 12.217998504638672
+      },
+      "differences": {
+        "positive_diff": 1.1019999999999772,
+        "negative_diff": 0.4121999999999997,
+        "max_diff": 1.1019999999999772,
+        "avg_diff": 0.7570999999999884
+      }
+    },
+    {
+      "test_case": {
+        "id": 5,
+        "ttc_seconds": 643,
+        "buffer_points": 1848,
+        "momentum_score": 26.69907816458661,
+        "momentum_bucket": 27
+      },
+      "live_results": {
+        "positive": 0.52,
+        "negative": 0.13,
+        "time_ms": 30.026912689208984
+      },
+      "lookup_results": {
+        "positive": 0.680800000000005,
+        "negative": 0.353999999999985,
+        "time_ms": 10.733842849731445
+      },
+      "differences": {
+        "positive_diff": 0.16080000000000494,
+        "negative_diff": 0.223999999999985,
+        "max_diff": 0.223999999999985,
+        "avg_diff": 0.19239999999999496
+      }
+    },
+    {
+      "test_case": {
+        "id": 6,
+        "ttc_seconds": 424,
+        "buffer_points": 130,
+        "momentum_score": -8.554988642986995,
+        "momentum_bucket": -9
+      },
+      "live_results": {
+        "positive": 23.1,
+        "negative": 20.13,
+        "time_ms": 25.21800994873047
+      },
+      "lookup_results": {
+        "positive": 25.364000000000004,
+        "negative": 22.061999999999998,
+        "time_ms": 3.0307769775390625
+      },
+      "differences": {
+        "positive_diff": 2.264000000000003,
+        "negative_diff": 1.9319999999999986,
+        "max_diff": 2.264000000000003,
+        "avg_diff": 2.0980000000000008
+      }
+    },
+    {
+      "test_case": {
+        "id": 7,
+        "ttc_seconds": 1922,
+        "buffer_points": 1477,
+        "momentum_score": -12.063328811188143,
+        "momentum_bucket": -12
+      },
+      "live_results": {
+        "positive": 1.15,
+        "negative": 2.07,
+        "time_ms": 24.400949478149414
+      },
+      "lookup_results": {
+        "positive": 1.3030000000000115,
+        "negative": 2.099000000000018,
+        "time_ms": 5.629301071166992
+      },
+      "differences": {
+        "positive_diff": 0.15300000000001157,
+        "negative_diff": 0.029000000000018122,
+        "max_diff": 0.15300000000001157,
+        "avg_diff": 0.09100000000001485
+      }
+    },
+    {
+      "test_case": {
+        "id": 8,
+        "ttc_seconds": 269,
+        "buffer_points": 674,
+        "momentum_score": 19.295910162972213,
+        "momentum_bucket": 19
+      },
+      "live_results": {
+        "positive": 0.32,
+        "negative": 0.18,
+        "time_ms": 24.915218353271484
+      },
+      "lookup_results": {
+        "positive": 2.6259999999999906,
+        "negative": 1.3319999999999936,
+        "time_ms": 11.202096939086914
+      },
+      "differences": {
+        "positive_diff": 2.3059999999999907,
+        "negative_diff": 1.1519999999999937,
+        "max_diff": 2.3059999999999907,
+        "avg_diff": 1.728999999999992
+      }
+    },
+    {
+      "test_case": {
+        "id": 9,
+        "ttc_seconds": 1888,
+        "buffer_points": 1734,
+        "momentum_score": 14.788874984348624,
+        "momentum_bucket": 15
+      },
+      "live_results": {
+        "positive": 1.6,
+        "negative": 0.92,
+        "time_ms": 24.997711181640625
+      },
+      "lookup_results": {
+        "positive": 1.5339999999999918,
+        "negative": 1.1119999999999948,
+        "time_ms": 5.651950836181641
+      },
+      "differences": {
+        "positive_diff": 0.06600000000000827,
+        "negative_diff": 0.19199999999999473,
+        "max_diff": 0.19199999999999473,
+        "avg_diff": 0.1290000000000015
+      }
+    },
+    {
+      "test_case": {
+        "id": 10,
+        "ttc_seconds": 2128,
+        "buffer_points": 1537,
+        "momentum_score": 4.524059511847383,
+        "momentum_bucket": 5
+      },
+      "live_results": {
+        "positive": 1.93,
+        "negative": 1.23,
+        "time_ms": 26.25894546508789
+      },
+      "lookup_results": {
+        "positive": 0.8259999999999934,
+        "negative": 0.6702000000000083,
+        "time_ms": 7.944822311401367
+      },
+      "differences": {
+        "positive_diff": 1.1040000000000065,
+        "negative_diff": 0.5597999999999916,
+        "max_diff": 1.1040000000000065,
+        "avg_diff": 0.8318999999999991
+      }
+    },
+    {
+      "test_case": {
+        "id": 11,
+        "ttc_seconds": 564,
+        "buffer_points": 1677,
+        "momentum_score": 1.8043915060289244,
+        "momentum_bucket": 2
+      },
+      "live_results": {
+        "positive": 0.44,
+        "negative": 0.1,
+        "time_ms": 24.893999099731445
+      },
+      "lookup_results": {
+        "positive": 0.030000000000001137,
+        "negative": 0.022399999999990428,
+        "time_ms": 15.076160430908203
+      },
+      "differences": {
+        "positive_diff": 0.40999999999999887,
+        "negative_diff": 0.07760000000000958,
+        "max_diff": 0.40999999999999887,
+        "avg_diff": 0.24380000000000424
+      }
+    },
+    {
+      "test_case": {
+        "id": 12,
+        "ttc_seconds": 2041,
+        "buffer_points": 29,
+        "momentum_score": 7.986857404005022,
+        "momentum_bucket": 8
+      },
+      "live_results": {
+        "positive": 43.28,
+        "negative": 46.64,
+        "time_ms": 24.68395233154297
+      },
+      "lookup_results": {
+        "positive": 45.514799999999994,
+        "negative": 47.84499999999999,
+        "time_ms": 6.916284561157227
+      },
+      "differences": {
+        "positive_diff": 2.234799999999993,
+        "negative_diff": 1.2049999999999912,
+        "max_diff": 2.234799999999993,
+        "avg_diff": 1.719899999999992
+      }
+    },
+    {
+      "test_case": {
+        "id": 13,
+        "ttc_seconds": 2025,
+        "buffer_points": 1499,
+        "momentum_score": 10.928484850127923,
+        "momentum_bucket": 11
+      },
+      "live_results": {
+        "positive": 1.89,
+        "negative": 1.1,
+        "time_ms": 24.25384521484375
+      },
+      "lookup_results": {
+        "positive": 1.853999999999985,
+        "negative": 1.2920000000000016,
+        "time_ms": 5.525112152099609
+      },
+      "differences": {
+        "positive_diff": 0.03600000000001491,
+        "negative_diff": 0.1920000000000015,
+        "max_diff": 0.1920000000000015,
+        "avg_diff": 0.1140000000000082
+      }
+    },
+    {
+      "test_case": {
+        "id": 14,
+        "ttc_seconds": 2997,
+        "buffer_points": 1073,
+        "momentum_score": -25.556950274701617,
+        "momentum_bucket": -26
+      },
+      "live_results": {
+        "positive": 2.04,
+        "negative": 3.33,
+        "time_ms": 24.251222610473633
+      },
+      "lookup_results": {
+        "positive": 11.7838,
+        "negative": 12.716999999999999,
+        "time_ms": 6.831169128417969
+      },
+      "differences": {
+        "positive_diff": 9.7438,
+        "negative_diff": 9.386999999999999,
+        "max_diff": 9.7438,
+        "avg_diff": 9.5654
+      }
+    },
+    {
+      "test_case": {
+        "id": 15,
+        "ttc_seconds": 3004,
+        "buffer_points": 83,
+        "momentum_score": 14.00999414976502,
+        "momentum_bucket": 14
+      },
+      "live_results": {
+        "positive": 39.01,
+        "negative": 40.08,
+        "time_ms": 24.2159366607666
+      },
+      "lookup_results": {
+        "positive": 42.5624,
+        "negative": 45.407,
+        "time_ms": 6.819009780883789
+      },
+      "differences": {
+        "positive_diff": 3.5523999999999987,
+        "negative_diff": 5.326999999999998,
+        "max_diff": 5.326999999999998,
+        "avg_diff": 4.439699999999998
+      }
+    },
+    {
+      "test_case": {
+        "id": 16,
+        "ttc_seconds": 350,
+        "buffer_points": 254,
+        "momentum_score": -27.098897141936646,
+        "momentum_bucket": -27
+      },
+      "live_results": {
+        "positive": 6.39,
+        "negative": 7.35,
+        "time_ms": 24.608850479125977
+      },
+      "lookup_results": {
+        "positive": 23.89399999999999,
+        "negative": 20.689999999999998,
+        "time_ms": 6.070137023925781
+      },
+      "differences": {
+        "positive_diff": 17.50399999999999,
+        "negative_diff": 13.339999999999998,
+        "max_diff": 17.50399999999999,
+        "avg_diff": 15.421999999999993
+      }
+    },
+    {
+      "test_case": {
+        "id": 17,
+        "ttc_seconds": 774,
+        "buffer_points": 561,
+        "momentum_score": 25.144701229960674,
+        "momentum_bucket": 25
+      },
+      "live_results": {
+        "positive": 2.78,
+        "negative": 1.42,
+        "time_ms": 24.8868465423584
+      },
+      "lookup_results": {
+        "positive": 11.8232,
+        "negative": 11.49799999999999,
+        "time_ms": 9.404897689819336
+      },
+      "differences": {
+        "positive_diff": 9.0432,
+        "negative_diff": 10.07799999999999,
+        "max_diff": 10.07799999999999,
+        "avg_diff": 9.560599999999996
+      }
+    },
+    {
+      "test_case": {
+        "id": 18,
+        "ttc_seconds": 124,
+        "buffer_points": 1932,
+        "momentum_score": 8.248657996936345,
+        "momentum_bucket": 8
+      },
+      "live_results": {
+        "positive": 0.09,
+        "negative": 0.0,
+        "time_ms": 24.94072914123535
+      },
+      "lookup_results": {
+        "positive": 0.0,
+        "negative": 0.0,
+        "time_ms": 5.766153335571289
+      },
+      "differences": {
+        "positive_diff": 0.09,
+        "negative_diff": 0.0,
+        "max_diff": 0.09,
+        "avg_diff": 0.045
+      }
+    },
+    {
+      "test_case": {
+        "id": 19,
+        "ttc_seconds": 3100,
+        "buffer_points": 513,
+        "momentum_score": 19.36420884183886,
+        "momentum_bucket": 19
+      },
+      "live_results": {
+        "positive": 11.37,
+        "negative": 8.8,
+        "time_ms": 25.616168975830078
+      },
+      "lookup_results": {
+        "positive": 22.457000000000008,
+        "negative": 21.742000000000004,
+        "time_ms": 12.862920761108398
+      },
+      "differences": {
+        "positive_diff": 11.087000000000009,
+        "negative_diff": 12.942000000000004,
+        "max_diff": 12.942000000000004,
+        "avg_diff": 12.014500000000005
+      }
+    },
+    {
+      "test_case": {
+        "id": 20,
+        "ttc_seconds": 177,
+        "buffer_points": 1296,
+        "momentum_score": 18.420424763917573,
+        "momentum_bucket": 18
+      },
+      "live_results": {
+        "positive": 0.12,
+        "negative": 0.0,
+        "time_ms": 25.625944137573242
+      },
+      "lookup_results": {
+        "positive": 0.14400000000000546,
+        "negative": 0.04000000000000625,
+        "time_ms": 3.099203109741211
+      },
+      "differences": {
+        "positive_diff": 0.02400000000000546,
+        "negative_diff": 0.04000000000000625,
+        "max_diff": 0.04000000000000625,
+        "avg_diff": 0.03200000000000586
+      }
+    },
+    {
+      "test_case": {
+        "id": 21,
+        "ttc_seconds": 1384,
+        "buffer_points": 272,
+        "momentum_score": 4.310399537476634,
+        "momentum_bucket": 4
+      },
+      "live_results": {
+        "positive": 16.14,
+        "negative": 14.46,
+        "time_ms": 25.159120559692383
+      },
+      "lookup_results": {
+        "positive": 14.145999999999987,
+        "negative": 14.370400000000004,
+        "time_ms": 6.018161773681641
+      },
+      "differences": {
+        "positive_diff": 1.994000000000014,
+        "negative_diff": 0.08959999999999724,
+        "max_diff": 1.994000000000014,
+        "avg_diff": 1.0418000000000056
+      }
+    },
+    {
+      "test_case": {
+        "id": 22,
+        "ttc_seconds": 1267,
+        "buffer_points": 1746,
+        "momentum_score": 8.197713725666716,
+        "momentum_bucket": 8
+      },
+      "live_results": {
+        "positive": 1.14,
+        "negative": 0.58,
+        "time_ms": 24.930238723754883
+      },
+      "lookup_results": {
+        "positive": 0.37999999999999545,
+        "negative": 0.3199999999999932,
+        "time_ms": 7.010936737060547
+      },
+      "differences": {
+        "positive_diff": 0.7600000000000044,
+        "negative_diff": 0.2600000000000068,
+        "max_diff": 0.7600000000000044,
+        "avg_diff": 0.5100000000000056
+      }
+    },
+    {
+      "test_case": {
+        "id": 23,
+        "ttc_seconds": 1185,
+        "buffer_points": 421,
+        "momentum_score": 8.738055614312294,
+        "momentum_bucket": 9
+      },
+      "live_results": {
+        "positive": 7.89,
+        "negative": 5.66,
+        "time_ms": 25.600671768188477
+      },
+      "lookup_results": {
+        "positive": 10.546999999999997,
+        "negative": 9.986000000000004,
+        "time_ms": 6.344318389892578
+      },
+      "differences": {
+        "positive_diff": 2.6569999999999974,
+        "negative_diff": 4.326000000000004,
+        "max_diff": 4.326000000000004,
+        "avg_diff": 3.4915000000000007
+      }
+    },
+    {
+      "test_case": {
+        "id": 24,
+        "ttc_seconds": 2083,
+        "buffer_points": 910,
+        "momentum_score": -15.155849660133294,
+        "momentum_bucket": -15
+      },
+      "live_results": {
+        "positive": 1.93,
+        "negative": 2.87,
+        "time_ms": 25.08997917175293
+      },
+      "lookup_results": {
+        "positive": 6.385999999999996,
+        "negative": 7.530000000000001,
+        "time_ms": 9.483098983764648
+      },
+      "differences": {
+        "positive_diff": 4.455999999999996,
+        "negative_diff": 4.660000000000001,
+        "max_diff": 4.660000000000001,
+        "avg_diff": 4.557999999999998
+      }
+    },
+    {
+      "test_case": {
+        "id": 25,
+        "ttc_seconds": 1958,
+        "buffer_points": 834,
+        "momentum_score": -1.9262667472341413,
+        "momentum_bucket": -2
+      },
+      "live_results": {
+        "positive": 2.03,
+        "negative": 3.02,
+        "time_ms": 25.09903907775879
+      },
+      "lookup_results": {
+        "positive": 2.009600000000006,
+        "negative": 2.102000000000004,
+        "time_ms": 6.119966506958008
+      },
+      "differences": {
+        "positive_diff": 0.020399999999993756,
+        "negative_diff": 0.9179999999999962,
+        "max_diff": 0.9179999999999962,
+        "avg_diff": 0.46919999999999495
+      }
+    },
+    {
+      "test_case": {
+        "id": 26,
+        "ttc_seconds": 2867,
+        "buffer_points": 840,
+        "momentum_score": -21.029677332150563,
+        "momentum_bucket": -21
+      },
+      "live_results": {
+        "positive": 2.95,
+        "negative": 4.49,
+        "time_ms": 25.15697479248047
+      },
+      "lookup_results": {
+        "positive": 14.194000000000003,
+        "negative": 13.537999999999997,
+        "time_ms": 5.649805068969727
+      },
+      "differences": {
+        "positive_diff": 11.244000000000003,
+        "negative_diff": 9.047999999999996,
+        "max_diff": 11.244000000000003,
+        "avg_diff": 10.146
+      }
+    },
+    {
+      "test_case": {
+        "id": 27,
+        "ttc_seconds": 2832,
+        "buffer_points": 28,
+        "momentum_score": 6.618723895469685,
+        "momentum_bucket": 7
+      },
+      "live_results": {
+        "positive": 45.14,
+        "negative": 47.18,
+        "time_ms": 25.378942489624023
+      },
+      "lookup_results": {
+        "positive": 45.738,
+        "negative": 48.354,
+        "time_ms": 6.536960601806641
+      },
+      "differences": {
+        "positive_diff": 0.597999999999999,
+        "negative_diff": 1.1739999999999995,
+        "max_diff": 1.1739999999999995,
+        "avg_diff": 0.8859999999999992
+      }
+    },
+    {
+      "test_case": {
+        "id": 28,
+        "ttc_seconds": 1769,
+        "buffer_points": 1350,
+        "momentum_score": -4.923847199052457,
+        "momentum_bucket": -5
+      },
+      "live_results": {
+        "positive": 1.02,
+        "negative": 1.88,
+        "time_ms": 25.452136993408203
+      },
+      "lookup_results": {
+        "positive": 0.6899999999999977,
+        "negative": 0.9199999999999875,
+        "time_ms": 7.400989532470703
+      },
+      "differences": {
+        "positive_diff": 0.3300000000000023,
+        "negative_diff": 0.9600000000000124,
+        "max_diff": 0.9600000000000124,
+        "avg_diff": 0.6450000000000073
+      }
+    },
+    {
+      "test_case": {
+        "id": 29,
+        "ttc_seconds": 1375,
+        "buffer_points": 432,
+        "momentum_score": -3.784639899038666,
+        "momentum_bucket": -4
+      },
+      "live_results": {
+        "positive": 7.83,
+        "negative": 9.13,
+        "time_ms": 25.54798126220703
+      },
+      "lookup_results": {
+        "positive": 6.774000000000001,
+        "negative": 6.811999999999998,
+        "time_ms": 7.297039031982422
+      },
+      "differences": {
+        "positive_diff": 1.0559999999999992,
+        "negative_diff": 2.318000000000003,
+        "max_diff": 2.318000000000003,
+        "avg_diff": 1.6870000000000012
+      }
+    },
+    {
+      "test_case": {
+        "id": 30,
+        "ttc_seconds": 2683,
+        "buffer_points": 805,
+        "momentum_score": 0.8041947846292494,
+        "momentum_bucket": 1
+      },
+      "live_results": {
+        "positive": 4.54,
+        "negative": 3.19,
+        "time_ms": 24.7039794921875
+      },
+      "lookup_results": {
+        "positive": 2.963000000000008,
+        "negative": 2.7779999999999916,
+        "time_ms": 7.050991058349609
+      },
+      "differences": {
+        "positive_diff": 1.576999999999992,
+        "negative_diff": 0.41200000000000836,
+        "max_diff": 1.576999999999992,
+        "avg_diff": 0.9945000000000002
+      }
+    },
+    {
+      "test_case": {
+        "id": 31,
+        "ttc_seconds": 2188,
+        "buffer_points": 1888,
+        "momentum_score": 8.434091143165482,
+        "momentum_bucket": 8
+      },
+      "live_results": {
+        "positive": 1.91,
+        "negative": 1.19,
+        "time_ms": 25.267362594604492
+      },
+      "lookup_results": {
+        "positive": 0.7219999999999942,
+        "negative": 0.5619999999999834,
+        "time_ms": 7.374763488769531
+      },
+      "differences": {
+        "positive_diff": 1.1880000000000057,
+        "negative_diff": 0.6280000000000165,
+        "max_diff": 1.1880000000000057,
+        "avg_diff": 0.9080000000000111
+      }
+    },
+    {
+      "test_case": {
+        "id": 32,
+        "ttc_seconds": 1291,
+        "buffer_points": 1836,
+        "momentum_score": -29.401751571663098,
+        "momentum_bucket": -29
+      },
+      "live_results": {
+        "positive": 0.57,
+        "negative": 1.51,
+        "time_ms": 25.487899780273438
+      },
+      "lookup_results": {
+        "positive": 1.2879999999999825,
+        "negative": 2.7235999999999763,
+        "time_ms": 7.635354995727539
+      },
+      "differences": {
+        "positive_diff": 0.7179999999999825,
+        "negative_diff": 1.2135999999999763,
+        "max_diff": 1.2135999999999763,
+        "avg_diff": 0.9657999999999793
+      }
+    },
+    {
+      "test_case": {
+        "id": 33,
+        "ttc_seconds": 122,
+        "buffer_points": 496,
+        "momentum_score": -15.863613512353618,
+        "momentum_bucket": -16
+      },
+      "live_results": {
+        "positive": 0.08,
+        "negative": 0.18,
+        "time_ms": 25.287151336669922
+      },
+      "lookup_results": {
+        "positive": 0.8123999999999967,
+        "negative": 1.4724000000000075,
+        "time_ms": 6.67881965637207
+      },
+      "differences": {
+        "positive_diff": 0.7323999999999967,
+        "negative_diff": 1.2924000000000075,
+        "max_diff": 1.2924000000000075,
+        "avg_diff": 1.0124000000000022
+      }
+    },
+    {
+      "test_case": {
+        "id": 34,
+        "ttc_seconds": 2076,
+        "buffer_points": 1565,
+        "momentum_score": -21.726396405764532,
+        "momentum_bucket": -22
+      },
+      "live_results": {
+        "positive": 1.38,
+        "negative": 2.15,
+        "time_ms": 24.663925170898438
+      },
+      "lookup_results": {
+        "positive": 2.9209999999999923,
+        "negative": 4.197999999999993,
+        "time_ms": 5.124807357788086
+      },
+      "differences": {
+        "positive_diff": 1.5409999999999924,
+        "negative_diff": 2.0479999999999934,
+        "max_diff": 2.0479999999999934,
+        "avg_diff": 1.7944999999999929
+      }
+    },
+    {
+      "test_case": {
+        "id": 35,
+        "ttc_seconds": 2025,
+        "buffer_points": 1572,
+        "momentum_score": 11.061974250123434,
+        "momentum_bucket": 11
+      },
+      "live_results": {
+        "positive": 1.89,
+        "negative": 1.1,
+        "time_ms": 24.181842803955078
+      },
+      "lookup_results": {
+        "positive": 1.6259999999999906,
+        "negative": 1.1059999999999945,
+        "time_ms": 12.871026992797852
+      },
+      "differences": {
+        "positive_diff": 0.26400000000000934,
+        "negative_diff": 0.005999999999994454,
+        "max_diff": 0.26400000000000934,
+        "avg_diff": 0.1350000000000019
+      }
+    },
+    {
+      "test_case": {
+        "id": 36,
+        "ttc_seconds": 2899,
+        "buffer_points": 1842,
+        "momentum_score": 22.056586850910733,
+        "momentum_bucket": 22
+      },
+      "live_results": {
+        "positive": 2.94,
+        "negative": 2.12,
+        "time_ms": 24.197101593017578
+      },
+      "lookup_results": {
+        "positive": 3.4295999999999793,
+        "negative": 2.9103999999999814,
+        "time_ms": 5.763769149780273
+      },
+      "differences": {
+        "positive_diff": 0.4895999999999794,
+        "negative_diff": 0.7903999999999813,
+        "max_diff": 0.7903999999999813,
+        "avg_diff": 0.6399999999999804
+      }
+    },
+    {
+      "test_case": {
+        "id": 37,
+        "ttc_seconds": 2671,
+        "buffer_points": 1834,
+        "momentum_score": 20.851715331793976,
+        "momentum_bucket": 21
+      },
+      "live_results": {
+        "positive": 2.73,
+        "negative": 1.93,
+        "time_ms": 24.48415756225586
+      },
+      "lookup_results": {
+        "positive": 2.6311999999999927,
+        "negative": 2.197199999999981,
+        "time_ms": 7.44175910949707
+      },
+      "differences": {
+        "positive_diff": 0.09880000000000733,
+        "negative_diff": 0.267199999999981,
+        "max_diff": 0.267199999999981,
+        "avg_diff": 0.18299999999999417
+      }
+    },
+    {
+      "test_case": {
+        "id": 38,
+        "ttc_seconds": 1695,
+        "buffer_points": 760,
+        "momentum_score": -6.819169606783632,
+        "momentum_bucket": -7
+      },
+      "live_results": {
+        "positive": 1.96,
+        "negative": 3.67,
+        "time_ms": 24.24311637878418
+      },
+      "lookup_results": {
+        "positive": 3.6400000000000006,
+        "negative": 4.180000000000007,
+        "time_ms": 6.544828414916992
+      },
+      "differences": {
+        "positive_diff": 1.6800000000000006,
+        "negative_diff": 0.5100000000000069,
+        "max_diff": 1.6800000000000006,
+        "avg_diff": 1.0950000000000037
+      }
+    },
+    {
+      "test_case": {
+        "id": 39,
+        "ttc_seconds": 3117,
+        "buffer_points": 534,
+        "momentum_score": -9.282097684475186,
+        "momentum_bucket": -9
+      },
+      "live_results": {
+        "positive": 9.6,
+        "negative": 10.37,
+        "time_ms": 24.246931076049805
+      },
+      "lookup_results": {
+        "positive": 14.93119999999999,
+        "negative": 14.503600000000006,
+        "time_ms": 5.855083465576172
+      },
+      "differences": {
+        "positive_diff": 5.33119999999999,
+        "negative_diff": 4.133600000000007,
+        "max_diff": 5.33119999999999,
+        "avg_diff": 4.732399999999998
+      }
+    },
+    {
+      "test_case": {
+        "id": 40,
+        "ttc_seconds": 959,
+        "buffer_points": 716,
+        "momentum_score": 1.391329945536807,
+        "momentum_bucket": 1
+      },
+      "live_results": {
+        "positive": 1.99,
+        "negative": 0.84,
+        "time_ms": 24.38521385192871
+      },
+      "lookup_results": {
+        "positive": 1.014799999999994,
+        "negative": 0.9739999999999895,
+        "time_ms": 6.850957870483398
+      },
+      "differences": {
+        "positive_diff": 0.9752000000000061,
+        "negative_diff": 0.13399999999998957,
+        "max_diff": 0.9752000000000061,
+        "avg_diff": 0.5545999999999978
+      }
+    },
+    {
+      "test_case": {
+        "id": 41,
+        "ttc_seconds": 2552,
+        "buffer_points": 371,
+        "momentum_score": 5.128825924643216,
+        "momentum_bucket": 5
+      },
+      "live_results": {
+        "positive": 14.6,
+        "negative": 13.15,
+        "time_ms": 25.10809898376465
+      },
+      "lookup_results": {
+        "positive": 15.022999999999996,
+        "negative": 15.23899999999999,
+        "time_ms": 13.418912887573242
+      },
+      "differences": {
+        "positive_diff": 0.4229999999999965,
+        "negative_diff": 2.0889999999999898,
+        "max_diff": 2.0889999999999898,
+        "avg_diff": 1.2559999999999931
+      }
+    },
+    {
+      "test_case": {
+        "id": 42,
+        "ttc_seconds": 1732,
+        "buffer_points": 1913,
+        "momentum_score": 3.943547014041279,
+        "momentum_bucket": 4
+      },
+      "live_results": {
+        "positive": 1.45,
+        "negative": 0.82,
+        "time_ms": 25.624752044677734
+      },
+      "lookup_results": {
+        "positive": 0.2600000000000051,
+        "negative": 0.22000000000001307,
+        "time_ms": 3.4780502319335938
+      },
+      "differences": {
+        "positive_diff": 1.1899999999999948,
+        "negative_diff": 0.5999999999999869,
+        "max_diff": 1.1899999999999948,
+        "avg_diff": 0.8949999999999909
+      }
+    },
+    {
+      "test_case": {
+        "id": 43,
+        "ttc_seconds": 2012,
+        "buffer_points": 1604,
+        "momentum_score": -6.031908409638319,
+        "momentum_bucket": -6
+      },
+      "live_results": {
+        "positive": 1.26,
+        "negative": 2.0,
+        "time_ms": 24.47509765625
+      },
+      "lookup_results": {
+        "positive": 0.6059999999999945,
+        "negative": 0.7583999999999946,
+        "time_ms": 7.835865020751953
+      },
+      "differences": {
+        "positive_diff": 0.6540000000000055,
+        "negative_diff": 1.2416000000000054,
+        "max_diff": 1.2416000000000054,
+        "avg_diff": 0.9478000000000054
+      }
+    },
+    {
+      "test_case": {
+        "id": 44,
+        "ttc_seconds": 1072,
+        "buffer_points": 1641,
+        "momentum_score": -6.136330859465101,
+        "momentum_bucket": -6
+      },
+      "live_results": {
+        "positive": 0.41,
+        "negative": 1.08,
+        "time_ms": 25.357723236083984
+      },
+      "lookup_results": {
+        "positive": 0.19360000000000355,
+        "negative": 0.2693999999999903,
+        "time_ms": 7.542133331298828
+      },
+      "differences": {
+        "positive_diff": 0.21639999999999643,
+        "negative_diff": 0.8106000000000098,
+        "max_diff": 0.8106000000000098,
+        "avg_diff": 0.5135000000000031
+      }
+    },
+    {
+      "test_case": {
+        "id": 45,
+        "ttc_seconds": 1609,
+        "buffer_points": 1416,
+        "momentum_score": 13.818016760925317,
+        "momentum_bucket": 14
+      },
+      "live_results": {
+        "positive": 1.53,
+        "negative": 0.75,
+        "time_ms": 24.39713478088379
+      },
+      "lookup_results": {
+        "positive": 1.9791999999999916,
+        "negative": 1.4499999999999886,
+        "time_ms": 6.644964218139648
+      },
+      "differences": {
+        "positive_diff": 0.4491999999999916,
+        "negative_diff": 0.6999999999999886,
+        "max_diff": 0.6999999999999886,
+        "avg_diff": 0.5745999999999901
+      }
+    },
+    {
+      "test_case": {
+        "id": 46,
+        "ttc_seconds": 2474,
+        "buffer_points": 763,
+        "momentum_score": -2.9870390491332977,
+        "momentum_bucket": -3
+      },
+      "live_results": {
+        "positive": 3.39,
+        "negative": 5.1,
+        "time_ms": 25.04897117614746
+      },
+      "lookup_results": {
+        "positive": 3.608000000000004,
+        "negative": 3.698599999999999,
+        "time_ms": 6.695985794067383
+      },
+      "differences": {
+        "positive_diff": 0.21800000000000397,
+        "negative_diff": 1.4014000000000006,
+        "max_diff": 1.4014000000000006,
+        "avg_diff": 0.8097000000000023
+      }
+    },
+    {
+      "test_case": {
+        "id": 47,
+        "ttc_seconds": 2096,
+        "buffer_points": 971,
+        "momentum_score": 18.912998559313337,
+        "momentum_bucket": 19
+      },
+      "live_results": {
+        "positive": 2.12,
+        "negative": 1.36,
+        "time_ms": 24.2922306060791
+      },
+      "lookup_results": {
+        "positive": 8.522999999999996,
+        "negative": 6.592799999999983,
+        "time_ms": 5.319833755493164
+      },
+      "differences": {
+        "positive_diff": 6.402999999999996,
+        "negative_diff": 5.232799999999982,
+        "max_diff": 6.402999999999996,
+        "avg_diff": 5.817899999999989
+      }
+    },
+    {
+      "test_case": {
+        "id": 48,
+        "ttc_seconds": 1888,
+        "buffer_points": 1004,
+        "momentum_score": -13.71242353944643,
+        "momentum_bucket": -14
+      },
+      "live_results": {
+        "positive": 1.11,
+        "negative": 1.96,
+        "time_ms": 25.03204345703125
+      },
+      "lookup_results": {
+        "positive": 4.266000000000005,
+        "negative": 5.659999999999997,
+        "time_ms": 6.648063659667969
+      },
+      "differences": {
+        "positive_diff": 3.156000000000005,
+        "negative_diff": 3.6999999999999966,
+        "max_diff": 3.6999999999999966,
+        "avg_diff": 3.428000000000001
+      }
+    },
+    {
+      "test_case": {
+        "id": 49,
+        "ttc_seconds": 2771,
+        "buffer_points": 163,
+        "momentum_score": 2.8357481464911984,
+        "momentum_bucket": 3
+      },
+      "live_results": {
+        "positive": 30.43,
+        "negative": 29.75,
+        "time_ms": 24.18804168701172
+      },
+      "lookup_results": {
+        "positive": 29.1254,
+        "negative": 28.91040000000001,
+        "time_ms": 7.276773452758789
+      },
+      "differences": {
+        "positive_diff": 1.3046000000000006,
+        "negative_diff": 0.8395999999999901,
+        "max_diff": 1.3046000000000006,
+        "avg_diff": 1.0720999999999954
+      }
+    },
+    {
+      "test_case": {
+        "id": 50,
+        "ttc_seconds": 2477,
+        "buffer_points": 706,
+        "momentum_score": 23.6393297476081,
+        "momentum_bucket": 24
+      },
+      "live_results": {
+        "positive": 5.45,
+        "negative": 4.04,
+        "time_ms": 24.866104125976562
+      },
+      "lookup_results": {
+        "positive": 16.918000000000006,
+        "negative": 15.451999999999998,
+        "time_ms": 8.251190185546875
+      },
+      "differences": {
+        "positive_diff": 11.468000000000007,
+        "negative_diff": 11.411999999999999,
+        "max_diff": 11.468000000000007,
+        "avg_diff": 11.440000000000003
+      }
+    },
+    {
+      "test_case": {
+        "id": 51,
+        "ttc_seconds": 1519,
+        "buffer_points": 920,
+        "momentum_score": 28.648748450822893,
+        "momentum_bucket": 29
+      },
+      "live_results": {
+        "positive": 1.88,
+        "negative": 0.86,
+        "time_ms": 24.325132369995117
+      },
+      "lookup_results": {
+        "positive": 10.528000000000006,
+        "negative": 8.271999999999991,
+        "time_ms": 2.862691879272461
+      },
+      "differences": {
+        "positive_diff": 8.648000000000007,
+        "negative_diff": 7.411999999999991,
+        "max_diff": 8.648000000000007,
+        "avg_diff": 8.03
+      }
+    },
+    {
+      "test_case": {
+        "id": 52,
+        "ttc_seconds": 809,
+        "buffer_points": 206,
+        "momentum_score": -27.603216701359102,
+        "momentum_bucket": -28
+      },
+      "live_results": {
+        "positive": 18.52,
+        "negative": 17.04,
+        "time_ms": 24.751901626586914
+      },
+      "lookup_results": {
+        "positive": 35.959199999999996,
+        "negative": 31.861999999999995,
+        "time_ms": 3.370046615600586
+      },
+      "differences": {
+        "positive_diff": 17.439199999999996,
+        "negative_diff": 14.821999999999996,
+        "max_diff": 17.439199999999996,
+        "avg_diff": 16.130599999999994
+      }
+    },
+    {
+      "test_case": {
+        "id": 53,
+        "ttc_seconds": 1159,
+        "buffer_points": 464,
+        "momentum_score": 29.499594231876245,
+        "momentum_bucket": 29
+      },
+      "live_results": {
+        "positive": 6.61,
+        "negative": 4.35,
+        "time_ms": 24.14727210998535
+      },
+      "lookup_results": {
+        "positive": 20.55879999999999,
+        "negative": 20.544799999999995,
+        "time_ms": 6.906747817993164
+      },
+      "differences": {
+        "positive_diff": 13.948799999999991,
+        "negative_diff": 16.194799999999994,
+        "max_diff": 16.194799999999994,
+        "avg_diff": 15.071799999999993
+      }
+    },
+    {
+      "test_case": {
+        "id": 54,
+        "ttc_seconds": 2951,
+        "buffer_points": 473,
+        "momentum_score": 24.133366107850165,
+        "momentum_bucket": 24
+      },
+      "live_results": {
+        "positive": 12.33,
+        "negative": 9.44,
+        "time_ms": 23.980140686035156
+      },
+      "lookup_results": {
+        "positive": 25.899,
+        "negative": 25.069000000000003,
+        "time_ms": 5.8727264404296875
+      },
+      "differences": {
+        "positive_diff": 13.569,
+        "negative_diff": 15.629000000000003,
+        "max_diff": 15.629000000000003,
+        "avg_diff": 14.599000000000002
+      }
+    },
+    {
+      "test_case": {
+        "id": 55,
+        "ttc_seconds": 2406,
+        "buffer_points": 1612,
+        "momentum_score": -14.827166428863377,
+        "momentum_bucket": -15
+      },
+      "live_results": {
+        "positive": 1.54,
+        "negative": 2.87,
+        "time_ms": 23.977041244506836
+      },
+      "lookup_results": {
+        "positive": 1.9643999999999835,
+        "negative": 2.775599999999983,
+        "time_ms": 6.407022476196289
+      },
+      "differences": {
+        "positive_diff": 0.42439999999998346,
+        "negative_diff": 0.09440000000001714,
+        "max_diff": 0.42439999999998346,
+        "avg_diff": 0.2594000000000003
+      }
+    },
+    {
+      "test_case": {
+        "id": 56,
+        "ttc_seconds": 2395,
+        "buffer_points": 1513,
+        "momentum_score": -4.114934872749089,
+        "momentum_bucket": -4
+      },
+      "live_results": {
+        "positive": 1.53,
+        "negative": 2.87,
+        "time_ms": 24.380922317504883
+      },
+      "lookup_results": {
+        "positive": 0.757000000000005,
+        "negative": 0.8770000000000095,
+        "time_ms": 7.375240325927734
+      },
+      "differences": {
+        "positive_diff": 0.772999999999995,
+        "negative_diff": 1.9929999999999906,
+        "max_diff": 1.9929999999999906,
+        "avg_diff": 1.382999999999993
+      }
+    },
+    {
+      "test_case": {
+        "id": 57,
+        "ttc_seconds": 1500,
+        "buffer_points": 990,
+        "momentum_score": -15.42584552028159,
+        "momentum_bucket": -15
+      },
+      "live_results": {
+        "positive": 0.81,
+        "negative": 1.74,
+        "time_ms": 24.21283721923828
+      },
+      "lookup_results": {
+        "positive": 3.8799999999999955,
+        "negative": 5.109999999999999,
+        "time_ms": 6.844997406005859
+      },
+      "differences": {
+        "positive_diff": 3.0699999999999954,
+        "negative_diff": 3.369999999999999,
+        "max_diff": 3.369999999999999,
+        "avg_diff": 3.219999999999997
+      }
+    },
+    {
+      "test_case": {
+        "id": 58,
+        "ttc_seconds": 1297,
+        "buffer_points": 1866,
+        "momentum_score": 9.67821672945189,
+        "momentum_bucket": 10
+      },
+      "live_results": {
+        "positive": 1.09,
+        "negative": 0.59,
+        "time_ms": 24.065017700195312
+      },
+      "lookup_results": {
+        "positive": 0.42799999999999727,
+        "negative": 0.269999999999996,
+        "time_ms": 5.951881408691406
+      },
+      "differences": {
+        "positive_diff": 0.6620000000000028,
+        "negative_diff": 0.32000000000000395,
+        "max_diff": 0.6620000000000028,
+        "avg_diff": 0.4910000000000034
+      }
+    },
+    {
+      "test_case": {
+        "id": 59,
+        "ttc_seconds": 2940,
+        "buffer_points": 1886,
+        "momentum_score": 27.53786914025084,
+        "momentum_bucket": 28
+      },
+      "live_results": {
+        "positive": 2.92,
+        "negative": 2.05,
+        "time_ms": 24.192094802856445
+      },
+      "lookup_results": {
+        "positive": 4.787999999999997,
+        "negative": 3.932000000000002,
+        "time_ms": 6.535053253173828
+      },
+      "differences": {
+        "positive_diff": 1.8679999999999968,
+        "negative_diff": 1.8820000000000023,
+        "max_diff": 1.8820000000000023,
+        "avg_diff": 1.8749999999999996
+      }
+    },
+    {
+      "test_case": {
+        "id": 60,
+        "ttc_seconds": 3565,
+        "buffer_points": 1442,
+        "momentum_score": 4.285281305349699,
+        "momentum_bucket": 4
+      },
+      "live_results": {
+        "positive": 3.38,
+        "negative": 2.67,
+        "time_ms": 24.025917053222656
+      },
+      "lookup_results": {
+        "positive": 1.7639999999999958,
+        "negative": 1.5360000000000014,
+        "time_ms": 6.245136260986328
+      },
+      "differences": {
+        "positive_diff": 1.616000000000004,
+        "negative_diff": 1.1339999999999986,
+        "max_diff": 1.616000000000004,
+        "avg_diff": 1.3750000000000013
+      }
+    },
+    {
+      "test_case": {
+        "id": 61,
+        "ttc_seconds": 3103,
+        "buffer_points": 387,
+        "momentum_score": 25.865267821981405,
+        "momentum_bucket": 26
+      },
+      "live_results": {
+        "positive": 15.86,
+        "negative": 13.86,
+        "time_ms": 24.288177490234375
+      },
+      "lookup_results": {
+        "positive": 28.357,
+        "negative": 33.369200000000006,
+        "time_ms": 8.028984069824219
+      },
+      "differences": {
+        "positive_diff": 12.497,
+        "negative_diff": 19.509200000000007,
+        "max_diff": 19.509200000000007,
+        "avg_diff": 16.003100000000003
+      }
+    },
+    {
+      "test_case": {
+        "id": 62,
+        "ttc_seconds": 2336,
+        "buffer_points": 346,
+        "momentum_score": -10.894210100027848,
+        "momentum_bucket": -11
+      },
+      "live_results": {
+        "positive": 16.14,
+        "negative": 15.59,
+        "time_ms": 25.011062622070312
+      },
+      "lookup_results": {
+        "positive": 23.672799999999995,
+        "negative": 21.454000000000008,
+        "time_ms": 4.137992858886719
+      },
+      "differences": {
+        "positive_diff": 7.532799999999995,
+        "negative_diff": 5.864000000000008,
+        "max_diff": 7.532799999999995,
+        "avg_diff": 6.698400000000001
+      }
+    },
+    {
+      "test_case": {
+        "id": 63,
+        "ttc_seconds": 2944,
+        "buffer_points": 1560,
+        "momentum_score": 26.808194061916012,
+        "momentum_bucket": 27
+      },
+      "live_results": {
+        "positive": 2.93,
+        "negative": 2.06,
+        "time_ms": 24.770736694335938
+      },
+      "lookup_results": {
+        "positive": 6.161999999999992,
+        "negative": 4.671999999999997,
+        "time_ms": 5.746126174926758
+      },
+      "differences": {
+        "positive_diff": 3.2319999999999918,
+        "negative_diff": 2.611999999999997,
+        "max_diff": 3.2319999999999918,
+        "avg_diff": 2.9219999999999944
+      }
+    },
+    {
+      "test_case": {
+        "id": 64,
+        "ttc_seconds": 782,
+        "buffer_points": 1702,
+        "momentum_score": -25.645184897176378,
+        "momentum_bucket": -26
+      },
+      "live_results": {
+        "positive": 0.31,
+        "negative": 0.87,
+        "time_ms": 24.69491958618164
+      },
+      "lookup_results": {
+        "positive": 0.5120000000000005,
+        "negative": 1.141999999999996,
+        "time_ms": 8.47005844116211
+      },
+      "differences": {
+        "positive_diff": 0.20200000000000046,
+        "negative_diff": 0.2719999999999959,
+        "max_diff": 0.2719999999999959,
+        "avg_diff": 0.23699999999999818
+      }
+    },
+    {
+      "test_case": {
+        "id": 65,
+        "ttc_seconds": 2397,
+        "buffer_points": 1134,
+        "momentum_score": 10.33586544690418,
+        "momentum_bucket": 10
+      },
+      "live_results": {
+        "positive": 2.37,
+        "negative": 1.3,
+        "time_ms": 25.3908634185791
+      },
+      "lookup_results": {
+        "positive": 3.5795999999999992,
+        "negative": 2.8659999999999997,
+        "time_ms": 3.1092166900634766
+      },
+      "differences": {
+        "positive_diff": 1.2095999999999991,
+        "negative_diff": 1.5659999999999996,
+        "max_diff": 1.5659999999999996,
+        "avg_diff": 1.3877999999999995
+      }
+    },
+    {
+      "test_case": {
+        "id": 66,
+        "ttc_seconds": 1679,
+        "buffer_points": 481,
+        "momentum_score": 1.9122398781398608,
+        "momentum_bucket": 2
+      },
+      "live_results": {
+        "positive": 8.29,
+        "negative": 6.18,
+        "time_ms": 24.47795867919922
+      },
+      "lookup_results": {
+        "positive": 5.566999999999979,
+        "negative": 5.296999999999997,
+        "time_ms": 7.668256759643555
+      },
+      "differences": {
+        "positive_diff": 2.7230000000000203,
+        "negative_diff": 0.8830000000000027,
+        "max_diff": 2.7230000000000203,
+        "avg_diff": 1.8030000000000115
+      }
+    },
+    {
+      "test_case": {
+        "id": 67,
+        "ttc_seconds": 100,
+        "buffer_points": 645,
+        "momentum_score": 21.616454196375024,
+        "momentum_bucket": 22
+      },
+      "live_results": {
+        "positive": 0.12,
+        "negative": 0.02,
+        "time_ms": 24.56378936767578
+      },
+      "lookup_results": {
+        "positive": 0.7450000000000045,
+        "negative": 0.269999999999996,
+        "time_ms": 9.05609130859375
+      },
+      "differences": {
+        "positive_diff": 0.6250000000000046,
+        "negative_diff": 0.24999999999999603,
+        "max_diff": 0.6250000000000046,
+        "avg_diff": 0.4375000000000003
+      }
+    },
+    {
+      "test_case": {
+        "id": 68,
+        "ttc_seconds": 1228,
+        "buffer_points": 386,
+        "momentum_score": -6.136364960559916,
+        "momentum_bucket": -6
+      },
+      "live_results": {
+        "positive": 8.85,
+        "negative": 9.69,
+        "time_ms": 24.761199951171875
+      },
+      "lookup_results": {
+        "positive": 9.352399999999989,
+        "negative": 9.25,
+        "time_ms": 2.979755401611328
+      },
+      "differences": {
+        "positive_diff": 0.5023999999999891,
+        "negative_diff": 0.4399999999999995,
+        "max_diff": 0.5023999999999891,
+        "avg_diff": 0.4711999999999943
+      }
+    },
+    {
+      "test_case": {
+        "id": 69,
+        "ttc_seconds": 942,
+        "buffer_points": 1678,
+        "momentum_score": 9.533483049398143,
+        "momentum_bucket": 10
+      },
+      "live_results": {
+        "positive": 0.73,
+        "negative": 0.36,
+        "time_ms": 25.113821029663086
+      },
+      "lookup_results": {
+        "positive": 0.35999999999999943,
+        "negative": 0.21199999999998909,
+        "time_ms": 3.1731128692626953
+      },
+      "differences": {
+        "positive_diff": 0.37000000000000055,
+        "negative_diff": 0.1480000000000109,
+        "max_diff": 0.37000000000000055,
+        "avg_diff": 0.2590000000000057
+      }
+    },
+    {
+      "test_case": {
+        "id": 70,
+        "ttc_seconds": 101,
+        "buffer_points": 873,
+        "momentum_score": 11.237507758966473,
+        "momentum_bucket": 11
+      },
+      "live_results": {
+        "positive": 0.06,
+        "negative": 0.0,
+        "time_ms": 23.9560604095459
+      },
+      "lookup_results": {
+        "positive": 0.07139999999998281,
+        "negative": 0.04999999999999716,
+        "time_ms": 4.292011260986328
+      },
+      "differences": {
+        "positive_diff": 0.011399999999982813,
+        "negative_diff": 0.04999999999999716,
+        "max_diff": 0.04999999999999716,
+        "avg_diff": 0.030699999999989985
+      }
+    },
+    {
+      "test_case": {
+        "id": 71,
+        "ttc_seconds": 1178,
+        "buffer_points": 1133,
+        "momentum_score": 23.76668967021797,
+        "momentum_bucket": 24
+      },
+      "live_results": {
+        "positive": 0.97,
+        "negative": 0.42,
+        "time_ms": 23.818254470825195
+      },
+      "lookup_results": {
+        "positive": 5.3078,
+        "negative": 3.3910000000000053,
+        "time_ms": 6.320953369140625
+      },
+      "differences": {
+        "positive_diff": 4.3378000000000005,
+        "negative_diff": 2.9710000000000054,
+        "max_diff": 4.3378000000000005,
+        "avg_diff": 3.654400000000003
+      }
+    },
+    {
+      "test_case": {
+        "id": 72,
+        "ttc_seconds": 2281,
+        "buffer_points": 1301,
+        "momentum_score": -7.470743717003884,
+        "momentum_bucket": -7
+      },
+      "live_results": {
+        "positive": 1.35,
+        "negative": 2.84,
+        "time_ms": 23.486852645874023
+      },
+      "lookup_results": {
+        "positive": 1.4369999999999834,
+        "negative": 1.9161999999999892,
+        "time_ms": 6.133079528808594
+      },
+      "differences": {
+        "positive_diff": 0.08699999999998331,
+        "negative_diff": 0.9238000000000106,
+        "max_diff": 0.9238000000000106,
+        "avg_diff": 0.505399999999997
+      }
+    },
+    {
+      "test_case": {
+        "id": 73,
+        "ttc_seconds": 2795,
+        "buffer_points": 1795,
+        "momentum_score": 17.34373095385437,
+        "momentum_bucket": 17
+      },
+      "live_results": {
+        "positive": 2.8,
+        "negative": 2.05,
+        "time_ms": 23.49066734313965
+      },
+      "lookup_results": {
+        "positive": 2.960000000000008,
+        "negative": 2.114999999999995,
+        "time_ms": 6.4601898193359375
+      },
+      "differences": {
+        "positive_diff": 0.16000000000000814,
+        "negative_diff": 0.06499999999999506,
+        "max_diff": 0.16000000000000814,
+        "avg_diff": 0.1125000000000016
+      }
+    },
+    {
+      "test_case": {
+        "id": 74,
+        "ttc_seconds": 2407,
+        "buffer_points": 1275,
+        "momentum_score": 18.86358916845063,
+        "momentum_bucket": 19
+      },
+      "live_results": {
+        "positive": 2.38,
+        "negative": 1.34,
+        "time_ms": 23.797988891601562
+      },
+      "lookup_results": {
+        "positive": 5.813000000000002,
+        "negative": 4.281000000000006,
+        "time_ms": 8.227109909057617
+      },
+      "differences": {
+        "positive_diff": 3.4330000000000025,
+        "negative_diff": 2.941000000000006,
+        "max_diff": 3.4330000000000025,
+        "avg_diff": 3.1870000000000043
+      }
+    },
+    {
+      "test_case": {
+        "id": 75,
+        "ttc_seconds": 2358,
+        "buffer_points": 1487,
+        "momentum_score": 26.264082893904593,
+        "momentum_bucket": 26
+      },
+      "live_results": {
+        "positive": 2.29,
+        "negative": 1.23,
+        "time_ms": 23.8800048828125
+      },
+      "lookup_results": {
+        "positive": 5.358800000000002,
+        "negative": 4.342199999999991,
+        "time_ms": 5.780935287475586
+      },
+      "differences": {
+        "positive_diff": 3.068800000000002,
+        "negative_diff": 3.112199999999991,
+        "max_diff": 3.112199999999991,
+        "avg_diff": 3.090499999999997
+      }
+    },
+    {
+      "test_case": {
+        "id": 76,
+        "ttc_seconds": 1737,
+        "buffer_points": 267,
+        "momentum_score": -14.172187950947464,
+        "momentum_bucket": -14
+      },
+      "live_results": {
+        "positive": 19.19,
+        "negative": 19.13,
+        "time_ms": 23.29397201538086
+      },
+      "lookup_results": {
+        "positive": 29.622000000000014,
+        "negative": 25.325000000000003,
+        "time_ms": 6.575822830200195
+      },
+      "differences": {
+        "positive_diff": 10.432000000000013,
+        "negative_diff": 6.195000000000004,
+        "max_diff": 10.432000000000013,
+        "avg_diff": 8.313500000000008
+      }
+    },
+    {
+      "test_case": {
+        "id": 77,
+        "ttc_seconds": 1857,
+        "buffer_points": 198,
+        "momentum_score": 6.132154293913182,
+        "momentum_bucket": 6
+      },
+      "live_results": {
+        "positive": 24.69,
+        "negative": 24.48,
+        "time_ms": 23.257017135620117
+      },
+      "lookup_results": {
+        "positive": 25.02879999999999,
+        "negative": 26.167999999999992,
+        "time_ms": 5.224943161010742
+      },
+      "differences": {
+        "positive_diff": 0.33879999999998844,
+        "negative_diff": 1.6879999999999917,
+        "max_diff": 1.6879999999999917,
+        "avg_diff": 1.01339999999999
+      }
+    },
+    {
+      "test_case": {
+        "id": 78,
+        "ttc_seconds": 1072,
+        "buffer_points": 207,
+        "momentum_score": -5.543517878324426,
+        "momentum_bucket": -6
+      },
+      "live_results": {
+        "positive": 21.7,
+        "negative": 18.98,
+        "time_ms": 23.223876953125
+      },
+      "lookup_results": {
+        "positive": 20.804000000000002,
+        "negative": 18.77900000000001,
+        "time_ms": 6.918907165527344
+      },
+      "differences": {
+        "positive_diff": 0.8959999999999972,
+        "negative_diff": 0.20099999999998985,
+        "max_diff": 0.8959999999999972,
+        "avg_diff": 0.5484999999999935
+      }
+    },
+    {
+      "test_case": {
+        "id": 79,
+        "ttc_seconds": 848,
+        "buffer_points": 1410,
+        "momentum_score": -2.900831552537614,
+        "momentum_bucket": -3
+      },
+      "live_results": {
+        "positive": 0.33,
+        "negative": 0.85,
+        "time_ms": 24.168968200683594
+      },
+      "lookup_results": {
+        "positive": 0.14000000000000057,
+        "negative": 0.1700000000000017,
+        "time_ms": 7.833957672119141
+      },
+      "differences": {
+        "positive_diff": 0.18999999999999945,
+        "negative_diff": 0.6799999999999983,
+        "max_diff": 0.6799999999999983,
+        "avg_diff": 0.43499999999999883
+      }
+    },
+    {
+      "test_case": {
+        "id": 80,
+        "ttc_seconds": 446,
+        "buffer_points": 1563,
+        "momentum_score": 4.0535983141424765,
+        "momentum_bucket": 4
+      },
+      "live_results": {
+        "positive": 0.22,
+        "negative": 0.07,
+        "time_ms": 23.506879806518555
+      },
+      "lookup_results": {
+        "positive": 0.04999999999999716,
+        "negative": 0.030000000000001137,
+        "time_ms": 7.687091827392578
+      },
+      "differences": {
+        "positive_diff": 0.17000000000000284,
+        "negative_diff": 0.03999999999999887,
+        "max_diff": 0.17000000000000284,
+        "avg_diff": 0.10500000000000086
+      }
+    },
+    {
+      "test_case": {
+        "id": 81,
+        "ttc_seconds": 2706,
+        "buffer_points": 979,
+        "momentum_score": 4.8095009442865475,
+        "momentum_bucket": 5
+      },
+      "live_results": {
+        "positive": 2.8,
+        "negative": 2.17,
+        "time_ms": 24.218320846557617
+      },
+      "lookup_results": {
+        "positive": 3.2387999999999977,
+        "negative": 2.9761999999999915,
+        "time_ms": 5.194664001464844
+      },
+      "differences": {
+        "positive_diff": 0.43879999999999786,
+        "negative_diff": 0.8061999999999916,
+        "max_diff": 0.8061999999999916,
+        "avg_diff": 0.6224999999999947
+      }
+    },
+    {
+      "test_case": {
+        "id": 82,
+        "ttc_seconds": 3340,
+        "buffer_points": 949,
+        "momentum_score": 23.757892106026453,
+        "momentum_bucket": 24
+      },
+      "live_results": {
+        "positive": 3.82,
+        "negative": 2.85,
+        "time_ms": 24.08909797668457
+      },
+      "lookup_results": {
+        "positive": 14.248000000000005,
+        "negative": 12.489999999999995,
+        "time_ms": 6.297826766967773
+      },
+      "differences": {
+        "positive_diff": 10.428000000000004,
+        "negative_diff": 9.639999999999995,
+        "max_diff": 10.428000000000004,
+        "avg_diff": 10.033999999999999
+      }
+    },
+    {
+      "test_case": {
+        "id": 83,
+        "ttc_seconds": 1575,
+        "buffer_points": 1668,
+        "momentum_score": -24.9787787482653,
+        "momentum_bucket": -25
+      },
+      "live_results": {
+        "positive": 0.81,
+        "negative": 1.81,
+        "time_ms": 23.99611473083496
+      },
+      "lookup_results": {
+        "positive": 1.8659999999999997,
+        "negative": 3.337999999999994,
+        "time_ms": 6.595849990844727
+      },
+      "differences": {
+        "positive_diff": 1.0559999999999996,
+        "negative_diff": 1.5279999999999938,
+        "max_diff": 1.5279999999999938,
+        "avg_diff": 1.2919999999999967
+      }
+    },
+    {
+      "test_case": {
+        "id": 84,
+        "ttc_seconds": 581,
+        "buffer_points": 1412,
+        "momentum_score": 24.418905116667503,
+        "momentum_bucket": 24
+      },
+      "live_results": {
+        "positive": 0.49,
+        "negative": 0.09,
+        "time_ms": 24.283885955810547
+      },
+      "lookup_results": {
+        "positive": 1.1459999999999866,
+        "negative": 0.578000000000003,
+        "time_ms": 5.557060241699219
+      },
+      "differences": {
+        "positive_diff": 0.6559999999999866,
+        "negative_diff": 0.488000000000003,
+        "max_diff": 0.6559999999999866,
+        "avg_diff": 0.5719999999999947
+      }
+    },
+    {
+      "test_case": {
+        "id": 85,
+        "ttc_seconds": 1677,
+        "buffer_points": 512,
+        "momentum_score": -15.576043107561844,
+        "momentum_bucket": -16
+      },
+      "live_results": {
+        "positive": 5.9,
+        "negative": 7.79,
+        "time_ms": 24.28913116455078
+      },
+      "lookup_results": {
+        "positive": 16.502799999999993,
+        "negative": 14.55879999999999,
+        "time_ms": 6.371021270751953
+      },
+      "differences": {
+        "positive_diff": 10.602799999999993,
+        "negative_diff": 6.768799999999991,
+        "max_diff": 10.602799999999993,
+        "avg_diff": 8.685799999999992
+      }
+    },
+    {
+      "test_case": {
+        "id": 86,
+        "ttc_seconds": 3589,
+        "buffer_points": 616,
+        "momentum_score": -23.127096442333656,
+        "momentum_bucket": -23
+      },
+      "live_results": {
+        "positive": 8.52,
+        "negative": 9.77,
+        "time_ms": 24.026155471801758
+      },
+      "lookup_results": {
+        "positive": 22.715199999999996,
+        "negative": 21.976399999999998,
+        "time_ms": 6.128787994384766
+      },
+      "differences": {
+        "positive_diff": 14.195199999999996,
+        "negative_diff": 12.206399999999999,
+        "max_diff": 14.195199999999996,
+        "avg_diff": 13.200799999999997
+      }
+    },
+    {
+      "test_case": {
+        "id": 87,
+        "ttc_seconds": 1883,
+        "buffer_points": 1361,
+        "momentum_score": 10.892783612461386,
+        "momentum_bucket": 11
+      },
+      "live_results": {
+        "positive": 1.6,
+        "negative": 0.92,
+        "time_ms": 24.22809600830078
+      },
+      "lookup_results": {
+        "positive": 2.131999999999991,
+        "negative": 1.5030000000000001,
+        "time_ms": 6.042003631591797
+      },
+      "differences": {
+        "positive_diff": 0.5319999999999907,
+        "negative_diff": 0.5830000000000001,
+        "max_diff": 0.5830000000000001,
+        "avg_diff": 0.5574999999999954
+      }
+    },
+    {
+      "test_case": {
+        "id": 88,
+        "ttc_seconds": 1347,
+        "buffer_points": 1798,
+        "momentum_score": 29.138435233890633,
+        "momentum_bucket": 29
+      },
+      "live_results": {
+        "positive": 1.13,
+        "negative": 0.62,
+        "time_ms": 24.25408363342285
+      },
+      "lookup_results": {
+        "positive": 2.6340000000000003,
+        "negative": 1.1580000000000013,
+        "time_ms": 6.0939788818359375
+      },
+      "differences": {
+        "positive_diff": 1.5040000000000004,
+        "negative_diff": 0.5380000000000013,
+        "max_diff": 1.5040000000000004,
+        "avg_diff": 1.0210000000000008
+      }
+    },
+    {
+      "test_case": {
+        "id": 89,
+        "ttc_seconds": 1710,
+        "buffer_points": 603,
+        "momentum_score": -14.507648793993898,
+        "momentum_bucket": -15
+      },
+      "live_results": {
+        "positive": 4.04,
+        "negative": 5.68,
+        "time_ms": 24.026870727539062
+      },
+      "lookup_results": {
+        "positive": 12.071000000000012,
+        "negative": 12.109000000000009,
+        "time_ms": 13.67497444152832
+      },
+      "differences": {
+        "positive_diff": 8.031000000000013,
+        "negative_diff": 6.429000000000009,
+        "max_diff": 8.031000000000013,
+        "avg_diff": 7.230000000000011
+      }
+    },
+    {
+      "test_case": {
+        "id": 90,
+        "ttc_seconds": 648,
+        "buffer_points": 720,
+        "momentum_score": -15.809676813941563,
+        "momentum_bucket": -16
+      },
+      "live_results": {
+        "positive": 0.67,
+        "negative": 1.36,
+        "time_ms": 24.97100830078125
+      },
+      "lookup_results": {
+        "positive": 3.2879999999999967,
+        "negative": 4.403999999999996,
+        "time_ms": 11.256217956542969
+      },
+      "differences": {
+        "positive_diff": 2.6179999999999968,
+        "negative_diff": 3.043999999999996,
+        "max_diff": 3.043999999999996,
+        "avg_diff": 2.8309999999999964
+      }
+    },
+    {
+      "test_case": {
+        "id": 91,
+        "ttc_seconds": 885,
+        "buffer_points": 301,
+        "momentum_score": -29.56730522125119,
+        "momentum_bucket": -30
+      },
+      "live_results": {
+        "positive": 10.82,
+        "negative": 11.0,
+        "time_ms": 24.82295036315918
+      },
+      "lookup_results": {
+        "positive": 31.546000000000006,
+        "negative": 24.741000000000014,
+        "time_ms": 8.660078048706055
+      },
+      "differences": {
+        "positive_diff": 20.726000000000006,
+        "negative_diff": 13.741000000000014,
+        "max_diff": 20.726000000000006,
+        "avg_diff": 17.23350000000001
+      }
+    },
+    {
+      "test_case": {
+        "id": 92,
+        "ttc_seconds": 3042,
+        "buffer_points": 1547,
+        "momentum_score": -24.51380930242151,
+        "momentum_bucket": -25
+      },
+      "live_results": {
+        "positive": 2.15,
+        "negative": 3.24,
+        "time_ms": 24.338960647583008
+      },
+      "lookup_results": {
+        "positive": 5.9572000000000145,
+        "negative": 6.021000000000015,
+        "time_ms": 9.823083877563477
+      },
+      "differences": {
+        "positive_diff": 3.8072000000000146,
+        "negative_diff": 2.781000000000015,
+        "max_diff": 3.8072000000000146,
+        "avg_diff": 3.2941000000000145
+      }
+    },
+    {
+      "test_case": {
+        "id": 93,
+        "ttc_seconds": 951,
+        "buffer_points": 1492,
+        "momentum_score": -15.494695012978635,
+        "momentum_bucket": -15
+      },
+      "live_results": {
+        "positive": 0.35,
+        "negative": 1.09,
+        "time_ms": 25.308847427368164
+      },
+      "lookup_results": {
+        "positive": 0.6199999999999761,
+        "negative": 1.0244,
+        "time_ms": 10.019063949584961
+      },
+      "differences": {
+        "positive_diff": 0.26999999999997615,
+        "negative_diff": 0.0656000000000001,
+        "max_diff": 0.26999999999997615,
+        "avg_diff": 0.16779999999998813
+      }
+    },
+    {
+      "test_case": {
+        "id": 94,
+        "ttc_seconds": 1963,
+        "buffer_points": 1907,
+        "momentum_score": -23.230624953258605,
+        "momentum_bucket": -23
+      },
+      "live_results": {
+        "positive": 1.19,
+        "negative": 2.08,
+        "time_ms": 24.791955947875977
+      },
+      "lookup_results": {
+        "positive": 1.795000000000016,
+        "negative": 2.470799999999997,
+        "time_ms": 9.717941284179688
+      },
+      "differences": {
+        "positive_diff": 0.605000000000016,
+        "negative_diff": 0.3907999999999969,
+        "max_diff": 0.605000000000016,
+        "avg_diff": 0.49790000000000645
+      }
+    },
+    {
+      "test_case": {
+        "id": 95,
+        "ttc_seconds": 581,
+        "buffer_points": 923,
+        "momentum_score": -20.524578906172565,
+        "momentum_bucket": -21
+      },
+      "live_results": {
+        "positive": 0.17,
+        "negative": 0.75,
+        "time_ms": 24.484872817993164
+      },
+      "lookup_results": {
+        "positive": 2.2489999999999952,
+        "negative": 3.4594000000000023,
+        "time_ms": 8.582115173339844
+      },
+      "differences": {
+        "positive_diff": 2.0789999999999953,
+        "negative_diff": 2.7094000000000023,
+        "max_diff": 2.7094000000000023,
+        "avg_diff": 2.3941999999999988
+      }
+    },
+    {
+      "test_case": {
+        "id": 96,
+        "ttc_seconds": 1086,
+        "buffer_points": 96,
+        "momentum_score": 27.597385965104564,
+        "momentum_bucket": 28
+      },
+      "live_results": {
+        "positive": 31.64,
+        "negative": 34.85,
+        "time_ms": 25.255918502807617
+      },
+      "lookup_results": {
+        "positive": 40.622,
+        "negative": 45.774,
+        "time_ms": 2.8450489044189453
+      },
+      "differences": {
+        "positive_diff": 8.982,
+        "negative_diff": 10.924,
+        "max_diff": 10.924,
+        "avg_diff": 9.953
+      }
+    },
+    {
+      "test_case": {
+        "id": 97,
+        "ttc_seconds": 736,
+        "buffer_points": 1571,
+        "momentum_score": 29.48818965225044,
+        "momentum_bucket": 29
+      },
+      "live_results": {
+        "positive": 0.65,
+        "negative": 0.22,
+        "time_ms": 24.077892303466797
+      },
+      "lookup_results": {
+        "positive": 1.3519999999999754,
+        "negative": 0.9191999999999894,
+        "time_ms": 12.03608512878418
+      },
+      "differences": {
+        "positive_diff": 0.7019999999999754,
+        "negative_diff": 0.6991999999999894,
+        "max_diff": 0.7019999999999754,
+        "avg_diff": 0.7005999999999823
+      }
+    },
+    {
+      "test_case": {
+        "id": 98,
+        "ttc_seconds": 1067,
+        "buffer_points": 1819,
+        "momentum_score": 16.804840458115557,
+        "momentum_bucket": 17
+      },
+      "live_results": {
+        "positive": 0.92,
+        "negative": 0.33,
+        "time_ms": 23.301124572753906
+      },
+      "lookup_results": {
+        "positive": 0.6850000000000023,
+        "negative": 0.4750000000000085,
+        "time_ms": 9.392976760864258
+      },
+      "differences": {
+        "positive_diff": 0.23499999999999777,
+        "negative_diff": 0.1450000000000085,
+        "max_diff": 0.23499999999999777,
+        "avg_diff": 0.19000000000000314
+      }
+    },
+    {
+      "test_case": {
+        "id": 99,
+        "ttc_seconds": 362,
+        "buffer_points": 306,
+        "momentum_score": -6.884332536423244,
+        "momentum_bucket": -7
+      },
+      "live_results": {
+        "positive": 4.53,
+        "negative": 5.07,
+        "time_ms": 23.27585220336914
+      },
+      "lookup_results": {
+        "positive": 4.900000000000006,
+        "negative": 5.374000000000009,
+        "time_ms": 11.284112930297852
+      },
+      "differences": {
+        "positive_diff": 0.37000000000000544,
+        "negative_diff": 0.30400000000000915,
+        "max_diff": 0.37000000000000544,
+        "avg_diff": 0.3370000000000073
+      }
+    },
+    {
+      "test_case": {
+        "id": 100,
+        "ttc_seconds": 3257,
+        "buffer_points": 1911,
+        "momentum_score": 4.280315710043908,
+        "momentum_bucket": 4
+      },
+      "live_results": {
+        "positive": 3.38,
+        "negative": 2.15,
+        "time_ms": 23.928165435791016
+      },
+      "lookup_results": {
+        "positive": 0.7484000000000037,
+        "negative": 0.6289999999999907,
+        "time_ms": 10.915040969848633
+      },
+      "differences": {
+        "positive_diff": 2.631599999999996,
+        "negative_diff": 1.5210000000000092,
+        "max_diff": 2.631599999999996,
+        "avg_diff": 2.0763000000000025
+      }
+    }
+  ],
+  "timestamp": "2025-08-14T07:40:52.070213",
+  "test_parameters": {
+    "num_cases": 100,
+    "ttc_range": [
+      60,
+      3600
+    ],
+    "buffer_range": [
+      0,
+      2000
+    ],
+    "momentum_range": [
+      -30,
+      30
+    ]
+  }
+}

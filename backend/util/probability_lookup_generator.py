@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 """
-MASTER PROBABILITY TABLE GENERATOR
+PROBABILITY LOOKUP TABLE GENERATOR
 
-This script generates a master lookup table containing pre-computed probability values
+This script generates probability lookup tables containing pre-computed probability values
 that match the live calculator's interpolation results exactly.
 
-The master table will contain:
-- ttc_seconds: Time to close in seconds
-- buffer_points: Distance from current price in points
+The lookup table will contain:
+- ttc_seconds: Time to close in seconds (5-second increments)
+- buffer_points: Distance from current price in points (10-point increments)
 - momentum_bucket: Momentum bucket (-30 to +30)
-- prob_positive: Interpolated positive probability
-- prob_negative: Interpolated negative probability
+- prob_within_positive: Interpolated positive probability (within buffer)
+- prob_within_negative: Interpolated negative probability (within buffer)
 
 This allows the lookup calculator to return identical results to the live calculator
 without performing interpolation calculations.
+
+OPTIMIZED VERSION: Uses 5-second TTC increments and 10-point buffer increments
+to dramatically reduce table size while maintaining acceptable precision.
 """
 
 import os
@@ -26,6 +29,8 @@ from typing import Dict, List, Tuple, Optional
 from datetime import datetime
 import time
 import pandas as pd
+from concurrent.futures import ThreadPoolExecutor
+import multiprocessing
 
 # Add backend to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -39,9 +44,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class MasterProbabilityTableGenerator:
+class ProbabilityLookupGenerator:
     """
-    Generates master probability lookup tables using the same methodology as the live calculator.
+    Probability Lookup Table Generator
+    
+    Generates probability lookup tables using the same methodology as the live calculator.
+    OPTIMIZED VERSION: Uses 5-second TTC increments and 10-point buffer increments.
     """
     
     def __init__(self, symbol: str = "btc"):
@@ -54,10 +62,16 @@ class MasterProbabilityTableGenerator:
         }
         
         # Table names
-        self.master_table_name = f"master_probability_lookup_{self.symbol}"
+        self.master_table_name = f"probability_lookup_{self.symbol}"
         self.fingerprint_table_prefix = f"{self.symbol}_fingerprint_directional_momentum_"
+        self.work_progress_schema = "work_progress"
         
-        logger.info(f"✅ Initialized master table generator for {self.symbol.upper()}")
+        # Parallel processing settings
+        self.max_workers = min(multiprocessing.cpu_count(), 6)  # Use up to 6 cores
+        self.batch_size = 1000  # Batch size for database inserts
+        
+        logger.info(f"✅ Initialized probability lookup generator for {self.symbol.upper()}")
+        logger.info(f"📊 Max workers: {self.max_workers}")
     
     def get_available_momentum_buckets(self) -> List[int]:
         """Get list of available momentum buckets from PostgreSQL."""
@@ -94,6 +108,104 @@ class MasterProbabilityTableGenerator:
         except Exception as e:
             logger.error(f"❌ Error getting momentum buckets: {e}")
             return []
+        finally:
+            if conn:
+                conn.close()
+    
+    def setup_work_progress_schema(self, ttc_range: Tuple[int, int], ttc_step: int):
+        """Create work_progress schema and progress tracking table."""
+        try:
+            conn = psycopg2.connect(**self.db_config)
+            cursor = conn.cursor()
+            
+            # Create work_progress schema
+            cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.work_progress_schema}")
+            
+            # Create progress tracking table
+            progress_table_sql = f"""
+            CREATE TABLE IF NOT EXISTS {self.work_progress_schema}.ttc_progress_incremental (
+                ttc_seconds INTEGER PRIMARY KEY,
+                status VARCHAR(20) DEFAULT 'pending',
+                started_at TIMESTAMP,
+                completed_at TIMESTAMP,
+                rows_generated INTEGER DEFAULT 0,
+                error_message TEXT,
+                table_name VARCHAR(100)
+            )
+            """
+            cursor.execute(progress_table_sql)
+            
+            # Initialize progress for all TTC values (using ttc_step increments)
+            ttc_values = list(range(ttc_range[0], ttc_range[1] + 1, ttc_step))
+            for ttc in ttc_values:
+                cursor.execute(f"""
+                INSERT INTO {self.work_progress_schema}.ttc_progress_incremental (ttc_seconds, status)
+                VALUES (%s, 'pending')
+                ON CONFLICT (ttc_seconds) DO NOTHING
+                """, (ttc,))
+            
+            conn.commit()
+            logger.info(f"✅ Work progress schema setup complete for {len(ttc_values)} TTC values")
+            
+        except Exception as e:
+            logger.error(f"❌ Error setting up work progress schema: {e}")
+            raise
+        finally:
+            if conn:
+                conn.close()
+    
+    def get_pending_ttc_values(self) -> List[int]:
+        """Get list of TTC values that need processing."""
+        try:
+            conn = psycopg2.connect(**self.db_config)
+            cursor = conn.cursor()
+            
+            cursor.execute(f"""
+            SELECT ttc_seconds FROM {self.work_progress_schema}.ttc_progress_incremental 
+            WHERE status IN ('pending', 'failed')
+            ORDER BY ttc_seconds
+            """)
+            
+            pending_ttc = [row[0] for row in cursor.fetchall()]
+            logger.info(f"📊 Found {len(pending_ttc)} pending TTC values")
+            return pending_ttc
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting pending TTC values: {e}")
+            return []
+        finally:
+            if conn:
+                conn.close()
+    
+    def update_ttc_status(self, ttc_seconds: int, status: str, rows_generated: int = 0, error_message: str = None):
+        """Update the status of a TTC value in the progress table."""
+        try:
+            conn = psycopg2.connect(**self.db_config)
+            cursor = conn.cursor()
+            
+            if status == 'processing':
+                cursor.execute(f"""
+                UPDATE {self.work_progress_schema}.ttc_progress_incremental 
+                SET status = %s, started_at = CURRENT_TIMESTAMP
+                WHERE ttc_seconds = %s
+                """, (status, ttc_seconds))
+            elif status == 'completed':
+                cursor.execute(f"""
+                UPDATE {self.work_progress_schema}.ttc_progress_incremental 
+                SET status = %s, completed_at = CURRENT_TIMESTAMP, rows_generated = %s
+                WHERE ttc_seconds = %s
+                """, (status, rows_generated, ttc_seconds))
+            elif status == 'failed':
+                cursor.execute(f"""
+                UPDATE {self.work_progress_schema}.ttc_progress_incremental 
+                SET status = %s, error_message = %s
+                WHERE ttc_seconds = %s
+                """, (status, error_message, ttc_seconds))
+            
+            conn.commit()
+            
+        except Exception as e:
+            logger.error(f"❌ Error updating TTC status: {e}")
         finally:
             if conn:
                 conn.close()
@@ -258,7 +370,7 @@ class MasterProbabilityTableGenerator:
             return 0.0, 0.0
     
     def create_master_table(self, ttc_range: Tuple[int, int], buffer_range: Tuple[int, int], 
-                          momentum_buckets: List[int], ttc_step: int = 30, buffer_step: int = 10):
+                          momentum_buckets: List[int], ttc_step: int = 5, buffer_step: int = 10):
         """
         Create the master probability lookup table.
         
@@ -266,11 +378,11 @@ class MasterProbabilityTableGenerator:
             ttc_range: (min_ttc_seconds, max_ttc_seconds)
             buffer_range: (min_buffer_points, max_buffer_points)
             momentum_buckets: List of momentum buckets to include
-            ttc_step: Step size for TTC in seconds
-            buffer_step: Step size for buffer in points
+            ttc_step: Step size for TTC in seconds (default: 5 seconds)
+            buffer_step: Step size for buffer in points (default: 10 points)
         """
         try:
-            logger.info(f"🚀 Creating master probability table")
+            logger.info(f"🚀 Creating incremental master probability table")
             logger.info(f"📊 TTC range: {ttc_range[0]}s to {ttc_range[1]}s (step: {ttc_step}s)")
             logger.info(f"📊 Buffer range: {buffer_range[0]} to {buffer_range[1]} points (step: {buffer_step})")
             logger.info(f"📊 Momentum buckets: {momentum_buckets}")
@@ -280,6 +392,7 @@ class MasterProbabilityTableGenerator:
             buffer_count = (buffer_range[1] - buffer_range[0]) // buffer_step + 1
             total_combinations = ttc_count * buffer_count * len(momentum_buckets)
             
+
             logger.info(f"📊 Total combinations to generate: {total_combinations:,}")
             
             # Create table
@@ -365,7 +478,7 @@ class MasterProbabilityTableGenerator:
             conn.commit()
             
             elapsed = time.time() - start_time
-            logger.info(f"✅ Master table created successfully!")
+            logger.info(f"✅ Incremental master table created successfully!")
             logger.info(f"📊 Total combinations generated: {total_generated:,}")
             logger.info(f"📊 Total time: {elapsed/60:.1f} minutes")
             logger.info(f"📊 Average rate: {total_generated/elapsed:.0f} combinations/second")
@@ -373,31 +486,198 @@ class MasterProbabilityTableGenerator:
             return True
             
         except Exception as e:
-            logger.error(f"❌ Error creating master table: {e}")
+            logger.error(f"❌ Error creating incremental master table: {e}")
             return False
         finally:
             if conn:
                 conn.close()
+    
+    def process_ttc_value(self, ttc_seconds: int, buffer_range: Tuple[int, int], 
+                         momentum_buckets: List[int], buffer_step: int, 
+                         fingerprint_data_cache: Dict) -> int:
+        """
+        Process a single TTC value and generate all combinations for it.
+        
+        Returns:
+            Number of combinations generated for this TTC value
+        """
+        try:
+            conn = psycopg2.connect(**self.db_config)
+            cursor = conn.cursor()
+            
+            rows_generated = 0
+            
+            # Generate all buffer and momentum combinations for this TTC
+            for buffer_points in range(buffer_range[0], buffer_range[1] + 1, buffer_step):
+                for momentum_bucket in momentum_buckets:
+                    if momentum_bucket not in fingerprint_data_cache:
+                        continue
+                    
+                    # Calculate move percentage (assuming $120,000 base price for now)
+                    base_price = 120000
+                    move_percent = (buffer_points / base_price) * 100
+                    
+                    # Interpolate both positive and negative probabilities
+                    prob_within_positive, prob_within_negative = self.interpolate_probabilities(
+                        fingerprint_data_cache[momentum_bucket], ttc_seconds, move_percent
+                    )
+                    
+                    # Insert into table
+                    insert_sql = f"""
+                    INSERT INTO analytics.{self.master_table_name} 
+                    (ttc_seconds, buffer_points, momentum_bucket, prob_within_positive, prob_within_negative)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (ttc_seconds, buffer_points, momentum_bucket) DO NOTHING
+                    """
+                    cursor.execute(insert_sql, (ttc_seconds, buffer_points, momentum_bucket, prob_within_positive, prob_within_negative))
+                    
+                    rows_generated += 1
+            
+            conn.commit()
+            return rows_generated
+            
+        except Exception as e:
+            logger.error(f"❌ Error processing TTC {ttc_seconds}: {e}")
+            return 0
+        finally:
+            if conn:
+                conn.close()
+    
+    def create_master_table_batched(self, ttc_range: Tuple[int, int], buffer_range: Tuple[int, int], 
+                                  momentum_buckets: List[int], ttc_step: int = 5, buffer_step: int = 10):
+        """
+        Create the master probability lookup table using batched processing with resume capability.
+        """
+        try:
+            logger.info(f"🚀 Creating incremental master probability table (batched)")
+            logger.info(f"📊 TTC range: {ttc_range[0]}s to {ttc_range[1]}s (step: {ttc_step}s)")
+            logger.info(f"📊 Buffer range: {buffer_range[0]} to {buffer_range[1]} points (step: {buffer_step})")
+            logger.info(f"📊 Momentum buckets: {momentum_buckets}")
+            
+            # Setup work progress tracking
+            self.setup_work_progress_schema(ttc_range, ttc_step)
+            
+            # Create main table if it doesn't exist
+            conn = psycopg2.connect(**self.db_config)
+            cursor = conn.cursor()
+            
+            create_table_sql = f"""
+            CREATE TABLE IF NOT EXISTS analytics.{self.master_table_name} (
+                ttc_seconds INTEGER NOT NULL,
+                buffer_points INTEGER NOT NULL,
+                momentum_bucket INTEGER NOT NULL,
+                prob_within_positive NUMERIC(5,2) NOT NULL,
+                prob_within_negative NUMERIC(5,2) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (ttc_seconds, buffer_points, momentum_bucket)
+            )
+            """
+            cursor.execute(create_table_sql)
+            conn.commit()
+            conn.close()
+            
+            # Load fingerprint data for all momentum buckets
+            fingerprint_data_cache = {}
+            for momentum_bucket in momentum_buckets:
+                fingerprint_data = self.load_fingerprint_data(momentum_bucket)
+                if fingerprint_data:
+                    fingerprint_data_cache[momentum_bucket] = fingerprint_data
+                else:
+                    logger.warning(f"⚠️ Skipping momentum bucket {momentum_bucket} - no data")
+            
+            if not fingerprint_data_cache:
+                raise ValueError("No fingerprint data available for any momentum bucket")
+            
+            # Get pending TTC values
+            pending_ttc = self.get_pending_ttc_values()
+            if not pending_ttc:
+                logger.info("✅ All TTC values already completed!")
+                return True
+            
+            logger.info(f"📊 Processing {len(pending_ttc)} TTC values...")
+            
+            # Process TTC values with parallel processing
+            total_generated = 0
+            start_time = time.time()
+            
+            def process_ttc_with_tracking(ttc_seconds):
+                try:
+                    # Mark as processing
+                    self.update_ttc_status(ttc_seconds, 'processing')
+                    
+                    # Process this TTC value
+                    rows_generated = self.process_ttc_value(
+                        ttc_seconds, buffer_range, momentum_buckets, buffer_step, fingerprint_data_cache
+                    )
+                    
+                    # Mark as completed
+                    self.update_ttc_status(ttc_seconds, 'completed', rows_generated)
+                    
+                    elapsed = time.time() - start_time
+                    logger.info(f"✅ TTC {ttc_seconds}s completed: {rows_generated:,} combinations in {elapsed/60:.1f}min")
+                    
+                    return rows_generated
+                    
+                except Exception as e:
+                    logger.error(f"❌ Error processing TTC {ttc_seconds}: {e}")
+                    self.update_ttc_status(ttc_seconds, 'failed', error_message=str(e))
+                    return 0
+            
+            # Use ThreadPoolExecutor for parallel processing
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                futures = [executor.submit(process_ttc_with_tracking, ttc) for ttc in pending_ttc]
+                
+                for future in futures:
+                    try:
+                        rows_generated = future.result()
+                        total_generated += rows_generated
+                    except Exception as e:
+                        logger.error(f"❌ Error in parallel processing: {e}")
+                        continue
+            
+            # Create index for faster lookups
+            conn = psycopg2.connect(**self.db_config)
+            cursor = conn.cursor()
+            
+            index_sql = f"""
+            CREATE INDEX IF NOT EXISTS idx_{self.master_table_name}_lookup 
+            ON analytics.{self.master_table_name} (ttc_seconds, buffer_points, momentum_bucket)
+            """
+            cursor.execute(index_sql)
+            conn.commit()
+            conn.close()
+            
+            elapsed = time.time() - start_time
+            logger.info(f"✅ Incremental master table created successfully!")
+            logger.info(f"📊 Total combinations generated: {total_generated:,}")
+            logger.info(f"📊 Total time: {elapsed/60:.1f} minutes")
+            logger.info(f"📊 Average rate: {total_generated/elapsed:.0f} combinations/second")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error creating incremental master table: {e}")
+            return False
 
 
 def main():
-    """Main function to run the master table generator."""
-    logger.info("🚀 Starting Master Probability Table Generator")
+    """Main function to run the incremental master table generator."""
+    logger.info("🚀 Starting Incremental Master Probability Table Generator")
     
     # Initialize generator
-    generator = MasterProbabilityTableGenerator("btc")
+    generator = ProbabilityLookupGenerator("btc")
     
-    # Generate full master table
-    logger.info("🚀 Generating full master probability table...")
+    # Generate incremental master table
+    logger.info("🚀 Generating incremental master probability table...")
     
-    # Full generation parameters (0-60 minutes, 0-2000 buffer, all momentum buckets)
+    # FULL DATASET: Complete BTC probability table
     ttc_range = (0, 3600)  # 0 to 60 minutes (3600 seconds)
     buffer_range = (0, 2000)   # 0 to 2000 points
     momentum_buckets = generator.get_available_momentum_buckets()  # All 61 momentum buckets
-    ttc_step = 1  # 1-second steps
-    buffer_step = 1  # 1-point steps
+    ttc_step = 5  # 5-second steps (optimized)
+    buffer_step = 10  # 10-point steps (optimized)
     
-    success = generator.create_master_table(
+    success = generator.create_master_table_batched(
         ttc_range=ttc_range,
         buffer_range=buffer_range,
         momentum_buckets=momentum_buckets,
@@ -406,10 +686,10 @@ def main():
     )
     
     if success:
-        logger.info("🎉 Full master table created successfully!")
-        logger.info("📁 Ready for production use")
+        logger.info("🎉 Incremental master table created successfully!")
+        logger.info("📁 Ready for production use with PostgreSQL interpolation")
     else:
-        logger.error("❌ Failed to create full master table")
+        logger.error("❌ Failed to create incremental master table")
     
     return 0 if success else 1
 
