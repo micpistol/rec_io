@@ -24,12 +24,14 @@ The `setup_new_user_complete.sh` script automatically handles:
 
 1. **System Requirements Check** - Verifies Python, PostgreSQL, and Supervisor
 2. **PostgreSQL Setup** - Creates database, user, and all required schemas
-3. **Python Environment** - Sets up virtual environment and installs dependencies
-4. **User Profile Creation** - Creates user directory structure and default files
-5. **Supervisor Configuration** - Generates dynamic supervisor config (fixes hardcoded paths)
-6. **Database Schema** - Creates all required tables and default data
-7. **System Startup** - Starts all services and verifies they're running
-8. **Final Verification** - Tests database connection and service health
+3. **Database Schema** - Creates all required tables including system monitoring tables
+4. **Database Verification** - Verifies all schemas, tables, and columns exist
+5. **Python Environment** - Sets up virtual environment and installs dependencies
+6. **User Profile Creation** - Creates user directory structure and default files
+7. **Supervisor Configuration** - Generates dynamic supervisor config (fixes hardcoded paths)
+8. **System Startup** - Starts all services and verifies they're running
+9. **Service Verification** - Comprehensive verification of all services and API endpoints
+10. **Final Health Check** - Tests database connection and service health
 
 ---
 
@@ -103,6 +105,24 @@ print(f'Database test: {message}')
 "
 ```
 
+### **Database Schema Issues**
+If you get "relation does not exist" errors:
+```bash
+# Run database verification
+python3 scripts/verify_database_setup.py
+
+# If verification fails, run manual fixes
+PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "CREATE SCHEMA IF NOT EXISTS system;"
+PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "CREATE TABLE IF NOT EXISTS system.health_status (id SERIAL PRIMARY KEY, service_name VARCHAR(100), status VARCHAR(50), last_check TIMESTAMP DEFAULT CURRENT_TIMESTAMP, details JSONB);"
+```
+
+### **Service Verification Issues**
+If services aren't responding properly:
+```bash
+# Run comprehensive service verification
+python3 scripts/verify_services.py
+```
+
 ### **Port Conflicts**
 Check if ports are in use:
 ```bash
@@ -167,6 +187,8 @@ If you encounter issues:
 Your installation is successful when:
 
 - ✅ All supervisor services show "RUNNING" status
+- ✅ Database verification script passes
+- ✅ Service verification script passes
 - ✅ Database connection test passes
 - ✅ Main app responds at http://localhost:3000/health
 - ✅ No error logs in `logs/*.err.log`

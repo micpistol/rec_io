@@ -63,6 +63,7 @@ class LookupProbabilityCalculator:
             logger.info(f"Buffer {buffer_points} outside lookup table range (0-2000), returning 99.9")
             return 99.9, 99.9
         
+        conn = None
         try:
             conn = psycopg2.connect(**self.db_config)
             cursor = conn.cursor()
@@ -427,6 +428,7 @@ class StrikeTableGenerator:
         Returns:
             True if successful
         """
+        conn = None
         try:
             # Get current market data
             logger.info("📊 Getting current market data...")
@@ -557,7 +559,7 @@ class StrikeTableGenerator:
             logger.info(f"✅ Generated {len(strike_data)} strike table records for {self.symbol.upper()}")
             return True
         
-    except Exception as e:
+        except Exception as e:
             logger.error(f"❌ Error generating strike table: {e}")
             return False
         finally:

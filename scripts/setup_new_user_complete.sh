@@ -90,6 +90,15 @@ PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -f scri
 
 print_success "Database schema setup completed"
 
+# Step 3.5: Verify database setup
+print_status "Verifying database setup..."
+python3 scripts/verify_database_setup.py
+if [ $? -ne 0 ]; then
+    print_error "Database setup verification failed"
+    exit 1
+fi
+print_success "Database setup verified"
+
 # Step 4: Setup Python environment
 print_status "Setting up Python environment..."
 
@@ -180,18 +189,39 @@ print_status "Checking service status..."
 
 supervisorctl -c backend/supervisord.conf status
 
+# Step 9.5: Verify service startup
+print_status "Verifying service startup..."
+sleep 5
+supervisorctl -c backend/supervisord.conf status | grep -q "RUNNING"
+if [ $? -ne 0 ]; then
+    print_error "Some services failed to start"
+    supervisorctl -c backend/supervisord.conf status
+    exit 1
+fi
+print_success "All services started successfully"
+
 print_success "Trading system started"
 
 # Step 10: Final verification
 print_status "Performing final verification..."
 
-# Check if main app is responding
-sleep 2
+# Verify API endpoints
+print_status "Verifying API endpoints..."
 if curl -s http://localhost:3000/health > /dev/null; then
-    print_success "Main application is responding"
+    print_success "Main API endpoint responding"
 else
-    print_warning "Main application may not be fully started yet"
+    print_error "Main API endpoint not responding"
+    exit 1
 fi
+
+# Run comprehensive service verification
+print_status "Running comprehensive service verification..."
+python3 scripts/verify_services.py
+if [ $? -ne 0 ]; then
+    print_error "Service verification failed"
+    exit 1
+fi
+print_success "All services verified successfully"
 
 # Check port usage
 print_status "Checking port usage..."
