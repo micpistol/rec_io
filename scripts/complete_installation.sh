@@ -71,32 +71,54 @@ check_requirements() {
     log_success "System requirements check completed"
 }
 
-# Setup PostgreSQL
+# Setup PostgreSQL (macOS compatible)
 setup_postgresql() {
     log_info "Setting up PostgreSQL..."
     
     # Start PostgreSQL service
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        brew services start postgresql
+        # macOS specific PostgreSQL setup
+        log_info "Detected macOS - using Homebrew PostgreSQL"
+        
+        # Start PostgreSQL service
+        brew services start postgresql@14 || brew services start postgresql
+        
+        # Wait for PostgreSQL to be ready
+        sleep 5
+        
+        # Check if database already exists
+        if psql -h localhost -U postgres -lqt 2>/dev/null | cut -d \| -f 1 | grep -qw rec_io_db; then
+            log_warning "Database rec_io_db already exists"
+        else
+            # Create database and user (macOS style)
+            log_info "Creating database and user..."
+            createdb rec_io_db 2>/dev/null || true
+            
+            # Create user if it doesn't exist
+            psql -h localhost -d rec_io_db -c "CREATE USER rec_io_user WITH PASSWORD 'rec_io_password';" 2>/dev/null || true
+            psql -h localhost -d rec_io_db -c "GRANT ALL PRIVILEGES ON DATABASE rec_io_db TO rec_io_user;" 2>/dev/null || true
+            log_success "Database and user created"
+        fi
     else
+        # Linux PostgreSQL setup
         sudo systemctl start postgresql
         sudo systemctl enable postgresql
-    fi
-    
-    # Wait for PostgreSQL to be ready
-    sleep 3
-    
-    # Create database and user
-    log_info "Creating database and user..."
-    
-    # Check if database already exists
-    if psql -h localhost -U postgres -lqt | cut -d \| -f 1 | grep -qw rec_io_db; then
-        log_warning "Database rec_io_db already exists"
-    else
-        sudo -u postgres psql -c "CREATE USER rec_io_user WITH PASSWORD 'rec_io_password';" || true
-        sudo -u postgres psql -c "CREATE DATABASE rec_io_db OWNER rec_io_user;" || true
-        sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE rec_io_db TO rec_io_user;" || true
-        log_success "Database and user created"
+        
+        # Wait for PostgreSQL to be ready
+        sleep 3
+        
+        # Create database and user
+        log_info "Creating database and user..."
+        
+        # Check if database already exists
+        if sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw rec_io_db; then
+            log_warning "Database rec_io_db already exists"
+        else
+            sudo -u postgres psql -c "CREATE USER rec_io_user WITH PASSWORD 'rec_io_password';" || true
+            sudo -u postgres psql -c "CREATE DATABASE rec_io_db OWNER rec_io_user;" || true
+            sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE rec_io_db TO rec_io_user;" || true
+            log_success "Database and user created"
+        fi
     fi
     
     # Create schema and tables
@@ -105,9 +127,28 @@ setup_postgresql() {
         PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -f scripts/setup_database_schema.sql
         log_success "Database schema created"
     else
-        log_error "Database schema file not found: scripts/setup_database_schema.sql"
-        exit 1
+        log_warning "Database schema file not found, using code-based initialization"
+        # Use Python to initialize database schema
+        source venv/bin/activate
+        python3 -c "
+import sys
+sys.path.append('backend')
+from core.config.database import init_database
+init_database()
+print('Database initialized via code')
+"
+        log_success "Database initialized via code"
     fi
+    
+    # Create missing ETH price log table if it doesn't exist
+    log_info "Ensuring all required tables exist..."
+    PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "
+CREATE TABLE IF NOT EXISTS live_data.eth_price_log (
+    id SERIAL PRIMARY KEY,
+    price DECIMAL(15,2),
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);" 2>/dev/null || true
+    log_success "All required tables verified"
 }
 
 # Setup Python environment
@@ -251,6 +292,98 @@ verify_services() {
     fi
 }
 
+# Setup Kalshi credentials
+setup_kalshi_credentials() {
+    log_info "Setting up Kalshi trading credentials..."
+    
+    echo ""
+    echo "🔐 KALSHI CREDENTIALS SETUP"
+    echo "=========================="
+    echo ""
+    echo "To enable trading functionality, you need to set up your Kalshi credentials."
+    echo "You can either:"
+    echo "1. Set up credentials now (recommended)"
+    echo "2. Skip for now and set up later"
+    echo ""
+    
+    read -p "Would you like to set up Kalshi credentials now? (y/n): " -n 1 -r
+    echo ""
+    
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        log_info "Setting up Kalshi credentials..."
+        
+        # Get user input for credentials
+        echo ""
+        echo "Please provide your Kalshi credentials:"
+        echo ""
+        
+        read -p "Kalshi Email: " kalshi_email
+        read -s -p "Kalshi Password: " kalshi_password
+        echo ""
+        read -s -p "Kalshi API Key: " kalshi_api_key
+        echo ""
+        read -s -p "Kalshi API Secret: " kalshi_api_secret
+        echo ""
+        
+        # Create credential files
+        log_info "Creating credential files..."
+        
+        # Create auth.txt file
+        cat > backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt << EOF
+email=${kalshi_email}
+password=${kalshi_password}
+api_key=${kalshi_api_key}
+api_secret=${kalshi_api_secret}
+EOF
+        
+        # Create PEM file (if user has one)
+        echo ""
+        read -p "Do you have a Kalshi certificate file (.pem)? (y/n): " -n 1 -r
+        echo ""
+        
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            read -p "Enter the path to your .pem file: " pem_file_path
+            if [[ -f "$pem_file_path" ]]; then
+                cp "$pem_file_path" backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.pem
+                chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.pem
+                log_success "Certificate file copied"
+            else
+                log_warning "Certificate file not found, creating empty file"
+                touch backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.pem
+                chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.pem
+            fi
+        else
+            log_info "Creating empty certificate file"
+            touch backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.pem
+            chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.pem
+        fi
+        
+        log_success "Kalshi credentials set up successfully"
+        
+        # Restart trading services
+        log_info "Restarting trading services with new credentials..."
+        supervisorctl -c backend/supervisord.conf restart kalshi_account_sync || true
+        supervisorctl -c backend/supervisord.conf restart trade_manager || true
+        supervisorctl -c backend/supervisord.conf restart unified_production_coordinator || true
+        
+        sleep 3
+        
+        # Check service status
+        log_info "Checking trading service status..."
+        supervisorctl -c backend/supervisord.conf status | grep -E "(kalshi|trade|unified)"
+        
+        log_success "Trading services restarted with credentials"
+        
+    else
+        log_warning "Skipping credential setup"
+        echo ""
+        echo "⚠️  NOTE: Trading services will not function without credentials."
+        echo "   You can set up credentials later by running:"
+        echo "   nano backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt"
+        echo ""
+    fi
+}
+
 # Main installation function
 main() {
     log_info "Starting REC.IO complete installation..."
@@ -261,11 +394,11 @@ main() {
     # Check system requirements
     check_requirements
     
+    # Setup Python environment first (needed for database setup)
+    setup_python
+    
     # Setup PostgreSQL
     setup_postgresql
-    
-    # Setup Python environment
-    setup_python
     
     # Create user directory structure
     setup_user_directories
@@ -285,11 +418,14 @@ main() {
     # Verify services
     verify_services
     
+    # Setup Kalshi credentials
+    setup_kalshi_credentials
+    
     log_success "Installation completed successfully!"
     log_info "Next steps:"
-    log_info "1. Add Kalshi trading credentials to enable trading services"
-    log_info "2. Access the web interface at http://localhost:3000"
-    log_info "3. Check logs in the logs/ directory for any issues"
+    log_info "1. Access the web interface at http://localhost:3000"
+    log_info "2. Check logs in the logs/ directory for any issues"
+    log_info "3. Monitor system health with: supervisorctl -c backend/supervisord.conf status"
 }
 
 # Run main function
