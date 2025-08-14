@@ -6,7 +6,21 @@ You are on a fresh machine with the REC.IO repository cloned. The system will NO
 
 ---
 
-## 🔧 CRITICAL FIXES NEEDED
+## 🎯 **SINGLE COMMAND INSTALLATION (RECOMMENDED)**
+
+**Run this single command to complete the entire installation:**
+
+```bash
+./scripts/complete_installation.sh
+```
+
+This script addresses ALL issues found in previous installation attempts and provides comprehensive error handling and verification.
+
+---
+
+## 🔧 **MANUAL STEP-BY-STEP INSTALLATION (ALTERNATIVE)**
+
+If you prefer manual control, follow these steps:
 
 ### **1. FIX SUPERVISOR CONFIG (BROKEN)**
 The `backend/supervisord.conf` has hardcoded paths that will fail on any machine.
@@ -23,9 +37,12 @@ The system expects PostgreSQL tables that don't exist.
 
 **RUN THESE COMMANDS:**
 ```bash
-# Start PostgreSQL
-sudo systemctl start postgresql
-sudo systemctl enable postgresql
+# Start PostgreSQL (macOS)
+brew services start postgresql
+
+# OR for Linux:
+# sudo systemctl start postgresql
+# sudo systemctl enable postgresql
 
 # Create database and user
 sudo -u postgres psql -c "CREATE USER rec_io_user WITH PASSWORD 'rec_io_password';"
@@ -77,6 +94,7 @@ mkdir -p logs
 ### **6. VERIFY DATABASE SETUP**
 ```bash
 # Run database verification script
+source venv/bin/activate
 python3 scripts/verify_database_setup.py
 ```
 
@@ -86,33 +104,45 @@ python3 scripts/verify_database_setup.py
 supervisord -c backend/supervisord.conf
 
 # Wait a moment, then check status
-sleep 3
+sleep 5
 supervisorctl -c backend/supervisord.conf status
 ```
 
 ### **8. VERIFY ALL SERVICES**
 ```bash
 # Run comprehensive service verification
+source venv/bin/activate
 python3 scripts/verify_services.py
 ```
 
 ---
 
-## ✅ VERIFICATION
+## ✅ **SUCCESS INDICATORS**
 
-**The system is working when:**
-- All services show "RUNNING" status
-- No services show "FATAL" status
-- Main app responds at http://localhost:3000/health
-- Database verification script passes
-- Service verification script passes
+Your installation is successful when:
 
-**If services are failing:**
+- ✅ All supervisor services show "RUNNING" status (or expected FATAL states for credential-dependent services)
+- ✅ Database verification script passes
+- ✅ Service verification script passes (with warnings for expected failures)
+- ✅ Database connection test passes
+- ✅ Main app responds at http://localhost:3000/health
+- ✅ No critical error logs in `logs/*.err.log`
+- ✅ All required ports are listening
+
+---
+
+## 🚨 **TROUBLESHOOTING**
+
+### **Services Not Starting**
+If services fail to start, check the logs:
 ```bash
-# Check error logs
 tail -f logs/*.err.log
+```
 
-# Test database connection
+### **Database Connection Issues**
+Test the database connection:
+```bash
+source venv/bin/activate
 python3 -c "
 from backend.core.config.database import test_database_connection
 success, message = test_database_connection()
@@ -120,146 +150,97 @@ print(f'Database test: {message}')
 "
 ```
 
----
-
-## 🎯 COMPLETE INSTALLATION SCRIPT
-
-**For a complete automated installation, run:**
+### **Port Conflicts**
+Check if ports are in use:
 ```bash
-./scripts/setup_new_user_complete.sh
+netstat -tlnp | grep -E "(3000|4000|8001|8007|8009|8004|8005|8010)"
 ```
 
-This script now includes:
-- ✅ Database schema setup with all required tables
-- ✅ Database verification
-- ✅ Service verification
-- ✅ API endpoint verification
-- ✅ Comprehensive error handling
-
----
-
-## 🔧 MANUAL FIXES (if automated script fails)
-
-### **Database Schema Issues**
-If you get "relation does not exist" errors:
-
+### **Permission Issues**
+Fix file permissions:
 ```bash
-# Add missing system schema and tables
-PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "CREATE SCHEMA IF NOT EXISTS system;"
-PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "CREATE TABLE IF NOT EXISTS system.health_status (id SERIAL PRIMARY KEY, service_name VARCHAR(100), status VARCHAR(50), last_check TIMESTAMP DEFAULT CURRENT_TIMESTAMP, details JSONB);"
-
-# Add missing columns
-PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "ALTER TABLE users.trades_0001 ADD COLUMN IF NOT EXISTS test_filter BOOLEAN DEFAULT FALSE;"
-PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "ALTER TABLE users.trade_preferences_0001 ADD COLUMN IF NOT EXISTS trade_strategy VARCHAR(100);"
-
-# Grant permissions
-PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "GRANT ALL PRIVILEGES ON SCHEMA system TO rec_io_user;"
-PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA system TO rec_io_user;"
+chmod +x scripts/*.sh
+chmod 700 backend/data/users/user_0001/credentials
 ```
 
-### **Strike Table Generator Issues**
-If you get variable scope errors:
+### **Expected Service Failures**
+Some services will be in FATAL state without credentials:
+- `kalshi_account_sync`: Expected without Kalshi credentials
+- `unified_production_coordinator`: Expected without credentials
+- `trade_manager`: Expected without credentials
 
-```bash
-# The strike table generator has been fixed to handle database connection errors properly
-# If you still get errors, check the logs:
-tail -f logs/strike_table_generator.err.log
-```
-
-### **Service Startup Issues**
-If services fail to start:
-
-```bash
-# Check supervisor status
-supervisorctl -c backend/supervisord.conf status
-
-# Check specific service logs
-tail -f logs/main_app.err.log
-tail -f logs/trade_manager.err.log
-tail -f logs/active_trade_supervisor.err.log
-```
+This is normal behavior for a fresh installation.
 
 ---
 
-## 🚨 TROUBLESHOOTING
+## 🔄 **ROLLBACK PROCEDURE**
 
-### **Common Issues and Solutions**
+If installation fails, use the rollback script:
+```bash
+./scripts/rollback_installation.sh
+```
 
-1. **"relation does not exist" errors**
-   - Run the database schema setup commands above
-   - Verify with `python3 scripts/verify_database_setup.py`
-
-2. **Services not starting**
-   - Check supervisor config: `./scripts/generate_supervisor_config.sh`
-   - Check logs: `tail -f logs/*.err.log`
-
-3. **API endpoints not responding**
-   - Wait for services to fully start (up to 30 seconds)
-   - Check service status: `supervisorctl -c backend/supervisord.conf status`
-
-4. **Database connection failures**
-   - Ensure PostgreSQL is running: `sudo systemctl status postgresql`
-   - Check credentials in the connection commands
-
-5. **Permission errors**
-   - Fix file permissions: `chmod +x scripts/*.sh`
-   - Fix user directory permissions: `chmod 700 backend/data/users/user_0001/credentials`
+This will clean up all installation changes and return the system to a clean state.
 
 ---
 
-## 📋 POST-INSTALLATION SETUP
+## 📋 **POST-INSTALLATION STEPS**
 
-### **1. Add Kalshi Credentials (Optional)**
-```bash
-# Edit the credential files
-nano backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
-nano backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.pem
-```
+After successful installation:
 
-### **2. Update User Information**
-```bash
-nano backend/data/users/user_0001/user_info.json
-```
+1. **Add Kalshi Trading Credentials**
+   ```bash
+   # Edit the credential files
+   nano backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
+   nano backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.pem
+   ```
 
-### **3. Access the System**
-- **Main Application**: http://localhost:3000
-- **Health Check**: http://localhost:3000/health
-- **Login Page**: http://localhost:3000/login
+2. **Restart Trading Services**
+   ```bash
+   supervisorctl -c backend/supervisord.conf restart kalshi_account_sync
+   supervisorctl -c backend/supervisord.conf restart unified_production_coordinator
+   supervisorctl -c backend/supervisord.conf restart trade_manager
+   ```
 
----
+3. **Access Web Interface**
+   - Open http://localhost:3000 in your browser
+   - Verify all panels are loading correctly
 
-## 🔄 SYSTEM MANAGEMENT
-
-### **Check Service Status**
-```bash
-supervisorctl -c backend/supervisord.conf status
-```
-
-### **Restart All Services**
-```bash
-./scripts/MASTER_RESTART.sh
-```
-
-### **View Real-time Logs**
-```bash
-tail -f logs/*.err.log
-```
-
-### **Stop All Services**
-```bash
-supervisorctl -c backend/supervisord.conf stop all
-```
+4. **Monitor System Health**
+   ```bash
+   # Check service status
+   supervisorctl -c backend/supervisord.conf status
+   
+   # Monitor logs
+   tail -f logs/*.log
+   ```
 
 ---
 
-## 🎯 THAT'S IT
+## 🎯 **VERIFICATION CHECKLIST**
 
-Run these commands in order and the system will work. The key issues were:
-1. Hardcoded supervisor paths (FIXED by generate_supervisor_config.sh)
-2. Missing database schema (FIXED by setup_database_schema.sql)
-3. Missing user directory structure (FIXED by mkdir commands)
-4. Missing verification steps (FIXED by verification scripts)
+- [ ] Supervisor is running
+- [ ] Database connection works
+- [ ] All required tables exist
+- [ ] User directory structure is created
+- [ ] Python environment is activated
+- [ ] All services are started
+- [ ] Web interface is accessible
+- [ ] No critical errors in logs
 
-**Access the system at: http://localhost:3000**
+---
 
-**For complete automation, just run: `./scripts/setup_new_user_complete.sh`**
+## 📞 **SUPPORT**
+
+If you encounter issues:
+
+1. Check the logs in `logs/` directory
+2. Run the verification scripts
+3. Review this document for troubleshooting steps
+4. Check the execution report for known issues
+
+---
+
+*Last updated: 2025-08-14*  
+*Version: 2.0 - Complete Installation Fix*  
+*Status: Single Source of Truth for Installation*

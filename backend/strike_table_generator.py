@@ -495,20 +495,25 @@ class StrikeTableGenerator:
                         probability = neg_prob
                     
                     # Get market data for this strike
-                    snapshot_strike = f"{strike - 0.01:.2f}"
+                    # Convert strike back to the format used in market data
+                    market_strike = f"{strike - 0.01:.2f}"
                     
                     yes_ask = None
                     no_ask = None
                     volume = None
                     ticker = None
                     
+                    # Find the matching market
                     for market in markets:
-                        if str(market.get("floor_strike")) == snapshot_strike or float(market.get("floor_strike", 0)) == float(snapshot_strike):
-                            yes_ask = market.get("yes_ask")
-                            no_ask = market.get("no_ask")
-                            volume = market.get("volume")
-                            ticker = market.get("ticker")
-                            break
+                        floor_strike = market.get("floor_strike")
+                        if floor_strike is not None:
+                            # Compare as floats to handle precision issues
+                            if abs(float(floor_strike) - float(market_strike)) < 0.01:
+                                yes_ask = market.get("yes_ask")
+                                no_ask = market.get("no_ask")
+                                volume = market.get("volume")
+                                ticker = market.get("ticker")
+                                break
                     
                     if yes_ask is None or no_ask is None:
                         logger.warning(f"⚠️ Missing ask prices for strike {strike}, skipping")
@@ -579,7 +584,7 @@ class StrikeTableGenerator:
             
             latest_timestamp = cursor.fetchone()[0]
             if not latest_timestamp:
-        return None
+                return None
 
             # Get all data for the latest timestamp
             cursor.execute(f"""
@@ -594,7 +599,7 @@ class StrikeTableGenerator:
             rows = cursor.fetchall()
             
             if not rows:
-        return None
+                return None
 
             # Convert to JSON format matching the current UPC output
             result = {
@@ -675,7 +680,7 @@ def run_continuous_generation(interval_seconds: int = 30):
                     """)
                     
                     result = cursor.fetchone()
-    if result:
+                    if result:
                         total_strikes, min_prob, max_prob, avg_prob = result
                         logger.info(f"📊 Summary: {total_strikes} strikes, Prob range: {min_prob:.2f}%-{max_prob:.2f}%, Avg: {avg_prob:.2f}%")
                     
