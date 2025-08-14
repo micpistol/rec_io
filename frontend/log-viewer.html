@@ -166,6 +166,11 @@
     <div class="log-header">
         <div class="log-title" id="logTitle">Log Viewer</div>
         <div class="log-controls">
+            <select class="control-btn" id="logTypeSelect" onchange="switchLogType()">
+                <option value="out">Output Log</option>
+                <option value="err">Error Log</option>
+                <option value="combined">Combined</option>
+            </select>
             <button class="control-btn" id="pauseBtn" onclick="togglePause()">Pause</button>
             <button class="control-btn clear-btn" onclick="clearLog()">Clear</button>
             <button class="control-btn" onclick="closeWindow()">Close</button>
@@ -181,6 +186,7 @@
 
     <script>
         let scriptName = '';
+        let currentLogType = 'out';
         let isPaused = false;
         let isConnected = false;
         let reconnectAttempts = 0;
@@ -215,7 +221,8 @@
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ 
-                    script: scriptName 
+                    script: scriptName,
+                    logType: currentLogType
                 })
             })
             .then(response => {
@@ -304,6 +311,19 @@
             
             // Auto-scroll to bottom
             logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        // Switch log type
+        function switchLogType() {
+            const logTypeSelect = document.getElementById('logTypeSelect');
+            currentLogType = logTypeSelect.value;
+            
+            // Clear current log and restart stream
+            clearLog();
+            if (isConnected) {
+                // Restart the log stream with new type
+                startLogStream();
+            }
         }
 
         // Toggle pause

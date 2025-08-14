@@ -3225,16 +3225,33 @@ async def get_log_stream(request: dict):
     import os
     
     script_name = request.get("script", "")
+    log_type = request.get("logType", "out")
+    
     if not script_name:
         return {"success": False, "error": "No script name provided"}
     
-    # Determine log file path based on script name
+    # Determine log file path based on script name and type
     project_dir = "/Users/ericwais1/rec_io_20"
     
-    # Try .log first, then fall back to .out.log
-    log_file = f"logs/{script_name}.log"
-    if not os.path.exists(os.path.join(project_dir, log_file)):
-        log_file = f"logs/{script_name}.out.log"
+    if log_type == "combined":
+        # For combined view, we'll need to handle multiple files
+        log_files = []
+        for suffix in [".out.log", ".err.log", ".log"]:
+            potential_file = f"logs/{script_name}{suffix}"
+            if os.path.exists(os.path.join(project_dir, potential_file)):
+                log_files.append(potential_file)
+        
+        if not log_files:
+            return {"success": False, "error": f"No log files found for {script_name}"}
+        
+        # Use the first available file for now (we can enhance this later)
+        log_file = log_files[0]
+    else:
+        # For specific log types
+        log_file = f"logs/{script_name}.{log_type}.log"
+        if not os.path.exists(os.path.join(project_dir, log_file)):
+            # Fallback to .log if specific type doesn't exist
+            log_file = f"logs/{script_name}.log"
     
     if not os.path.exists(os.path.join(project_dir, log_file)):
         return {"success": False, "error": f"Log file not found: {log_file}"}
