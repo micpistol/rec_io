@@ -22,6 +22,8 @@ This script addresses ALL issues found in previous installation attempts and pro
 
 **🔐 CRITICAL**: The installation script will prompt you to set up Kalshi credentials during installation. This is **ESSENTIAL** for full system functionality. Without credentials, 3 trading services will be in FATAL state.
 
+**⚠️ IMPORTANT**: Database initialization is critical and will stop installation if it fails. Service verification failures are non-blocking, but database setup must succeed for the system to function.
+
 ---
 
 ## 🔧 **MANUAL STEP-BY-STEP INSTALLATION (ALTERNATIVE)**
@@ -213,6 +215,8 @@ Your installation is successful when:
 - ✅ **Interactive credential setup integrated**
 - ✅ **Missing scipy dependency added**
 - ✅ **Dual credential location support implemented**
+- ✅ **Missing init_database() function implemented**
+- ✅ **Non-blocking verification steps implemented**
 
 ---
 

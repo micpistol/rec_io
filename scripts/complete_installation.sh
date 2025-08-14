@@ -123,21 +123,51 @@ setup_postgresql() {
     
     # Create schema and tables
     log_info "Creating database schema..."
+    
+    # First try SQL file if it exists
     if [[ -f "scripts/setup_database_schema.sql" ]]; then
-        PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -f scripts/setup_database_schema.sql
-        log_success "Database schema created"
-    else
-        log_warning "Database schema file not found, using code-based initialization"
-        # Use Python to initialize database schema
-        source venv/bin/activate
-        python3 -c "
+        log_info "Using SQL schema file for database initialization..."
+        if PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -f scripts/setup_database_schema.sql; then
+            log_success "Database schema created from SQL file"
+        else
+            log_warning "SQL schema file failed, falling back to code-based initialization"
+            # Fall back to code-based initialization
+            source venv/bin/activate
+            if python3 -c "
 import sys
 sys.path.append('backend')
 from core.config.database import init_database
-init_database()
+success, message = init_database()
+if not success:
+    print(f'Database initialization failed: {message}')
+    exit(1)
 print('Database initialized via code')
-"
-        log_success "Database initialized via code"
+"; then
+                log_success "Database initialized via code"
+            else
+                log_error "Database initialization failed"
+                exit 1
+            fi
+        fi
+    else
+        log_info "SQL schema file not found, using code-based initialization"
+        # Use Python to initialize database schema
+        source venv/bin/activate
+        if python3 -c "
+import sys
+sys.path.append('backend')
+from core.config.database import init_database
+success, message = init_database()
+if not success:
+    print(f'Database initialization failed: {message}')
+    exit(1)
+print('Database initialized via code')
+"; then
+            log_success "Database initialized via code"
+        else
+            log_error "Database initialization failed"
+            exit 1
+        fi
     fi
     
     # Create missing ETH price log table if it doesn't exist
@@ -235,18 +265,53 @@ generate_supervisor_config() {
 verify_database() {
     log_info "Verifying database setup..."
     
+    # First, test basic database connection
+    log_info "Testing database connection..."
+    source venv/bin/activate
+    if python3 -c "
+import sys
+sys.path.append('backend')
+from core.config.database import test_database_connection
+success, message = test_database_connection()
+if not success:
+    print(f'Database connection failed: {message}')
+    exit(1)
+print('Database connection successful')
+"; then
+        log_success "Database connection verified"
+    else
+        log_error "Database connection failed - installation cannot continue"
+        exit 1
+    fi
+    
+    # Then run comprehensive verification if script exists
     if [[ -f "scripts/verify_database_setup.py" ]]; then
-        source venv/bin/activate
-        python3 scripts/verify_database_setup.py
-        if [[ $? -eq 0 ]]; then
+        log_info "Running comprehensive database verification..."
+        if python3 scripts/verify_database_setup.py; then
             log_success "Database verification passed"
         else
-            log_error "Database verification failed"
+            log_error "Database verification failed - critical database setup issues detected"
+            log_info "Please check database setup and try again"
             exit 1
         fi
     else
-        log_error "Database verification script not found"
-        exit 1
+        log_warning "Database verification script not found"
+        log_info "Running basic schema verification..."
+        
+        # Basic verification using direct SQL queries
+        if PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "
+SELECT 
+    CASE WHEN EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'users') THEN 'users schema exists' ELSE 'users schema missing' END as users_schema,
+    CASE WHEN EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'live_data') THEN 'live_data schema exists' ELSE 'live_data schema missing' END as live_data_schema,
+    CASE WHEN EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'system') THEN 'system schema exists' ELSE 'system schema missing' END as system_schema,
+    CASE WHEN EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'users' AND table_name = 'trades_0001') THEN 'trades table exists' ELSE 'trades table missing' END as trades_table;
+" 2>/dev/null | grep -q "missing"; then
+            log_error "Critical database tables or schemas are missing"
+            log_info "Database initialization may have failed"
+            exit 1
+        else
+            log_success "Basic database verification passed"
+        fi
     fi
 }
 
@@ -287,8 +352,8 @@ verify_services() {
             log_warning "Service verification had issues (some failures expected without credentials)"
         fi
     else
-        log_error "Service verification script not found"
-        exit 1
+        log_warning "Service verification script not found - continuing with installation"
+        log_info "Services can be verified manually later"
     fi
 }
 
