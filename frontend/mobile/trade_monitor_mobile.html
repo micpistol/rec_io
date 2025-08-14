@@ -680,6 +680,29 @@
                         <span style="font-size:13px; color:#666;">Allow re-entry on the same strike</span>
                     </div>
                 </div>
+                
+                <!-- Spike Alert Settings -->
+                <div style="margin-bottom:16px;">
+                    <div style="display:flex; align-items:center; margin-bottom:8px;">
+                        <input type="checkbox" id="mobileSpikeAlertEnabled" style="width:16px; height:16px; margin-right:8px; accent-color:#007bff;" />
+                        <span style="font-size:13px; color:#666;">Enable spike alerts for momentum detection</span>
+                    </div>
+                    <label style="font-size:14px; color:#333; margin-bottom:8px; display:block; font-weight:500;">Momentum Spike Level (±):</label>
+                    <div style="position:relative; width:100%;">
+                        <input type="range" id="mobileSpikeAlertMomentumSlider" min="0" max="100" value="40" style="width:100%; height:8px; background:#e0e0e0; border-radius:4px; outline:none;" />
+                        <div id="mobileSpikeAlertMomentumValueDisplay" style="position:absolute; top:-40px; left:0; font-size:12px; color:#222; background:white; padding:6px 10px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0; font-weight:500;">±40</div>
+                    </div>
+                    <label style="font-size:14px; color:#333; margin-bottom:8px; display:block; font-weight:500;">Cooldown Level (±):</label>
+                    <div style="position:relative; width:100%;">
+                        <input type="range" id="mobileSpikeAlertCooldownSlider" min="0" max="50" value="30" style="width:100%; height:8px; background:#e0e0e0; border-radius:4px; outline:none;" />
+                        <div id="mobileSpikeAlertCooldownValueDisplay" style="position:absolute; top:-40px; left:0; font-size:12px; color:#222; background:white; padding:6px 10px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0; font-weight:500;">±30</div>
+                    </div>
+                    <label style="font-size:14px; color:#333; margin-bottom:8px; display:block; font-weight:500;">Cooldown Time (minutes):</label>
+                    <div style="position:relative; width:100%;">
+                        <input type="range" id="mobileSpikeAlertTimeSlider" min="0" max="180" value="15" style="width:100%; height:8px; background:#e0e0e0; border-radius:4px; outline:none;" />
+                        <div id="mobileSpikeAlertTimeValueDisplay" style="position:absolute; top:-40px; left:0; font-size:12px; color:#222; background:white; padding:6px 10px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0; font-weight:500;">15m</div>
+                    </div>
+                </div>
             </div>
             
             <!-- Auto Stop Settings Section -->
@@ -705,6 +728,32 @@
                             <button id="mobileAutoStopMinTTCUp" style="padding:10px 14px; border:none; background:#f8f9fa; cursor:pointer; border-left:1px solid #ddd; border-radius:0 6px 6px 0; font-size:14px;">▲</button>
                         </div>
                         <input type="hidden" id="mobileAutoStopMinTTCInput" value="60" />
+                    </div>
+                </div>
+                
+                <!-- Momentum Spike Settings -->
+                <div style="margin-bottom:16px;">
+                    <div style="display:flex; align-items:center; margin-bottom:8px;">
+                        <input type="checkbox" id="mobileMomentumSpikeEnabled" style="width:16px; height:16px; margin-right:8px; accent-color:#007bff;" />
+                        <span style="font-size:13px; color:#666;">Auto-close trades during momentum spikes</span>
+                    </div>
+                    <label style="font-size:14px; color:#333; margin-bottom:8px; display:block; font-weight:500;">Momentum Spike Threshold (±):</label>
+                    <div style="position:relative; width:100%;">
+                        <input type="range" id="mobileMomentumSpikeThresholdSlider" min="10" max="100" value="35" style="width:100%; height:8px; background:#e0e0e0; border-radius:4px; outline:none;" />
+                        <div id="mobileMomentumSpikeThresholdValueDisplay" style="position:absolute; top:-40px; left:0; font-size:12px; color:#222; background:white; padding:6px 10px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0; font-weight:500;">±35</div>
+                    </div>
+                </div>
+                
+                <!-- Verification Period Settings -->
+                <div style="margin-bottom:16px;">
+                    <div style="display:flex; align-items:center; margin-bottom:8px;">
+                        <input type="checkbox" id="mobileVerificationPeriodEnabled" style="width:16px; height:16px; margin-right:8px; accent-color:#007bff;" />
+                        <span style="font-size:13px; color:#666;">Enable verification period before auto-stop</span>
+                    </div>
+                    <label style="font-size:14px; color:#333; margin-bottom:8px; display:block; font-weight:500;">Verification Duration (seconds):</label>
+                    <div style="position:relative; width:100%;">
+                        <input type="range" id="mobileVerificationPeriodSlider" min="5" max="60" value="15" style="width:100%; height:8px; background:#e0e0e0; border-radius:4px; outline:none;" />
+                        <div id="mobileVerificationPeriodValueDisplay" style="position:absolute; top:-40px; left:0; font-size:12px; color:#222; background:white; padding:6px 10px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0; font-weight:500;">15s</div>
                     </div>
                 </div>
             </div>
@@ -2567,6 +2616,12 @@
             
             // Fetch initial active trades
             fetchInitialActiveTrades();
+            
+            // Set up auto-refresh for Auto Trade status indicator every 10 seconds
+            setInterval(() => {
+                console.log('🔄 Auto-refreshing Auto Trade status indicator (mobile)');
+                fetchInitialAutoEntryIndicator();
+            }, 10000); // 10 seconds
         });
         
         // Fetch initial active trades state
@@ -2672,6 +2727,14 @@
         let mobileLastSavedAutoEntryMinTime = 0;
         let mobileLastSavedAutoEntryMaxTime = 3600;
         let mobileLastSavedAutoEntryAllowReEntry = false;
+        let mobileLastSavedMomentumSpikeEnabled = true;
+        let mobileLastSavedMomentumSpikeThreshold = 35;
+        let mobileLastSavedVerificationPeriodEnabled = false;
+        let mobileLastSavedVerificationPeriodSeconds = 15;
+        let mobileLastSavedSpikeAlertEnabled = true;
+        let mobileLastSavedSpikeAlertMomentum = 40;
+        let mobileLastSavedSpikeAlertCooldown = 30;
+        let mobileLastSavedSpikeAlertTime = 15;
 
         // Initialize mobile settings functionality
         document.addEventListener('DOMContentLoaded', function() {
@@ -2808,6 +2871,74 @@
                         minTTCInput.value = mobileLastSavedAutoStopMinTTC;
                         minTTCDisplay.textContent = formatSecondsToMMSS(mobileLastSavedAutoStopMinTTC);
                     }
+                    
+                    // Load momentum spike and verification period settings
+                    mobileLastSavedMomentumSpikeEnabled = autoStopData.momentum_spike_enabled ?? true;
+                    mobileLastSavedMomentumSpikeThreshold = autoStopData.momentum_spike_threshold ?? 35;
+                    mobileLastSavedVerificationPeriodEnabled = autoStopData.verification_period_enabled ?? false;
+                    mobileLastSavedVerificationPeriodSeconds = autoStopData.verification_period_seconds ?? 15;
+                    
+                    // Set momentum spike controls
+                    const momentumSpikeEnabledCheckbox = document.getElementById('mobileMomentumSpikeEnabled');
+                    const momentumSpikeThresholdSlider = document.getElementById('mobileMomentumSpikeThresholdSlider');
+                    
+                    if (momentumSpikeEnabledCheckbox) {
+                        momentumSpikeEnabledCheckbox.checked = mobileLastSavedMomentumSpikeEnabled;
+                    }
+                    
+                    if (momentumSpikeThresholdSlider) {
+                        momentumSpikeThresholdSlider.value = mobileLastSavedMomentumSpikeThreshold;
+                        updateMobileMomentumSpikeThresholdDisplay(mobileLastSavedMomentumSpikeThreshold);
+                    }
+                    
+                    // Set verification period controls
+                    const verificationPeriodEnabledCheckbox = document.getElementById('mobileVerificationPeriodEnabled');
+                    const verificationPeriodSlider = document.getElementById('mobileVerificationPeriodSlider');
+                    
+                    if (verificationPeriodEnabledCheckbox) {
+                        verificationPeriodEnabledCheckbox.checked = mobileLastSavedVerificationPeriodEnabled;
+                    }
+                    
+                    if (verificationPeriodSlider) {
+                        verificationPeriodSlider.value = mobileLastSavedVerificationPeriodSeconds;
+                        updateMobileVerificationPeriodDisplay(mobileLastSavedVerificationPeriodSeconds);
+                    }
+                }
+                
+                // Load Spike Alert Settings (from auto entry settings)
+                const spikeAlertResponse = await fetch('/api/get_auto_entry_settings');
+                if (spikeAlertResponse.ok) {
+                    const spikeAlertData = await spikeAlertResponse.json();
+                    
+                    mobileLastSavedSpikeAlertEnabled = spikeAlertData.spike_alert_enabled ?? true;
+                    mobileLastSavedSpikeAlertMomentum = spikeAlertData.spike_alert_momentum_threshold ?? 40;
+                    mobileLastSavedSpikeAlertCooldown = spikeAlertData.spike_alert_cooldown_threshold ?? 30;
+                    mobileLastSavedSpikeAlertTime = spikeAlertData.spike_alert_cooldown_minutes ?? 15;
+                    
+                    // Set spike alert controls
+                    const spikeAlertEnabledCheckbox = document.getElementById('mobileSpikeAlertEnabled');
+                    const spikeAlertMomentumSlider = document.getElementById('mobileSpikeAlertMomentumSlider');
+                    const spikeAlertCooldownSlider = document.getElementById('mobileSpikeAlertCooldownSlider');
+                    const spikeAlertTimeSlider = document.getElementById('mobileSpikeAlertTimeSlider');
+                    
+                    if (spikeAlertEnabledCheckbox) {
+                        spikeAlertEnabledCheckbox.checked = mobileLastSavedSpikeAlertEnabled;
+                    }
+                    
+                    if (spikeAlertMomentumSlider) {
+                        spikeAlertMomentumSlider.value = mobileLastSavedSpikeAlertMomentum;
+                        updateMobileSpikeAlertMomentumDisplay(mobileLastSavedSpikeAlertMomentum);
+                    }
+                    
+                    if (spikeAlertCooldownSlider) {
+                        spikeAlertCooldownSlider.value = mobileLastSavedSpikeAlertCooldown;
+                        updateMobileSpikeAlertCooldownDisplay(mobileLastSavedSpikeAlertCooldown);
+                    }
+                    
+                    if (spikeAlertTimeSlider) {
+                        spikeAlertTimeSlider.value = mobileLastSavedSpikeAlertTime;
+                        updateMobileSpikeAlertTimeDisplay(mobileLastSavedSpikeAlertTime);
+                    }
                 }
             } catch (error) {
                 console.error('Error loading mobile settings:', error);
@@ -2823,11 +2954,31 @@
                 const stopProbSlider = document.getElementById('mobileAutoStopProbabilitySlider');
                 const minTTCInput = document.getElementById('mobileAutoStopMinTTCInput');
                 
+                // Get new auto-stop settings
+                const momentumSpikeEnabledCheckbox = document.getElementById('mobileMomentumSpikeEnabled');
+                const momentumSpikeThresholdSlider = document.getElementById('mobileMomentumSpikeThresholdSlider');
+                const verificationPeriodEnabledCheckbox = document.getElementById('mobileVerificationPeriodEnabled');
+                const verificationPeriodSlider = document.getElementById('mobileVerificationPeriodSlider');
+                
+                // Get new spike alert settings
+                const spikeAlertEnabledCheckbox = document.getElementById('mobileSpikeAlertEnabled');
+                const spikeAlertMomentumSlider = document.getElementById('mobileSpikeAlertMomentumSlider');
+                const spikeAlertCooldownSlider = document.getElementById('mobileSpikeAlertCooldownSlider');
+                const spikeAlertTimeSlider = document.getElementById('mobileSpikeAlertTimeSlider');
+                
                 const newProb = parseInt(probSlider.value, 10);
                 const newDifferential = parseFloat(diffSlider.value);
                 const allowReEntry = allowReEntryCheckbox ? allowReEntryCheckbox.checked : false;
                 const newStopProb = parseInt(stopProbSlider.value, 10);
                 const newMinTTC = parseInt(minTTCInput.value, 10);
+                const newMomentumSpikeEnabled = momentumSpikeEnabledCheckbox ? momentumSpikeEnabledCheckbox.checked : true;
+                const newMomentumSpikeThreshold = momentumSpikeThresholdSlider ? parseInt(momentumSpikeThresholdSlider.value) : 35;
+                const newVerificationPeriodEnabled = verificationPeriodEnabledCheckbox ? verificationPeriodEnabledCheckbox.checked : false;
+                const newVerificationPeriodSeconds = verificationPeriodSlider ? parseInt(verificationPeriodSlider.value) : 15;
+                const newSpikeAlertEnabled = spikeAlertEnabledCheckbox ? spikeAlertEnabledCheckbox.checked : true;
+                const newSpikeAlertMomentum = spikeAlertMomentumSlider ? parseInt(spikeAlertMomentumSlider.value) : 40;
+                const newSpikeAlertCooldown = spikeAlertCooldownSlider ? parseInt(spikeAlertCooldownSlider.value) : 30;
+                const newSpikeAlertTime = spikeAlertTimeSlider ? parseInt(spikeAlertTimeSlider.value) : 15;
                 
                 if (!isNaN(newProb) && !isNaN(newDifferential) && !isNaN(newStopProb) && !isNaN(newMinTTC)) {
                     // Save Auto Entry Settings
@@ -2840,7 +2991,11 @@
                             min_ttc_seconds: 60,
                             min_time: mobileMinTimeSeconds,
                             max_time: mobileMaxTimeSeconds,
-                            allow_re_entry: allowReEntry
+                            allow_re_entry: allowReEntry,
+                            spike_alert_enabled: newSpikeAlertEnabled,
+                            spike_alert_momentum_threshold: newSpikeAlertMomentum,
+                            spike_alert_cooldown_threshold: newSpikeAlertCooldown,
+                            spike_alert_cooldown_minutes: newSpikeAlertTime
                         })
                     });
                     
@@ -2850,7 +3005,11 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             current_probability: newStopProb,
-                            min_ttc_seconds: newMinTTC
+                            min_ttc_seconds: newMinTTC,
+                            momentum_spike_enabled: newMomentumSpikeEnabled,
+                            momentum_spike_threshold: newMomentumSpikeThreshold,
+                            verification_period_enabled: newVerificationPeriodEnabled,
+                            verification_period_seconds: newVerificationPeriodSeconds
                         })
                     });
                     
@@ -2863,6 +3022,14 @@
                         mobileLastSavedAutoEntryMinTime = mobileMinTimeSeconds;
                         mobileLastSavedAutoEntryMaxTime = mobileMaxTimeSeconds;
                         mobileLastSavedAutoEntryAllowReEntry = allowReEntry;
+                        mobileLastSavedMomentumSpikeEnabled = newMomentumSpikeEnabled;
+                        mobileLastSavedMomentumSpikeThreshold = newMomentumSpikeThreshold;
+                        mobileLastSavedVerificationPeriodEnabled = newVerificationPeriodEnabled;
+                        mobileLastSavedVerificationPeriodSeconds = newVerificationPeriodSeconds;
+                        mobileLastSavedSpikeAlertEnabled = newSpikeAlertEnabled;
+                        mobileLastSavedSpikeAlertMomentum = newSpikeAlertMomentum;
+                        mobileLastSavedSpikeAlertCooldown = newSpikeAlertCooldown;
+                        mobileLastSavedSpikeAlertTime = newSpikeAlertTime;
                         
                         hideMobileSettingsModal();
                     } else {
@@ -2898,6 +3065,46 @@
             if (display) {
                 display.textContent = value + '%';
                 updateSliderDisplayPosition(display, value, 0, 100);
+            }
+        }
+
+        function updateMobileMomentumSpikeThresholdDisplay(value) {
+            const display = document.getElementById('mobileMomentumSpikeThresholdValueDisplay');
+            if (display) {
+                display.textContent = `±${value}`;
+                updateSliderDisplayPosition(display, value, 10, 100);
+            }
+        }
+
+        function updateMobileVerificationPeriodDisplay(value) {
+            const display = document.getElementById('mobileVerificationPeriodValueDisplay');
+            if (display) {
+                display.textContent = `${value}s`;
+                updateSliderDisplayPosition(display, value, 5, 60);
+            }
+        }
+
+        function updateMobileSpikeAlertMomentumDisplay(value) {
+            const display = document.getElementById('mobileSpikeAlertMomentumValueDisplay');
+            if (display) {
+                display.textContent = `±${value}`;
+                updateSliderDisplayPosition(display, value, 0, 100);
+            }
+        }
+
+        function updateMobileSpikeAlertCooldownDisplay(value) {
+            const display = document.getElementById('mobileSpikeAlertCooldownValueDisplay');
+            if (display) {
+                display.textContent = `±${value}`;
+                updateSliderDisplayPosition(display, value, 0, 50);
+            }
+        }
+
+        function updateMobileSpikeAlertTimeDisplay(value) {
+            const display = document.getElementById('mobileSpikeAlertTimeValueDisplay');
+            if (display) {
+                display.textContent = `${value}m`;
+                updateSliderDisplayPosition(display, value, 0, 180);
             }
         }
 
@@ -3012,6 +3219,46 @@
             if (stopProbSlider) {
                 stopProbSlider.addEventListener('input', function() {
                     updateMobileAutoStopSliderDisplay(this.value);
+                });
+            }
+
+            // Momentum Spike Threshold Slider
+            const momentumSpikeThresholdSlider = document.getElementById('mobileMomentumSpikeThresholdSlider');
+            if (momentumSpikeThresholdSlider) {
+                momentumSpikeThresholdSlider.addEventListener('input', function() {
+                    updateMobileMomentumSpikeThresholdDisplay(this.value);
+                });
+            }
+
+            // Verification Period Slider
+            const verificationPeriodSlider = document.getElementById('mobileVerificationPeriodSlider');
+            if (verificationPeriodSlider) {
+                verificationPeriodSlider.addEventListener('input', function() {
+                    updateMobileVerificationPeriodDisplay(this.value);
+                });
+            }
+
+            // Spike Alert Momentum Slider
+            const spikeAlertMomentumSlider = document.getElementById('mobileSpikeAlertMomentumSlider');
+            if (spikeAlertMomentumSlider) {
+                spikeAlertMomentumSlider.addEventListener('input', function() {
+                    updateMobileSpikeAlertMomentumDisplay(this.value);
+                });
+            }
+
+            // Spike Alert Cooldown Slider
+            const spikeAlertCooldownSlider = document.getElementById('mobileSpikeAlertCooldownSlider');
+            if (spikeAlertCooldownSlider) {
+                spikeAlertCooldownSlider.addEventListener('input', function() {
+                    updateMobileSpikeAlertCooldownDisplay(this.value);
+                });
+            }
+
+            // Spike Alert Time Slider
+            const spikeAlertTimeSlider = document.getElementById('mobileSpikeAlertTimeSlider');
+            if (spikeAlertTimeSlider) {
+                spikeAlertTimeSlider.addEventListener('input', function() {
+                    updateMobileSpikeAlertTimeDisplay(this.value);
                 });
             }
 

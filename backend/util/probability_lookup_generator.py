@@ -50,6 +50,26 @@ class ProbabilityLookupGenerator:
     
     Generates probability lookup tables using the same methodology as the live calculator.
     OPTIMIZED VERSION: Uses 5-second TTC increments and 10-point buffer increments.
+    
+    FUTURE ENHANCEMENT - SYMBOL-SPECIFIC BUFFER CONFIGURATION:
+    Currently uses fixed buffer range (0-2000 points) and increments (10 points) for all symbols.
+    This should be made symbol-specific based on price range and volatility characteristics:
+    
+    Examples:
+    - BTC ($120,000): Buffer 0-2000 points, 10-point increments (200 steps)
+    - ETH ($4,000): Buffer 0-400 points, 2-point increments (200 steps) 
+    - SOL ($100): Buffer 0-20 points, 0.5-point increments (40 steps)
+    
+    This would require:
+    1. Symbol-specific buffer configuration (range, increments)
+    2. Dynamic buffer step calculation based on symbol price
+    3. Validation that buffer range covers typical price movements
+    4. Configuration file or database table for symbol parameters
+    
+    Benefits:
+    - More accurate interpolation for lower-priced symbols
+    - Reduced table size for high-priced symbols
+    - Better coverage of typical price movements per symbol
     """
     
     def __init__(self, symbol: str = "btc"):
@@ -672,10 +692,10 @@ def main():
     
     # FULL DATASET: Complete BTC probability table
     ttc_range = (0, 3600)  # 0 to 60 minutes (3600 seconds)
-    buffer_range = (0, 2000)   # 0 to 2000 points
+    buffer_range = (0, 2000)   # 0 to 2000 points (BTC-specific - see FUTURE ENHANCEMENT comment above)
     momentum_buckets = generator.get_available_momentum_buckets()  # All 61 momentum buckets
     ttc_step = 5  # 5-second steps (optimized)
-    buffer_step = 10  # 10-point steps (optimized)
+    buffer_step = 10  # 10-point steps (optimized - BTC-specific)
     
     success = generator.create_master_table_batched(
         ttc_range=ttc_range,

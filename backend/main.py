@@ -185,7 +185,8 @@ def get_auto_stop_settings_postgresql():
         )
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT current_probability, min_ttc_seconds, momentum_spike_enabled, momentum_spike_threshold
+                SELECT current_probability, min_ttc_seconds, momentum_spike_enabled, momentum_spike_threshold,
+                       verification_period_enabled, verification_period_seconds
                 FROM users.auto_trade_settings_0001 WHERE id = 1
             """)
             result = cursor.fetchone()
@@ -196,14 +197,18 @@ def get_auto_stop_settings_postgresql():
                     "current_probability": result[0],
                     "min_ttc_seconds": result[1],
                     "momentum_spike_enabled": result[2],
-                    "momentum_spike_threshold": result[3]
+                    "momentum_spike_threshold": result[3],
+                    "verification_period_enabled": result[4],
+                    "verification_period_seconds": result[5]
                 }
             else:
                 return {
                     "current_probability": 40,
                     "min_ttc_seconds": 60,
                     "momentum_spike_enabled": True,
-                    "momentum_spike_threshold": 36
+                    "momentum_spike_threshold": 36,
+                    "verification_period_enabled": False,
+                    "verification_period_seconds": 15
                 }
     except Exception as e:
         print(f"[PostgreSQL Error] Failed to get auto stop settings: {e}")
@@ -211,7 +216,9 @@ def get_auto_stop_settings_postgresql():
             "current_probability": 40,
             "min_ttc_seconds": 60,
             "momentum_spike_enabled": True,
-            "momentum_spike_threshold": 36
+            "momentum_spike_threshold": 36,
+            "verification_period_enabled": False,
+            "verification_period_seconds": 15
         }
 
 # PostgreSQL helper functions for trade preferences
@@ -2233,6 +2240,10 @@ async def set_auto_stop_settings(request: Request):
             update_data["momentum_spike_enabled"] = bool(data["momentum_spike_enabled"])
         if "momentum_spike_threshold" in data:
             update_data["momentum_spike_threshold"] = int(data["momentum_spike_threshold"])
+        if "verification_period_enabled" in data:
+            update_data["verification_period_enabled"] = bool(data["verification_period_enabled"])
+        if "verification_period_seconds" in data:
+            update_data["verification_period_seconds"] = int(data["verification_period_seconds"])
         
         if update_data:
             update_auto_trade_settings_postgresql(**update_data)
@@ -2449,6 +2460,94 @@ async def get_strike_table(symbol: str):
             return {"error": f"Strike table file not found for {symbol}"}
     except Exception as e:
         return {"error": f"Error loading strike table for {symbol}: {str(e)}"}
+
+@app.get("/api/postgresql/strike_table/{symbol}")
+async def get_postgresql_strike_table(symbol: str):
+    """Get strike table data from PostgreSQL for a specific symbol"""
+    try:
+        import psycopg2
+        
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        
+        with conn.cursor() as cursor:
+            # Get the latest strike table data from PostgreSQL
+            cursor.execute(f"""
+                SELECT 
+                    symbol,
+                    current_price,
+                    ttc_seconds,
+                    momentum_weighted_score,
+                    market_title,
+                    timestamp
+                FROM live_data.{symbol.lower()}_strike_table 
+                LIMIT 1
+            """)
+            
+            header_data = cursor.fetchone()
+            
+            if not header_data:
+                return {"error": f"No strike table data found for {symbol}"}
+            
+            # Get all strike rows
+            cursor.execute(f"""
+                SELECT 
+                    strike,
+                    buffer,
+                    buffer_pct,
+                    probability,
+                    yes_ask,
+                    no_ask,
+                    volume,
+                    ticker,
+                    yes_diff,
+                    no_diff,
+                    active_side
+                FROM live_data.{symbol.lower()}_strike_table 
+                ORDER BY strike
+            """)
+            
+            strikes_data = cursor.fetchall()
+            
+            # Format the response
+            response = {
+                "symbol": header_data[0],
+                "current_price": float(header_data[1]) if header_data[1] else None,
+                "ttc_seconds": int(header_data[2]) if header_data[2] else None,
+                "momentum_weighted_score": float(header_data[3]) if header_data[3] else None,
+                "market_title": header_data[4],
+                "timestamp": header_data[5].isoformat() if header_data[5] else None,
+                "strikes": []
+            }
+            
+            # Add strike data
+            for strike_row in strikes_data:
+                strike_data = {
+                    "strike": float(strike_row[0]) if strike_row[0] else None,
+                    "buffer": float(strike_row[1]) if strike_row[1] else None,
+                    "buffer_pct": float(strike_row[2]) if strike_row[2] else None,
+                    "probability": float(strike_row[3]) if strike_row[3] else None,
+                    "yes_ask": int(strike_row[4]) if strike_row[4] else None,
+                    "no_ask": int(strike_row[5]) if strike_row[5] else None,
+                    "volume": int(strike_row[6]) if strike_row[6] else None,
+                    "ticker": strike_row[7],
+                    "yes_diff": float(strike_row[8]) if strike_row[8] else None,
+                    "no_diff": float(strike_row[9]) if strike_row[9] else None,
+                    "active_side": strike_row[10]
+                }
+                response["strikes"].append(strike_data)
+            
+            conn.close()
+            return response
+            
+    except Exception as e:
+        print(f"Error getting PostgreSQL strike table for {symbol}: {str(e)}")
+        return {"error": f"Error loading PostgreSQL strike table for {symbol}: {str(e)}"}
 
 @app.get("/api/watchlist/{symbol}")
 async def get_watchlist(symbol: str):
@@ -3130,8 +3229,12 @@ async def get_log_stream(request: dict):
         return {"success": False, "error": "No script name provided"}
     
     # Determine log file path based on script name
-    log_file = f"logs/{script_name}.out.log"
     project_dir = "/Users/ericwais1/rec_io_20"
+    
+    # Try .log first, then fall back to .out.log
+    log_file = f"logs/{script_name}.log"
+    if not os.path.exists(os.path.join(project_dir, log_file)):
+        log_file = f"logs/{script_name}.out.log"
     
     if not os.path.exists(os.path.join(project_dir, log_file)):
         return {"success": False, "error": f"Log file not found: {log_file}"}

@@ -327,10 +327,11 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                         cursor_orders.execute("""
                             SELECT SUM(taker_fees) as total_fees
                             FROM users.orders_0001 
-                            WHERE ticker = %s AND action = 'buy'
+                            WHERE ticker = %s
                         """, (expected_ticker,))
                         fees_row = cursor_orders.fetchone()
-                        total_fees_paid = float(fees_row[0]) if fees_row and fees_row[0] is not None else None
+                        # Convert cents to dollars for PnL calculation
+                        total_fees_paid = float(fees_row[0]) / 100.0 if fees_row and fees_row[0] is not None else None
                     pg_conn_orders.close()
                 
                 log_event(ticket_id, f"MANAGER: Calculated total fees from orders: {total_fees_paid}")
@@ -427,6 +428,18 @@ def confirm_close_trade(id: int, ticket_id: str) -> None:
                         close_method = "manual"
                     
                     try:
+                        # Update the fees in the trades table to match the calculated total
+                        pg_conn_fees = get_postgresql_connection()
+                        if pg_conn_fees:
+                            with pg_conn_fees.cursor() as cursor_fees:
+                                cursor_fees.execute("""
+                                    UPDATE users.trades_0001 
+                                    SET fees = %s 
+                                    WHERE id = %s
+                                """, (total_fees_paid, id))
+                                pg_conn_fees.commit()
+                            pg_conn_fees.close()
+                        
                         update_trade_status(id, "closed", closed_at, sell_price, symbol_close, win_loss, pnl, close_method)
                         
 

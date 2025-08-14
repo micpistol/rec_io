@@ -177,7 +177,7 @@ class ProbabilityLookupTableManager:
             validation_result["table_info"]["buffer_range"] = {"min": min_buffer, "max": max_buffer}
             
             if min_buffer != 0 or max_buffer < 2000:
-                validation_result["warnings"].append(f"Buffer range is {min_buffer}-{max_buffer}, expected 0-2000")
+                validation_result["warnings"].append(f"Buffer range is {min_buffer}-{max_buffer}, expected 0-2000 (BTC-specific)")
             
             # Check momentum bucket range
             cursor.execute(f"SELECT MIN(momentum_bucket), MAX(momentum_bucket) FROM {self.analytics_schema}.{table_name}")

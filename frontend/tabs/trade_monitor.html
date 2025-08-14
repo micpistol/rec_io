@@ -1307,6 +1307,20 @@ document.addEventListener('DOMContentLoaded', () => {
               <input type="range" id="momentumSpikeThresholdSlider" min="10" max="100" value="35" style="width:100%; height:6px; z-index:1; position:relative; background:#e0e0e0; border-radius:3px; outline:none;" />
               <div id="momentumSpikeThresholdValueDisplay" style="position:absolute; top:-32px; left:0; font-size:12px; color:#222; background:white; padding:4px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0;">±35</div>
             </div>
+            
+            <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 24px 0;">
+            
+            <!-- Verification Period Settings Section -->
+            <div style="position:relative; margin-bottom:24px; width:100%;">
+              <input type="checkbox" id="verificationPeriodEnabled" style="width:16px; height:16px; margin-right:8px; accent-color:#007bff;" />
+              <span style="font-size:13px; color:#666;">Enable verification period before auto-stop</span>
+            </div>
+            
+            <label for="verificationPeriodSlider" style="font-size:14px; color:#333; margin-bottom:34px; font-weight:500;">Verification Duration (seconds):</label>
+            <div style="position:relative; margin-bottom:8px; width:100%;">
+              <input type="range" id="verificationPeriodSlider" min="5" max="60" value="15" style="width:100%; height:6px; z-index:1; position:relative; background:#e0e0e0; border-radius:3px; outline:none;" />
+              <div id="verificationPeriodValueDisplay" style="position:absolute; top:-32px; left:0; font-size:12px; color:#222; background:white; padding:4px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:2; transform:translateX(-50%); border:1px solid #e0e0e0;">15s</div>
+            </div>
           </div>
           <div style="display:flex; gap:12px; justify-content:flex-end; align-items:center; margin-top:20px;">
             <button id="autoStopSettingsCancel" style="padding:8px 16px; border-radius:4px; border:1px solid #ddd; background:#f8f9fa; color:#333; font-size:13px; cursor:pointer; font-weight:500;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">Cancel</button>
@@ -3062,6 +3076,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
+  function updateVerificationPeriodDisplay(value) {
+    const display = document.getElementById('verificationPeriodValueDisplay');
+    const slider = document.getElementById('verificationPeriodSlider');
+    if (display && slider) {
+      display.textContent = `${value}s`;
+      // Calculate thumb position in px
+      const min = parseInt(slider.min, 10);
+      const max = parseInt(slider.max, 10);
+      const percent = (value - min) / (max - min);
+      const sliderWidth = slider.offsetWidth;
+      const thumbWidth = 16;
+      const offset = percent * (sliderWidth - thumbWidth) + thumbWidth / 2;
+      display.style.left = `${offset}px`;
+    }
+  }
+
   async function fetchAutoStopSettings() {
     try {
       const resp = await fetch('/api/get_auto_stop_settings');
@@ -3070,7 +3100,14 @@ document.addEventListener('DOMContentLoaded', function() {
         return data;
       }
     } catch {}
-    return { current_probability: 25, min_ttc_seconds: 60, momentum_spike_enabled: true, momentum_spike_threshold: 35 };
+    return { 
+      current_probability: 25, 
+      min_ttc_seconds: 60, 
+      momentum_spike_enabled: true, 
+      momentum_spike_threshold: 35,
+      verification_period_enabled: false,
+      verification_period_seconds: 15
+    };
   }
 
   function showAutoStopSettingsModal() {
@@ -3114,6 +3151,24 @@ document.addEventListener('DOMContentLoaded', function() {
           updateMomentumSpikeThresholdDisplay(momentumSpikeThreshold);
           window.lastSavedMomentumSpikeThreshold = momentumSpikeThreshold;
         }
+        
+        // Set verification period settings
+        const verificationPeriodEnabled = data.verification_period_enabled !== undefined ? data.verification_period_enabled : false;
+        const verificationPeriodSeconds = data.verification_period_seconds !== undefined ? data.verification_period_seconds : 15;
+        
+        const verificationPeriodEnabledCheckbox = document.getElementById('verificationPeriodEnabled');
+        const verificationPeriodSlider = document.getElementById('verificationPeriodSlider');
+        
+        if (verificationPeriodEnabledCheckbox) {
+          verificationPeriodEnabledCheckbox.checked = verificationPeriodEnabled;
+          window.lastSavedVerificationPeriodEnabled = verificationPeriodEnabled;
+        }
+        
+        if (verificationPeriodSlider) {
+          verificationPeriodSlider.value = verificationPeriodSeconds;
+          updateVerificationPeriodDisplay(verificationPeriodSeconds);
+          window.lastSavedVerificationPeriodSeconds = verificationPeriodSeconds;
+        }
       });
     }
   }
@@ -3155,6 +3210,19 @@ document.addEventListener('DOMContentLoaded', function() {
         momentumSpikeThresholdSlider.value = window.lastSavedMomentumSpikeThreshold;
         updateMomentumSpikeThresholdDisplay(window.lastSavedMomentumSpikeThreshold);
       }
+      
+      // Reset verification period settings to last saved values
+      const verificationPeriodEnabledCheckbox = document.getElementById('verificationPeriodEnabled');
+      const verificationPeriodSlider = document.getElementById('verificationPeriodSlider');
+      
+      if (verificationPeriodEnabledCheckbox && window.lastSavedVerificationPeriodEnabled !== undefined) {
+        verificationPeriodEnabledCheckbox.checked = window.lastSavedVerificationPeriodEnabled;
+      }
+      
+      if (verificationPeriodSlider && window.lastSavedVerificationPeriodSeconds !== undefined) {
+        verificationPeriodSlider.value = window.lastSavedVerificationPeriodSeconds;
+        updateVerificationPeriodDisplay(window.lastSavedVerificationPeriodSeconds);
+      }
       hideAutoStopSettingsModal();
     });
   }
@@ -3171,6 +3239,13 @@ document.addEventListener('DOMContentLoaded', function() {
       const momentumSpikeEnabled = momentumSpikeEnabledCheckbox ? momentumSpikeEnabledCheckbox.checked : true;
       const momentumSpikeThreshold = momentumSpikeThresholdSlider ? parseInt(momentumSpikeThresholdSlider.value) : 35;
       
+      // Get verification period settings
+      const verificationPeriodEnabledCheckbox = document.getElementById('verificationPeriodEnabled');
+      const verificationPeriodSlider = document.getElementById('verificationPeriodSlider');
+      
+      const verificationPeriodEnabled = verificationPeriodEnabledCheckbox ? verificationPeriodEnabledCheckbox.checked : false;
+      const verificationPeriodSeconds = verificationPeriodSlider ? parseInt(verificationPeriodSlider.value) : 15;
+      
       if (!isNaN(newProb)) {
         try {
           const response = await fetch('/api/set_auto_stop_settings', {
@@ -3181,7 +3256,9 @@ document.addEventListener('DOMContentLoaded', function() {
               current_probability: newProb, 
               min_ttc_seconds: minTTC,
               momentum_spike_enabled: momentumSpikeEnabled,
-              momentum_spike_threshold: momentumSpikeThreshold
+              momentum_spike_threshold: momentumSpikeThreshold,
+              verification_period_enabled: verificationPeriodEnabled,
+              verification_period_seconds: verificationPeriodSeconds
             })
           });
           if (response.ok) {
@@ -3190,6 +3267,8 @@ document.addEventListener('DOMContentLoaded', function() {
             window.lastSavedMinTTC = minTTC;
             window.lastSavedMomentumSpikeEnabled = momentumSpikeEnabled;
             window.lastSavedMomentumSpikeThreshold = momentumSpikeThreshold;
+            window.lastSavedVerificationPeriodEnabled = verificationPeriodEnabled;
+            window.lastSavedVerificationPeriodSeconds = verificationPeriodSeconds;
           } else {
             console.error('Failed to save auto stop settings:', response.status);
           }
@@ -3220,6 +3299,17 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     window.addEventListener('resize', function() {
       updateMomentumSpikeThresholdDisplay(momentumSpikeThresholdSlider.value);
+    });
+  }
+  
+  // Verification Period Slider Event Listeners
+  const verificationPeriodSlider = document.getElementById('verificationPeriodSlider');
+  if (verificationPeriodSlider) {
+    verificationPeriodSlider.addEventListener('input', function() {
+      updateVerificationPeriodDisplay(this.value);
+    });
+    window.addEventListener('resize', function() {
+      updateVerificationPeriodDisplay(verificationPeriodSlider.value);
     });
   }
   // Remove click-to-close on dimmed area

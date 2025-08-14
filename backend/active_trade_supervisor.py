@@ -17,6 +17,13 @@ import requests
 from typing import Dict, List, Optional, Any
 import psycopg2
 # Import the universal centralized port system
+import sys
+import os
+# Add the project root to the Python path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from backend.core.port_config import get_port
 from backend.util.paths import get_host
 
@@ -1125,6 +1132,7 @@ def start_monitoring_loop():
         global monitoring_thread
         log("📊 MONITORING: Starting monitoring loop for active trades")
         auto_stop_triggered_trades = set()
+        verification_pending_trades = {}  # trade_id -> (trigger_time, verification_end_time)
         
         try:
             while True:
@@ -1163,12 +1171,46 @@ def start_monitoring_loop():
                 if is_auto_stop_enabled():
                     threshold = get_auto_stop_threshold()
                     min_ttc_seconds = get_min_ttc_seconds()
+                    verification_enabled = get_verification_period_enabled()
+                    verification_seconds = get_verification_period_seconds()
+                    current_time = time.time()
+                    
                     for trade in active_trades:
                         prob = trade.get('current_probability')
                         trade_id = trade.get('trade_id')
                         ttc_seconds = trade.get('time_since_entry')
                         
-                        # Only trigger if not already closing/closed and not already triggered
+                        # Check if trade is in verification period
+                        if trade_id in verification_pending_trades:
+                            trigger_time, verification_end_time = verification_pending_trades[trade_id]
+                            
+                            # Check if verification period has ended
+                            if current_time >= verification_end_time:
+                                # Verification period ended - check if conditions still met
+                                if (
+                                    prob is not None and
+                                    isinstance(prob, (int, float)) and
+                                    prob < threshold and
+                                    trade.get('status') == 'active'
+                                ):
+                                    # Conditions still met after verification - trigger auto-stop
+                                    log(f"[AUTO STOP] ✅ Verification period ended - triggering auto stop for trade {trade_id} (prob={prob}, verification_duration={verification_seconds}s)")
+                                    trigger_auto_stop_close(trade)
+                                    auto_stop_triggered_trades.add(trade_id)
+                                    del verification_pending_trades[trade_id]
+                                else:
+                                    # Conditions no longer met - cancel verification
+                                    log(f"[AUTO STOP] ❌ Verification period ended - conditions no longer met for trade {trade_id} (prob={prob}, threshold={threshold})")
+                                    del verification_pending_trades[trade_id]
+                            else:
+                                # Still in verification period - just wait, don't check conditions during wait
+                                remaining_time = verification_end_time - current_time
+                                if not hasattr(monitoring_worker, 'last_verification_log') or current_time - monitoring_worker.last_verification_log > 10:
+                                    log(f"[AUTO STOP] ⏳ Trade {trade_id} in verification period - {remaining_time:.1f}s remaining")
+                                    monitoring_worker.last_verification_log = current_time
+                                continue
+                        
+                        # Check for new auto-stop conditions
                         if (
                             prob is not None and
                             isinstance(prob, (int, float)) and
@@ -1178,9 +1220,16 @@ def start_monitoring_loop():
                             ttc_seconds is not None and
                             ttc_seconds >= min_ttc_seconds # Respect min_ttc_seconds setting
                         ):
-                            log(f"[AUTO STOP] Triggering auto stop for trade {trade_id} (prob={prob}, ttc={ttc_seconds}s, min_ttc={min_ttc_seconds}s)")
-                            trigger_auto_stop_close(trade)
-                            auto_stop_triggered_trades.add(trade_id)
+                            if verification_enabled:
+                                # Start verification period
+                                verification_end_time = current_time + verification_seconds
+                                verification_pending_trades[trade_id] = (current_time, verification_end_time)
+                                log(f"[AUTO STOP] 🔍 Starting verification period for trade {trade_id} (prob={prob}, threshold={threshold}, verification_duration={verification_seconds}s)")
+                            else:
+                                # No verification - trigger immediately
+                                log(f"[AUTO STOP] Triggering auto stop for trade {trade_id} (prob={prob}, ttc={ttc_seconds}s, min_ttc={min_ttc_seconds}s)")
+                                trigger_auto_stop_close(trade)
+                                auto_stop_triggered_trades.add(trade_id)
                         elif (
                             prob is not None and
                             isinstance(prob, (int, float)) and
@@ -1236,9 +1285,16 @@ def start_monitoring_loop():
                                             trade.get('side', '').upper() in ['N', 'NO'] and
                                             trade.get('trade_id') not in auto_stop_triggered_trades):
                                             
-                                            log(f"[MOMENTUM SPIKE] Triggering close for NO trade {trade.get('trade_id')} (momentum: {current_momentum:.2f})")
+                                            trade_id = trade.get('trade_id')
+                                            log(f"[MOMENTUM SPIKE] Triggering close for NO trade {trade_id} (momentum: {current_momentum:.2f})")
+                                            
+                                            # Cancel any pending verification period for this trade
+                                            if trade_id in verification_pending_trades:
+                                                log(f"[MOMENTUM SPIKE] Cancelling verification period for trade {trade_id} due to momentum spike")
+                                                del verification_pending_trades[trade_id]
+                                            
                                             trigger_auto_stop_close(trade)
-                                            auto_stop_triggered_trades.add(trade.get('trade_id'))
+                                            auto_stop_triggered_trades.add(trade_id)
                                             momentum_spike_triggered = True
                                     
                                     if momentum_spike_triggered:
@@ -1253,9 +1309,16 @@ def start_monitoring_loop():
                                             trade.get('side', '').upper() in ['Y', 'YES'] and
                                             trade.get('trade_id') not in auto_stop_triggered_trades):
                                             
-                                            log(f"[MOMENTUM SPIKE] Triggering close for YES trade {trade.get('trade_id')} (momentum: {current_momentum:.2f})")
+                                            trade_id = trade.get('trade_id')
+                                            log(f"[MOMENTUM SPIKE] Triggering close for YES trade {trade_id} (momentum: {current_momentum:.2f})")
+                                            
+                                            # Cancel any pending verification period for this trade
+                                            if trade_id in verification_pending_trades:
+                                                log(f"[MOMENTUM SPIKE] Cancelling verification period for trade {trade_id} due to momentum spike")
+                                                del verification_pending_trades[trade_id]
+                                            
                                             trigger_auto_stop_close(trade)
-                                            auto_stop_triggered_trades.add(trade.get('trade_id'))
+                                            auto_stop_triggered_trades.add(trade_id)
                                             momentum_spike_triggered = True
                                     
                                     if momentum_spike_triggered:
@@ -1601,6 +1664,42 @@ def get_min_ttc_seconds():
     except Exception as e:
         log(f"[AUTO STOP] Error reading min_ttc_seconds from PostgreSQL: {e}")
         return 60
+
+def get_verification_period_enabled():
+    """Get the verification period enabled setting from PostgreSQL"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db", 
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT verification_period_enabled FROM users.auto_trade_settings_0001 WHERE id = 1")
+            result = cursor.fetchone()
+            return result[0] if result else False
+    except Exception as e:
+        log(f"[AUTO STOP] Error reading verification_period_enabled from PostgreSQL: {e}")
+        return False
+
+def get_verification_period_seconds():
+    """Get the verification period seconds setting from PostgreSQL"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db", 
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT verification_period_seconds FROM users.auto_trade_settings_0001 WHERE id = 1")
+            result = cursor.fetchone()
+            return result[0] if result else 15
+    except Exception as e:
+        log(f"[AUTO STOP] Error reading verification_period_seconds from PostgreSQL: {e}")
+        return 15
 
 if __name__ == "__main__":
     # Start the event-driven supervisor
