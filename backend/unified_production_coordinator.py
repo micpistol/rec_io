@@ -488,53 +488,14 @@ def get_unified_ttc(symbol: str = "btc") -> Dict[str, Any]:
         print(f"Error getting unified TTC for {symbol}: {e}")
         raise
 
-def load_auto_entry_settings() -> Dict[str, Any]:
-    """Load auto entry settings from PostgreSQL"""
-    try:
-        import psycopg2
-        conn = psycopg2.connect(
-            host="localhost",
-            database="rec_io_db",
-            user="rec_io_user",
-            password="rec_io_password"
-        )
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT min_probability, min_differential, min_time, max_time, allow_re_entry,
-                       spike_alert_enabled, spike_alert_momentum_threshold, 
-                       spike_alert_cooldown_threshold, spike_alert_cooldown_minutes
-                FROM users.auto_trade_settings_0001 WHERE id = 1
-            """)
-            result = cursor.fetchone()
-            if result:
-                settings = {
-                    "min_probability": result[0],
-                    "min_differential": float(result[1]),
-                    "min_time": result[2],
-                    "max_time": result[3],
-                    "allow_re_entry": result[4],
-                    "spike_alert_enabled": result[5],
-                    "spike_alert_momentum_threshold": result[6],
-                    "spike_alert_cooldown_threshold": result[7],
-                    "spike_alert_cooldown_minutes": result[8],
-                    "watchlist_min_volume": 1000,  # Default value
-                    "watchlist_max_ask": 98  # Default value
-                }
-                # print(f"📊 Loaded auto entry settings from PostgreSQL: {settings}")
-                return settings
-            else:
-                # print(f"⚠️ No auto entry settings found in PostgreSQL")
-                return None
-    except Exception as e:
-        # print(f"⚠️ Error loading auto entry settings from PostgreSQL: {e}")
-        return None
+# load_auto_entry_settings function removed - moved to auto_entry_supervisor
 
 class PipelineStep(Enum):
     BTC_PRICE = "btc_price"
     MARKET_SNAPSHOT = "market_snapshot"
     PROBABILITIES = "probabilities"
     STRIKE_TABLE = "strike_table"
-    WATCHLIST = "watchlist"
+    # WATCHLIST = "watchlist"  # REMOVED - moved to auto_entry_supervisor
 
 @dataclass
 class PipelineResult:
@@ -563,7 +524,7 @@ class UnifiedProductionCoordinator:
         # Output paths
         self.live_probabilities_path = os.path.join(self.data_dir, "live_data", "live_probabilities", "btc_live_probabilities.json")
         self.strike_table_path = os.path.join(self.data_dir, "live_data", "markets", "kalshi", "strike_tables", "btc_strike_table.json")
-        self.watchlist_path = os.path.join(self.data_dir, "live_data", "markets", "kalshi", "strike_tables", "btc_watchlist.json")
+        # self.watchlist_path = os.path.join(self.data_dir, "live_data", "markets", "kalshi", "strike_tables", "btc_watchlist.json")  # REMOVED - moved to auto_entry_supervisor
         
         # Ensure directories exist
         os.makedirs(os.path.dirname(self.live_probabilities_path), exist_ok=True)
@@ -590,8 +551,8 @@ class UnifiedProductionCoordinator:
                 "btc_price": [],
                 "market_snapshot": [],
                 "probabilities": [],
-                "strike_table": [],
-                "watchlist": []
+                "strike_table": []
+                # "watchlist": []  # REMOVED - moved to auto_entry_supervisor
             },
             "slow_cycles": 0,
             "last_performance_log": 0
@@ -775,22 +736,22 @@ class UnifiedProductionCoordinator:
             if not strike_table_result.success:
                 return False
             
-            # Step 5: Generate watchlist (can be async, doesn't block strike table)
-            watchlist_result = self._step_generate_watchlist(
-                btc_price_result.data,
-                market_snapshot_result.data,
-                strike_table_result.data
-            )
-            if not watchlist_result.success:
-                return False
+            # Step 5: Generate watchlist (can be async, doesn't block strike table) - REMOVED - moved to auto_entry_supervisor
+            # watchlist_result = self._step_generate_watchlist(
+            #     btc_price_result.data,
+            #     market_snapshot_result.data,
+            #     strike_table_result.data
+            # )
+            # if not watchlist_result.success:
+            #     return False
             
             # Store results
             self.pipeline_results = [
                 btc_price_result,
                 market_snapshot_result,
                 probabilities_result,
-                strike_table_result,
-                watchlist_result
+                strike_table_result
+                # watchlist_result  # REMOVED - moved to auto_entry_supervisor
             ]
             
             # Performance monitoring
@@ -992,120 +953,7 @@ class UnifiedProductionCoordinator:
                 duration=time.time() - step_start
             )
     
-    def _step_generate_watchlist(self, btc_price_data: Dict, market_data: Dict, strike_table_data: Dict) -> PipelineResult:
-        """Step 5: Generate watchlist"""
-        step_start = time.time()
-        try:
-            btc_price = btc_price_data["btc_price"]
-            ttc_seconds = strike_table_data["ttc"]
-            strikes = strike_table_data["strikes"]
-            
-            # Load auto entry settings for filter parameters
-            settings = load_auto_entry_settings()
-            if settings is None:
-                raise Exception("CRITICAL ERROR: Auto entry settings are None - server should catch on fire!")
-            
-            min_volume = settings.get("watchlist_min_volume", 1000)
-            max_ask = settings.get("watchlist_max_ask", 98)
-            min_probability = settings.get("min_probability") - 5  # Subtract 5 from min_probability
-            min_differential = settings.get("min_differential") - 3  # Subtract 3 from min_differential
-            
-            # print(f"🔍 Watchlist filtering with settings: min_prob={min_probability}, min_diff={min_differential}")
-            
-            # Filter strikes for watchlist
-            filtered_strikes = []
-            for strike in strikes:
-                volume = strike.get("volume")
-                probability = strike.get("probability")
-                yes_ask = strike.get("yes_ask")
-                no_ask = strike.get("no_ask")
-                yes_diff = strike.get("yes_diff")
-                no_diff = strike.get("no_diff")
-                
-                if (volume is None or probability is None or 
-                    yes_ask is None or no_ask is None or
-                    yes_diff is None or no_diff is None):
-                    continue
-                
-                # Get the higher of yes_ask and no_ask
-                max_ask_price = max(yes_ask, no_ask)
-                
-                # Determine which side would be the active buy button
-                is_above_money_line = strike.get("strike", 0) > btc_price
-                
-                # Get the active button's differential
-                active_diff = no_diff if is_above_money_line else yes_diff
-                
-                # Check if at least one side meets the differential requirement
-                yes_diff_ok = yes_diff >= min_differential
-                no_diff_ok = no_diff >= min_differential
-                at_least_one_diff_ok = yes_diff_ok or no_diff_ok
-                
-                # Apply filter criteria from auto entry settings
-                volume_ok = volume >= min_volume
-                probability_ok = probability > min_probability
-                ask_ok = max_ask_price <= max_ask
-                
-                # Debug output for volume filtering
-                if not volume_ok:
-                    # print(f"🔍 Volume debug for strike {strike.get('strike')}: volume={volume} (type: {type(volume)}), min_volume={min_volume} (type: {type(min_volume)})")
-                    pass
-                
-                # Debug output for probability filtering
-                if not probability_ok:
-                    # print(f"🔍 Probability debug for strike {strike.get('strike')}: probability={probability} (type: {type(probability)}), min_probability={min_probability} (type: {type(min_probability)})")
-                    pass
-                
-                # Debug output for differential filtering
-                if not at_least_one_diff_ok:
-                    # print(f"🔍 Differential debug for strike {strike.get('strike')}: yes_diff={yes_diff}, no_diff={no_diff}, min_differential={min_differential}")
-                    pass
-                
-                # Debug output for ask price filtering
-                if not ask_ok:
-                    # print(f"🔍 Ask price debug for strike {strike.get('strike')}: max_ask_price={max_ask_price}, max_ask={max_ask}")
-                    pass
-                
-                if (volume_ok and probability_ok and ask_ok and at_least_one_diff_ok):
-                    filtered_strikes.append(strike)
-                else:
-                    # print(f"❌ Strike {strike.get('strike')} filtered out: vol={volume_ok}, prob={probability_ok}, ask={ask_ok}, diff={at_least_one_diff_ok}")
-                    pass
-            
-            # Sort by probability (highest to lowest)
-            filtered_strikes.sort(key=lambda x: x.get("probability", 0), reverse=True)
-            
-            # Create watchlist output
-            watchlist_output = {
-                "symbol": "BTC",
-                "current_price": btc_price,
-                "ttc": ttc_seconds,
-                "broker": "Kalshi",
-                "event_ticker": market_data.get("event_ticker"),
-                "market_title": market_data.get("event_title"),
-                "strike_tier": market_data.get("strike_tier"),
-                "market_status": market_data.get("market_status"),
-                "last_updated": datetime.now().isoformat(),
-                "strikes": filtered_strikes
-            }
-            
-            # Write watchlist to file
-            safe_write_json(watchlist_output, self.watchlist_path)
-            
-            # print(f"📊 Watchlist: {len(filtered_strikes)} filtered strikes")
-            return PipelineResult(
-                step=PipelineStep.WATCHLIST,
-                success=True,
-                data=watchlist_output,
-                duration=time.time() - step_start
-            )
-        except Exception as e:
-            return PipelineResult(
-                step=PipelineStep.WATCHLIST,
-                success=False,
-                error=str(e),
-                duration=time.time() - step_start
-            )
+    # _step_generate_watchlist method removed - moved to auto_entry_supervisor
     
     def get_pipeline_status(self) -> Dict[str, Any]:
         """Get current pipeline status"""

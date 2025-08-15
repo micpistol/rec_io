@@ -520,7 +520,9 @@ def get_auto_entry_settings():
                     "spike_alert_enabled": result[5],
                     "spike_alert_momentum_threshold": result[6],
                     "spike_alert_cooldown_threshold": result[7],
-                    "spike_alert_cooldown_minutes": result[8]
+                    "spike_alert_cooldown_minutes": result[8],
+                    "watchlist_min_volume": 1000,  # Default value
+                    "watchlist_max_ask": 98  # Default value
                 }
                 log(f"[AUTO ENTRY] Loaded settings from PostgreSQL")
                 return settings
@@ -547,10 +549,132 @@ def get_current_ttc():
         log(f"[AUTO ENTRY] Error fetching TTC: {e}")
     return 0
 
+def get_strike_table_path():
+    """Get the path to the master strike table JSON file"""
+    return os.path.join(get_data_dir(), "live_data", "markets", "kalshi", "strike_tables", "btc_strike_table.json")
+
+def get_watchlist_path():
+    """Get the path to the watchlist JSON file"""
+    return os.path.join(get_data_dir(), "live_data", "markets", "kalshi", "strike_tables", "btc_watchlist.json")
+
+def get_master_strike_table_data():
+    """Get current master strike table data"""
+    try:
+        strike_table_path = get_strike_table_path()
+        if os.path.exists(strike_table_path):
+            with open(strike_table_path, "r") as f:
+                data = json.load(f)
+                return data
+        else:
+            log(f"[WATCHLIST] Master strike table file not found")
+    except Exception as e:
+        log(f"[WATCHLIST] Error reading master strike table data: {e}")
+    return None
+
+def generate_watchlist_from_strike_table():
+    """Generate watchlist by filtering the master strike table based on auto entry settings"""
+    try:
+        # Get master strike table data
+        strike_table_data = get_master_strike_table_data()
+        if not strike_table_data or "strikes" not in strike_table_data:
+            log(f"[WATCHLIST] No master strike table data available")
+            return False
+        
+        btc_price = strike_table_data.get("current_price")
+        ttc_seconds = strike_table_data.get("ttc")
+        strikes = strike_table_data["strikes"]
+        market_data = {
+            "event_ticker": strike_table_data.get("event_ticker"),
+            "event_title": strike_table_data.get("market_title"),
+            "strike_tier": strike_table_data.get("strike_tier"),
+            "market_status": strike_table_data.get("market_status")
+        }
+        
+        # Load auto entry settings for filter parameters
+        settings = get_auto_entry_settings()
+        if not settings:
+            log(f"[WATCHLIST] No auto entry settings available")
+            return False
+        
+        min_volume = settings.get("watchlist_min_volume", 1000)
+        max_ask = settings.get("watchlist_max_ask", 98)
+        min_probability = settings.get("min_probability", 0) - 5  # Subtract 5 from min_probability
+        min_differential = settings.get("min_differential", 0) - 3  # Subtract 3 from min_differential
+        
+        log(f"[WATCHLIST] Filtering with settings: min_prob={min_probability}, min_diff={min_differential}, min_vol={min_volume}, max_ask={max_ask}")
+        
+        # Filter strikes for watchlist
+        filtered_strikes = []
+        for strike in strikes:
+            volume = strike.get("volume")
+            probability = strike.get("probability")
+            yes_ask = strike.get("yes_ask")
+            no_ask = strike.get("no_ask")
+            yes_diff = strike.get("yes_diff")
+            no_diff = strike.get("no_diff")
+            
+            if (volume is None or probability is None or 
+                yes_ask is None or no_ask is None or
+                yes_diff is None or no_diff is None):
+                continue
+            
+            # Get the higher of yes_ask and no_ask
+            max_ask_price = max(yes_ask, no_ask)
+            
+            # Determine which side would be the active buy button
+            is_above_money_line = strike.get("strike", 0) > btc_price
+            
+            # Get the active button's differential
+            active_diff = no_diff if is_above_money_line else yes_diff
+            
+            # Check if at least one side meets the differential requirement
+            yes_diff_ok = yes_diff >= min_differential
+            no_diff_ok = no_diff >= min_differential
+            at_least_one_diff_ok = yes_diff_ok or no_diff_ok
+            
+            # Apply filter criteria from auto entry settings
+            volume_ok = volume >= min_volume
+            probability_ok = probability > min_probability
+            ask_ok = max_ask_price <= max_ask
+            
+            if (volume_ok and probability_ok and ask_ok and at_least_one_diff_ok):
+                filtered_strikes.append(strike)
+        
+        # Sort by probability (highest to lowest)
+        filtered_strikes.sort(key=lambda x: x.get("probability", 0), reverse=True)
+        
+        # Create watchlist output
+        watchlist_output = {
+            "symbol": "BTC",
+            "current_price": btc_price,
+            "ttc": ttc_seconds,
+            "broker": "Kalshi",
+            "event_ticker": market_data.get("event_ticker"),
+            "market_title": market_data.get("event_title"),
+            "strike_tier": market_data.get("strike_tier"),
+            "market_status": market_data.get("market_status"),
+            "last_updated": datetime.now().isoformat(),
+            "strikes": filtered_strikes
+        }
+        
+        # Write watchlist to file
+        watchlist_path = get_watchlist_path()
+        os.makedirs(os.path.dirname(watchlist_path), exist_ok=True)
+        
+        with open(watchlist_path, "w") as f:
+            json.dump(watchlist_output, f, indent=2)
+        
+        log(f"[WATCHLIST] Generated watchlist with {len(filtered_strikes)} filtered strikes")
+        return True
+        
+    except Exception as e:
+        log(f"[WATCHLIST] Error generating watchlist: {e}")
+        return False
+
 def get_watchlist_data():
     """Get current watchlist data"""
     try:
-        watchlist_path = os.path.join(get_data_dir(), "live_data", "markets", "kalshi", "strike_tables", "btc_watchlist.json")
+        watchlist_path = get_watchlist_path()
         if os.path.exists(watchlist_path):
             with open(watchlist_path, "r") as f:
                 data = json.load(f)
@@ -812,6 +936,11 @@ def check_auto_entry_conditions():
     global auto_entry_indicator_state
     
     try:
+        # ALWAYS generate watchlist first (regardless of scanning status)
+        watchlist_generated = generate_watchlist_from_strike_table()
+        if not watchlist_generated:
+            log(f"[AUTO ENTRY] Failed to generate watchlist")
+        
         # Check spike alert conditions first
         check_spike_alert_conditions()
         
