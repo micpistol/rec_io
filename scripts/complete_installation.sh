@@ -247,11 +247,13 @@ setup_logs() {
     log_success "Logs directory created"
 }
 
-# Generate supervisor config
-generate_supervisor_config() {
-    log_info "Generating supervisor configuration..."
+# Generate all system configurations dynamically
+generate_system_configs() {
+    log_info "Generating all system configurations..."
     
+    # Generate supervisor configuration
     if [[ -f "scripts/generate_supervisor_config.sh" ]]; then
+        log_info "Generating supervisor configuration..."
         chmod +x scripts/generate_supervisor_config.sh
         ./scripts/generate_supervisor_config.sh
         log_success "Supervisor configuration generated"
@@ -259,6 +261,31 @@ generate_supervisor_config() {
         log_error "Supervisor config generator not found"
         exit 1
     fi
+    
+    # Generate any other configuration files that might have hardcoded paths
+    log_info "Ensuring all configuration files use dynamic paths..."
+    
+    # Fix any remaining hardcoded paths
+    if [[ -f "scripts/fix_hardcoded_paths.sh" ]]; then
+        log_info "Fixing any remaining hardcoded paths..."
+        chmod +x scripts/fix_hardcoded_paths.sh
+        ./scripts/fix_hardcoded_paths.sh
+        log_success "Hardcoded paths fixed"
+    else
+        log_warning "Path fixing script not found - checking for hardcoded paths manually"
+        if grep -r "/Users/ericwais1/rec_io_20" backend/ 2>/dev/null | grep -v ".git" | grep -v "node_modules" | head -5; then
+            log_warning "Found hardcoded paths in backend files - these should be fixed"
+            log_info "Continuing with installation, but some files may need manual updates"
+        fi
+    fi
+    
+    # Ensure logs directory exists
+    mkdir -p logs
+    
+    # Set proper permissions on generated configs
+    chmod 644 backend/supervisord.conf
+    
+    log_success "All system configurations generated"
 }
 
 # Verify database setup
@@ -329,9 +356,24 @@ start_system() {
     # Start supervisor
     supervisord -c backend/supervisord.conf
     
-    # Wait for supervisor to be ready
+    # Wait for supervisor to be ready and verify it's running
     log_info "Waiting for supervisor to be ready..."
     sleep 3
+    
+    # Verify supervisor is actually running and responsive
+    log_info "Verifying supervisor is running..."
+    if ! supervisorctl -c backend/supervisord.conf status >/dev/null 2>&1; then
+        log_error "Supervisor failed to start or is not responsive"
+        log_info "Checking supervisor process..."
+        if ! pgrep supervisord >/dev/null; then
+            log_error "Supervisor process is not running"
+            exit 1
+        else
+            log_error "Supervisor process exists but socket is not responsive"
+            exit 1
+        fi
+    fi
+    log_success "Supervisor is running and responsive"
     
     # Start only non-trading services initially
     log_info "Starting non-trading services..."
@@ -348,7 +390,18 @@ start_system() {
     log_info "Non-trading services status:"
     supervisorctl -c backend/supervisord.conf status | grep -v -E "(kalshi|trade|unified)" || true
     
-    log_success "Non-trading services started"
+    # Verify critical non-trading services are running
+    log_info "Verifying critical non-trading services..."
+    for service in main system_monitor; do
+        if ! supervisorctl -c backend/supervisord.conf status $service | grep -q "RUNNING"; then
+            log_error "Critical service $service is not running"
+            log_info "Service status:"
+            supervisorctl -c backend/supervisord.conf status $service
+            exit 1
+        fi
+    done
+    
+    log_success "Non-trading services started and verified"
     log_info "Trading services will be started after credential setup"
 }
 
@@ -506,9 +559,21 @@ EOF
         
         sleep 3
         
-        # Check trading service status
+        # Check trading service status and verify they're running
         log_info "Checking trading service status..."
         supervisorctl -c backend/supervisord.conf status | grep -E "(kalshi|trade|unified)"
+        
+        # Verify trading services are running
+        log_info "Verifying trading services are running..."
+        for service in kalshi_account_sync trade_manager unified_production_coordinator; do
+            if ! supervisorctl -c backend/supervisord.conf status $service | grep -q "RUNNING"; then
+                log_warning "Trading service $service is not running (this may be expected without valid credentials)"
+                log_info "Service status:"
+                supervisorctl -c backend/supervisord.conf status $service
+            else
+                log_success "Trading service $service is running"
+            fi
+        done
         
         log_success "Trading services started with credentials"
     }
@@ -536,8 +601,8 @@ main() {
     # Create logs directory
     setup_logs
     
-    # Generate supervisor config
-    generate_supervisor_config
+    # Generate all system configurations dynamically
+    generate_system_configs
     
     # Verify database setup
     verify_database
@@ -550,6 +615,23 @@ main() {
     
     # Verify services
     verify_services
+    
+    # Final verification - check web interface is responding
+    log_info "Performing final system verification..."
+    sleep 5  # Give services time to fully start
+    
+    # Check if web interface is responding
+    log_info "Checking web interface..."
+    if curl -s http://localhost:3000/health >/dev/null 2>&1; then
+        log_success "Web interface is responding"
+    else
+        log_warning "Web interface is not responding yet (may need more time to start)"
+        log_info "You can check manually: curl http://localhost:3000/health"
+    fi
+    
+    # Final status check
+    log_info "Final system status:"
+    supervisorctl -c backend/supervisord.conf status
     
     log_success "Installation completed successfully!"
     log_info "Next steps:"

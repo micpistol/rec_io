@@ -3236,7 +3236,7 @@ async def get_log_stream(request: dict):
         return {"success": False, "error": "No script name provided"}
     
     # Determine log file path based on script name and type
-    project_dir = "/Users/ericwais1/rec_io_20"
+    project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
     if log_type == "combined":
         # For combined view, we'll need to handle multiple files

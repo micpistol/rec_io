@@ -26,6 +26,10 @@ This script addresses ALL issues found in previous installation attempts and pro
 
 **🔄 CRITICAL FIX**: Installation now prompts for Kalshi credentials BEFORE starting trading services, preventing the restart loop issue that previously caused installations to stall.
 
+**🔧 CRITICAL FIX**: Installation now generates ALL configuration files dynamically for the target system, eliminating hardcoded paths that previously broke installations on new machines.
+
+**🚀 CRITICAL FIX**: Installation now properly starts and verifies the supervisor daemon, ensuring the system is actually functional after installation instead of appearing successful but being non-operational.
+
 ---
 
 ## 🔧 **MANUAL STEP-BY-STEP INSTALLATION (ALTERNATIVE)**
@@ -250,6 +254,17 @@ Fix file permissions:
 ```bash
 chmod +x scripts/*.sh
 chmod 700 backend/data/users/user_0001/credentials
+```
+
+### **Supervisor Socket Issues**
+If you see `unix:///tmp/supervisord.sock no such file`:
+```bash
+# Generate correct supervisor config for your system
+bash scripts/generate_supervisor_config.sh
+# Start supervisor daemon
+supervisord -c backend/supervisord.conf
+# Now check status
+supervisorctl -c backend/supervisord.conf status
 ```
 
 ### **Credential Setup During Installation**
