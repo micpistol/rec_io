@@ -18,7 +18,36 @@ from apscheduler.triggers.cron import CronTrigger
 from backend.util.paths import get_project_root, get_trade_history_dir, get_logs_dir, get_host, get_data_dir
 from backend.account_mode import get_account_mode
 from backend.util.paths import get_accounts_data_dir
-from backend.unified_production_coordinator import get_momentum_data_from_postgresql
+# Function to get momentum data from PostgreSQL (replacement for archived unified_production_coordinator)
+def get_momentum_data_from_postgresql():
+    """Get current momentum data directly from PostgreSQL."""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        cursor = conn.cursor()
+        cursor.execute("SELECT momentum FROM live_data.live_price_log_1s_btc ORDER BY timestamp DESC LIMIT 1")
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result and result[0] is not None:
+            momentum_score = float(result[0])
+            return {
+                "weighted_momentum_score": momentum_score
+            }
+        else:
+            return {
+                "weighted_momentum_score": 0
+            }
+    except Exception as e:
+        print(f"Error getting momentum from PostgreSQL: {e}")
+        return {
+            "weighted_momentum_score": 0
+        }
 
 # Get port from centralized system
 TRADE_MANAGER_PORT = get_port("trade_manager")

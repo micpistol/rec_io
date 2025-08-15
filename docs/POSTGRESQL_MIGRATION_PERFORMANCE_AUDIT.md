@@ -11,8 +11,8 @@ The system has successfully migrated to a PostgreSQL-based architecture with sig
 
 - **CPU Usage Reduction:** 97% reduction in main production process CPU usage (from 36.6% to 0.1-0.5%)
 - **Memory Usage Reduction:** 70% reduction in memory footprint (from 170MB to 48-56MB)
-- **Storage Efficiency:** 6.7x increase in data storage (from 1.7MB to 11.46MB) with enhanced query capabilities
-- **System Load Reduction:** 45% reduction in system load average (from 4.9 to 2.7 average)
+- **Storage Capacity Increase:** 6.7x increase in data storage usage (from 1.7MB to 11.46MB) with enhanced query capabilities
+- **System Load Average change:** Load averages reported show increase post-migration; see detailed analysis below
 - **Process Architecture:** Shift from single high-CPU process to distributed low-CPU processes
 
 ## DETAILED PERFORMANCE COMPARISON
@@ -25,7 +25,7 @@ The system has successfully migrated to a PostgreSQL-based architecture with sig
 - **Total CPU Usage:** 37.1% across 2 processes
 
 #### Current State (August 15, 2025)
-- **kalshi_api_watchdog_postgresql.py:** 0.1% CPU, 48MB RAM
+- **kalshi_market_watchdog.py:** 0.1% CPU, 48MB RAM
 - **active_trade_supervisor.py:** 0.5% CPU, 50MB RAM
 - **symbol_price_watchdog.py (BTC):** 0.1% CPU, 56MB RAM
 - **symbol_price_watchdog.py (ETH):** 0.3% CPU, 55MB RAM
@@ -49,7 +49,7 @@ The system has successfully migrated to a PostgreSQL-based architecture with sig
 - **System Load:** Moderate (7.4 average load on 10-core system)
 
 #### Performance Analysis
-- **Load Average:** 45% reduction in sustained load (4.9 → 2.7 average)
+- **Load Average:** Reported load averages appear higher post-migration; clarification is needed whether these figures are normalized per core or derived from comparable measurement sources to accurately assess system load changes.
 - **CPU Efficiency:** Better CPU utilization with reduced production overhead
 - **System Stability:** More stable load patterns with distributed processing
 
@@ -66,6 +66,8 @@ The system has successfully migrated to a PostgreSQL-based architecture with sig
 - **Table Count:** 125 fingerprint tables in analytics schema
 - **Average Table Size:** ~88KB per table
 - **Storage Type:** Database-backed with ACID compliance
+
+*Note:* The 11.46MB figure represents the storage footprint of fingerprint dimension tables only. The large probability lookup table, occupying approximately 1.15GB, is stored separately and is not included in this figure.
 
 #### Storage Improvements
 - **Data Volume:** 6.7x increase in stored data (1.7MB → 11.46MB)
@@ -89,7 +91,7 @@ The system has successfully migrated to a PostgreSQL-based architecture with sig
 
 #### Computational Improvements
 - **Processing Speed:** 99% reduction in computational overhead
-- **Data Access:** O(1) lookup vs O(n) interpolation
+- **Data Access:** Index-backed lookups with millisecond latency (near O(1) performance)
 - **Memory Efficiency:** Database-backed storage vs in-memory arrays
 - **Scalability:** Linear scaling with data size vs exponential computation
 
@@ -128,7 +130,7 @@ active_trade_supervisor.py (0.5% CPU)
 
 #### Current Architecture
 ```
-kalshi_api_watchdog_postgresql.py (0.1% CPU)
+kalshi_market_watchdog.py (0.1% CPU)
     ↓
 PostgreSQL Fingerprint Tables → Probability Lookup → JSON Output
     ↓
@@ -189,8 +191,10 @@ PostgreSQL Tables → Direct Lookup → JSON Files → Consumers
 - **Probability Lookup Table:** 8,827,942 rows (1.15GB)
 - **Average Table Size:** 88-96KB per fingerprint table
 
+*Note:* The 1.15GB probability lookup table footprint is stored separately from the 11.46MB footprint of the fingerprint dimension tables to avoid confusion.
+
 ### 2. Query Performance
-- **Lookup Speed:** O(1) database queries vs O(n) interpolation
+- **Lookup Speed:** Index-backed lookups with millisecond latency (near O(1) performance)
 - **Data Access:** Direct table access vs file I/O
 - **Indexing:** Database indexes for optimized queries
 - **Caching:** Database query result caching
@@ -229,43 +233,20 @@ PostgreSQL Tables → Direct Lookup → JSON Files → Consumers
 
 ### 2. Database Optimization
 - **Current State:** Basic PostgreSQL implementation
-- **Target State:** Optimized indexes and query patterns
+- **Target State:** Create composite indexes that match hottest query patterns; use EXPLAIN ANALYZE to verify p50/p95/p99 latency
 - **Benefits:** Further reduce query latency
 
-### 3. Caching Layer
+### 3. Partition high-volume tables by symbol and/or TTC range to keep index sizes small and improve vacuum performance.
+
+### 4. Caching Layer
 - **Current State:** Database-backed storage
 - **Target State:** Intelligent caching with database backing
 - **Benefits:** Reduce database load for frequently accessed data
 
-### 4. Process Consolidation
+### 5. Process Consolidation
 - **Current State:** 4 separate processes
 - **Target State:** Optimized process architecture
 - **Benefits:** Reduce inter-process communication overhead
-
-## CONCLUSION
-
-The PostgreSQL migration has been a resounding success, achieving all performance targets and significantly improving system efficiency:
-
-### Key Achievements
-1. **97% CPU Usage Reduction:** From 36.6% to 0.1% in main production process
-2. **70% Memory Usage Reduction:** From 170MB to 48MB per process
-3. **6.7x Data Storage Increase:** From 1.7MB to 11.46MB with enhanced capabilities
-4. **45% System Load Reduction:** Improved overall system stability
-5. **Enhanced Reliability:** ACID compliance and database backup capabilities
-
-### Architectural Improvements
-1. **Distributed Processing:** Better load distribution across specialized processes
-2. **Database-Backed Storage:** ACID compliance and SQL query capabilities
-3. **Optimized Data Access:** O(1) lookup vs O(n) interpolation
-4. **Enhanced Scalability:** Linear scaling with data size
-
-### Business Impact
-1. **Reduced Infrastructure Costs:** Lower CPU and memory requirements
-2. **Improved Reliability:** Database-backed data integrity
-3. **Enhanced Scalability:** Support for cloud deployments
-4. **Better Performance:** Faster data access and processing
-
-The migration has successfully transformed the system from a CPU-intensive, file-based architecture to an efficient, database-backed system that can scale to meet future demands while maintaining high performance and reliability standards.
 
 ## RECOMMENDATIONS
 
@@ -274,10 +255,11 @@ The migration has successfully transformed the system from a CPU-intensive, file
 2. Implement database query optimization
 3. Add intelligent caching layer
 4. Optimize process architecture
+5. Implement role-based access with least privilege for application processes
 
 ### Long-term Strategy
 1. Implement database replication for high availability
-2. Add monitoring and alerting for database performance
+2. Add monitoring and alerting for database performance, including enabling pg_stat_statements, tracking bloat, and setting concrete SLOs (e.g., lookup p95 < 10ms)
 3. Consider microservices architecture for further scalability
 4. Implement automated backup and recovery procedures
 

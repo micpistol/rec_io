@@ -32,7 +32,7 @@ DEFAULT_PORTS = {
     "active_trade_supervisor": 6000,
 
     "kalshi_account_sync": 8004,
-    "kalshi_api_watchdog": 8005,
+    "kalshi_market_watchdog": 8005,
     "unified_production_coordinator": 8010
 }
 
@@ -72,9 +72,9 @@ def ensure_port_config_exists():
                     "description": "Kalshi account synchronization",
                     "status": "RUNNING"
                 },
-                "kalshi_api_watchdog": {
+                "kalshi_market_watchdog": {
                     "port": 8005,
-                    "description": "Kalshi API monitoring",
+                    "description": "Kalshi market data monitoring",
                     "status": "RUNNING"
                 }
             },

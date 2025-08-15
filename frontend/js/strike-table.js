@@ -42,14 +42,14 @@ async function fetchUnifiedTTC() {
   }
 }
 
-// Fetch strike table data from unified endpoint
+// Fetch strike table data from PostgreSQL endpoint
 async function fetchStrikeTableData() {
   try {
-    const response = await fetch('/api/strike_tables/btc');
+    const response = await fetch('/api/postgresql/strike_table/btc');
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Error fetching strike table data:', error);
+    console.error('Error fetching PostgreSQL strike table data:', error);
     return null;
   }
 }
@@ -127,10 +127,22 @@ function updateMarketTitle(strikeTableData) {
   const cell = document.getElementById('strikePanelMarketTitleCell');
   if (!cell) return;
   
-  // Extract time from market_title (e.g., "Bitcoin price on Jul 22, 2025 at 3pm EDT?" -> "3pm")
+  // Extract time from market_title (e.g., "BTC price on Aug 25 at 5pm" -> "5pm")
   const marketTitle = strikeTableData.market_title || '';
-  const timeMatch = marketTitle.match(/at\s+(.+?)\s+(?:EDT|EST)\?/i);
-  const timeStr = timeMatch ? timeMatch[1].trim() : '11pm';
+  
+  // Try new format first: "BTC price on Aug 25 at 5pm"
+  let timeMatch = marketTitle.match(/at\s+(\d{1,2}(?:am|pm))$/i);
+  let timeStr = '11pm'; // default
+  
+  if (timeMatch) {
+    timeStr = timeMatch[1].trim();
+  } else {
+    // Fallback to old format: "Bitcoin price on Jul 22, 2025 at 3pm EDT?"
+    timeMatch = marketTitle.match(/at\s+(.+?)\s+(?:EDT|EST)\?/i);
+    if (timeMatch) {
+      timeStr = timeMatch[1].trim();
+    }
+  }
   
   // Format as "<symbol> price today at <time>?"
   const symbol = strikeTableData.symbol || 'BTC';
@@ -150,8 +162,8 @@ async function updateMiddleColumnData() {
     updateMarketTitle(strikeTableData);
     
     // Update TTC display from strike table data
-    if (strikeTableData && strikeTableData.ttc !== undefined) {
-      updateTTCDisplay(strikeTableData.ttc);
+    if (strikeTableData && strikeTableData.ttc_seconds !== undefined) {
+      updateTTCDisplay(strikeTableData.ttc_seconds);
     }
     
     // Update BTC price display from strike table data
@@ -542,6 +554,18 @@ async function updateStrikeTable() {
     // Update fingerprint display if function exists
     if (typeof updateFingerprintDisplay === 'function') {
       updateFingerprintDisplay();
+    }
+
+    // Update momentum bucket display
+    const momentumBucketDisplay = document.getElementById('momentum-bucket-display');
+    if (momentumBucketDisplay && strikeTableData.momentum_bucket !== undefined) {
+      const bucket = strikeTableData.momentum_bucket;
+      const sign = bucket >= 0 ? '+' : '';
+      momentumBucketDisplay.textContent = `${sign}${bucket}`;
+      
+      // Color coding based on bucket value
+      momentumBucketDisplay.style.color = bucket === 0 ? '#888' : 
+                                         bucket > 0 ? '#45d34a' : '#dc3545';
     }
 
     // Update heat band if function exists

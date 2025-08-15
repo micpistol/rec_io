@@ -52,7 +52,7 @@ TRADING_PORTS = [
             # 8002,  # btc_price_watchdog - DEPRECATED: Migrated to PostgreSQL
 
     8004,  # kalshi_account_sync
-    8005,  # kalshi_api_watchdog
+    8005,  # kalshi_market_watchdog
     8007,  # active_trade_supervisor
     8009,  # auto_entry_supervisor
     8010,  # unified_production_coordinator

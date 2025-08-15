@@ -81,8 +81,8 @@ log_files=(
 
     "logs/kalshi_account_sync.out.log"
     "logs/kalshi_account_sync.err.log"
-    "logs/kalshi_api_watchdog.out.log"
-    "logs/kalshi_api_watchdog.err.log"
+    "logs/kalshi_market_watchdog.out.log"
+    "logs/kalshi_market_watchdog.err.log"
     "logs/unified_production_coordinator.out.log"
     "logs/unified_production_coordinator.err.log"
     "logs/cascading_failure_detector.out.log"

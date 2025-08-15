@@ -38,14 +38,9 @@
       "description": "Kalshi account synchronization",
       "status": "RUNNING"
     },
-    "kalshi_api_watchdog": {
+    "kalshi_market_watchdog": {
       "port": 8005,
-      "description": "Kalshi API monitoring",
-      "status": "RUNNING"
-    },
-    "kalshi_api_watchdog_postgresql": {
-      "port": 8012,
-      "description": "Kalshi API PostgreSQL market data service",
+      "description": "Kalshi market data monitoring",
       "status": "RUNNING"
     },
     "strike_table_generator": {

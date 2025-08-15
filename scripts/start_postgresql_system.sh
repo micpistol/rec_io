@@ -10,17 +10,17 @@ echo "🚀 Starting PostgreSQL Test System..."
 # Kill any existing processes
 echo "🛑 Stopping existing processes..."
 pkill -f "symbol_price_watchdog.py" || true
-pkill -f "kalshi_api_watchdog_postgresql.py" || true
+pkill -f "kalshi_market_watchdog.py" || true
 pkill -f "strike_table_analysis.py" || true
 pkill -f "live_table_viewer.py" || true
 
 sleep 2
 
 # Check for remaining processes
-REMAINING=$(ps aux | grep -E "(symbol_price_watchdog|kalshi_api_watchdog_postgresql|strike_table_analysis|live_table_viewer)" | grep -v grep | wc -l)
+REMAINING=$(ps aux | grep -E "(symbol_price_watchdog|kalshi_market_watchdog|strike_table_analysis|live_table_viewer)" | grep -v grep | wc -l)
 if [ "$REMAINING" -gt 0 ]; then
     echo "⚠️  Warning: $REMAINING processes still running"
-    ps aux | grep -E "(symbol_price_watchdog|kalshi_api_watchdog_postgresql|strike_table_analysis|live_table_viewer)" | grep -v grep
+    ps aux | grep -E "(symbol_price_watchdog|kalshi_market_watchdog|strike_table_analysis|live_table_viewer)" | grep -v grep
 fi
 
 # Set up environment
@@ -37,7 +37,7 @@ SYMBOL_PID=$!
 echo "   PID: $SYMBOL_PID"
 
 echo "📊 Starting Kalshi API Watchdog..."
-source venv/bin/activate && PYTHONPATH=/Users/ericwais1/rec_io_20 python backend/api/kalshi-api/kalshi_api_watchdog_postgresql.py > logs/kalshi_api_watchdog_postgresql.log 2>&1 &
+source venv/bin/activate && PYTHONPATH=/Users/ericwais1/rec_io_20 python backend/kalshi_market_watchdog.py > logs/kalshi_market_watchdog.log 2>&1 &
 KALSHI_PID=$!
 echo "   PID: $KALSHI_PID"
 
@@ -53,7 +53,7 @@ echo "   PID: $VIEWER_PID"
 
 # Save PIDs to file for later reference
 echo "$SYMBOL_PID" > logs/symbol_price_watchdog.pid
-echo "$KALSHI_PID" > logs/kalshi_api_watchdog_postgresql.pid
+echo "$KALSHI_PID" > logs/kalshi_market_watchdog.pid
 echo "$STRIKE_PID" > logs/strike_table_analysis.pid
 echo "$VIEWER_PID" > logs/live_table_viewer.pid
 
@@ -83,7 +83,7 @@ echo "📊 System Status:"
 echo "   Symbol Price Watchdog: http://localhost:8080 (if running)"
 echo "   Live Table Viewer: http://localhost:8080"
 echo "   Logs: logs/symbol_price_watchdog_btc.log"
-echo "         logs/kalshi_api_watchdog_postgresql.log"
+echo "         logs/kalshi_market_watchdog.log"
 echo "         logs/strike_table_analysis.log"
 echo "         logs/live_table_viewer.log"
 
