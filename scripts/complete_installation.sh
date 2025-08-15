@@ -346,6 +346,21 @@ SELECT
 start_system() {
     log_info "Starting the system (non-trading services only)..."
     
+    # Verify supervisor configuration exists and is valid
+    if [ ! -f "backend/supervisord.conf" ]; then
+        log_error "Supervisor configuration file not found: backend/supervisord.conf"
+        exit 1
+    fi
+    
+    log_info "Verifying supervisor configuration..."
+    if ! supervisord -c backend/supervisord.conf -n; then
+        log_error "Supervisor configuration is invalid"
+        log_info "Configuration file contents:"
+        head -20 backend/supervisord.conf
+        exit 1
+    fi
+    log_success "Supervisor configuration is valid"
+    
     # Check if supervisor is already running
     if pgrep supervisord > /dev/null; then
         log_warning "Supervisor is already running"
@@ -353,40 +368,96 @@ start_system() {
         sleep 2
     fi
     
-    # Start supervisor
-    supervisord -c backend/supervisord.conf
+    # Start supervisor with better error handling
+    log_info "Starting supervisor daemon..."
+    supervisord -c backend/supervisord.conf &
+    SUPERVISOR_PID=$!
     
-    # Wait for supervisor to be ready and verify it's running
+    # Wait for supervisor to be ready with timeout
     log_info "Waiting for supervisor to be ready..."
-    sleep 3
+    TIMEOUT=30
+    COUNTER=0
     
-    # Verify supervisor is actually running and responsive
-    log_info "Verifying supervisor is running..."
-    if ! supervisorctl -c backend/supervisord.conf status >/dev/null 2>&1; then
-        log_error "Supervisor failed to start or is not responsive"
-        log_info "Checking supervisor process..."
-        if ! pgrep supervisord >/dev/null; then
-            log_error "Supervisor process is not running"
-            exit 1
-        else
-            log_error "Supervisor process exists but socket is not responsive"
+    while [ $COUNTER -lt $TIMEOUT ]; do
+        if supervisorctl -c backend/supervisord.conf status >/dev/null 2>&1; then
+            log_success "Supervisor is running and responsive"
+            break
+        fi
+        
+        # Check if supervisor process is still alive
+        if ! kill -0 $SUPERVISOR_PID 2>/dev/null; then
+            log_error "Supervisor process died unexpectedly"
+            log_info "Checking for supervisor errors..."
+            if [ -f "logs/supervisord.log" ]; then
+                log_info "Supervisor log contents:"
+                tail -20 logs/supervisord.log
+            fi
             exit 1
         fi
+        
+        sleep 1
+        COUNTER=$((COUNTER + 1))
+        if [ $((COUNTER % 5)) -eq 0 ]; then
+            log_info "Still waiting for supervisor... ($COUNTER/$TIMEOUT seconds)"
+        fi
+    done
+    
+    if [ $COUNTER -eq $TIMEOUT ]; then
+        log_error "Supervisor failed to become responsive within $TIMEOUT seconds"
+        log_info "Supervisor process status:"
+        ps aux | grep supervisord | grep -v grep || true
+        log_info "Supervisor socket status:"
+        ls -la /tmp/supervisord.sock 2>/dev/null || echo "Socket file not found"
+        log_info "Supervisor log contents:"
+        if [ -f "logs/supervisord.log" ]; then
+            tail -20 logs/supervisord.log
+        fi
+        exit 1
     fi
-    log_success "Supervisor is running and responsive"
     
     # Start only non-trading services initially
     log_info "Starting non-trading services..."
-    supervisorctl -c backend/supervisord.conf start main || true
-    supervisorctl -c backend/supervisord.conf start symbol_price_watchdog_btc || true
-    supervisorctl -c backend/supervisord.conf start strike_table_generator || true
-    supervisorctl -c backend/supervisord.conf start system_monitor || true
     
-    # Wait for services to start
+    # Start services with better error handling
+    for service in main symbol_price_watchdog_btc strike_table_generator system_monitor; do
+        log_info "Starting service: $service"
+        if supervisorctl -c backend/supervisord.conf start $service; then
+            log_success "Service $service started successfully"
+        else
+            log_warning "Service $service failed to start (this may be expected)"
+        fi
+    done
+    
+    # Wait for services to start with timeout
     log_info "Waiting for non-trading services to start..."
-    sleep 3
+    TIMEOUT=30
+    COUNTER=0
     
-    # Check status of non-trading services
+    while [ $COUNTER -lt $TIMEOUT ]; do
+        # Check if critical services are running
+        CRITICAL_RUNNING=true
+        for service in main system_monitor; do
+            if ! supervisorctl -c backend/supervisord.conf status $service | grep -q "RUNNING"; then
+                CRITICAL_RUNNING=false
+                break
+            fi
+        done
+        
+        if [ "$CRITICAL_RUNNING" = true ]; then
+            log_success "Critical services are running"
+            break
+        fi
+        
+        sleep 2
+        COUNTER=$((COUNTER + 2))
+        if [ $((COUNTER % 10)) -eq 0 ]; then
+            log_info "Still waiting for critical services... ($COUNTER/$TIMEOUT seconds)"
+            log_info "Current service status:"
+            supervisorctl -c backend/supervisord.conf status | grep -E "(main|system_monitor)" || true
+        fi
+    done
+    
+    # Check final status of non-trading services
     log_info "Non-trading services status:"
     supervisorctl -c backend/supervisord.conf status | grep -v -E "(kalshi|trade|unified)" || true
     
@@ -394,10 +465,16 @@ start_system() {
     log_info "Verifying critical non-trading services..."
     for service in main system_monitor; do
         if ! supervisorctl -c backend/supervisord.conf status $service | grep -q "RUNNING"; then
-            log_error "Critical service $service is not running"
+            log_error "Critical service $service is not running after $TIMEOUT seconds"
             log_info "Service status:"
             supervisorctl -c backend/supervisord.conf status $service
+            log_info "Service log (if available):"
+            if [ -f "logs/$service.log" ]; then
+                tail -10 logs/$service.log
+            fi
             exit 1
+        else
+            log_success "Critical service $service is running"
         fi
     done
     

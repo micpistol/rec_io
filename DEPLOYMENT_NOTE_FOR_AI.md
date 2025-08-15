@@ -30,6 +30,8 @@ This script addresses ALL issues found in previous installation attempts and pro
 
 **🚀 CRITICAL FIX**: Installation now properly starts and verifies the supervisor daemon, ensuring the system is actually functional after installation instead of appearing successful but being non-operational.
 
+**🔧 ENHANCED ERROR HANDLING**: Installation script now includes comprehensive error handling, timeouts, and debugging information to identify and resolve supervisor startup issues.
+
 ---
 
 ## 🔧 **MANUAL STEP-BY-STEP INSTALLATION (ALTERNATIVE)**
@@ -266,6 +268,62 @@ supervisord -c backend/supervisord.conf
 # Now check status
 supervisorctl -c backend/supervisord.conf status
 ```
+
+### **Enhanced Supervisor Troubleshooting**
+The installation script now includes comprehensive error handling. If supervisor startup still fails:
+
+1. **Check supervisor configuration**:
+   ```bash
+   supervisord -c backend/supervisord.conf -n
+   ```
+
+2. **Check for existing supervisor processes**:
+   ```bash
+   pgrep supervisord
+   ps aux | grep supervisord
+   ```
+
+3. **Check supervisor socket**:
+   ```bash
+   ls -la /tmp/supervisord.sock
+   ```
+
+4. **Check supervisor logs**:
+   ```bash
+   tail -20 logs/supervisord.log
+   ```
+
+5. **Manual recovery**:
+   ```bash
+   # Stop any existing supervisor
+   pkill supervisord
+   
+   # Start supervisor manually
+   supervisord -c backend/supervisord.conf
+   
+   # Check status
+   supervisorctl -c backend/supervisord.conf status
+   ```
+
+### **Service Startup Issues**
+If individual services fail to start:
+
+1. **Check individual service logs**:
+   ```bash
+   tail -20 logs/main.log
+   tail -20 logs/system_monitor.log
+   ```
+
+2. **Check service configuration**:
+   ```bash
+   supervisorctl -c backend/supervisord.conf status
+   ```
+
+3. **Restart specific services**:
+   ```bash
+   supervisorctl -c backend/supervisord.conf restart main
+   supervisorctl -c backend/supervisord.conf restart system_monitor
+   ```
 
 ### **Credential Setup During Installation**
 The installation script now includes an interactive credential setup process:
