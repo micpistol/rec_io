@@ -861,18 +861,56 @@ def get_current_btc_price(symbol: str = "BTC") -> Optional[float]:
         return None
 
 def get_kalshi_market_snapshot() -> Optional[Dict[str, Any]]:
-    """Get the latest Kalshi market snapshot data"""
+    """Get the latest Kalshi market snapshot data from PostgreSQL"""
     try:
-        snapshot_path = os.path.join(get_kalshi_data_dir(), "latest_market_snapshot.json")
-        if not os.path.exists(snapshot_path):
-            log("⚠️ Kalshi market snapshot file not found")
+        conn = get_postgresql_connection()
+        if not conn:
+            log("⚠️ Failed to connect to PostgreSQL")
             return None
             
-        with open(snapshot_path, 'r') as f:
-            data = json.load(f)
-            return data
+        cursor = conn.cursor()
+        
+        # Get market data from PostgreSQL
+        cursor.execute("""
+            SELECT 
+                market_ticker,
+                yes_ask,
+                no_ask,
+                volume,
+                event_ticker,
+                strike
+            FROM live_data.market_kalshi_btc
+            ORDER BY updated_at DESC
+        """)
+        
+        markets_data = cursor.fetchall()
+        conn.close()
+        
+        if not markets_data:
+            log("⚠️ No Kalshi market data found in PostgreSQL")
+            return None
+        
+        # Convert to the same format as the JSON file
+        markets = []
+        for row in markets_data:
+            market = {
+                "ticker": row[0],  # market_ticker
+                "yes_ask": row[1],
+                "no_ask": row[2],
+                "volume": row[3],
+                "event_ticker": row[4],
+                "strike": row[5]
+            }
+            markets.append(market)
+        
+        # Return in the same format as the JSON file
+        return {
+            "markets": markets,
+            "timestamp": datetime.now().isoformat()
+        }
+        
     except Exception as e:
-        log(f"Error reading Kalshi market snapshot: {e}")
+        log(f"Error reading Kalshi market snapshot from PostgreSQL: {e}")
         return None
 
 def get_current_closing_price_for_trade(trade_ticker: str, trade_side: str) -> Optional[float]:
@@ -924,24 +962,38 @@ def get_current_closing_price_for_trade(trade_ticker: str, trade_side: str) -> O
 
 def get_current_probability(strike: float, current_price: float, ttc_seconds: float, momentum_score: Optional[float] = None) -> Optional[float]:
     """
-    Get the probability for a strike from the live probabilities JSON file.
-    Fallback to the old API if the file is missing or unreadable.
+    Get the probability for a strike from the PostgreSQL strike table.
+    Fallback to the old API if PostgreSQL data is not available.
     """
-    import os
-    import json
-    from backend.util.paths import get_data_dir
     try:
-        live_json_path = os.path.join(get_data_dir(), "live_data", "live_probabilities", "btc_live_probabilities.json")
-        if os.path.exists(live_json_path):
-            with open(live_json_path, "r") as f:
-                data = json.load(f)
-            if "probabilities" in data:
-                # Find the closest strike in the JSON
-                closest = min(data["probabilities"], key=lambda row: abs(row["strike"] - strike))
-                return closest.get("prob_within")
+        conn = get_postgresql_connection()
+        if not conn:
+            log("⚠️ Failed to connect to PostgreSQL for probability lookup")
+            return None
+            
+        cursor = conn.cursor()
+        
+        # Get probability from PostgreSQL strike table
+        cursor.execute("""
+            SELECT probability 
+            FROM live_data.strike_table_btc 
+            WHERE strike = %s
+            ORDER BY timestamp DESC 
+            LIMIT 1
+        """, (strike,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result and result[0] is not None:
+            return float(result[0])
+        else:
+            log(f"⚠️ No probability found in PostgreSQL for strike {strike}")
+            
     except Exception as e:
-        log(f"⚠️ Probability JSON exception: {e}")
-    # Fallback to old API if JSON fails
+        log(f"⚠️ Probability PostgreSQL exception: {e}")
+    
+    # Fallback to old API if PostgreSQL fails
     try:
         host = get_host()
         port = get_port("main_app")

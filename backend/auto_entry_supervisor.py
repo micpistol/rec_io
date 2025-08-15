@@ -558,18 +558,79 @@ def get_watchlist_path():
     return os.path.join(get_data_dir(), "live_data", "markets", "kalshi", "strike_tables", "btc_watchlist.json")
 
 def get_master_strike_table_data():
-    """Get current master strike table data"""
+    """Get current master strike table data from PostgreSQL"""
     try:
-        strike_table_path = get_strike_table_path()
-        if os.path.exists(strike_table_path):
-            with open(strike_table_path, "r") as f:
-                data = json.load(f)
-                return data
-        else:
-            log(f"[WATCHLIST] Master strike table file not found")
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    symbol,
+                    current_price,
+                    ttc_seconds,
+                    event_ticker,
+                    market_title,
+                    strike_tier,
+                    market_status
+                FROM live_data.strike_table_btc
+                LIMIT 1
+            """)
+            header_data = cursor.fetchone()
+            if not header_data:
+                log(f"[WATCHLIST] No strike table data found in PostgreSQL")
+                return None
+            cursor.execute("""
+                SELECT
+                    strike,
+                    buffer,
+                    buffer_pct,
+                    probability,
+                    yes_ask,
+                    no_ask,
+                    volume,
+                    ticker,
+                    yes_diff,
+                    no_diff,
+                    active_side
+                FROM live_data.strike_table_btc
+                ORDER BY strike
+            """)
+            strikes_data = cursor.fetchall()
+            response = {
+                "symbol": header_data[0],
+                "current_price": float(header_data[1]) if header_data[1] else None,
+                "ttc": int(header_data[2]) if header_data[2] else None,
+                "event_ticker": header_data[3],
+                "market_title": header_data[4],
+                "strike_tier": header_data[5],
+                "market_status": header_data[6],
+                "strikes": []
+            }
+            for strike_row in strikes_data:
+                strike_data = {
+                    "strike": float(strike_row[0]) if strike_row[0] else None,
+                    "buffer": float(strike_row[1]) if strike_row[1] else None,
+                    "buffer_pct": float(strike_row[2]) if strike_row[2] else None,
+                    "probability": float(strike_row[3]) if strike_row[3] else None,
+                    "yes_ask": int(strike_row[4]) if strike_row[4] else None,
+                    "no_ask": int(strike_row[5]) if strike_row[5] else None,
+                    "volume": int(strike_row[6]) if strike_row[6] else None,
+                    "ticker": strike_row[7],
+                    "yes_diff": float(strike_row[8]) if strike_row[8] else None,
+                    "no_diff": float(strike_row[9]) if strike_row[9] else None,
+                    "active_side": strike_row[10]
+                }
+                response["strikes"].append(strike_data)
+            conn.close()
+            return response
     except Exception as e:
-        log(f"[WATCHLIST] Error reading master strike table data: {e}")
-    return None
+        log(f"[WATCHLIST] Error reading master strike table data from PostgreSQL: {e}")
+        return None
 
 def generate_watchlist_from_strike_table():
     """Generate watchlist by filtering the master strike table based on auto entry settings"""
@@ -657,33 +718,123 @@ def generate_watchlist_from_strike_table():
             "strikes": filtered_strikes
         }
         
-        # Write watchlist to file
-        watchlist_path = get_watchlist_path()
-        os.makedirs(os.path.dirname(watchlist_path), exist_ok=True)
-        
-        with open(watchlist_path, "w") as f:
-            json.dump(watchlist_output, f, indent=2)
-        
-        log(f"[WATCHLIST] Generated watchlist with {len(filtered_strikes)} filtered strikes")
-        return True
+        # Write watchlist to PostgreSQL
+        try:
+            import psycopg2
+            conn = psycopg2.connect(
+                host="localhost",
+                database="rec_io_db",
+                user="rec_io_user",
+                password="rec_io_password"
+            )
+            with conn.cursor() as cursor:
+                # Clear existing watchlist data
+                cursor.execute("DELETE FROM live_data.watchlist_btc")
+                # Insert filtered strikes into watchlist table
+                for strike in filtered_strikes:
+                    cursor.execute("""
+                        INSERT INTO live_data.watchlist_btc (
+                            symbol, current_price, ttc_seconds, broker, event_ticker,
+                            market_title, strike_tier, market_status, strike, buffer,
+                            buffer_pct, probability, yes_ask, no_ask, yes_diff, no_diff,
+                            volume, ticker, active_side
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        "BTC", btc_price, ttc_seconds, "Kalshi", market_data.get("event_ticker"),
+                        market_data.get("event_title"), market_data.get("strike_tier"),
+                        market_data.get("market_status"), strike.get("strike"), strike.get("buffer"),
+                        strike.get("buffer_pct"), strike.get("probability"), strike.get("yes_ask"),
+                        strike.get("no_ask"), strike.get("yes_diff"), strike.get("no_diff"),
+                        strike.get("volume"), strike.get("ticker"), strike.get("active_side")
+                    ))
+                conn.commit()
+                conn.close()
+                log(f"[WATCHLIST] Generated watchlist with {len(filtered_strikes)} filtered strikes in PostgreSQL")
+                return True
+        except Exception as e:
+            log(f"[WATCHLIST] Error writing to PostgreSQL: {e}")
+            return False
         
     except Exception as e:
         log(f"[WATCHLIST] Error generating watchlist: {e}")
         return False
 
 def get_watchlist_data():
-    """Get current watchlist data"""
+    """Get current watchlist data from PostgreSQL"""
     try:
-        watchlist_path = get_watchlist_path()
-        if os.path.exists(watchlist_path):
-            with open(watchlist_path, "r") as f:
-                data = json.load(f)
-                return data
-        else:
-            log(f"[AUTO ENTRY] Watchlist file not found")
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    symbol,
+                    current_price,
+                    ttc_seconds,
+                    broker,
+                    event_ticker,
+                    market_title,
+                    strike_tier,
+                    market_status
+                FROM live_data.watchlist_btc
+                LIMIT 1
+            """)
+            header_data = cursor.fetchone()
+            if not header_data:
+                log(f"[AUTO ENTRY] No watchlist data found in PostgreSQL")
+                return None
+            cursor.execute("""
+                SELECT
+                    strike,
+                    buffer,
+                    buffer_pct,
+                    probability,
+                    yes_ask,
+                    no_ask,
+                    yes_diff,
+                    no_diff,
+                    volume,
+                    ticker,
+                    active_side
+                FROM live_data.watchlist_btc
+                ORDER BY probability DESC
+            """)
+            strikes_data = cursor.fetchall()
+            response = {
+                "symbol": header_data[0],
+                "current_price": float(header_data[1]) if header_data[1] else None,
+                "ttc": int(header_data[2]) if header_data[2] else None,
+                "broker": header_data[3],
+                "event_ticker": header_data[4],
+                "market_title": header_data[5],
+                "strike_tier": header_data[6],
+                "market_status": header_data[7],
+                "strikes": []
+            }
+            for strike_row in strikes_data:
+                strike_data = {
+                    "strike": float(strike_row[0]) if strike_row[0] else None,
+                    "buffer": float(strike_row[1]) if strike_row[1] else None,
+                    "buffer_pct": float(strike_row[2]) if strike_row[2] else None,
+                    "probability": float(strike_row[3]) if strike_row[3] else None,
+                    "yes_ask": int(strike_row[4]) if strike_row[4] else None,
+                    "no_ask": int(strike_row[5]) if strike_row[5] else None,
+                    "yes_diff": float(strike_row[6]) if strike_row[6] else None,
+                    "no_diff": float(strike_row[7]) if strike_row[7] else None,
+                    "volume": int(strike_row[8]) if strike_row[8] else None,
+                    "ticker": strike_row[9],
+                    "active_side": strike_row[10]
+                }
+                response["strikes"].append(strike_data)
+            conn.close()
+            return response
     except Exception as e:
-        log(f"[AUTO ENTRY] Error reading watchlist data: {e}")
-    return None
+        log(f"[AUTO ENTRY] Error reading watchlist data from PostgreSQL: {e}")
+        return None
 
 def get_position_size():
     """Get position size from PostgreSQL trade preferences including multiplier"""
