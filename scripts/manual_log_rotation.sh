@@ -78,8 +78,7 @@ log_files=(
     "logs/auto_entry_supervisor.err.log"
     "logs/btc_price_watchdog.out.log"
     "logs/btc_price_watchdog.err.log"
-    "logs/db_poller.out.log"
-    "logs/db_poller.err.log"
+
     "logs/kalshi_account_sync.out.log"
     "logs/kalshi_account_sync.err.log"
     "logs/kalshi_api_watchdog.out.log"

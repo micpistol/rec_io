@@ -110,6 +110,26 @@ def init_database():
         """)
         
         cursor.execute("""
+            CREATE TABLE IF NOT EXISTS live_data.btc_price_change (
+                id SERIAL PRIMARY KEY,
+                change1h DECIMAL(10,6),
+                change3h DECIMAL(10,6),
+                change1d DECIMAL(10,6),
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS live_data.eth_price_change (
+                id SERIAL PRIMARY KEY,
+                change1h DECIMAL(10,6),
+                change3h DECIMAL(10,6),
+                change1d DECIMAL(10,6),
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS system.health_status (
                 id SERIAL PRIMARY KEY,
                 service_name VARCHAR(100),

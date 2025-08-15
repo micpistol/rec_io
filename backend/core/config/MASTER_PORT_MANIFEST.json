@@ -33,11 +33,6 @@
   },
   
   "watchdog_services": {
-    "db_poller": {
-      "port": 8003,
-      "description": "Database polling service",
-      "status": "RUNNING"
-    },
     "kalshi_account_sync": {
       "port": 8004,
       "description": "Kalshi account synchronization",
@@ -48,7 +43,6 @@
       "description": "Kalshi API monitoring",
       "status": "RUNNING"
     },
-
     "unified_production_coordinator": {
       "port": 8010,
       "description": "Unified data production coordinator",

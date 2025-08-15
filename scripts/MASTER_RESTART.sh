@@ -321,7 +321,6 @@ master_restart() {
     pkill -f "python.*trade_executor.py" || true
     pkill -f "python.*active_trade_supervisor.py" || true
     pkill -f "python.*btc_price_watchdog.py" || true
-    pkill -f "python.*db_poller.py" || true
     pkill -f "python.*kalshi_account_sync.py" || true
     pkill -f "python.*kalshi_api_watchdog.py" || true
     
@@ -433,7 +432,6 @@ emergency_restart() {
     pkill -f "python.*trade_executor.py" || true
     pkill -f "python.*active_trade_supervisor.py" || true
     pkill -f "python.*btc_price_watchdog.py" || true
-    pkill -f "python.*db_poller.py" || true
     pkill -f "python.*kalshi_account_sync.py" || true
     pkill -f "python.*kalshi_api_watchdog.py" || true
     

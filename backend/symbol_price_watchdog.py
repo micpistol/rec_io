@@ -410,13 +410,26 @@ async def poll_kraken_price_changes(symbol: str):
                                     "change1h": pct_change(close_1h, close_now),
                                     "change3h": pct_change(close_3h, close_now),
                                     "change1d": pct_change(close_1d, close_now),
-                                    "timestamp": datetime.now(ZoneInfo("America/New_York")).isoformat()
+                                    "timestamp": datetime.now(ZoneInfo("America/New_York"))
                                 }
-                                # Write to JSON file
-                                price_change_path = os.path.join(get_btc_price_history_dir(), SYMBOL_CONFIG[symbol]['price_change_file'])
-                                os.makedirs(os.path.dirname(price_change_path), exist_ok=True)
-                                with open(price_change_path, "w") as f:
-                                    json.dump(changes, f)
+                                # Write to PostgreSQL database
+                                conn = get_postgres_connection()
+                                if conn:
+                                    try:
+                                        cursor = conn.cursor()
+                                        table_name = f"{symbol.lower()}_price_change"
+                                        cursor.execute(f"""
+                                            INSERT INTO live_data.{table_name} 
+                                            (change1h, change3h, change1d, timestamp)
+                                            VALUES (%s, %s, %s, %s)
+                                        """, (changes["change1h"], changes["change3h"], changes["change1d"], changes["timestamp"]))
+                                        conn.commit()
+                                        cursor.close()
+                                        conn.close()
+                                    except Exception as e:
+                                        print(f"[Database Error for {symbol}]", e)
+                                        if conn:
+                                            conn.close()
         except Exception as e:
             print(f"[Kraken Poll Error for {symbol}]", e)
         await asyncio.sleep(60)

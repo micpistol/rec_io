@@ -1401,10 +1401,10 @@ async def create_trade(trade_data: dict):
 # Additional endpoints for other data
 @app.get("/btc_price_changes")
 async def get_btc_changes():
-    """Get BTC price changes from PostgreSQL live_data.btc_price_log."""
+    """Get BTC price changes from PostgreSQL live_data.btc_price_change."""
     try:
         import psycopg2
-        from datetime import datetime, timedelta
+        from datetime import datetime
         from zoneinfo import ZoneInfo
         
         conn = psycopg2.connect(
@@ -1415,41 +1415,27 @@ async def get_btc_changes():
         )
         cursor = conn.cursor()
         
-        # Get current price
-        cursor.execute("SELECT price FROM live_data.btc_price_log ORDER BY timestamp DESC LIMIT 1")
-        current_result = cursor.fetchone()
+        # Get latest price changes from the database
+        cursor.execute("""
+            SELECT change1h, change3h, change1d, timestamp 
+            FROM live_data.btc_price_change 
+            ORDER BY timestamp DESC 
+            LIMIT 1
+        """)
         
-        if not current_result:
-            return {"change1h": None, "change3h": None, "change1d": None, "timestamp": None}
-        
-        current_price = float(current_result[0])
-        
-        # Calculate changes for different time periods
-        now = datetime.now(ZoneInfo("America/New_York"))
-        
-        changes = {}
-        for period, minutes in [("1h", 60), ("3h", 180), ("1d", 1440)]:
-            target_time = now - timedelta(minutes=minutes)
-            target_timestamp = target_time.strftime("%Y-%m-%dT%H:%M:%S")
-            
-            cursor.execute("""
-                SELECT price FROM live_data.btc_price_log 
-                WHERE timestamp <= %s 
-                ORDER BY timestamp DESC 
-                LIMIT 1
-            """, (target_timestamp,))
-            
-            result = cursor.fetchone()
-            if result:
-                old_price = float(result[0])
-                change = ((current_price - old_price) / old_price) * 100
-                changes[f"change{period}"] = change
-            else:
-                changes[f"change{period}"] = None
-        
+        result = cursor.fetchone()
         conn.close()
         
-        changes["timestamp"] = now.isoformat()
+        if result:
+            changes = {
+                "change1h": float(result[0]) if result[0] is not None else None,
+                "change3h": float(result[1]) if result[1] is not None else None,
+                "change1d": float(result[2]) if result[2] is not None else None,
+                "timestamp": result[3].isoformat() if result[3] else datetime.now(ZoneInfo("America/New_York")).isoformat()
+            }
+        else:
+            changes = {"change1h": None, "change3h": None, "change1d": None, "timestamp": datetime.now(ZoneInfo("America/New_York")).isoformat()}
+        
         return changes
         
     except Exception as e:
