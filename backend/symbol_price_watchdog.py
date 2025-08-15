@@ -32,14 +32,14 @@ SYMBOL_CONFIG = {
     'BTC': {
         'api_endpoint': 'wss://ws-feed.exchange.coinbase.com',
         'product_id': 'BTC-USD',
-        'table_name': 'btc_price_log',
+        'table_name': 'live_price_log_1s_btc',
         'heartbeat_file': 'btc_logger_heartbeat_postgresql.txt',
         'price_change_file': 'btc_price_change_postgresql.json'
     },
     'ETH': {
         'api_endpoint': 'wss://ws-feed.exchange.coinbase.com',
         'product_id': 'ETH-USD',
-        'table_name': 'eth_price_log',
+        'table_name': 'live_price_log_1s_eth',
         'heartbeat_file': 'eth_logger_heartbeat_postgresql.txt',
         'price_change_file': 'eth_price_change_postgresql.json'
     }
@@ -270,11 +270,29 @@ def insert_tick(symbol: str, timestamp: str, price: float):
     cursor = conn.cursor()
     
     try:
-        # Calculate 1-minute average price
-        one_minute_avg = get_1m_avg_price(symbol)
+        # Calculate 1-minute average price - handle case where no historical data exists yet
+        try:
+            one_minute_avg = get_1m_avg_price(symbol)
+            if one_minute_avg == 0.0:  # No historical data
+                one_minute_avg = price  # Use current price as fallback
+        except Exception as e:
+            print(f"⚠️ 1m average calculation failed (no historical data yet): {e}")
+            one_minute_avg = price  # Use current price as fallback
         
-        # Get momentum data
-        momentum_data = get_momentum_data(symbol)
+        # Get momentum data - handle case where no historical data exists yet
+        try:
+            momentum_data = get_momentum_data(symbol)
+        except Exception as e:
+            print(f"⚠️ Momentum calculation failed (no historical data yet): {e}")
+            momentum_data = {
+                'momentum': None,
+                'delta_1m': None,
+                'delta_2m': None,
+                'delta_3m': None,
+                'delta_4m': None,
+                'delta_15m': None,
+                'delta_30m': None
+            }
         
         table_name = SYMBOL_CONFIG[symbol]['table_name']
         
@@ -417,7 +435,7 @@ async def poll_kraken_price_changes(symbol: str):
                                 if conn:
                                     try:
                                         cursor = conn.cursor()
-                                        table_name = f"{symbol.lower()}_price_change"
+                                        table_name = f"price_change_{symbol.lower()}"
                                         cursor.execute(f"""
                                             INSERT INTO live_data.{table_name} 
                                             (change1h, change3h, change1d, timestamp)

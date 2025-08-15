@@ -56,7 +56,7 @@ def insert_trade(trade):
         pg_conn = get_postgresql_connection()
         if pg_conn:
             with pg_conn.cursor() as cursor:
-                cursor.execute("SELECT price FROM live_data.btc_price_log ORDER BY timestamp DESC LIMIT 1")
+                cursor.execute("SELECT price FROM live_data.live_price_log_1s_btc ORDER BY timestamp DESC LIMIT 1")
                 result = cursor.fetchone()
             
             if result and result[0] is not None:

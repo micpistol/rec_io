@@ -14,7 +14,7 @@ def verify_database_setup():
     required_tables = {
         'users': ['trades_0001', 'active_trades_0001', 'auto_trade_settings_0001', 
                  'trade_preferences_0001', 'trade_history_preferences_0001'],
-        'live_data': ['btc_price_log', 'eth_price_log'],
+        'live_data': ['live_price_log_1s_btc', 'live_price_log_1s_eth'],
         'system': ['health_status']
     }
     required_columns = {

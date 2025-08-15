@@ -2,7 +2,7 @@
 
 import sys
 import os
-# Add the project root to the Python path
+# Add the project root to the Python path (permanent scalable fix)
 from backend.util.paths import get_project_root
 if get_project_root() not in sys.path:
     sys.path.insert(0, get_project_root())
@@ -48,14 +48,14 @@ def connect_database():
         print(f"[{datetime.now(EST)}] ❌ Database connection failed: {e}")
         return None
 
-def create_btc_live_tables(connection):
-    """Create the btc_live_strikes and btc_live_header tables if they don't exist"""
+def create_market_kalshi_btc_table(connection):
+    """Create the market_kalshi_btc table if it doesn't exist"""
     try:
         cursor = connection.cursor()
         
-        # Create the strikes table (formerly btc_market_snapshot)
-        create_strikes_table_sql = """
-        CREATE TABLE IF NOT EXISTS live_data.btc_live_strikes (
+        # Create the market_kalshi_btc table
+        create_table_sql = """
+        CREATE TABLE IF NOT EXISTS live_data.market_kalshi_btc (
             id SERIAL PRIMARY KEY,
             event_ticker VARCHAR(50) NOT NULL,
             market_ticker VARCHAR(100) NOT NULL,
@@ -74,13 +74,13 @@ def create_btc_live_tables(connection):
         );
         """
         
-        cursor.execute(create_strikes_table_sql)
+        cursor.execute(create_table_sql)
         
         # Add unique constraint if it doesn't exist
         try:
             cursor.execute("""
-                ALTER TABLE live_data.btc_live_strikes 
-                ADD CONSTRAINT btc_live_strikes_event_market_unique 
+                ALTER TABLE live_data.market_kalshi_btc 
+                ADD CONSTRAINT market_kalshi_btc_event_market_unique 
                 UNIQUE (event_ticker, market_ticker)
             """)
         except Exception:
@@ -88,10 +88,10 @@ def create_btc_live_tables(connection):
             pass
         
         connection.commit()
-        print(f"[{datetime.now(EST)}] ✅ BTC live strikes table ready")
+        print(f"[{datetime.now(EST)}] ✅ Market Kalshi BTC table ready")
         
     except Exception as e:
-        print(f"[{datetime.now(EST)}] ❌ Failed to create tables: {e}")
+        print(f"[{datetime.now(EST)}] ❌ Failed to create table: {e}")
         connection.rollback()
 
 def get_current_btc_price():
@@ -103,7 +103,7 @@ def get_current_btc_price():
             
         cursor = connection.cursor()
         cursor.execute("""
-            SELECT price FROM live_data.btc_price_log 
+            SELECT price FROM live_data.live_price_log_1s_btc 
             ORDER BY timestamp DESC LIMIT 1
         """)
         result = cursor.fetchone()
@@ -117,83 +117,11 @@ def get_current_btc_price():
         print(f"[{datetime.now(EST)}] ❌ Error getting BTC price: {e}")
         return None
 
-def detect_strike_tier_spacing(markets):
-    """Detect the spacing between strike tiers"""
-    if not markets:
-        return 250
-    
-    # Extract all strikes and find differences
-    strikes = []
-    for market in markets:
-        try:
-            subtitle = market.get("subtitle", "")
-            if "or above" in subtitle:
-                strike_str = subtitle.split(" or above")[0].strip()
-                strike_value = float(strike_str.replace("$", "").replace(",", ""))
-                strikes.append(strike_value)
-        except:
-            continue
-    
-    if len(strikes) < 2:
-        return 250
-    
-    # Calculate differences between consecutive strikes
-    differences = []
-    for i in range(1, len(strikes)):
-        diff = strikes[i] - strikes[i-1]
-        if diff > 0:
-            differences.append(diff)
-    
-    if differences:
-        # Return the most common difference
-        from collections import Counter
-        most_common = Counter(differences).most_common(1)[0][0]
-        return int(most_common)
-    
-    return 250  # Default
-
-def filter_relevant_strikes(markets, current_price, num_levels=10):
-    """Filter markets to only include strikes around current price"""
-    if not markets or current_price is None:
-        return markets
-    
-    # Convert current price to float
-    current_price_float = float(current_price)
-    
-    # Calculate reasonable range (about 10 strikes above and below current price)
-    # With $250 spacing, this should be about $2,500 above and below
-    range_limit = 2500  # $2,500 range
-    
-    # Get all strikes within the reasonable range
-    relevant_markets = []
-    for market in markets:
-        try:
-            # Extract strike from subtitle (e.g., "$104,250 or above" -> 104250)
-            subtitle = market.get("subtitle", "")
-            if "or above" in subtitle:
-                strike_str = subtitle.split(" or above")[0].strip()
-                strike_value = float(strike_str.replace("$", "").replace(",", ""))
-                
-                # Only include strikes within the reasonable range
-                if abs(strike_value - current_price_float) <= range_limit:
-                    distance = abs(strike_value - current_price_float)
-                    relevant_markets.append((distance, market))
-        except Exception as e:
-            print(f"[{datetime.now(EST)}] ⚠️ Error parsing strike from subtitle '{market.get('subtitle', 'unknown')}': {e}")
-            continue
-    
-    # Sort by distance and take the closest strikes (limit to 21 total)
-    relevant_markets.sort(key=lambda x: x[0])
-    closest_markets = [market for distance, market in relevant_markets[:21]]  # Limit to 21 strikes
-    
-    print(f"[{datetime.now(EST)}] 📊 Filtered {len(markets)} markets to {len(closest_markets)} relevant strikes around ${current_price_float:,.0f}")
-    return closest_markets
-
 def get_current_event_ticker():
     global last_failed_ticker
     now = datetime.now(EST)
 
-    # Only try current hour (next hour from now)
+    # Construct current hour ticker
     test_time = now + timedelta(hours=1)
     year_str = test_time.strftime("%y")
     month_str = test_time.strftime("%b").upper()
@@ -208,6 +136,18 @@ def get_current_event_ticker():
             return current_ticker, data
         else:
             last_failed_ticker = current_ticker
+
+    # Try next hour
+    test_time = now + timedelta(hours=1)
+    year_str = test_time.strftime("%y")
+    month_str = test_time.strftime("%b").upper()
+    day_str = test_time.strftime("%d")
+    hour_str = test_time.strftime("%H")
+    next_ticker = f"KXBTCD-{year_str}{month_str}{day_str}{hour_str}"
+
+    data = fetch_event_json(next_ticker)
+    if data and "markets" in data:
+        return next_ticker, data
 
     return None, None
 
@@ -225,23 +165,17 @@ def fetch_event_json(event_ticker):
         print(f"[{datetime.now(EST)}] ❌ Exception fetching event JSON: {e}")
         return None
 
-def save_postgresql_snapshot(event_ticker, markets_data):
-    """Save market data to PostgreSQL instead of JSON"""
+def save_market_data_to_postgresql(event_ticker, markets_data):
+    """Save market data to PostgreSQL market_kalshi_btc table"""
     try:
         connection = connect_database()
         if not connection:
             return False
             
-        # Get current BTC price for filtering
-        current_price = get_current_btc_price()
-        
-        # Filter markets to relevant strikes
-        filtered_markets = filter_relevant_strikes(markets_data, current_price)
-        
         cursor = connection.cursor()
         
-        # Insert/update market data using ON CONFLICT to preserve probability data
-        for market in filtered_markets:
+        # Insert/update market data using ON CONFLICT
+        for market in markets_data:
             try:
                 # Extract market data
                 market_ticker = market.get("ticker", "")
@@ -260,9 +194,9 @@ def save_postgresql_snapshot(event_ticker, markets_data):
                 open_interest = market.get("open_interest", 0)
                 liquidity = market.get("liquidity", 0)
                 
-                # Insert with ON CONFLICT to preserve probability data
+                # Insert with ON CONFLICT to handle updates
                 cursor.execute("""
-                    INSERT INTO live_data.btc_live_strikes 
+                    INSERT INTO live_data.market_kalshi_btc 
                     (event_ticker, market_ticker, strike, yes_bid, yes_ask, no_bid, no_ask,
                      last_price, volume, volume_24h, open_interest, liquidity, updated_at)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
@@ -286,7 +220,7 @@ def save_postgresql_snapshot(event_ticker, markets_data):
         
         connection.commit()
         connection.close()
-        print(f"[{datetime.now(EST)}] ✅ Saved {len(filtered_markets)} markets to PostgreSQL for {event_ticker}")
+        print(f"[{datetime.now(EST)}] ✅ Saved {len(markets_data)} markets to PostgreSQL for {event_ticker}")
         return True
         
     except Exception as e:
@@ -297,24 +231,24 @@ def save_postgresql_snapshot(event_ticker, markets_data):
         return False
 
 def main():
-    print(f"[{datetime.now(EST)}] 🚀 Starting Kalshi API PostgreSQL Watchdog")
+    print(f"[{datetime.now(EST)}] 🚀 Starting Kalshi API Market Kalshi BTC Watchdog")
     
-    # Initialize database tables
+    # Initialize database table
     connection = connect_database()
     if connection:
-        create_btc_live_tables(connection)
+        create_market_kalshi_btc_table(connection)
         connection.close()
     
     while True:
         try:
-            # Get current event ticker and data
+            # Get current event ticker and data using same logic as active kalshi_api_watchdog
             event_ticker, event_data = get_current_event_ticker()
             
             if event_ticker and event_data and "markets" in event_data:
                 print(f"[{datetime.now(EST)}] 📊 Processing event: {event_ticker}")
                 
                 # Save to PostgreSQL
-                success = save_postgresql_snapshot(event_ticker, event_data["markets"])
+                success = save_market_data_to_postgresql(event_ticker, event_data["markets"])
                 
                 if not success:
                     print(f"[{datetime.now(EST)}] ❌ Failed to save data for {event_ticker}")
@@ -324,7 +258,7 @@ def main():
             time.sleep(POLL_INTERVAL_SECONDS)
             
         except KeyboardInterrupt:
-            print(f"\n[{datetime.now(EST)}] 🛑 Kalshi API PostgreSQL Watchdog stopped")
+            print(f"\n[{datetime.now(EST)}] 🛑 Kalshi API Market Kalshi BTC Watchdog stopped")
             break
         except Exception as e:
             print(f"[{datetime.now(EST)}] ❌ Unexpected error: {e}")

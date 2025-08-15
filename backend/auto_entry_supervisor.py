@@ -135,7 +135,7 @@ def get_current_momentum():
         cursor = conn.cursor()
         
         cursor.execute("""
-            SELECT momentum FROM live_data.btc_price_log 
+            SELECT momentum FROM live_data.live_price_log_1s_btc 
             ORDER BY timestamp DESC 
             LIMIT 1
         """)
@@ -551,7 +551,7 @@ def get_current_ttc():
 
 def get_strike_table_path():
     """Get the path to the master strike table JSON file"""
-    return os.path.join(get_data_dir(), "live_data", "markets", "kalshi", "strike_tables", "btc_strike_table.json")
+    return os.path.join(get_data_dir(), "live_data", "markets", "kalshi", "strike_tables", "strike_table_btc.json")
 
 def get_watchlist_path():
     """Get the path to the watchlist JSON file"""

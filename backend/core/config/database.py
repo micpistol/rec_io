@@ -109,6 +109,37 @@ def init_database():
             );
         """)
         
+        # New naming convention tables
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS live_data.live_price_log_1s_btc (
+                timestamp TEXT PRIMARY KEY,
+                price DECIMAL(10,2),
+                one_minute_avg DECIMAL(10,2),
+                momentum DECIMAL(10,4),
+                delta_1m DECIMAL(10,4),
+                delta_2m DECIMAL(10,4),
+                delta_3m DECIMAL(10,4),
+                delta_4m DECIMAL(10,4),
+                delta_15m DECIMAL(10,4),
+                delta_30m DECIMAL(10,4)
+            );
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS live_data.live_price_log_1s_eth (
+                timestamp TEXT PRIMARY KEY,
+                price DECIMAL(10,2),
+                one_minute_avg DECIMAL(10,2),
+                momentum DECIMAL(10,4),
+                delta_1m DECIMAL(10,4),
+                delta_2m DECIMAL(10,4),
+                delta_3m DECIMAL(10,4),
+                delta_4m DECIMAL(10,4),
+                delta_15m DECIMAL(10,4),
+                delta_30m DECIMAL(10,4)
+            );
+        """)
+        
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS live_data.btc_price_change (
                 id SERIAL PRIMARY KEY,
@@ -126,6 +157,56 @@ def init_database():
                 change3h DECIMAL(10,6),
                 change1d DECIMAL(10,6),
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        
+        # New naming convention for price change tables
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS live_data.price_change_btc (
+                id SERIAL PRIMARY KEY,
+                change1h DECIMAL(10,6),
+                change3h DECIMAL(10,6),
+                change1d DECIMAL(10,6),
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS live_data.price_change_eth (
+                id SERIAL PRIMARY KEY,
+                change1h DECIMAL(10,6),
+                change3h DECIMAL(10,6),
+                change1d DECIMAL(10,6),
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        
+        # New naming convention for strike table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS live_data.strike_table_btc (
+                id SERIAL PRIMARY KEY,
+                timestamp TIMESTAMP WITH TIME ZONE DEFAULT now(),
+                symbol VARCHAR(10),
+                current_price DECIMAL(10,2),
+                ttc_seconds INTEGER,
+                broker VARCHAR(20),
+                event_ticker VARCHAR(50),
+                market_title TEXT,
+                strike_tier INTEGER,
+                market_status VARCHAR(20),
+                strike INTEGER,
+                buffer DECIMAL(10,2),
+                buffer_pct DECIMAL(5,2),
+                probability DECIMAL(5,2),
+                yes_ask DECIMAL(5,2),
+                no_ask DECIMAL(5,2),
+                yes_diff DECIMAL(5,2),
+                no_diff DECIMAL(5,2),
+                volume INTEGER,
+                ticker VARCHAR(50),
+                active_side VARCHAR(10),
+                momentum_weighted_score DECIMAL(5,3),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
             );
         """)
         

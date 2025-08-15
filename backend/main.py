@@ -1117,7 +1117,7 @@ async def get_core_data():
         # Get BTC price from PostgreSQL live_data
         btc_price = 0
         try:
-            # Get the latest price from PostgreSQL live_data.btc_price_log
+            # Get the latest price from PostgreSQL live_data.live_price_log_1s_btc
             import psycopg2
             conn = psycopg2.connect(
                 host="localhost",
@@ -1126,7 +1126,7 @@ async def get_core_data():
                 password="rec_io_password"
             )
             cursor = conn.cursor()
-            cursor.execute("SELECT price FROM live_data.btc_price_log ORDER BY timestamp DESC LIMIT 1")
+            cursor.execute("SELECT price FROM live_data.live_price_log_1s_btc ORDER BY timestamp DESC LIMIT 1")
             result = cursor.fetchone()
             conn.close()
             
@@ -1165,7 +1165,7 @@ async def get_core_data():
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT momentum, delta_1m, delta_2m, delta_3m, delta_4m, delta_15m, delta_30m
-                FROM live_data.btc_price_log 
+                FROM live_data.live_price_log_1s_btc 
                 ORDER BY timestamp DESC 
                 LIMIT 1
             """)
@@ -1401,7 +1401,7 @@ async def create_trade(trade_data: dict):
 # Additional endpoints for other data
 @app.get("/btc_price_changes")
 async def get_btc_changes():
-    """Get BTC price changes from PostgreSQL live_data.btc_price_change."""
+    """Get BTC price changes from PostgreSQL live_data.price_change_btc."""
     try:
         import psycopg2
         from datetime import datetime
@@ -1418,7 +1418,7 @@ async def get_btc_changes():
         # Get latest price changes from the database
         cursor.execute("""
             SELECT change1h, change3h, change1d, timestamp 
-            FROM live_data.btc_price_change 
+            FROM live_data.price_change_btc 
             ORDER BY timestamp DESC 
             LIMIT 1
         """)
@@ -1759,7 +1759,7 @@ async def get_current_momentum():
             password="rec_io_password"
         )
         cursor = conn.cursor()
-        cursor.execute("SELECT momentum FROM live_data.btc_price_log ORDER BY timestamp DESC LIMIT 1")
+        cursor.execute("SELECT momentum FROM live_data.live_price_log_1s_btc ORDER BY timestamp DESC LIMIT 1")
         result = cursor.fetchone()
         conn.close()
         
@@ -1785,7 +1785,7 @@ async def get_current_momentum():
 
 @app.get("/api/btc_price")
 async def get_btc_price():
-    """Get current BTC price directly from PostgreSQL live_data.btc_price_log."""
+    """Get current BTC price directly from PostgreSQL live_data.live_price_log_1s_btc."""
     try:
         import psycopg2
         
@@ -1796,7 +1796,7 @@ async def get_btc_price():
             password="rec_io_password"
         )
         cursor = conn.cursor()
-        cursor.execute("SELECT price FROM live_data.btc_price_log ORDER BY timestamp DESC LIMIT 1")
+        cursor.execute("SELECT price FROM live_data.live_price_log_1s_btc ORDER BY timestamp DESC LIMIT 1")
         result = cursor.fetchone()
         conn.close()
         
@@ -1822,7 +1822,7 @@ async def get_momentum_score():
             password="rec_io_password"
         )
         cursor = conn.cursor()
-        cursor.execute("SELECT momentum FROM live_data.btc_price_log ORDER BY timestamp DESC LIMIT 1")
+        cursor.execute("SELECT momentum FROM live_data.live_price_log_1s_btc ORDER BY timestamp DESC LIMIT 1")
         result = cursor.fetchone()
         conn.close()
         
@@ -2435,7 +2435,7 @@ async def get_strike_table(symbol: str):
     try:
         # Convert symbol to lowercase for consistency
         symbol_lower = symbol.lower()
-        strike_table_file = os.path.join(get_data_dir(), "live_data", "markets", "kalshi", "strike_tables", f"{symbol_lower}_strike_table.json")
+        strike_table_file = os.path.join(get_data_dir(), "live_data", "markets", "kalshi", "strike_tables", f"strike_table_{symbol_lower}.json")
         
         if os.path.exists(strike_table_file):
             data = safe_read_json(strike_table_file)
@@ -2471,7 +2471,7 @@ async def get_postgresql_strike_table(symbol: str):
                     momentum_weighted_score,
                     market_title,
                     timestamp
-                FROM live_data.{symbol.lower()}_strike_table 
+                FROM live_data.strike_table_{symbol.lower()} 
                 LIMIT 1
             """)
             
@@ -2494,7 +2494,7 @@ async def get_postgresql_strike_table(symbol: str):
                     yes_diff,
                     no_diff,
                     active_side
-                FROM live_data.{symbol.lower()}_strike_table 
+                FROM live_data.strike_table_{symbol.lower()} 
                 ORDER BY strike
             """)
             

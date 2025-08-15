@@ -50,10 +50,12 @@ class CascadingFailureDetector:
             "trade_manager",       # Trade management
             "trade_executor",      # Trade execution
             "active_trade_supervisor",  # Active trade monitoring
-            "symbol_price_watchdog_btc", # BTC price data
-            "symbol_price_watchdog_eth", # ETH price data
+                    "symbol_price_watchdog_btc", # BTC price data
+        "symbol_price_watchdog_eth", # ETH price data
+        "strike_table_generator", # Strike table data
             "kalshi_account_sync", # Kalshi API sync
-            "kalshi_api_watchdog" # Kalshi API monitoring
+            "kalshi_api_watchdog", # Kalshi API monitoring
+            "kalshi_api_watchdog_postgresql" # Kalshi API PostgreSQL market data
         ]
         
         # Service health tracking
@@ -183,7 +185,7 @@ class CascadingFailureDetector:
                     password="rec_io_password"
                 )
                 cursor_live_data = conn_live_data.cursor()
-                cursor_live_data.execute("SELECT 1 FROM live_data.btc_price_log LIMIT 1")
+                cursor_live_data.execute("SELECT 1 FROM live_data.live_price_log_1s_btc LIMIT 1")
                 cursor_live_data.fetchone()
                 conn_live_data.close()
             except Exception as e:

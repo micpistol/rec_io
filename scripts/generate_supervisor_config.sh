@@ -91,6 +91,42 @@ stderr_logfile=$PROJECT_ROOT/logs/auto_entry_supervisor.err.log
 stdout_logfile=$PROJECT_ROOT/logs/auto_entry_supervisor.out.log
 environment=PATH="$VENV_PATH/bin",PYTHONPATH="$PROJECT_ROOT",PYTHONGC=1,PYTHONDNSCACHE=1,DB_HOST="localhost",DB_NAME="rec_io_db",DB_USER="rec_io_user",DB_PASSWORD="rec_io_password",DB_PORT="5432"
 
+[program:symbol_price_watchdog_btc]
+command=$PYTHON_PATH $PROJECT_ROOT/backend/symbol_price_watchdog.py BTC
+directory=$PROJECT_ROOT
+autostart=true
+autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
+stderr_logfile=$PROJECT_ROOT/logs/symbol_price_watchdog_btc.err.log
+stdout_logfile=$PROJECT_ROOT/logs/symbol_price_watchdog_btc.out.log
+environment=PATH="$VENV_PATH/bin",PYTHONPATH="$PROJECT_ROOT",PYTHONGC=1,PYTHONDNSCACHE=1,DB_HOST="localhost",DB_NAME="rec_io_db",DB_USER="rec_io_user",DB_PASSWORD="rec_io_password",DB_PORT="5432"
+
+[program:symbol_price_watchdog_eth]
+command=$PYTHON_PATH $PROJECT_ROOT/backend/symbol_price_watchdog.py ETH
+directory=$PROJECT_ROOT
+autostart=true
+autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
+stderr_logfile=$PROJECT_ROOT/logs/symbol_price_watchdog_eth.err.log
+stdout_logfile=$PROJECT_ROOT/logs/symbol_price_watchdog_eth.out.log
+environment=PATH="$VENV_PATH/bin",PYTHONPATH="$PROJECT_ROOT",PYTHONGC=1,PYTHONDNSCACHE=1,DB_HOST="localhost",DB_NAME="rec_io_db",DB_USER="rec_io_user",DB_PASSWORD="rec_io_password",DB_PORT="5432"
+
+[program:strike_table_generator]
+command=$PYTHON_PATH $PROJECT_ROOT/backend/strike_table_generator.py continuous 1
+directory=$PROJECT_ROOT
+autostart=true
+autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
+stderr_logfile=$PROJECT_ROOT/logs/strike_table_generator.err.log
+stdout_logfile=$PROJECT_ROOT/logs/strike_table_generator.out.log
+environment=PATH="$VENV_PATH/bin",PYTHONPATH="$PROJECT_ROOT",PYTHONGC=1,PYTHONDNSCACHE=1,DB_HOST="localhost",DB_NAME="rec_io_db",DB_USER="rec_io_user",DB_PASSWORD="rec_io_password",DB_PORT="5432"
+
 [program:kalshi_account_sync]
 command=$PYTHON_PATH $PROJECT_ROOT/backend/api/kalshi-api/kalshi_account_sync_ws.py
 directory=$PROJECT_ROOT
@@ -101,6 +137,30 @@ stopasgroup=true
 killasgroup=true
 stderr_logfile=$PROJECT_ROOT/logs/kalshi_account_sync.err.log
 stdout_logfile=$PROJECT_ROOT/logs/kalshi_account_sync.out.log
+environment=PATH="$VENV_PATH/bin",PYTHONPATH="$PROJECT_ROOT",PYTHONGC=1,PYTHONDNSCACHE=1,DB_HOST="localhost",DB_NAME="rec_io_db",DB_USER="rec_io_user",DB_PASSWORD="rec_io_password",DB_PORT="5432"
+
+[program:kalshi_api_watchdog]
+command=$PYTHON_PATH $PROJECT_ROOT/backend/api/kalshi-api/kalshi_api_watchdog.py
+directory=$PROJECT_ROOT
+autostart=true
+autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
+stderr_logfile=$PROJECT_ROOT/logs/kalshi_api_watchdog.err.log
+stdout_logfile=$PROJECT_ROOT/logs/kalshi_api_watchdog.out.log
+environment=PATH="$VENV_PATH/bin",PYTHONPATH="$PROJECT_ROOT",PYTHONGC=1,PYTHONDNSCACHE=1,DB_HOST="localhost",DB_NAME="rec_io_db",DB_USER="rec_io_user",DB_PASSWORD="rec_io_password",DB_PORT="5432"
+
+[program:kalshi_api_watchdog_postgresql]
+command=$PYTHON_PATH $PROJECT_ROOT/backend/api/kalshi-api/kalshi_api_watchdog_postgresql.py
+directory=$PROJECT_ROOT
+autostart=true
+autorestart=true
+startretries=3
+stopasgroup=true
+killasgroup=true
+stderr_logfile=$PROJECT_ROOT/logs/kalshi_api_watchdog_postgresql.err.log
+stdout_logfile=$PROJECT_ROOT/logs/kalshi_api_watchdog_postgresql.out.log
 environment=PATH="$VENV_PATH/bin",PYTHONPATH="$PROJECT_ROOT",PYTHONGC=1,PYTHONDNSCACHE=1,DB_HOST="localhost",DB_NAME="rec_io_db",DB_USER="rec_io_user",DB_PASSWORD="rec_io_password",DB_PORT="5432"
 
 [program:kalshi_api_watchdog]

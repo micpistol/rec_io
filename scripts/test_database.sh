@@ -152,13 +152,13 @@ test_data_access() {
     fi
     
     # Test reading from btc_price_log table
-    ROW_COUNT=$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "SELECT COUNT(*) FROM live_data.btc_price_log;" 2>/dev/null | tr -d ' ')
+    ROW_COUNT=$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "SELECT COUNT(*) FROM live_data.live_price_log_1s_btc;" 2>/dev/null | tr -d ' ')
     
     if [ -n "$ROW_COUNT" ] && [ "$ROW_COUNT" -ge 0 ]; then
         print_success "Data access test passed - $ROW_COUNT rows in btc_price_log"
         
         # Test reading latest record
-        LATEST_RECORD=$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "SELECT timestamp, price, momentum FROM live_data.btc_price_log ORDER BY timestamp DESC LIMIT 1;" 2>/dev/null | head -1)
+        LATEST_RECORD=$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "SELECT timestamp, price, momentum FROM live_data.live_price_log_1s_btc ORDER BY timestamp DESC LIMIT 1;" 2>/dev/null | head -1)
         
         if [ -n "$LATEST_RECORD" ]; then
             print_success "Latest record access test passed"
@@ -222,7 +222,7 @@ test_performance() {
     
     # Run a simple query multiple times to test performance
     for i in {1..5}; do
-        psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT COUNT(*) FROM live_data.btc_price_log;" >/dev/null 2>&1
+        psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT COUNT(*) FROM live_data.live_price_log_1s_btc;" >/dev/null 2>&1
     done
     
     END_TIME=$(date +%s.%N)
@@ -277,7 +277,7 @@ try:
     cursor = conn.cursor()
     
     # Test query
-    cursor.execute("SELECT COUNT(*) FROM live_data.btc_price_log;")
+            cursor.execute("SELECT COUNT(*) FROM live_data.live_price_log_1s_btc;")
     count = cursor.fetchone()[0]
     
     print(f"Python connection successful - {count} rows in btc_price_log")

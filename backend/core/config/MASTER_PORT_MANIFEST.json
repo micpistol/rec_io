@@ -43,6 +43,16 @@
       "description": "Kalshi API monitoring",
       "status": "RUNNING"
     },
+    "kalshi_api_watchdog_postgresql": {
+      "port": 8012,
+      "description": "Kalshi API PostgreSQL market data service",
+      "status": "RUNNING"
+    },
+    "strike_table_generator": {
+      "port": 8011,
+      "description": "Strike table generation service",
+      "status": "RUNNING"
+    },
     "unified_production_coordinator": {
       "port": 8010,
       "description": "Unified data production coordinator",

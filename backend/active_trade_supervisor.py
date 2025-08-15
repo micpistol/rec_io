@@ -832,12 +832,12 @@ def get_current_btc_price(symbol: str = "BTC") -> Optional[float]:
         
         # Map symbol to the appropriate price log table
         if symbol.upper() == "BTC":
-            table_name = "live_data.btc_price_log"
+            table_name = "live_data.live_price_log_1s_btc"
         elif symbol.upper() == "ETH":
-            table_name = "live_data.eth_price_log"
+            table_name = "live_data.live_price_log_1s_eth"
         else:
             # Default to BTC if symbol is not recognized
-            table_name = "live_data.btc_price_log"
+            table_name = "live_data.live_price_log_1s_btc"
             log(f"⚠️ Unknown symbol '{symbol}', defaulting to BTC")
             
         cursor.execute(f"SELECT price FROM {table_name} ORDER BY timestamp DESC LIMIT 1")

@@ -60,7 +60,7 @@ def get_postgres_pool():
     return _postgres_pool
 
 def get_momentum_data_from_postgresql() -> Dict[str, Any]:
-    """Get momentum data directly from PostgreSQL live_data.btc_price_log with optimized query"""
+    """Get momentum data directly from PostgreSQL live_data.live_price_log_1s_btc with optimized query"""
     try:
         pool = get_postgres_pool()
         if pool:
@@ -71,7 +71,7 @@ def get_momentum_data_from_postgresql() -> Dict[str, Any]:
                 # Optimized query with explicit index usage
                 cursor.execute("""
                     SELECT momentum, delta_1m, delta_2m, delta_3m, delta_4m, delta_15m, delta_30m, price
-                    FROM live_data.btc_price_log 
+                    FROM live_data.live_price_log_1s_btc 
                     ORDER BY timestamp DESC 
                     LIMIT 1
                 """)
@@ -112,7 +112,7 @@ def get_momentum_data_from_postgresql() -> Dict[str, Any]:
             
             cursor.execute("""
                 SELECT momentum, delta_1m, delta_2m, delta_3m, delta_4m, delta_15m, delta_30m, price
-                FROM live_data.btc_price_log 
+                FROM live_data.live_price_log_1s_btc 
                 ORDER BY timestamp DESC 
                 LIMIT 1
             """)
@@ -523,7 +523,7 @@ class UnifiedProductionCoordinator:
         
         # Output paths
         self.live_probabilities_path = os.path.join(self.data_dir, "live_data", "live_probabilities", "btc_live_probabilities.json")
-        self.strike_table_path = os.path.join(self.data_dir, "live_data", "markets", "kalshi", "strike_tables", "btc_strike_table.json")
+        self.strike_table_path = os.path.join(self.data_dir, "live_data", "markets", "kalshi", "strike_tables", "strike_table_btc.json")
         # self.watchlist_path = os.path.join(self.data_dir, "live_data", "markets", "kalshi", "strike_tables", "btc_watchlist.json")  # REMOVED - moved to auto_entry_supervisor
         
         # Ensure directories exist

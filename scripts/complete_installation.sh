@@ -173,7 +173,7 @@ print('Database initialized via code')
     # Create missing ETH price log table if it doesn't exist
     log_info "Ensuring all required tables exist..."
     PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "
-CREATE TABLE IF NOT EXISTS live_data.eth_price_log (
+CREATE TABLE IF NOT EXISTS live_data.live_price_log_1s_eth (
     id SERIAL PRIMARY KEY,
     price DECIMAL(15,2),
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP

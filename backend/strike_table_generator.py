@@ -242,7 +242,7 @@ class StrikeTableGenerator:
             
             # Create strike table data table
             strike_table_sql = f"""
-            CREATE TABLE IF NOT EXISTS live_data.{self.symbol}_strike_table (
+            CREATE TABLE IF NOT EXISTS live_data.strike_table_{self.symbol.lower()} (
                 id SERIAL PRIMARY KEY,
                 timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                 symbol VARCHAR(10),
@@ -272,8 +272,8 @@ class StrikeTableGenerator:
             
             # Create index for strike table
             strike_index_sql = f"""
-            CREATE INDEX IF NOT EXISTS idx_{self.symbol}_strike_table_lookup 
-            ON live_data.{self.symbol}_strike_table (timestamp, symbol, current_price)
+                    CREATE INDEX IF NOT EXISTS idx_strike_table_{self.symbol.lower()}_lookup
+        ON live_data.strike_table_{self.symbol.lower()} (timestamp, symbol, current_price)
             """
             cursor.execute(strike_index_sql)
             
@@ -288,21 +288,21 @@ class StrikeTableGenerator:
                 conn.close()
     
     def get_current_market_data(self) -> Dict[str, Any]:
-        """Get current market data from live_data.btc_price_log and Kalshi snapshot."""
+        """Get current market data from live_data.live_price_log_1s_btc and Kalshi snapshot."""
         try:
             # Get current price and momentum from PostgreSQL
             conn = psycopg2.connect(**self.db_config)
             cursor = conn.cursor()
             
             cursor.execute("""
-            SELECT price, momentum FROM live_data.btc_price_log 
+            SELECT price, momentum FROM live_data.live_price_log_1s_btc 
             ORDER BY timestamp DESC 
             LIMIT 1
             """)
             
             result = cursor.fetchone()
             if not result:
-                raise ValueError("No price data found in live_data.btc_price_log")
+                raise ValueError("No price data found in live_data.live_price_log_1s_btc")
             
             current_price = float(result[0])
             momentum_score = float(result[1]) if result[1] is not None else 0.0
@@ -323,54 +323,114 @@ class StrikeTableGenerator:
             raise
     
     def get_kalshi_market_snapshot(self) -> Dict[str, Any]:
-        """Get live Kalshi market snapshot from the latest JSON file"""
+        """Get live Kalshi market snapshot from the market_kalshi_btc database table"""
         try:
-            snapshot_file = os.path.join(get_kalshi_data_dir(), "latest_market_snapshot.json")
+            conn = psycopg2.connect(**self.db_config)
+            cursor = conn.cursor()
             
-            if not os.path.exists(snapshot_file):
-                raise FileNotFoundError(f"Kalshi snapshot file not found: {snapshot_file}")
+            # Get the latest event_ticker from the market_kalshi_btc table
+            cursor.execute("""
+                SELECT event_ticker 
+                FROM live_data.market_kalshi_btc 
+                ORDER BY updated_at DESC 
+                LIMIT 1
+            """)
             
-            with open(snapshot_file, 'r') as f:
-                snapshot_data = json.load(f)
+            result = cursor.fetchone()
+            if not result:
+                raise ValueError("No event_ticker found in market_kalshi_btc table")
+            
+            event_ticker = result[0]
+            
+            # Get all markets for this event_ticker
+            cursor.execute("""
+                SELECT market_ticker, strike, yes_bid, yes_ask, no_bid, no_ask, 
+                       last_price, volume, volume_24h, open_interest, liquidity, updated_at
+                FROM live_data.market_kalshi_btc 
+                WHERE event_ticker = %s
+                ORDER BY updated_at DESC
+            """, (event_ticker,))
+            
+            market_rows = cursor.fetchall()
+            if not market_rows:
+                raise ValueError(f"No markets found for event_ticker: {event_ticker}")
+            
+            # Convert database rows to market dictionary format
+            markets = []
+            for row in market_rows:
+                market_ticker, strike, yes_bid, yes_ask, no_bid, no_ask, last_price, volume, volume_24h, open_interest, liquidity, updated_at = row
                 
-                # Get event_ticker from header
-                event_ticker = snapshot_data.get("event", {}).get("event_ticker")
-                if not event_ticker:
-                    raise ValueError("No event_ticker found in snapshot")
+                # Convert strike from "$104,250" format to float
+                floor_strike = None
+                if strike and strike.startswith('$'):
+                    try:
+                        floor_strike = float(strike.replace('$', '').replace(',', ''))
+                    except ValueError:
+                        continue
                 
-                # Get first status from markets array
-                markets = snapshot_data.get("markets", [])
-                if not markets:
-                    raise ValueError("No markets found in snapshot")
-                
-                first_status = markets[0].get("status")
-                if not first_status:
-                    raise ValueError("No market status found")
-                
-                # Get event title and strike_date from header
-                event_title = snapshot_data.get("event", {}).get("title")
-                if not event_title:
-                    raise ValueError("No event title found")
-                    
-                strike_date = snapshot_data.get("event", {}).get("strike_date")
-                if not strike_date:
-                    raise ValueError("No strike_date found")
-                
-                # Detect strike tier spacing
-                strike_tier = self.detect_strike_tier_spacing(markets)
-                
-                logger.info(f"📊 Loaded live market snapshot - Event: {event_ticker}, Status: {first_status}, Tier: ${strike_tier:,}")
-                
-                return {
-                    "event_ticker": event_ticker,
-                    "market_status": first_status,
-                    "event_title": event_title,
-                    "strike_date": strike_date,
-                    "strike_tier": strike_tier,
-                    "markets": markets
+                market = {
+                    "ticker": market_ticker,
+                    "floor_strike": floor_strike,
+                    "yes_bid": yes_bid,
+                    "yes_ask": yes_ask,
+                    "no_bid": no_bid,
+                    "no_ask": no_ask,
+                    "last_price": last_price,
+                    "volume": volume,
+                    "volume_24h": volume_24h,
+                    "open_interest": open_interest,
+                    "liquidity": liquidity,
+                    "status": "active"  # Assume active status for database records
                 }
+                markets.append(market)
+            
+            # Detect strike tier spacing
+            strike_tier = self.detect_strike_tier_spacing(markets)
+            
+            # For database records, we'll use the event_ticker as the title and estimate strike_date
+            # The strike_date is typically the hour from the event_ticker
+            event_title = f"BTC Price at {event_ticker}"
+            
+            # Extract date from event_ticker (e.g., KXBTCD-25AUG1515 -> 2025-08-15T15:00:00)
+            try:
+                # Parse event_ticker format: KXBTCD-25AUG1515
+                # Extract year, month, day, hour
+                parts = event_ticker.split('-')
+                if len(parts) >= 2:
+                    date_part = parts[1]  # 25AUG1515
+                    year = "20" + date_part[:2]  # 25 -> 2025
+                    month_str = date_part[2:5]  # AUG
+                    day = date_part[5:7]  # 15
+                    hour = date_part[7:9]  # 15
+                    
+                    # Convert month abbreviation to number
+                    month_map = {
+                        'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04',
+                        'MAY': '05', 'JUN': '06', 'JUL': '07', 'AUG': '08',
+                        'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12'
+                    }
+                    month = month_map.get(month_str, '01')
+                    
+                    strike_date = f"{year}-{month}-{day}T{hour}:00:00Z"
+                else:
+                    strike_date = "2025-08-15T15:00:00Z"  # Default fallback
+            except Exception:
+                strike_date = "2025-08-15T15:00:00Z"  # Default fallback
+            
+            conn.close()
+            
+            logger.info(f"📊 Loaded live market data from database - Event: {event_ticker}, Markets: {len(markets)}, Tier: ${strike_tier:,}")
+            
+            return {
+                "event_ticker": event_ticker,
+                "market_status": "active",
+                "event_title": event_title,
+                "strike_date": strike_date,
+                "strike_tier": strike_tier,
+                "markets": markets
+            }
         except Exception as e:
-            logger.error(f"❌ Error getting Kalshi market snapshot: {e}")
+            logger.error(f"❌ Error getting Kalshi market data from database: {e}")
             raise
     
     def detect_strike_tier_spacing(self, markets: List[Dict[str, Any]]) -> int:
@@ -474,7 +534,7 @@ class StrikeTableGenerator:
             cursor = conn.cursor()
             
             # Clear ALL previous strike table data - only keep current iteration
-            cursor.execute(f"DELETE FROM live_data.{self.symbol}_strike_table")
+            cursor.execute(f"DELETE FROM live_data.strike_table_{self.symbol.lower()}")
             
             # Process each strike
             strike_data = []
@@ -534,7 +594,7 @@ class StrikeTableGenerator:
                     
                     # Insert into database
                     cursor.execute(f"""
-                    INSERT INTO live_data.{self.symbol}_strike_table 
+                    INSERT INTO live_data.strike_table_{self.symbol.lower()} 
                     (symbol, current_price, ttc_seconds, broker, event_ticker, market_title,
                      strike_tier, market_status, strike, buffer, buffer_pct, probability,
                      yes_ask, no_ask, yes_diff, no_diff, volume, ticker, active_side, momentum_weighted_score)
@@ -580,7 +640,7 @@ class StrikeTableGenerator:
             
             # Get the latest timestamp
             cursor.execute(f"""
-            SELECT MAX(timestamp) FROM live_data.{self.symbol}_strike_table
+            SELECT MAX(timestamp) FROM live_data.strike_table_{self.symbol.lower()}
             """)
             
             latest_timestamp = cursor.fetchone()[0]
@@ -592,7 +652,7 @@ class StrikeTableGenerator:
             SELECT symbol, current_price, ttc_seconds, broker, event_ticker, market_title,
                    strike_tier, market_status, strike, buffer, buffer_pct, probability,
                    yes_ask, no_ask, yes_diff, no_diff, volume, ticker, active_side, momentum_weighted_score
-            FROM live_data.{self.symbol}_strike_table
+            FROM live_data.strike_table_{self.symbol.lower()}
             WHERE timestamp = %s
             ORDER BY strike
             """, (latest_timestamp,))
@@ -677,7 +737,7 @@ def run_continuous_generation(interval_seconds: int = 30):
                            MIN(probability) as min_prob, 
                            MAX(probability) as max_prob,
                            AVG(probability) as avg_prob
-                    FROM live_data.{generator.symbol}_strike_table
+                    FROM live_data.strike_table_{generator.symbol.lower()}
                     """)
                     
                     result = cursor.fetchone()
@@ -743,7 +803,7 @@ def main():
             
             cursor.execute(f"""
             SELECT COUNT(*) as total_records, MAX(timestamp) as latest_update 
-            FROM live_data.{generator.symbol}_strike_table
+            FROM live_data.strike_table_{generator.symbol.lower()}
             """)
             
             result = cursor.fetchone()
@@ -755,7 +815,7 @@ def main():
                 # Show sample strike table data
                 cursor.execute(f"""
                 SELECT strike, buffer, probability, yes_ask, no_ask, active_side 
-                FROM live_data.{generator.symbol}_strike_table 
+                FROM live_data.strike_table_{generator.symbol.lower()} 
                 ORDER BY strike 
                 LIMIT 5
                 """)
