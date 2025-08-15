@@ -127,10 +127,22 @@ function updateMarketTitle(strikeTableData) {
   const cell = document.getElementById('strikePanelMarketTitleCell');
   if (!cell) return;
   
-  // Extract time from market_title (e.g., "Bitcoin price on Jul 22, 2025 at 3pm EDT?" -> "3pm")
+  // Extract time from market_title (e.g., "BTC price on Aug 25 at 5pm" -> "5pm")
   const marketTitle = strikeTableData.market_title || '';
-  const timeMatch = marketTitle.match(/at\s+(.+?)\s+(?:EDT|EST)\?/i);
-  const timeStr = timeMatch ? timeMatch[1].trim() : '11pm';
+  
+  // Try new format first: "BTC price on Aug 25 at 5pm"
+  let timeMatch = marketTitle.match(/at\s+(\d{1,2}(?:am|pm))$/i);
+  let timeStr = '11pm'; // default
+  
+  if (timeMatch) {
+    timeStr = timeMatch[1].trim();
+  } else {
+    // Fallback to old format: "Bitcoin price on Jul 22, 2025 at 3pm EDT?"
+    timeMatch = marketTitle.match(/at\s+(.+?)\s+(?:EDT|EST)\?/i);
+    if (timeMatch) {
+      timeStr = timeMatch[1].trim();
+    }
+  }
   
   // Format as "<symbol> price today at <time>?"
   const symbol = strikeTableData.symbol || 'BTC';

@@ -1444,20 +1444,59 @@ async def get_btc_changes():
 
 @app.get("/kalshi_market_snapshot")
 async def get_kalshi_snapshot():
-    """Get Kalshi market snapshot."""
+    """Get Kalshi market snapshot from PostgreSQL."""
     try:
-        # Read from the latest market snapshot file
-        snapshot_file = os.path.join("backend", "data", "live_data", "markets", "kalshi", "latest_market_snapshot.json")
+        import psycopg2
         
-        if os.path.exists(snapshot_file):
-            with open(snapshot_file, 'r') as f:
-                snapshot_data = json.load(f)
-                return snapshot_data
-        else:
-            print(f"Kalshi snapshot file not found: {snapshot_file}")
-            return {"markets": []}
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        
+        with conn.cursor() as cursor:
+            # Get market data from PostgreSQL
+            cursor.execute("""
+                SELECT 
+                    market_ticker,
+                    yes_ask,
+                    no_ask,
+                    volume,
+                    event_ticker,
+                    strike
+                FROM live_data.market_kalshi_btc
+                ORDER BY updated_at DESC
+            """)
+            
+            markets_data = cursor.fetchall()
+            conn.close()
+            
+            if not markets_data:
+                return {"markets": []}
+            
+            # Convert to the same format as the JSON file
+            markets = []
+            for row in markets_data:
+                market = {
+                    "ticker": row[0],  # market_ticker
+                    "yes_ask": row[1],
+                    "no_ask": row[2],
+                    "volume": row[3],
+                    "event_ticker": row[4],
+                    "strike": row[5]
+                }
+                markets.append(market)
+            
+            # Return in the same format as the JSON file
+            return {
+                "markets": markets,
+                "timestamp": datetime.now().isoformat()
+            }
+            
     except Exception as e:
-        print(f"Error getting Kalshi snapshot: {e}")
+        print(f"Error getting Kalshi snapshot from PostgreSQL: {e}")
         return {"markets": []}
 
 # API endpoints for account data
@@ -1837,21 +1876,65 @@ async def get_momentum_score():
 
 @app.get("/api/strike_table")
 async def get_strike_table_mobile():
-    """Get strike table data for mobile directly from file."""
+    """Get strike table data for mobile from PostgreSQL."""
     try:
-        from backend.util.paths import get_data_dir
-        import os
+        import psycopg2
         
-        strike_table_path = os.path.join(get_data_dir(), "live_data", "markets", "kalshi", "strike_tables", "btc_strike_table.json")
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
         
-        if os.path.exists(strike_table_path):
-            with open(strike_table_path, 'r') as f:
-                strike_data = json.load(f)
-            return {"strikes": strike_data.get("strikes", [])}
-        else:
-            return {"strikes": [], "error": "Strike table file not found"}
+        with conn.cursor() as cursor:
+            # Get strike table data from PostgreSQL
+            cursor.execute("""
+                SELECT 
+                    strike,
+                    buffer,
+                    buffer_pct,
+                    probability,
+                    yes_ask,
+                    no_ask,
+                    volume,
+                    ticker,
+                    yes_diff,
+                    no_diff,
+                    active_side
+                FROM live_data.strike_table_btc
+                ORDER BY strike
+            """)
+            
+            strikes_data = cursor.fetchall()
+            conn.close()
+            
+            if not strikes_data:
+                return {"strikes": [], "error": "No strike table data found"}
+            
+            # Convert to the same format as the JSON file
+            strikes = []
+            for row in strikes_data:
+                strike = {
+                    "strike": float(row[0]) if row[0] else None,
+                    "buffer": float(row[1]) if row[1] else None,
+                    "buffer_pct": float(row[2]) if row[2] else None,
+                    "probability": float(row[3]) if row[3] else None,
+                    "yes_ask": int(row[4]) if row[4] else None,
+                    "no_ask": int(row[5]) if row[5] else None,
+                    "volume": int(row[6]) if row[6] else None,
+                    "ticker": row[7],
+                    "yes_diff": float(row[8]) if row[8] else None,
+                    "no_diff": float(row[9]) if row[9] else None,
+                    "active_side": row[10]
+                }
+                strikes.append(strike)
+            
+            return {"strikes": strikes}
+            
     except Exception as e:
-        print(f"Error getting strike table: {e}")
+        print(f"Error getting strike table from PostgreSQL: {e}")
         return {"strikes": [], "error": str(e)}
 
 # === PREFERENCES API ENDPOINTS ===
@@ -2396,18 +2479,50 @@ def frontend_changes():
 
 @app.get("/api/live_probabilities")
 async def get_live_probabilities():
-    """Get live probabilities from the unified probability endpoint"""
+    """Get live probabilities from PostgreSQL strike table"""
     try:
-        live_prob_file = os.path.join(get_data_dir(), "live_data", "live_probabilities", "btc_live_probabilities.json")
+        import psycopg2
         
-        if os.path.exists(live_prob_file):
-            with open(live_prob_file, 'r') as f:
-                data = json.load(f)
-            return data
-        else:
-            return {"error": "Live probabilities file not found"}
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        
+        with conn.cursor() as cursor:
+            # Get probability data from PostgreSQL strike table
+            cursor.execute("""
+                SELECT 
+                    strike,
+                    probability
+                FROM live_data.strike_table_btc
+                ORDER BY strike
+            """)
+            
+            probabilities_data = cursor.fetchall()
+            conn.close()
+            
+            if not probabilities_data:
+                return {"error": "No probability data found"}
+            
+            # Convert to the same format as the JSON file
+            probabilities = []
+            for row in probabilities_data:
+                prob_data = {
+                    "strike": float(row[0]) if row[0] else None,
+                    "prob_within": float(row[1]) if row[1] else None
+                }
+                probabilities.append(prob_data)
+            
+            return {
+                "probabilities": probabilities,
+                "timestamp": datetime.now().isoformat()
+            }
+            
     except Exception as e:
-        return {"error": f"Error loading live probabilities: {str(e)}"}
+        return {"error": f"Error loading live probabilities from PostgreSQL: {str(e)}"}
 
 def safe_read_json(filepath: str, timeout: float = 0.1):
     """Read JSON data with file locking to prevent race conditions"""
@@ -2431,21 +2546,94 @@ def safe_read_json(filepath: str, timeout: float = 0.1):
 
 @app.get("/api/strike_tables/{symbol}")
 async def get_strike_table(symbol: str):
-    """Get strike table data for a specific symbol"""
+    """Get strike table data for a specific symbol from PostgreSQL"""
     try:
+        import psycopg2
+        
         # Convert symbol to lowercase for consistency
         symbol_lower = symbol.lower()
-        strike_table_file = os.path.join(get_data_dir(), "live_data", "markets", "kalshi", "strike_tables", f"strike_table_{symbol_lower}.json")
         
-        if os.path.exists(strike_table_file):
-            data = safe_read_json(strike_table_file)
-            if data is None:
-                return {"error": f"Error reading strike table file for {symbol}"}
-            return data
-        else:
-            return {"error": f"Strike table file not found for {symbol}"}
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        
+        with conn.cursor() as cursor:
+            # Get header data
+            cursor.execute(f"""
+                SELECT 
+                    symbol,
+                    current_price,
+                    ttc_seconds,
+                    event_ticker,
+                    market_title,
+                    strike_tier,
+                    market_status
+                FROM live_data.strike_table_{symbol_lower}
+                LIMIT 1
+            """)
+            
+            header_data = cursor.fetchone()
+            
+            if not header_data:
+                return {"error": f"No strike table data found for {symbol}"}
+            
+            # Get all strike rows
+            cursor.execute(f"""
+                SELECT 
+                    strike,
+                    buffer,
+                    buffer_pct,
+                    probability,
+                    yes_ask,
+                    no_ask,
+                    volume,
+                    ticker,
+                    yes_diff,
+                    no_diff,
+                    active_side
+                FROM live_data.strike_table_{symbol_lower}
+                ORDER BY strike
+            """)
+            
+            strikes_data = cursor.fetchall()
+            conn.close()
+            
+            # Build response in the same format as JSON
+            response = {
+                "symbol": header_data[0],
+                "current_price": float(header_data[1]) if header_data[1] else None,
+                "ttc": int(header_data[2]) if header_data[2] else None,
+                "event_ticker": header_data[3],
+                "market_title": header_data[4],
+                "strike_tier": header_data[5],
+                "market_status": header_data[6],
+                "strikes": []
+            }
+            
+            for row in strikes_data:
+                strike = {
+                    "strike": float(row[0]) if row[0] else None,
+                    "buffer": float(row[1]) if row[1] else None,
+                    "buffer_pct": float(row[2]) if row[2] else None,
+                    "probability": float(row[3]) if row[3] else None,
+                    "yes_ask": int(row[4]) if row[4] else None,
+                    "no_ask": int(row[5]) if row[5] else None,
+                    "volume": int(row[6]) if row[6] else None,
+                    "ticker": row[7],
+                    "yes_diff": float(row[8]) if row[8] else None,
+                    "no_diff": float(row[9]) if row[9] else None,
+                    "active_side": row[10]
+                }
+                response["strikes"].append(strike)
+            
+            return response
+            
     except Exception as e:
-        return {"error": f"Error loading strike table for {symbol}: {str(e)}"}
+        return {"error": f"Error loading strike table for {symbol} from PostgreSQL: {str(e)}"}
 
 @app.get("/api/postgresql/strike_table/{symbol}")
 async def get_postgresql_strike_table(symbol: str):
@@ -2542,21 +2730,96 @@ async def get_postgresql_strike_table(symbol: str):
 
 @app.get("/api/watchlist/{symbol}")
 async def get_watchlist(symbol: str):
-    """Get watchlist data for a specific symbol"""
+    """Get watchlist data for a specific symbol from PostgreSQL"""
     try:
+        import psycopg2
+        
         # Convert symbol to lowercase for consistency
         symbol_lower = symbol.lower()
-        watchlist_file = os.path.join(get_data_dir(), "live_data", "markets", "kalshi", "strike_tables", f"{symbol_lower}_watchlist.json")
         
-        if os.path.exists(watchlist_file):
-            data = safe_read_json(watchlist_file)
-            if data is None:
-                return {"error": f"Error reading watchlist file for {symbol}"}
-            return data
-        else:
-            return {"error": f"Watchlist file not found for {symbol}"}
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        
+        with conn.cursor() as cursor:
+            # Get header data
+            cursor.execute(f"""
+                SELECT 
+                    symbol,
+                    current_price,
+                    ttc_seconds,
+                    broker,
+                    event_ticker,
+                    market_title,
+                    strike_tier,
+                    market_status
+                FROM live_data.watchlist_{symbol_lower}
+                LIMIT 1
+            """)
+            
+            header_data = cursor.fetchone()
+            
+            if not header_data:
+                return {"error": f"No watchlist data found for {symbol}"}
+            
+            # Get all strike rows
+            cursor.execute(f"""
+                SELECT 
+                    strike,
+                    buffer,
+                    buffer_pct,
+                    probability,
+                    yes_ask,
+                    no_ask,
+                    yes_diff,
+                    no_diff,
+                    volume,
+                    ticker,
+                    active_side
+                FROM live_data.watchlist_{symbol_lower}
+                ORDER BY probability DESC
+            """)
+            
+            strikes_data = cursor.fetchall()
+            conn.close()
+            
+            # Build response in the same format as JSON
+            response = {
+                "symbol": header_data[0],
+                "current_price": float(header_data[1]) if header_data[1] else None,
+                "ttc": int(header_data[2]) if header_data[2] else None,
+                "broker": header_data[3],
+                "event_ticker": header_data[4],
+                "market_title": header_data[5],
+                "strike_tier": header_data[6],
+                "market_status": header_data[7],
+                "strikes": []
+            }
+            
+            for row in strikes_data:
+                strike = {
+                    "strike": float(row[0]) if row[0] else None,
+                    "buffer": float(row[1]) if row[1] else None,
+                    "buffer_pct": float(row[2]) if row[2] else None,
+                    "probability": float(row[3]) if row[3] else None,
+                    "yes_ask": int(row[4]) if row[4] else None,
+                    "no_ask": int(row[5]) if row[5] else None,
+                    "yes_diff": float(row[6]) if row[6] else None,
+                    "no_diff": float(row[7]) if row[7] else None,
+                    "volume": int(row[8]) if row[8] else None,
+                    "ticker": row[9],
+                    "active_side": row[10]
+                }
+                response["strikes"].append(strike)
+            
+            return response
+            
     except Exception as e:
-        return {"error": f"Error loading watchlist for {symbol}: {str(e)}"}
+        return {"error": f"Error loading watchlist for {symbol} from PostgreSQL: {str(e)}"}
 
 @app.get("/api/unified_ttc/{symbol}")
 async def get_unified_ttc(symbol: str):

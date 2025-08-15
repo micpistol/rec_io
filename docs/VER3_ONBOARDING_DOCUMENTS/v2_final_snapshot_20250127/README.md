@@ -56,6 +56,7 @@ This package contains the complete v2 system snapshot from the system architect 
 - `CI_CD_and_Container_Guide.md` – Local-first → DigitalOcean pipeline
 - `DigitalOcean_Deployment_Guide.md` – Complete DigitalOcean deployment guide with environment setup, deployment procedures, rollback mechanisms, and maintenance
 - `Performance_Baselines.md` – Current v2 performance metrics, v3 targets, monitoring setup, and alert thresholds
+- `POSTGRESQL_MIGRATION_PERFORMANCE_AUDIT.md` – Comprehensive performance audit comparing pre/post PostgreSQL migration with 97% CPU reduction and 70% memory improvement
 - `supervisor/*.conf` – Process management configs
 
 ### 05_Security/

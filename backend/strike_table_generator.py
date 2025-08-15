@@ -230,6 +230,69 @@ class StrikeTableGenerator:
         self.symbol = symbol.lower()
         self.db_config = POSTGRES_CONFIG
         self.calculator = LookupProbabilityCalculator(symbol)
+    
+    def generate_market_title(self, event_ticker: str) -> str:
+        """
+        Generate a human-readable market title from event ticker.
+        
+        Args:
+            event_ticker: Event ticker like 'KXBTCD-25AUG1515'
+            
+        Returns:
+            Formatted title like 'BTC price today at 3pm'
+        """
+        if not event_ticker:
+            return "BTC price today"
+        
+        try:
+            # Parse event ticker format: KXBTCD-25AUG1515
+            # KXBTCD = Kalshi Bitcoin Daily
+            # 25AUG15 = August 15, 2025 at 15:00 (3pm)
+            
+            # Extract date and time from the end
+            parts = event_ticker.split('-')
+            if len(parts) < 2:
+                return "BTC price today"
+            
+            date_time_part = parts[-1]  # 25AUG1515
+            
+            # Extract date (25AUG15) and hour (15)
+            if len(date_time_part) >= 7:
+                date_part = date_time_part[:-2]  # 25AUG15
+                hour_part = date_time_part[-2:]  # 15
+                
+                # Parse date
+                day = date_part[:2]  # 25
+                month = date_part[2:5]  # AUG
+                year = date_part[5:]  # 15
+                
+                # Convert to 24-hour format and then to 12-hour format
+                hour_24 = int(hour_part)
+                if hour_24 == 0:
+                    time_str = "12am"
+                elif hour_24 < 12:
+                    time_str = f"{hour_24}am"
+                elif hour_24 == 12:
+                    time_str = "12pm"
+                else:
+                    time_str = f"{hour_24 - 12}pm"
+                
+                # Check if it's today
+                today = datetime.now()
+                event_date = datetime.strptime(f"{day}{month}20{year}", "%d%b%Y")
+                
+                if event_date.date() == today.date():
+                    return f"BTC price today at {time_str}"
+                else:
+                    # Format date like "Aug 15"
+                    month_name = event_date.strftime("%b")
+                    return f"BTC price on {month_name} {day} at {time_str}"
+            
+            return "BTC price today"
+            
+        except Exception as e:
+            logger.error(f"Error parsing event ticker {event_ticker}: {e}")
+            return "BTC price today"
         
     def setup_live_data_schema(self):
         """Create live_data schema and tables if they don't exist."""
@@ -595,6 +658,9 @@ class StrikeTableGenerator:
                         no_diff = probability - no_ask
                         active_side = 'no'
                     
+                    # Generate market title from event ticker
+                    market_title = self.generate_market_title(market_data.get("event_ticker"))
+                    
                     # Insert into database
                     cursor.execute(f"""
                     INSERT INTO live_data.strike_table_{self.symbol.lower()} 
@@ -604,7 +670,7 @@ class StrikeTableGenerator:
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         self.symbol.upper(), current_price, ttc_seconds, "Kalshi",
-                        market_data.get("event_ticker"), market_data.get("event_title"),
+                        market_data.get("event_ticker"), market_title,
                         market_data.get("strike_tier"), market_data.get("market_status"),
                         strike, buffer, buffer_pct, probability,
                         yes_ask, no_ask, yes_diff, no_diff,

@@ -57,9 +57,7 @@ class SystemMonitor:
             "symbol_price_watchdog_eth": get_port("symbol_price_watchdog_eth"),
             "strike_table_generator": get_port("strike_table_generator"),
             "kalshi_account_sync": get_port("kalshi_account_sync"),
-            "kalshi_api_watchdog": get_port("kalshi_api_watchdog"),
             "kalshi_api_watchdog_postgresql": get_port("kalshi_api_watchdog_postgresql"),
-            "unified_production_coordinator": get_port("unified_production_coordinator"),
             "cascading_failure_detector": get_port("cascading_failure_detector"),
             "system_monitor": get_port("system_monitor")
         }
@@ -69,8 +67,7 @@ class SystemMonitor:
             "auto_entry_supervisor",
             "trade_manager", 
             "trade_executor",
-            "active_trade_supervisor",
-            "unified_production_coordinator"
+            "active_trade_supervisor"
         ]
     
     def check_service_health(self, service_name: str, port: int) -> Dict[str, Any]:
@@ -332,7 +329,6 @@ class SystemMonitor:
             
             # System management
             "cascading_failure_detector",
-            "unified_production_coordinator",
             "system_monitor"
         ]
         
@@ -668,8 +664,8 @@ class SystemMonitor:
                 service_categories = {
                     "Core Trading": ["main_app", "trade_manager", "trade_executor", "auto_entry_supervisor", "active_trade_supervisor"],
                     "Data Services": ["symbol_price_watchdog_btc", "symbol_price_watchdog_eth", "strike_table_generator", "kalshi_api_watchdog_postgresql"],
-                    "Kalshi API": ["kalshi_account_sync", "kalshi_api_watchdog"],
-                    "System Management": ["cascading_failure_detector", "unified_production_coordinator", "system_monitor"]
+                    "Kalshi API": ["kalshi_account_sync"],
+                    "System Management": ["cascading_failure_detector", "system_monitor"]
                 }
                 
                 for category, services in service_categories.items():

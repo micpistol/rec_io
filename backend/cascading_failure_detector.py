@@ -54,7 +54,6 @@ class CascadingFailureDetector:
         "symbol_price_watchdog_eth", # ETH price data
         "strike_table_generator", # Strike table data
             "kalshi_account_sync", # Kalshi API sync
-            "kalshi_api_watchdog", # Kalshi API monitoring
             "kalshi_api_watchdog_postgresql" # Kalshi API PostgreSQL market data
         ]
         
