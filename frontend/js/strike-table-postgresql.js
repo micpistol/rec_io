@@ -544,6 +544,18 @@ async function updateStrikeTable() {
       updateFingerprintDisplay();
     }
 
+    // Update momentum bucket display
+    const momentumBucketDisplay = document.getElementById('momentum-bucket-display');
+    if (momentumBucketDisplay && strikeTableData.momentum_bucket !== undefined) {
+      const bucket = strikeTableData.momentum_bucket;
+      const sign = bucket >= 0 ? '+' : '';
+      momentumBucketDisplay.textContent = `${sign}${bucket}`;
+      
+      // Color coding based on bucket value
+      momentumBucketDisplay.style.color = bucket === 0 ? '#888' : 
+                                         bucket > 0 ? '#45d34a' : '#dc3545';
+    }
+
     // Update heat band if function exists
     if (typeof updateMomentumHeatBandSegmented === 'function') {
       setTimeout(() => {

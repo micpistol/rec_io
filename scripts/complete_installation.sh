@@ -397,6 +397,8 @@ setup_kalshi_credentials() {
     
     read -p "Press Enter to continue with credential setup..."
     echo ""
+    
+    {
         log_info "Setting up Kalshi credentials..."
         
         # Get user input for credentials
@@ -421,9 +423,20 @@ email:${kalshi_email}
 key:${kalshi_api_key}
 EOF
         
-        # Create PEM file (if user has one)
+        # Create PEM file (REQUIRED for trading functionality)
         echo ""
-        read -p "Do you have a Kalshi certificate file (.pem)? (y/n): " -n 1 -r
+        echo "🔐 KALSHI PRIVATE KEY FILE (.pem) - REQUIRED"
+        echo "============================================="
+        echo ""
+        echo "The kalshi.pem file is a cryptographic private key required for:"
+        echo "  • API request signing"
+        echo "  • Trading functionality"
+        echo "  • Account synchronization"
+        echo ""
+        echo "This file must be obtained from your Kalshi account."
+        echo ""
+        
+        read -p "Do you have your Kalshi private key file (.pem)? (y/n): " -n 1 -r
         echo ""
         
         if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -431,14 +444,33 @@ EOF
             if [[ -f "$pem_file_path" ]]; then
                 cp "$pem_file_path" backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
                 chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
-                log_success "Certificate file copied"
+                log_success "Private key file copied successfully"
             else
-                log_warning "Certificate file not found, creating empty file"
-                touch backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
-                chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
+                log_error "Private key file not found at specified path"
+                echo ""
+                echo "❌ ERROR: The .pem file was not found at: $pem_file_path"
+                echo "   Please check the path and try again."
+                echo ""
+                read -p "Enter the correct path to your .pem file: " pem_file_path
+                if [[ -f "$pem_file_path" ]]; then
+                    cp "$pem_file_path" backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
+                    chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
+                    log_success "Private key file copied successfully"
+                else
+                    log_error "Private key file still not found - creating empty file"
+                    echo ""
+                    echo "⚠️  WARNING: Creating empty .pem file. Trading services will not function properly."
+                    echo "   You must manually add your private key file later."
+                    touch backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
+                    chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
+                fi
             fi
         else
-            log_info "Creating empty certificate file"
+            log_warning "No private key file provided"
+            echo ""
+            echo "⚠️  WARNING: No .pem file provided. Trading services will not function properly."
+            echo "   You must manually add your private key file later."
+            echo ""
             touch backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
             chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem
         fi
@@ -455,6 +487,7 @@ EOF
         # Create .env file for environment configuration
         cat > backend/data/users/user_0001/credentials/kalshi-credentials/prod/.env << EOF
 KALSHI_API_KEY_ID=${kalshi_api_key}
+KALSHI_API_SECRET=${kalshi_api_secret}
 KALSHI_PRIVATE_KEY_PATH=kalshi.pem
 KALSHI_EMAIL=${kalshi_email}
 EOF
@@ -478,7 +511,7 @@ EOF
         supervisorctl -c backend/supervisord.conf status | grep -E "(kalshi|trade|unified)"
         
         log_success "Trading services started with credentials"
-    fi
+    }
 }
 
 # Main installation function

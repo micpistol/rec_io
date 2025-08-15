@@ -2514,12 +2514,17 @@ async def get_postgresql_strike_table(symbol: str):
             
             strikes_data = cursor.fetchall()
             
+            # Calculate momentum bucket from momentum_weighted_score
+            momentum_score = float(header_data[3]) if header_data[3] else 0
+            momentum_bucket = round(momentum_score * 100)
+            
             # Format the response
             response = {
                 "symbol": header_data[0],
                 "current_price": float(header_data[1]) if header_data[1] else None,
                 "ttc_seconds": int(header_data[2]) if header_data[2] else None,
-                "momentum_weighted_score": float(header_data[3]) if header_data[3] else None,
+                "momentum_weighted_score": momentum_score,
+                "momentum_bucket": momentum_bucket,
                 "market_title": header_data[4],
                 "timestamp": header_data[5].isoformat() if header_data[5] else None,
                 "strikes": []
