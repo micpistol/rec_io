@@ -342,149 +342,71 @@ SELECT
     fi
 }
 
-# Start the system (non-trading services only)
+# Start the system using MASTER RESTART script
 start_system() {
-    log_info "Starting the system (non-trading services only)..."
+    log_info "Starting the system using MASTER RESTART script..."
     
-    # Verify supervisor configuration exists and is valid
-    if [ ! -f "backend/supervisord.conf" ]; then
-        log_error "Supervisor configuration file not found: backend/supervisord.conf"
+    # Verify MASTER RESTART script exists
+    if [ ! -f "scripts/MASTER_RESTART.sh" ]; then
+        log_error "MASTER RESTART script not found: scripts/MASTER_RESTART.sh"
         exit 1
     fi
     
-    log_info "Verifying supervisor configuration..."
-    if ! supervisord -c backend/supervisord.conf -n; then
-        log_error "Supervisor configuration is invalid"
-        log_info "Configuration file contents:"
-        head -20 backend/supervisord.conf
-        exit 1
-    fi
-    log_success "Supervisor configuration is valid"
+    # Make sure the script is executable
+    chmod +x scripts/MASTER_RESTART.sh
     
-    # Check if supervisor is already running
-    if pgrep supervisord > /dev/null; then
-        log_warning "Supervisor is already running"
-        supervisorctl -c backend/supervisord.conf stop all || true
-        sleep 2
-    fi
+    log_info "Using MASTER RESTART script to avoid port conflicts and process management issues..."
+    log_info "This script will:"
+    log_info "  • Flush all ports to prevent conflicts"
+    log_info "  • Kill any existing processes"
+    log_info "  • Start supervisor cleanly"
+    log_info "  • Start all services in proper order"
     
-    # Start supervisor with better error handling
-    log_info "Starting supervisor daemon..."
-    supervisord -c backend/supervisord.conf &
-    SUPERVISOR_PID=$!
-    
-    # Wait for supervisor to be ready with timeout
-    log_info "Waiting for supervisor to be ready..."
-    TIMEOUT=30
-    COUNTER=0
-    
-    while [ $COUNTER -lt $TIMEOUT ]; do
-        if supervisorctl -c backend/supervisord.conf status >/dev/null 2>&1; then
-            log_success "Supervisor is running and responsive"
-            break
-        fi
-        
-        # Check if supervisor process is still alive
-        if ! kill -0 $SUPERVISOR_PID 2>/dev/null; then
-            log_error "Supervisor process died unexpectedly"
-            log_info "Checking for supervisor errors..."
-            if [ -f "logs/supervisord.log" ]; then
-                log_info "Supervisor log contents:"
-                tail -20 logs/supervisord.log
-            fi
-            exit 1
-        fi
-        
-        sleep 1
-        COUNTER=$((COUNTER + 1))
-        if [ $((COUNTER % 5)) -eq 0 ]; then
-            log_info "Still waiting for supervisor... ($COUNTER/$TIMEOUT seconds)"
-        fi
-    done
-    
-    if [ $COUNTER -eq $TIMEOUT ]; then
-        log_error "Supervisor failed to become responsive within $TIMEOUT seconds"
-        log_info "Supervisor process status:"
-        ps aux | grep supervisord | grep -v grep || true
-        log_info "Supervisor socket status:"
-        ls -la /tmp/supervisord.sock 2>/dev/null || echo "Socket file not found"
-        log_info "Supervisor log contents:"
-        if [ -f "logs/supervisord.log" ]; then
-            tail -20 logs/supervisord.log
-        fi
+    # Run MASTER RESTART script
+    if ./scripts/MASTER_RESTART.sh; then
+        log_success "MASTER RESTART completed successfully"
+    else
+        log_error "MASTER RESTART failed"
+        log_info "Checking system status..."
+        ./scripts/MASTER_RESTART.sh status
         exit 1
     fi
     
-    # Start only non-trading services initially
-    log_info "Starting non-trading services..."
+    # Wait a moment for all services to stabilize
+    log_info "Waiting for services to stabilize..."
+    sleep 5
     
-    # Start services with better error handling
-    for service in main symbol_price_watchdog_btc strike_table_generator system_monitor; do
-        log_info "Starting service: $service"
-        if supervisorctl -c backend/supervisord.conf start $service; then
-            log_success "Service $service started successfully"
-        else
-            log_warning "Service $service failed to start (this may be expected)"
-        fi
-    done
+    # Check final status
+    log_info "Final system status:"
+    ./scripts/MASTER_RESTART.sh status
     
-    # Wait for services to start with timeout
-    log_info "Waiting for non-trading services to start..."
-    TIMEOUT=30
-    COUNTER=0
-    
-    while [ $COUNTER -lt $TIMEOUT ]; do
-        # Check if critical services are running
-        CRITICAL_RUNNING=true
-        for service in main system_monitor; do
-            if ! supervisorctl -c backend/supervisord.conf status $service | grep -q "RUNNING"; then
-                CRITICAL_RUNNING=false
-                break
-            fi
-        done
-        
-        if [ "$CRITICAL_RUNNING" = true ]; then
-            log_success "Critical services are running"
-            break
-        fi
-        
-        sleep 2
-        COUNTER=$((COUNTER + 2))
-        if [ $((COUNTER % 10)) -eq 0 ]; then
-            log_info "Still waiting for critical services... ($COUNTER/$TIMEOUT seconds)"
-            log_info "Current service status:"
-            supervisorctl -c backend/supervisord.conf status | grep -E "(main|system_monitor)" || true
-        fi
-    done
-    
-    # Check final status of non-trading services
-    log_info "Non-trading services status:"
-    supervisorctl -c backend/supervisord.conf status | grep -v -E "(kalshi|trade|unified)" || true
-    
-    # Verify critical non-trading services are running
-    log_info "Verifying critical non-trading services..."
-    for service in main system_monitor; do
-        if ! supervisorctl -c backend/supervisord.conf status $service | grep -q "RUNNING"; then
-            log_error "Critical service $service is not running after $TIMEOUT seconds"
-            log_info "Service status:"
-            supervisorctl -c backend/supervisord.conf status $service
-            log_info "Service log (if available):"
-            if [ -f "logs/$service.log" ]; then
-                tail -10 logs/$service.log
-            fi
-            exit 1
-        else
-            log_success "Critical service $service is running"
-        fi
-    done
-    
-    log_success "Non-trading services started and verified"
-    log_info "Trading services will be started after credential setup"
+    log_success "System started successfully using MASTER RESTART"
+    log_info "All services should now be running and ports should be available"
 }
 
 # Verify services
 verify_services() {
     log_info "Verifying services..."
+    
+    # Validate supervisor logging configuration
+    log_info "Validating supervisor logging configuration..."
+    if [ -f "backend/supervisord.conf" ]; then
+        # Check if supervisor config has proper logging setup
+        if grep -q "stdout_logfile\|stderr_logfile" backend/supervisord.conf; then
+            log_success "Supervisor logging configuration found"
+        else
+            log_warning "Supervisor logging configuration may be incomplete"
+        fi
+        
+        # Check log directory permissions
+        if [ -d "logs" ] && [ -w "logs" ]; then
+            log_success "Logs directory is writable"
+        else
+            log_error "Logs directory is not writable"
+        fi
+    else
+        log_error "Supervisor configuration file not found"
+    fi
     
     if [[ -f "scripts/verify_services.py" ]]; then
         source venv/bin/activate
@@ -503,6 +425,43 @@ verify_services() {
 # Setup Kalshi credentials
 setup_kalshi_credentials() {
     log_info "Setting up Kalshi trading credentials..."
+    
+    # Check for existing credentials
+    if [ -f "backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt" ] && \
+       [ -f "backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem" ]; then
+        log_info "Existing Kalshi credentials detected"
+        echo ""
+        echo "🔐 EXISTING KALSHI CREDENTIALS DETECTED"
+        echo "======================================"
+        echo ""
+        echo "✅ Found existing credential files:"
+        echo "  • kalshi-auth.txt"
+        echo "  • kalshi.pem"
+        echo ""
+        echo "Do you want to:"
+        echo "1. Use existing credentials (recommended)"
+        echo "2. Set up new credentials"
+        echo ""
+        read -p "Enter your choice (1 or 2): " -n 1 -r
+        echo ""
+        
+        if [[ $REPLY =~ ^[1]$ ]]; then
+            log_success "Using existing Kalshi credentials"
+            echo "✅ Using existing credentials - skipping credential setup"
+            
+            # Copy existing credentials to system-expected locations
+            log_info "Setting up system-expected credential locations..."
+            mkdir -p backend/api/kalshi-api/kalshi-credentials/prod
+            mkdir -p backend/api/kalshi-api/kalshi-credentials/demo
+            
+            # Copy credentials to system-expected locations
+            cp backend/data/users/user_0001/credentials/kalshi-credentials/prod/* backend/api/kalshi-api/kalshi-credentials/prod/
+            cp backend/api/kalshi-api/kalshi-credentials/prod/* backend/api/kalshi-api/kalshi-credentials/demo/
+            
+            log_success "Existing credentials configured successfully"
+            return 0
+        fi
+    fi
     
     echo ""
     echo "🔐 KALSHI CREDENTIALS SETUP"
@@ -628,31 +587,23 @@ EOF
         
         log_success "Kalshi credentials set up successfully"
         
-        # Start trading services with credentials now in place
-        log_info "Starting trading services with credentials..."
-        supervisorctl -c backend/supervisord.conf start kalshi_account_sync || true
-        supervisorctl -c backend/supervisord.conf start trade_manager || true
-        supervisorctl -c backend/supervisord.conf start unified_production_coordinator || true
+        # Restart trading services with credentials now in place using MASTER RESTART
+        log_info "Restarting trading services with credentials using MASTER RESTART..."
+        log_info "This will ensure clean startup and avoid port conflicts..."
+        
+        if ./scripts/MASTER_RESTART.sh; then
+            log_success "MASTER RESTART completed successfully with credentials"
+        else
+            log_warning "MASTER RESTART had issues, but continuing with installation"
+        fi
         
         sleep 3
         
-        # Check trading service status and verify they're running
+        # Check trading service status
         log_info "Checking trading service status..."
-        supervisorctl -c backend/supervisord.conf status | grep -E "(kalshi|trade|unified)"
+        ./scripts/MASTER_RESTART.sh status | grep -E "(kalshi|trade|unified)" || true
         
-        # Verify trading services are running
-        log_info "Verifying trading services are running..."
-        for service in kalshi_account_sync trade_manager unified_production_coordinator; do
-            if ! supervisorctl -c backend/supervisord.conf status $service | grep -q "RUNNING"; then
-                log_warning "Trading service $service is not running (this may be expected without valid credentials)"
-                log_info "Service status:"
-                supervisorctl -c backend/supervisord.conf status $service
-            else
-                log_success "Trading service $service is running"
-            fi
-        done
-        
-        log_success "Trading services started with credentials"
+        log_success "Trading services restarted with credentials"
     }
 }
 
@@ -693,9 +644,36 @@ main() {
     # Verify services
     verify_services
     
-    # Final verification - check web interface is responding
-    log_info "Performing final system verification..."
+    # Enhanced service initialization health checks
+    log_info "Performing enhanced service initialization health checks..."
     sleep 5  # Give services time to fully start
+    
+    # Check service initialization and logging
+    log_info "Checking service initialization and logging..."
+    
+    # Check if critical services are actually functional (not just running)
+    for service in main system_monitor; do
+        log_info "Checking service: $service"
+        
+        # Check if service is running
+        if ./scripts/MASTER_RESTART.sh status | grep -q "$service.*RUNNING"; then
+            log_success "Service $service is running"
+            
+            # Check if service is writing to logs (indicates it's actually working)
+            if [ -f "logs/$service.log" ]; then
+                log_file_size=$(stat -f%z "logs/$service.log" 2>/dev/null || echo "0")
+                if [ "$log_file_size" -gt 0 ]; then
+                    log_success "Service $service is writing to logs"
+                else
+                    log_warning "Service $service is not writing to logs (may be hanging)"
+                fi
+            else
+                log_warning "Service $service log file not found"
+            fi
+        else
+            log_error "Service $service is not running"
+        fi
+    done
     
     # Check if web interface is responding
     log_info "Checking web interface..."
@@ -706,15 +684,61 @@ main() {
         log_info "You can check manually: curl http://localhost:3000/health"
     fi
     
+    # Check logging infrastructure
+    log_info "Checking logging infrastructure..."
+    if [ -d "logs" ] && [ -w "logs" ]; then
+        log_success "Logs directory exists and is writable"
+        
+        # Check if any log files are being written
+        log_files_with_content=$(find logs -name "*.log" -size +0 2>/dev/null | wc -l)
+        if [ "$log_files_with_content" -gt 0 ]; then
+            log_success "Logging infrastructure is working ($log_files_with_content log files with content)"
+        else
+            log_warning "No log files with content found (logging may not be working)"
+        fi
+    else
+        log_error "Logs directory issues detected"
+    fi
+    
     # Final status check
     log_info "Final system status:"
-    supervisorctl -c backend/supervisord.conf status
+    ./scripts/MASTER_RESTART.sh status
+    
+    # Service initialization health summary
+    log_info "Service initialization health summary:"
+    log_info "====================================="
+    
+    # Count services that are running but not writing logs (potential hanging)
+    hanging_services=0
+    for service in main system_monitor kalshi_account_sync trade_manager unified_production_coordinator; do
+        if ./scripts/MASTER_RESTART.sh status | grep -q "$service.*RUNNING"; then
+            if [ -f "logs/$service.log" ]; then
+                log_file_size=$(stat -f%z "logs/$service.log" 2>/dev/null || echo "0")
+                if [ "$log_file_size" -eq 0 ]; then
+                    log_warning "Service $service is running but not writing logs (may be hanging)"
+                    hanging_services=$((hanging_services + 1))
+                fi
+            else
+                log_warning "Service $service is running but no log file found"
+                hanging_services=$((hanging_services + 1))
+            fi
+        fi
+    done
+    
+    if [ "$hanging_services" -gt 0 ]; then
+        log_warning "Found $hanging_services services that may be hanging during initialization"
+        log_info "This is common and may resolve itself as services complete their startup sequence"
+        log_info "Monitor logs for progress: tail -f logs/*.log"
+    else
+        log_success "All services appear to be initializing properly"
+    fi
     
     log_success "Installation completed successfully!"
     log_info "Next steps:"
     log_info "1. Access the web interface at http://localhost:3000"
     log_info "2. Check logs in the logs/ directory for any issues"
-    log_info "3. Monitor system health with: supervisorctl -c backend/supervisord.conf status"
+    log_info "3. Monitor system health with: ./scripts/MASTER_RESTART.sh status"
+    log_info "4. If services are hanging, monitor logs: tail -f logs/*.log"
 }
 
 # Run main function

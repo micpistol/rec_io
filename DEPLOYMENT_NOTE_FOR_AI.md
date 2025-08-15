@@ -32,6 +32,14 @@ This script addresses ALL issues found in previous installation attempts and pro
 
 **🔧 ENHANCED ERROR HANDLING**: Installation script now includes comprehensive error handling, timeouts, and debugging information to identify and resolve supervisor startup issues.
 
+**🚀 MASTER RESTART INTEGRATION**: Installation script now uses the MASTER RESTART script to avoid port conflicts and process management issues that were causing service startup failures.
+
+**🔧 WEBSOCKET COMPATIBILITY FIX**: Fixed Python 3.13 + WebSockets 15.0.1 compatibility issue by changing `extra_headers` to `additional_headers` in WebSocket connections.
+
+**🔐 CREDENTIAL DETECTION**: Installation script now detects existing Kalshi credentials and offers to reuse them instead of requiring re-entry.
+
+**🔍 SERVICE INITIALIZATION MONITORING**: Installation script now includes comprehensive health checks for service initialization and logging infrastructure to detect hanging services.
+
 ---
 
 ## 🔧 **MANUAL STEP-BY-STEP INSTALLATION (ALTERNATIVE)**
@@ -261,12 +269,11 @@ chmod 700 backend/data/users/user_0001/credentials
 ### **Supervisor Socket Issues**
 If you see `unix:///tmp/supervisord.sock no such file`:
 ```bash
-# Generate correct supervisor config for your system
-bash scripts/generate_supervisor_config.sh
-# Start supervisor daemon
-supervisord -c backend/supervisord.conf
-# Now check status
-supervisorctl -c backend/supervisord.conf status
+# Use MASTER RESTART script to handle all process and port management
+./scripts/MASTER_RESTART.sh
+
+# Check status
+./scripts/MASTER_RESTART.sh status
 ```
 
 ### **Enhanced Supervisor Troubleshooting**
@@ -295,14 +302,14 @@ The installation script now includes comprehensive error handling. If supervisor
 
 5. **Manual recovery**:
    ```bash
-   # Stop any existing supervisor
-   pkill supervisord
-   
-   # Start supervisor manually
-   supervisord -c backend/supervisord.conf
+   # Use MASTER RESTART script for comprehensive process management
+   ./scripts/MASTER_RESTART.sh
    
    # Check status
-   supervisorctl -c backend/supervisord.conf status
+   ./scripts/MASTER_RESTART.sh status
+   
+   # If MASTER RESTART fails, try emergency mode
+   ./scripts/MASTER_RESTART.sh emergency
    ```
 
 ### **Service Startup Issues**
@@ -316,13 +323,12 @@ If individual services fail to start:
 
 2. **Check service configuration**:
    ```bash
-   supervisorctl -c backend/supervisord.conf status
+   ./scripts/MASTER_RESTART.sh status
    ```
 
-3. **Restart specific services**:
+3. **Restart all services using MASTER RESTART**:
    ```bash
-   supervisorctl -c backend/supervisord.conf restart main
-   supervisorctl -c backend/supervisord.conf restart system_monitor
+   ./scripts/MASTER_RESTART.sh
    ```
 
 ### **Credential Setup During Installation**
@@ -364,7 +370,7 @@ After successful installation:
 2. **Monitor System Health**
    ```bash
    # Check service status
-   supervisorctl -c backend/supervisord.conf status
+   ./scripts/MASTER_RESTART.sh status
    
    # Monitor logs
    tail -f logs/*.log

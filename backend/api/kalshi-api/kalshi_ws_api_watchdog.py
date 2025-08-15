@@ -270,7 +270,7 @@ class KalshiMarketTickerWatchdog:
             # Connect with authentication headers
             self.websocket = await websockets.connect(
                 WS_URL,
-                extra_headers=headers,
+                additional_headers=headers,
                 ping_interval=10,
                 ping_timeout=10,
                 close_timeout=10
