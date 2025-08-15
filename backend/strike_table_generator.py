@@ -470,13 +470,16 @@ class StrikeTableGenerator:
             raise
     
     def calculate_ttc_seconds(self, strike_date: str) -> int:
-        """Calculate time to close in seconds from strike date."""
+        """Calculate time to close in seconds - always top of next hour."""
         try:
-            from datetime import datetime
-            strike_datetime = datetime.fromisoformat(strike_date.replace('Z', '+00:00'))
-            now = datetime.now(strike_datetime.tzinfo)
-            ttc_seconds = int((strike_datetime - now).total_seconds())
-            return max(60, min(3600, ttc_seconds))  # Clamp to 1-60 minutes
+            from datetime import datetime, timedelta
+            now = datetime.now()
+            
+            # Calculate time to top of next hour
+            next_hour = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+            ttc_seconds = int((next_hour - now).total_seconds())
+            
+            return max(60, ttc_seconds)  # Minimum 60 seconds
         except Exception as e:
             logger.warning(f"⚠️ Error calculating TTC, using default: {e}")
             return 300  # Default 5 minutes
