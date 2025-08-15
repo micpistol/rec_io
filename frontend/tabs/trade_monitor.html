@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/styles/global.css">
 <link rel="stylesheet" href="/styles/strike-table.css">
 <script src="/js/live-data.js"></script>
-<script src="/js/strike-table.js"></script>
+<script src="/js/strike-table-postgresql.js"></script>
 <script src="/js/watchlist-table.js"></script>
 
         <script src="/js/globals.js"></script>
@@ -779,6 +779,8 @@ function hideAutoEntrySettingsModal() {
     document.addEventListener('DOMContentLoaded', () => {
       // Initial load of active trades
       fetchAndRenderTrades();
+      
+
       
       // Active trades are now updated by the strike table loop in live-data.js
       // No separate polling needed

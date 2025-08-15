@@ -150,8 +150,8 @@ async function updateMiddleColumnData() {
     updateMarketTitle(strikeTableData);
     
     // Update TTC display from strike table data
-    if (strikeTableData && strikeTableData.ttc !== undefined) {
-      updateTTCDisplay(strikeTableData.ttc);
+    if (strikeTableData && strikeTableData.ttc_seconds !== undefined) {
+      updateTTCDisplay(strikeTableData.ttc_seconds);
     }
     
     // Update BTC price display from strike table data
