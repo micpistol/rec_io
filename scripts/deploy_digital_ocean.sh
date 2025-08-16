@@ -132,17 +132,27 @@ create_deployment_package() {
     mkdir -p backup
     DEPLOY_PACKAGE="backup/full_deployment_${DEPLOY_TIMESTAMP}.tar.gz"
     
-    # Create deployment package
-    tar --exclude='venv' \
-        --exclude='logs/*' \
-        --exclude='*.pyc' \
-        --exclude='__pycache__' \
-        --exclude='.git' \
-        --exclude='temp_*' \
-        --exclude='backup' \
-        --exclude='node_modules' \
-        --exclude='.DS_Store' \
-        -czf "$DEPLOY_PACKAGE" .
+    # Create deployment package from temporary directory to avoid hostname issues
+    TEMP_DIR=$(mktemp -d)
+    cp -r . "$TEMP_DIR/rec_io"
+    cd "$TEMP_DIR"
+    
+    # Remove excluded directories from temp copy
+    rm -rf rec_io/venv
+    rm -rf rec_io/logs/* 2>/dev/null || true
+    rm -rf rec_io/backup
+    find rec_io -name "temp_*" -type d -exec rm -rf {} + 2>/dev/null || true
+    find rec_io -name "*.pyc" -delete 2>/dev/null || true
+    find rec_io -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+    find rec_io -name ".DS_Store" -delete 2>/dev/null || true
+    find rec_io -name "node_modules" -type d -exec rm -rf {} + 2>/dev/null || true
+    
+    # Create tar from temp directory
+    tar -czf "$PROJECT_ROOT/$DEPLOY_PACKAGE" rec_io
+    
+    # Clean up temp directory
+    cd "$PROJECT_ROOT"
+    rm -rf "$TEMP_DIR"
     
     log_success "Deployment package created: $DEPLOY_PACKAGE"
     echo "$DEPLOY_PACKAGE"
@@ -172,7 +182,7 @@ setup_remote_server() {
 set -e
 cd /tmp
 
-# Extract deployment package
+# Extract deployment package (with rec_io prefix)
 tar -xzf $(basename "$deploy_package") -C $REMOTE_DIR --strip-components=1
 cd $REMOTE_DIR
 
