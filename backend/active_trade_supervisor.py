@@ -1457,7 +1457,22 @@ def get_all_active_trades() -> List[Dict[str, Any]]:
         rows = cursor.fetchall()
         conn.close()
         
-        return [dict(zip(columns, row)) for row in rows]
+        # Convert datetime objects to ISO format strings for JSON serialization
+        def convert_datetime_to_iso(obj):
+            if hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            return obj
+        
+        result = []
+        for row in rows:
+            trade_dict = dict(zip(columns, row))
+            # Convert any datetime objects to ISO strings
+            for key, value in trade_dict.items():
+                if hasattr(value, 'isoformat'):
+                    trade_dict[key] = value.isoformat()
+            result.append(trade_dict)
+        
+        return result
         
     except Exception as e:
         log(f"Error getting active trades: {e}")

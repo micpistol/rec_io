@@ -71,11 +71,11 @@ print_header() {
     echo -e "${PURPLE}=============================================================================${NC}"
 }
 
-# Function to check if a port is in use
+# Function to check if a port is in use (only listening processes)
 check_port() {
     local port=$1
-    if lsof -i :$port >/dev/null 2>&1; then
-        return 0  # Port is in use
+    if lsof -i :$port | grep LISTEN >/dev/null 2>&1; then
+        return 0  # Port is in use (listening)
     else
         return 1  # Port is free
     fi
