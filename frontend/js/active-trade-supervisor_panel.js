@@ -81,14 +81,14 @@ function initializeActiveTradeSupervisorTable() {
 async function fetchAndRenderActiveTradeSupervisorTrades() {
   try {
     
-    // Get the active trade supervisor service URL
+    // Get the active trades from the main app (which proxies to the active trade supervisor)
     let activeTradeSupervisorUrl;
     try {
-      activeTradeSupervisorUrl = getActiveTradeSupervisorUrl('/api/active_trades');
+      activeTradeSupervisorUrl = getMainAppUrl('/api/active_trades');
     } catch (error) {
       console.error('[ACTIVE TRADE SUPERVISOR] Port configuration error:', error);
-      // Fallback to hardcoded URL
-      activeTradeSupervisorUrl = `http://${window.location.hostname}:8007/api/active_trades`;
+      // Fallback to main app URL
+      activeTradeSupervisorUrl = `http://${window.location.hostname}:3000/api/active_trades`;
     }
     
     // Fetch active trades from the supervisor service
