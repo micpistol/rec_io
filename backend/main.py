@@ -1308,14 +1308,12 @@ async def get_trades(status: Optional[str] = None):
                 cursor.execute("""
                     SELECT * FROM users.trades_0001 
                     WHERE status = %s 
-                    ORDER BY id DESC 
-                    LIMIT 100
+                    ORDER BY id DESC
                 """, (status,))
             else:
                 cursor.execute("""
                     SELECT * FROM users.trades_0001 
-                    ORDER BY id DESC 
-                    LIMIT 100
+                    ORDER BY id DESC
                 """)
             
             trades = cursor.fetchall()
@@ -1719,8 +1717,7 @@ def get_trades_from_postgresql():
             # Get all trades from PostgreSQL
             cursor.execute("""
                 SELECT * FROM users.trades_0001 
-                ORDER BY id DESC 
-                LIMIT 100
+                ORDER BY id DESC
             """)
             trades = cursor.fetchall()
             
