@@ -2571,7 +2571,8 @@ async def get_strike_table(symbol: str):
                     event_ticker,
                     market_title,
                     strike_tier,
-                    market_status
+                    market_status,
+                    momentum_weighted_score
                 FROM live_data.strike_table_{symbol_lower}
                 LIMIT 1
             """)
@@ -2611,6 +2612,9 @@ async def get_strike_table(symbol: str):
                 "market_title": header_data[4],
                 "strike_tier": header_data[5],
                 "market_status": header_data[6],
+                "momentum": {
+                    "weighted_score": float(header_data[7]) if header_data[7] else 0.0
+                },
                 "strikes": []
             }
             
@@ -2823,10 +2827,43 @@ async def get_watchlist(symbol: str):
 
 @app.get("/api/unified_ttc/{symbol}")
 async def get_unified_ttc(symbol: str):
-    """Get unified TTC data for a specific symbol from unified production coordinator"""
+    """Get unified TTC data for a specific symbol from strike table"""
     try:
-        from unified_production_coordinator import get_unified_ttc
-        return get_unified_ttc(symbol)
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost",
+            database="rec_io_db",
+            user="rec_io_user",
+            password="rec_io_password"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT ttc_seconds, event_ticker, market_title, market_status
+                FROM live_data.strike_table_btc
+                WHERE market_status = 'active'
+                ORDER BY ttc_seconds ASC
+                LIMIT 1
+            """)
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result and result[0] is not None:
+                ttc_seconds = int(result[0])
+                return {
+                    "ttc_seconds": ttc_seconds,
+                    "event_ticker": result[1],
+                    "market_title": result[2],
+                    "market_status": result[3],
+                    "symbol": symbol.upper()
+                }
+            else:
+                return {
+                    "ttc_seconds": 0,
+                    "event_ticker": None,
+                    "market_title": None,
+                    "market_status": "no_active_markets",
+                    "symbol": symbol.upper()
+                }
     except Exception as e:
         return {"error": f"Error getting unified TTC: {str(e)}"}
 

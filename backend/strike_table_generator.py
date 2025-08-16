@@ -542,7 +542,7 @@ class StrikeTableGenerator:
             next_hour = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
             ttc_seconds = int((next_hour - now).total_seconds())
             
-            return max(60, ttc_seconds)  # Minimum 60 seconds
+            return max(0, ttc_seconds)  # Allow countdown to 0
         except Exception as e:
             logger.warning(f"⚠️ Error calculating TTC, using default: {e}")
             return 300  # Default 5 minutes

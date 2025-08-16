@@ -47,11 +47,6 @@
       "port": 8011,
       "description": "Strike table generation service",
       "status": "RUNNING"
-    },
-    "unified_production_coordinator": {
-      "port": 8010,
-      "description": "Unified data production coordinator",
-      "status": "RUNNING"
     }
   },
   

@@ -32,8 +32,7 @@ DEFAULT_PORTS = {
     "active_trade_supervisor": 6000,
 
     "kalshi_account_sync": 8004,
-    "kalshi_market_watchdog": 8005,
-    "unified_production_coordinator": 8010
+    "kalshi_market_watchdog": 8005
 }
 
 def ensure_port_config_exists():
