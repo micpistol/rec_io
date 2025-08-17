@@ -102,6 +102,47 @@ chmod 700 backend/data/users/user_0001/credentials 2>/dev/null || true
 # Clean up uploaded file
 rm -f "/tmp/$(basename "$DEPLOY_PACKAGE")"
 
+# Step 3.5: Setup Git Repository Connection
+echo "Setting up Git repository connection..."
+
+# Add GitHub to known hosts
+ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null || true
+
+# Check if we have SSH key for GitHub access
+if [[ ! -f ~/.ssh/id_ed25519 ]]; then
+    echo "⚠️  No SSH key found. Git repository will be read-only."
+    echo "To enable git pull, copy your SSH key to the server:"
+    echo "scp ~/.ssh/id_ed25519 root@$REMOTE_HOST:~/.ssh/"
+    echo "ssh root@$REMOTE_HOST 'chmod 600 ~/.ssh/id_ed25519'"
+else
+    # Copy SSH key for GitHub access
+    scp ~/.ssh/id_ed25519 "$REMOTE_USER@$REMOTE_HOST:~/.ssh/" 2>/dev/null || true
+    ssh "$REMOTE_USER@$REMOTE_HOST" "chmod 600 ~/.ssh/id_ed25519 2>/dev/null || true"
+    
+    # Clone fresh from git repository
+    echo "Cloning from git repository..."
+    ssh "$REMOTE_USER@$REMOTE_HOST" << 'GIT_SETUP'
+set -e
+cd /opt
+rm -rf rec_io_temp
+git clone git@github.com:betaclone1/rec_io.git rec_io_temp 2>/dev/null || {
+    echo "⚠️  Git clone failed. Using deployed files instead."
+    exit 0
+}
+
+# If git clone succeeded, replace the deployed files
+if [[ -d rec_io_temp ]]; then
+    rm -rf rec_io
+    mv rec_io_temp rec_io
+    cd rec_io
+    chmod +x scripts/*.sh
+    echo "✅ Git repository connected successfully"
+else
+    echo "⚠️  Using deployed files (no git connection)"
+fi
+GIT_SETUP
+fi
+
 echo "Remote server setup complete"
 EOF
 
@@ -322,5 +363,6 @@ log_info "2. Update user info: $REMOTE_DIR/backend/data/users/user_0001/user_inf
 log_info "3. Access the system at: http://$REMOTE_HOST:3000"
 log_info "4. Check logs: ssh $REMOTE_USER@$REMOTE_HOST 'tail -f $REMOTE_DIR/logs/*.out.log'"
 log_info "5. Restart system: ssh $REMOTE_USER@$REMOTE_HOST 'cd $REMOTE_DIR && ./scripts/MASTER_RESTART.sh'"
+log_info "6. Future updates: ssh $REMOTE_USER@$REMOTE_HOST 'cd $REMOTE_DIR && git pull && ./scripts/MASTER_RESTART.sh'"
 
 log_success "Simple Digital Ocean deployment completed successfully!"
