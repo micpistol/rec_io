@@ -7,7 +7,7 @@
 window.TRADE_CONFIG = {
   DEMO_MODE: false,  // Set to false for live trading
   MAX_POSITION_SIZE: 1000,
-  ENABLE_SOUNDS: true,
+  ENABLE_SOUNDS: function() { return window.isSoundEnabled ? window.isSoundEnabled() : true; },
   ENABLE_POPUPS: true
 };
 

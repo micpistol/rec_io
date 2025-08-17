@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>rec.io - Trading Platform (REMOTE SERVER)</title>
+  <title>rec.io - Trading Platform</title>
   <script>
     function setRealViewportHeight() {
       document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
@@ -258,6 +258,14 @@
       transition: transform 0.3s;
     }
     
+    /* Prevent sound icon from rotating and center it */
+    #soundToggle .nav-icon img {
+      transform: none !important;
+      transition: none !important;
+      display: block;
+      margin: 0 auto;
+    }
+    
     /* User Section Styles */
     .user-section {
       margin-top: auto;
@@ -408,6 +416,14 @@
         </a>
       </div>
       
+      <!-- Sound Toggle -->
+      <button class="sidebar-toggle" id="soundToggle" data-tooltip="Sound">
+        <span class="nav-icon" aria-hidden="true">
+          <img id="soundIcon" src="/images/icons/sound_on_icon.png" alt="Sound" style="width: 20px; height: 20px; object-fit: contain;">
+        </span>
+        <span class="toggle-label">Sound ON</span>
+      </button>
+      
       <!-- Collapse/Expand Button -->
       <button class="sidebar-toggle" id="sidebarToggle" data-tooltip="Expand">
         <span class="nav-icon" aria-hidden="true">
@@ -440,6 +456,47 @@
     const sidebarToggle = document.getElementById('sidebarToggle');
     const navItems = document.querySelectorAll('.nav-item');
     const contentFrames = document.querySelectorAll('.content-frame');
+    
+    // Sound control system
+    let soundEnabled = localStorage.getItem('soundEnabled') !== 'false'; // Default to true
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    const soundLabel = soundToggle.querySelector('.toggle-label');
+    
+    // Initialize sound toggle state
+    function initializeSoundToggle() {
+      updateSoundToggleDisplay();
+    }
+    
+    // Update sound toggle visual state
+    function updateSoundToggleDisplay() {
+      if (soundEnabled) {
+        soundLabel.textContent = 'Sound ON';
+        soundIcon.src = '/images/icons/sound_on_icon.png';
+      } else {
+        soundLabel.textContent = 'Sound OFF';
+        soundIcon.src = '/images/icons/sound_off_icon.png';
+      }
+    }
+    
+    // Toggle sound on/off
+    soundToggle.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      localStorage.setItem('soundEnabled', soundEnabled);
+      updateSoundToggleDisplay();
+    });
+    
+    // Global sound control function that can be used by other scripts
+    window.playSound = function(audioElement) {
+      if (soundEnabled && audioElement) {
+        audioElement.play().catch(e => console.log('Sound play failed:', e));
+      }
+    };
+    
+    // Global sound state getter
+    window.isSoundEnabled = function() {
+      return soundEnabled;
+    };
     
     // Tab configuration
     const tabConfig = {
@@ -505,6 +562,9 @@
       
       // Start system health monitoring for icon updates
       startSystemHealthMonitoring();
+
+      // Initialize sound toggle
+      initializeSoundToggle();
     });
     
     // Load user information and display in sidebar

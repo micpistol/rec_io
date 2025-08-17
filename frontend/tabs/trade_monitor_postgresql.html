@@ -2685,7 +2685,10 @@ async function fetchAndRenderPositions() {
       if (openSound) {
         const clone = openSound.cloneNode(true);
         clone.volume = 0.1;
-        clone.play().catch(err => {});
+        // Use global sound control
+        if (window.isSoundEnabled && window.isSoundEnabled()) {
+          clone.play().catch(err => {});
+        }
       }
       
       // Show green popup
@@ -2731,7 +2734,10 @@ async function fetchAndRenderPositions() {
       if (closeSound) {
         const clone = closeSound.cloneNode(true);
         clone.volume = 0.2;
-        clone.play().catch(err => {});
+        // Use global sound control
+        if (window.isSoundEnabled && window.isSoundEnabled()) {
+          clone.play().catch(err => {});
+        }
       }
       
       // Show red popup
