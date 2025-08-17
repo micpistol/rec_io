@@ -19,31 +19,13 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Configuration - Use portable paths
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-SUPERVISOR_CONFIG="$PROJECT_ROOT/backend/supervisord.conf"
+# Load unified configuration system
+source "$(dirname -- "${BASH_SOURCE[0]}")/load_unified_config.sh"
+
+# Configuration - Use unified configuration
+SUPERVISOR_CONFIG="$REC_PROJECT_ROOT/backend/supervisord.conf"
 SUPERVISOR_SOCKET="/tmp/supervisord.sock"
 SUPERVISOR_PID="/tmp/supervisord.pid"
-
-# Find virtual environment
-if [ -d "$PROJECT_ROOT/venv" ]; then
-    VENV_PATH="$PROJECT_ROOT/venv"
-elif [ -d "$PROJECT_ROOT/.venv" ]; then
-    VENV_PATH="$PROJECT_ROOT/.venv"
-else
-    echo -e "${RED}❌ No virtual environment found${NC}"
-    echo "Please create a virtual environment first:"
-    echo "  python -m venv venv"
-    echo "  source venv/bin/activate"
-    echo "  pip install -r requirements.txt"
-    exit 1
-fi
-
-# Set environment variables for supervisor
-export PROJECT_ROOT="$PROJECT_ROOT"
-export VENV_PATH="$VENV_PATH"
-export TRADING_SYSTEM_HOST="localhost"
 
 # Port assignments from MASTER_PORT_MANIFEST.json
 PORTS=(3000 4000 6000 8001 8002 8003 8004 8005 8008)
@@ -302,61 +284,37 @@ master_restart() {
     stop_supervisor
     echo ""
     
-    # Step 2: Force kill ALL related processes - MORE AGGRESSIVE
+    # Step 2: Force kill ALL related processes - BULLETPROOF
     print_status "Step 2: Force killing ALL related processes..."
     
     # Kill all screen sessions that might be running our processes
     print_warning "Killing all screen sessions..."
-    screen -ls | grep -E "(combined_trade_tails|trade)" | cut -d. -f1 | xargs -r kill 2>/dev/null || true
+    screen -ls 2>/dev/null | grep -E "(combined_trade_tails|trade)" | cut -d. -f1 | xargs -r kill 2>/dev/null || true
     
     # Kill all tail processes that might be monitoring logs
     print_warning "Killing all tail processes..."
-    pkill -f "tail.*log" || true
+    ps aux 2>/dev/null | grep "tail.*log" | grep -v grep | awk '{print $2}' | xargs -r kill 2>/dev/null || true
     
-    # Kill all Python processes related to our project - MORE COMPREHENSIVE
+    # Kill all Python processes related to our project - BULLETPROOF
     print_warning "Killing all Python backend processes..."
-    pkill -f "python.*backend" || true
-    pkill -f "python.*main.py" || true
-    pkill -f "python.*trade_manager.py" || true
-    pkill -f "python.*trade_executor.py" || true
-    pkill -f "python.*active_trade_supervisor.py" || true
-    pkill -f "python.*btc_price_watchdog.py" || true
-    pkill -f "python.*kalshi_account_sync.py" || true
-    pkill -f "python.*kalshi_market_watchdog.py" || true
+    ps aux 2>/dev/null | grep python | grep -E "(backend|main\.py|trade_manager|trade_executor|active_trade_supervisor|auto_entry_supervisor|symbol_price_watchdog|strike_table_generator|kalshi_account_sync|kalshi_market_watchdog|cascading_failure_detector|system_monitor)" | grep -v grep | grep -v "MASTER_RESTART" | awk '{print $2}' | xargs -r kill 2>/dev/null || true
     
-    # Kill any processes with our project path in the command line
+    # Kill any processes with our project path in the command line - BULLETPROOF
     print_warning "Killing processes with project path..."
-    pkill -f "rec_io" || true
-    pkill -f "rec_io_20" || true
+    ps aux 2>/dev/null | grep -E "(rec_io|rec_io_20)" | grep -v grep | grep -v "MASTER_RESTART" | awk '{print $2}' | xargs -r kill 2>/dev/null || true
     
-    # Kill external connections that might interfere with local system
-    print_warning "Killing external connections to remote servers..."
-    lsof -i | grep -E "(64\.23\.138\.71|digitalocean)" | awk '{print $2}' | xargs kill -9 2>/dev/null || true
-    
-    # Kill Chrome processes that might be maintaining persistent connections
-    print_warning "Killing Chrome processes with remote connections..."
-    ps aux | grep -i chrome | grep -E "(64\.23\.138\.71|digitalocean)" | awk '{print $2}' | xargs kill -9 2>/dev/null || true
-    
-    # Kill any processes using our ports
+    # Kill any processes using our ports - BULLETPROOF
     print_warning "Killing processes using our ports..."
     for port in "${PORTS[@]}"; do
-        lsof -ti :$port | xargs kill -9 2>/dev/null || true
+        lsof -ti :$port 2>/dev/null | xargs -r kill 2>/dev/null || true
     done
     
-    # Kill any remaining Python processes that might be ours
-    print_warning "Killing any remaining suspicious Python processes..."
-    ps aux | grep python | grep -E "(backend|trade|kalshi|btc)" | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null || true
-    
-    # Kill external connections that might interfere with local system
-    print_warning "Killing external connections to remote servers..."
-    lsof -i | grep -E "(64\.23\.138\.71|digitalocean)" | awk '{print $2}' | xargs kill -9 2>/dev/null || true
-    
-    # Kill Chrome processes that might be maintaining persistent connections
-    print_warning "Killing Chrome processes with remote connections..."
-    ps aux | grep -i chrome | grep -E "(64\.23\.138\.71|digitalocean)" | awk '{print $2}' | xargs kill -9 2>/dev/null || true
+    # Kill supervisor process if still running - BULLETPROOF
+    print_warning "Killing any remaining supervisor processes..."
+    ps aux 2>/dev/null | grep supervisord | grep -v grep | awk '{print $2}' | xargs -r kill 2>/dev/null || true
     
     # Wait for processes to fully terminate
-    /bin/sleep 5
+    /bin/sleep 3
     echo ""
     
     # Step 3: Flush all ports
@@ -364,18 +322,28 @@ master_restart() {
     flush_all_ports
     echo ""
     
-    # Step 4: Start supervisor
-    print_status "Step 4: Starting supervisor..."
+    # Step 4: Generate supervisor configuration
+    print_status "Step 4: Generating unified supervisor configuration..."
+    if [ -f "$REC_PROJECT_ROOT/scripts/generate_unified_supervisor_config.py" ]; then
+        "$REC_PYTHON_EXECUTABLE" "$REC_PROJECT_ROOT/scripts/generate_unified_supervisor_config.py"
+    else
+        print_error "generate_unified_supervisor_config.py not found"
+        exit 1
+    fi
+    echo ""
+    
+    # Step 5: Start supervisor
+    print_status "Step 5: Starting supervisor..."
     start_supervisor
     echo ""
     
-    # Step 5: Restart all services
-    print_status "Step 5: Restarting all services..."
+    # Step 6: Restart all services
+    print_status "Step 6: Restarting all services..."
     restart_all_services
     echo ""
     
-    # Step 6: Verify everything is running
-    print_status "Step 6: Verifying all services..."
+    # Step 7: Verify everything is running
+    print_status "Step 7: Verifying all services..."
     verify_services
     echo ""
     

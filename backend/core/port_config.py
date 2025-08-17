@@ -146,9 +146,15 @@ def list_all_ports() -> Dict[str, int]:
 
 def get_port_info() -> Dict:
     """Get comprehensive port information for API endpoints using universal host system."""
+    try:
+        # Try to use unified configuration first
+        from backend.core.unified_config import unified_config
+        host = unified_config.get('runtime.system_host', 'localhost')
+    except ImportError:
+        # Fallback to old method
+        host = "localhost"
+    
     ports = list_all_ports()
-    # Use localhost for frontend communication to ensure portability
-    host = "localhost"
     return {
         "ports": ports,
         "service_urls": {name: f"http://{host}:{port}" for name, port in ports.items()},
