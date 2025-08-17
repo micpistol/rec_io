@@ -220,6 +220,27 @@ def init_database():
             );
         """)
         
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS system.installation_access_log (
+                id SERIAL PRIMARY KEY,
+                installer_user_id VARCHAR(100) NOT NULL,
+                installer_name VARCHAR(200),
+                installer_email VARCHAR(200),
+                installer_ip_address INET,
+                connection_start TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                connection_end TIMESTAMP WITH TIME ZONE,
+                schemas_accessed TEXT[],
+                tables_cloned INTEGER,
+                total_rows_cloned BIGINT,
+                clone_duration_seconds INTEGER,
+                status VARCHAR(50) DEFAULT 'in_progress',
+                error_message TEXT,
+                user_agent TEXT,
+                installation_package_version VARCHAR(50),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
+        """)
+        
         # Grant privileges
         cursor.execute("GRANT ALL PRIVILEGES ON SCHEMA users TO rec_io_user;")
         cursor.execute("GRANT ALL PRIVILEGES ON SCHEMA live_data TO rec_io_user;")
