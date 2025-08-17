@@ -226,7 +226,7 @@
         .then(response => response.json())
         .then(data => {
                   if (data.authenticated) {
-          window.location.href = `/app?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`;
+          window.location.href = getRedirectUrl(token, deviceId);
         }
         })
         .catch(() => {
@@ -279,7 +279,7 @@
           
           // Redirect to main app
           setTimeout(() => {
-            window.location.href = `/app?token=${encodeURIComponent(data.token)}&deviceId=${encodeURIComponent(data.deviceId)}`;
+            window.location.href = getRedirectUrl(data.token, data.deviceId);
           }, 1000);
         } else {
           errorMessage.textContent = data.error || 'Authentication failed';
@@ -302,7 +302,47 @@
       localStorage.setItem('rec_device_id', 'local_development');
       localStorage.setItem('rec_local_bypass', 'true');
       
-      window.location.href = `/app?token=${encodeURIComponent(localToken)}&deviceId=${encodeURIComponent('local_development')}`;
+      window.location.href = getRedirectUrl(localToken, 'local_development');
+    }
+    
+    // Device detection function
+    function isMobileDevice() {
+      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+      
+      // Check for mobile devices
+      if (/android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase())) {
+        return true;
+      }
+      
+      // Check for touch capability (additional mobile indicator)
+      if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        return true;
+      }
+      
+      // Check screen size (mobile typically < 768px)
+      if (window.innerWidth <= 768) {
+        return true;
+      }
+      
+      return false;
+    }
+    
+    // Get appropriate redirect URL based on device
+    function getRedirectUrl(token, deviceId) {
+      // Check for mobile/desktop override in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const forceMobile = urlParams.has('mobile');
+      const forceDesktop = urlParams.has('desktop');
+      
+      if (forceMobile) {
+        return `/mobile?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`;
+      } else if (forceDesktop) {
+        return `/app?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`;
+      } else if (isMobileDevice()) {
+        return `/mobile?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`;
+      } else {
+        return `/app?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`;
+      }
     }
     
     // Check auth status on page load

@@ -753,7 +753,6 @@ app.mount("/audio", CacheBustingStaticFiles(directory=f"{frontend_dir}/audio"), 
 app.mount("/js", CacheBustingStaticFiles(directory=f"{frontend_dir}/js"), name="js")
 app.mount("/images", CacheBustingStaticFiles(directory=f"{frontend_dir}/images"), name="images")
 app.mount("/styles", CacheBustingStaticFiles(directory=f"{frontend_dir}/styles"), name="styles")
-app.mount("/mobile", CacheBustingStaticFiles(directory=f"{frontend_dir}/mobile"), name="mobile")
 
 # Health check endpoint
 @app.get("/health")
@@ -1054,8 +1053,33 @@ async def serve_js(filename: str):
 
 # Serve mobile trade monitor with cache busting
 @app.get("/mobile/trade_monitor", response_class=HTMLResponse)
-async def serve_mobile_trade_monitor():
+async def serve_mobile_trade_monitor(request: Request):
     """Serve mobile trade monitor with cache busting headers."""
+    # Check if user is authenticated
+    if AUTH_ENABLED:
+        # Get token from query parameters
+        token = request.query_params.get("token", "")
+        device_id = request.query_params.get("deviceId", "")
+        
+        if not token or not device_id:
+            return RedirectResponse(url="/login")
+        
+        # Verify the token
+        try:
+            auth_tokens = load_auth_tokens()
+            if token not in auth_tokens:
+                return RedirectResponse(url="/login")
+            
+            token_data = auth_tokens[token]
+            expires = datetime.fromisoformat(token_data["expires"])
+            
+            if datetime.now() >= expires:
+                return RedirectResponse(url="/login")
+                
+        except Exception as e:
+            print(f"[AUTH] Error verifying token: {e}")
+            return RedirectResponse(url="/login")
+    
     file_path = f"{frontend_dir}/mobile/trade_monitor_mobile.html"
     if os.path.exists(file_path):
         with open(file_path, "r") as f:
@@ -1073,8 +1097,33 @@ async def serve_mobile_trade_monitor():
 
 # Serve mobile account manager with cache busting
 @app.get("/mobile/account_manager", response_class=HTMLResponse)
-async def serve_mobile_account_manager():
+async def serve_mobile_account_manager(request: Request):
     """Serve mobile account manager with cache busting headers."""
+    # Check if user is authenticated
+    if AUTH_ENABLED:
+        # Get token from query parameters
+        token = request.query_params.get("token", "")
+        device_id = request.query_params.get("deviceId", "")
+        
+        if not token or not device_id:
+            return RedirectResponse(url="/login")
+        
+        # Verify the token
+        try:
+            auth_tokens = load_auth_tokens()
+            if token not in auth_tokens:
+                return RedirectResponse(url="/login")
+            
+            token_data = auth_tokens[token]
+            expires = datetime.fromisoformat(token_data["expires"])
+            
+            if datetime.now() >= expires:
+                return RedirectResponse(url="/login")
+                
+        except Exception as e:
+            print(f"[AUTH] Error verifying token: {e}")
+            return RedirectResponse(url="/login")
+    
     file_path = f"{frontend_dir}/mobile/account_manager_mobile.html"
     if os.path.exists(file_path):
         with open(file_path, "r") as f:
@@ -1092,8 +1141,77 @@ async def serve_mobile_account_manager():
 
 # Serve mobile index with cache busting
 @app.get("/mobile", response_class=HTMLResponse)
-async def serve_mobile_index():
+async def serve_mobile_index(request: Request):
     """Serve mobile index with cache busting headers."""
+    # Check if user is authenticated
+    if AUTH_ENABLED:
+        # Get token from query parameters
+        token = request.query_params.get("token", "")
+        device_id = request.query_params.get("deviceId", "")
+        
+        if not token or not device_id:
+            return RedirectResponse(url="/login")
+        
+        # Verify the token
+        try:
+            auth_tokens = load_auth_tokens()
+            if token not in auth_tokens:
+                return RedirectResponse(url="/login")
+            
+            token_data = auth_tokens[token]
+            expires = datetime.fromisoformat(token_data["expires"])
+            
+            if datetime.now() >= expires:
+                return RedirectResponse(url="/login")
+                
+        except Exception as e:
+            print(f"[AUTH] Error verifying token: {e}")
+            return RedirectResponse(url="/login")
+    
+    file_path = f"{frontend_dir}/mobile/index.html"
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            content = f.read()
+            return HTMLResponse(
+                content=content,
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+            )
+    else:
+        return HTMLResponse(content="Mobile index not found", status_code=404)
+
+# Serve mobile index.html directly (for direct access)
+@app.get("/mobile/index.html", response_class=HTMLResponse)
+async def serve_mobile_index_html(request: Request):
+    """Serve mobile index.html directly with authentication."""
+    # Check if user is authenticated
+    if AUTH_ENABLED:
+        # Get token from query parameters
+        token = request.query_params.get("token", "")
+        device_id = request.query_params.get("deviceId", "")
+        
+        if not token or not device_id:
+            return RedirectResponse(url="/login")
+        
+        # Verify the token
+        try:
+            auth_tokens = load_auth_tokens()
+            if token not in auth_tokens:
+                return RedirectResponse(url="/login")
+            
+            token_data = auth_tokens[token]
+            expires = datetime.fromisoformat(token_data["expires"])
+            
+            if datetime.now() >= expires:
+                return RedirectResponse(url="/login")
+                
+        except Exception as e:
+            print(f"[AUTH] Error verifying token: {e}")
+            return RedirectResponse(url="/login")
+    
     file_path = f"{frontend_dir}/mobile/index.html"
     if os.path.exists(file_path):
         with open(file_path, "r") as f:
@@ -1120,6 +1238,138 @@ async def test_mobile():
 async def test_mobile_path():
     """Test route for debugging mobile path."""
     return {"message": "Mobile path test route works!"}
+
+# Serve mobile user settings with authentication
+@app.get("/mobile/user", response_class=HTMLResponse)
+async def serve_mobile_user(request: Request):
+    """Serve mobile user settings with authentication."""
+    # Check if user is authenticated
+    if AUTH_ENABLED:
+        # Get token from query parameters
+        token = request.query_params.get("token", "")
+        device_id = request.query_params.get("deviceId", "")
+        
+        if not token or not device_id:
+            return RedirectResponse(url="/login")
+        
+        # Verify the token
+        try:
+            auth_tokens = load_auth_tokens()
+            if token not in auth_tokens:
+                return RedirectResponse(url="/login")
+            
+            token_data = auth_tokens[token]
+            expires = datetime.fromisoformat(token_data["expires"])
+            
+            if datetime.now() >= expires:
+                return RedirectResponse(url="/login")
+                
+        except Exception as e:
+            print(f"[AUTH] Error verifying token: {e}")
+            return RedirectResponse(url="/login")
+    
+    file_path = f"{frontend_dir}/mobile/user_mobile.html"
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            content = f.read()
+            return HTMLResponse(
+                content=content,
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+            )
+    else:
+        return HTMLResponse(content="Mobile user settings not found", status_code=404)
+
+# Serve mobile system with authentication
+@app.get("/mobile/system", response_class=HTMLResponse)
+async def serve_mobile_system(request: Request):
+    """Serve mobile system page with authentication."""
+    # Check if user is authenticated
+    if AUTH_ENABLED:
+        # Get token from query parameters
+        token = request.query_params.get("token", "")
+        device_id = request.query_params.get("deviceId", "")
+        
+        if not token or not device_id:
+            return RedirectResponse(url="/login")
+        
+        # Verify the token
+        try:
+            auth_tokens = load_auth_tokens()
+            if token not in auth_tokens:
+                return RedirectResponse(url="/login")
+            
+            token_data = auth_tokens[token]
+            expires = datetime.fromisoformat(token_data["expires"])
+            
+            if datetime.now() >= expires:
+                return RedirectResponse(url="/login")
+                
+        except Exception as e:
+            print(f"[AUTH] Error verifying token: {e}")
+            return RedirectResponse(url="/login")
+    
+    file_path = f"{frontend_dir}/mobile/system_mobile.html"
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            content = f.read()
+            return HTMLResponse(
+                content=content,
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+            )
+    else:
+        return HTMLResponse(content="Mobile system page not found", status_code=404)
+
+# Serve mobile trade history with authentication
+@app.get("/mobile/trade_history", response_class=HTMLResponse)
+async def serve_mobile_trade_history(request: Request):
+    """Serve mobile trade history with authentication."""
+    # Check if user is authenticated
+    if AUTH_ENABLED:
+        # Get token from query parameters
+        token = request.query_params.get("token", "")
+        device_id = request.query_params.get("deviceId", "")
+        
+        if not token or not device_id:
+            return RedirectResponse(url="/login")
+        
+        # Verify the token
+        try:
+            auth_tokens = load_auth_tokens()
+            if token not in auth_tokens:
+                return RedirectResponse(url="/login")
+            
+            token_data = auth_tokens[token]
+            expires = datetime.fromisoformat(token_data["expires"])
+            
+            if datetime.now() >= expires:
+                return RedirectResponse(url="/login")
+                
+        except Exception as e:
+            print(f"[AUTH] Error verifying token: {e}")
+            return RedirectResponse(url="/login")
+    
+    file_path = f"{frontend_dir}/mobile/trade_history_mobile.html"
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            content = f.read()
+            return HTMLResponse(
+                content=content,
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+            )
+    else:
+        return HTMLResponse(content="Mobile trade history not found", status_code=404)
 
 def get_ttc_data_from_postgresql() -> Dict[str, Any]:
     """Get TTC data directly from PostgreSQL"""

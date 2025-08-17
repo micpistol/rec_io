@@ -5,6 +5,62 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>rec.io - Trading Platform</title>
   <script>
+    // Device detection and mobile redirect
+    function isMobileDevice() {
+      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+      
+      // Check for mobile devices
+      if (/android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase())) {
+        return true;
+      }
+      
+      // Check for touch capability (additional mobile indicator)
+      if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        return true;
+      }
+      
+      // Check screen size (mobile typically < 768px)
+      if (window.innerWidth <= 768) {
+        return true;
+      }
+      
+      return false;
+    }
+    
+    // Redirect to mobile if accessing desktop on mobile device
+    function checkMobileRedirect() {
+      // Check for mobile/desktop override in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const forceMobile = urlParams.has('mobile');
+      const forceDesktop = urlParams.has('desktop');
+      
+      if (forceMobile) {
+        const token = localStorage.getItem('rec_auth_token');
+        const deviceId = localStorage.getItem('rec_device_id');
+        
+        if (token && deviceId) {
+          window.location.href = `/mobile?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`;
+        } else {
+          window.location.href = '/login';
+        }
+      } else if (forceDesktop) {
+        // Stay on desktop (no redirect needed)
+        return;
+      } else if (isMobileDevice()) {
+        const token = localStorage.getItem('rec_auth_token');
+        const deviceId = localStorage.getItem('rec_device_id');
+        
+        if (token && deviceId) {
+          window.location.href = `/mobile?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`;
+        } else {
+          window.location.href = '/login';
+        }
+      }
+    }
+    
+    // Check for mobile redirect on page load
+    document.addEventListener('DOMContentLoaded', checkMobileRedirect);
+    
     function setRealViewportHeight() {
       document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
     }

@@ -129,19 +129,19 @@
         <!-- Content Area -->
         <div class="content-area">
             <!-- Monitor Page -->
-            <iframe id="monitor-frame" class="page-frame active" src="trade_monitor_mobile.html"></iframe>
+            <iframe id="monitor-frame" class="page-frame active" src=""></iframe>
             
             <!-- History Page -->
-            <iframe id="history-frame" class="page-frame" src="trade_history_mobile.html"></iframe>
+            <iframe id="history-frame" class="page-frame" src=""></iframe>
             
             <!-- Account Page -->
-            <iframe id="account-frame" class="page-frame" src="account_manager_mobile.html"></iframe>
+            <iframe id="account-frame" class="page-frame" src=""></iframe>
             
             <!-- User Page -->
-            <iframe id="user-frame" class="page-frame" src="user_mobile.html"></iframe>
+            <iframe id="user-frame" class="page-frame" src=""></iframe>
             
             <!-- System Page -->
-            <iframe id="system-frame" class="page-frame" src="system_mobile.html"></iframe>
+            <iframe id="system-frame" class="page-frame" src=""></iframe>
         </div>
 
         <!-- Bottom Tab Navigation -->
@@ -170,10 +170,38 @@
     </div>
 
     <script>
-        // Tab switching functionality
+        // Authentication and tab switching functionality
         document.addEventListener('DOMContentLoaded', function() {
             const tabItems = document.querySelectorAll('.tab-item');
             const pageFrames = document.querySelectorAll('.page-frame');
+            
+            // Get authentication tokens
+            const token = localStorage.getItem('rec_auth_token');
+            const deviceId = localStorage.getItem('rec_device_id');
+            
+            // Check if user is authenticated
+            if (!token || !deviceId) {
+                // Redirect to login if not authenticated
+                window.location.href = '/login';
+                return;
+            }
+            
+            // Set up iframe sources with authentication tokens
+            const iframeSources = {
+                monitor: `/mobile/trade_monitor?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`,
+                history: `/mobile/trade_history?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`,
+                account: `/mobile/account_manager?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`,
+                user: `/mobile/user?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`,
+                system: `/mobile/system?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`
+            };
+            
+            // Set initial iframe sources
+            Object.keys(iframeSources).forEach(tabName => {
+                const frame = document.getElementById(`${tabName}-frame`);
+                if (frame) {
+                    frame.src = iframeSources[tabName];
+                }
+            });
 
             function switchTab(tabName) {
                 // Remove active class from all tabs and frames
