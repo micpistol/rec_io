@@ -410,7 +410,7 @@ async function updateStrikeTable() {
         bufferTd.textContent = strikeData.buffer.toLocaleString(undefined, {maximumFractionDigits: 0});
 
         // Buffer % (pre-calculated)
-        bmTd.textContent = strikeData.buffer_pct.toFixed(2);
+        bmTd.textContent = strikeData.buffer_pct ? strikeData.buffer_pct.toFixed(2) : '—';
 
         // Probability (pre-calculated)
         const prob = strikeData.probability;

@@ -30,23 +30,86 @@
             font-size: 14px;
             color: white;
             font-weight: 500;
+            padding: 6px 8px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
         }
         
-        .logout-button {
-            background: #e74c3c;
+        .info-value.editable {
+            background: #2c3e50;
+            border: 1px solid #34495e;
+            cursor: text;
+        }
+        
+        .info-value.editable:focus {
+            outline: none;
+            border-color: #3498db;
+            background: #34495e;
+        }
+        
+        .info-value.readonly {
+            background: transparent;
+            border: none;
+            cursor: default;
+        }
+        
+        .button {
+            background: #3498db;
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 6px;
-            font-size: 14px;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 12px;
             font-weight: 500;
             cursor: pointer;
             transition: background-color 0.2s;
+            margin-right: 8px;
+        }
+        
+        .button:hover {
+            background: #2980b9;
+        }
+        
+        .button.danger {
+            background: #e74c3c;
+        }
+        
+        .button.danger:hover {
+            background: #c0392b;
+        }
+        
+        .password-form {
+            background: #2c3e50;
+            border: 1px solid #34495e;
+            padding: 15px;
+            border-radius: 4px;
             margin-top: 10px;
         }
         
-        .logout-button:hover {
-            background: #c0392b;
+        .password-form input {
+            background: #34495e;
+            border: 1px solid #4a5f7a;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 10px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .password-form input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .password-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .hidden {
+            display: none;
         }
         
         .loading {
@@ -60,6 +123,18 @@
             padding: 20px;
             text-align: center;
         }
+        
+        .success {
+            color: #27ae60;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .button-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -70,18 +145,28 @@
             <div id="userInfo" class="user-info-grid">
                 <div class="loading">Loading user information...</div>
             </div>
-        </div>
-    </div>
-    
-    <!-- Session Management Panel -->
-    <div class="panel-container" style="width: 600px;">
-        <div class="panel">
-            <div class="panel-header">Session Management</div>
-            <button id="logoutButton" class="logout-button">Logout</button>
+            <div class="button-row">
+                <button id="editButton" class="button">Edit Information</button>
+                <button id="changePasswordButton" class="button">Change Password</button>
+                <button id="logoutButton" class="button danger">Logout</button>
+            </div>
+            <div id="passwordForm" class="password-form hidden">
+                <input type="password" id="currentPassword" placeholder="Current Password" />
+                <input type="password" id="newPassword" placeholder="New Password" />
+                <input type="password" id="confirmPassword" placeholder="Confirm New Password" />
+                <div class="password-buttons">
+                    <button id="savePassword" class="button">Save Password</button>
+                    <button id="cancelPassword" class="button">Cancel</button>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
+        let currentUserInfo = {};
+        let isEditMode = false;
+        let originalValues = {};
+        
         // Load user information from the server
         async function loadUserInfo() {
             try {
@@ -91,6 +176,7 @@
                 
                 if (userResponse.ok) {
                     userInfo = await userResponse.json();
+                    currentUserInfo = userInfo;
                     displayUserInfo({}, userInfo);
                     return;
                 }
@@ -118,6 +204,7 @@
                 const data = await response.json();
                 
                 if (data.authenticated) {
+                    currentUserInfo = userInfo;
                     displayUserInfo(data, userInfo);
                 } else {
                     throw new Error('Authentication failed');
@@ -138,57 +225,213 @@
             userInfoContainer.innerHTML = `
                 <div class="info-item">
                     <div class="info-label">User ID</div>
-                    <div class="info-value">${userInfo.user_id || authData.username || 'N/A'}</div>
+                    <div class="info-value readonly">${userInfo.user_id || authData.username || 'N/A'}</div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Name</div>
-                    <div class="info-value">${userInfo.name || authData.name || 'N/A'}</div>
+                    <div class="info-value ${isEditMode ? 'editable' : 'readonly'}" id="nameValue" contenteditable="${isEditMode}" data-field="name">${userInfo.name || authData.name || 'N/A'}</div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Email</div>
-                    <div class="info-value">${userInfo.email || 'N/A'}</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Account Type</div>
-                    <div class="info-value">${userInfo.account_type || 'N/A'}</div>
+                    <div class="info-value ${isEditMode ? 'editable' : 'readonly'}" id="emailValue" contenteditable="${isEditMode}" data-field="email">${userInfo.email || 'N/A'}</div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Phone</div>
-                    <div class="info-value">${userInfo.phone || 'N/A'}</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Login Status</div>
-                    <div class="info-value">Active</div>
+                    <div class="info-value ${isEditMode ? 'editable' : 'readonly'}" id="phoneValue" contenteditable="${isEditMode}" data-field="phone">${userInfo.phone || 'N/A'}</div>
                 </div>
             `;
+            
+            // Store original values when entering edit mode
+            if (isEditMode) {
+                originalValues = {
+                    name: userInfo.name || authData.name || '',
+                    email: userInfo.email || '',
+                    phone: userInfo.phone || ''
+                };
+            }
         }
+        
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            const editButton = document.getElementById('editButton');
+            
+            if (isEditMode) {
+                editButton.textContent = 'Save Changes';
+                displayUserInfo({}, currentUserInfo);
+            } else {
+                editButton.textContent = 'Edit Information';
+                displayUserInfo({}, currentUserInfo);
+            }
+        }
+        
+        async function saveChanges() {
+            const nameValue = document.getElementById('nameValue');
+            const emailValue = document.getElementById('emailValue');
+            const phoneValue = document.getElementById('phoneValue');
+            
+            const updateData = {};
+            if (nameValue) {
+                const name = nameValue.textContent.trim();
+                updateData.first_name = name.split(' ')[0] || '';
+                updateData.last_name = name.split(' ').slice(1).join(' ') || '';
+            }
+            if (emailValue) updateData.email = emailValue.textContent.trim();
+            if (phoneValue) updateData.phone = phoneValue.textContent.trim();
+            
+            try {
+                const response = await fetch('/api/user/info', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(updateData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Update local data
+                    currentUserInfo.name = nameValue ? nameValue.textContent.trim() : currentUserInfo.name;
+                    currentUserInfo.email = emailValue ? emailValue.textContent.trim() : currentUserInfo.email;
+                    currentUserInfo.phone = phoneValue ? phoneValue.textContent.trim() : currentUserInfo.phone;
+                    
+                    // Exit edit mode
+                    isEditMode = false;
+                    const editButton = document.getElementById('editButton');
+                    editButton.textContent = 'Edit Information';
+                    
+                    // Refresh display
+                    displayUserInfo({}, currentUserInfo);
+                    
+                    // Show success message
+                    showMessage('User information updated successfully!', 'success');
+                } else {
+                    throw new Error(result.error || 'Failed to update user information');
+                }
+            } catch (error) {
+                console.error('Error updating user info:', error);
+                showMessage('Failed to update user information: ' + error.message, 'error');
+            }
+        }
+        
+        function showMessage(message, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type;
+            messageDiv.textContent = message;
+            messageDiv.style.position = 'fixed';
+            messageDiv.style.top = '20px';
+            messageDiv.style.right = '20px';
+            messageDiv.style.padding = '15px 20px';
+            messageDiv.style.borderRadius = '6px';
+            messageDiv.style.zIndex = '1000';
+            messageDiv.style.maxWidth = '300px';
+            
+            document.body.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                if (document.body.contains(messageDiv)) {
+                    document.body.removeChild(messageDiv);
+                }
+            }, 5000);
+        }
+        
+        // Edit button functionality
+        document.getElementById('editButton').addEventListener('click', () => {
+            if (isEditMode) {
+                saveChanges();
+            } else {
+                toggleEditMode();
+            }
+        });
+        
+        // Password change functionality
+        document.getElementById('changePasswordButton').addEventListener('click', () => {
+            const form = document.getElementById('passwordForm');
+            form.classList.toggle('hidden');
+        });
+        
+        document.getElementById('cancelPassword').addEventListener('click', () => {
+            document.getElementById('passwordForm').classList.add('hidden');
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+        });
+        
+        document.getElementById('savePassword').addEventListener('click', async () => {
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            if (!currentPassword || !newPassword || !confirmPassword) {
+                showMessage('All password fields are required', 'error');
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                showMessage('New passwords do not match', 'error');
+                return;
+            }
+            
+            if (newPassword.length < 4) {
+                showMessage('New password must be at least 4 characters long', 'error');
+                return;
+            }
+            
+            try {
+                console.log('Sending password change request:', {
+                    currentPassword: currentPassword,
+                    newPassword: newPassword
+                });
+                
+                const response = await fetch('/api/user/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        currentPassword: currentPassword,
+                        newPassword: newPassword
+                    })
+                });
+                
+                console.log('Response status:', response.status);
+                const result = await response.json();
+                console.log('Response result:', result);
+                
+                if (result.success) {
+                    showMessage('Password changed successfully!', 'success');
+                    document.getElementById('passwordForm').classList.add('hidden');
+                    document.getElementById('currentPassword').value = '';
+                    document.getElementById('newPassword').value = '';
+                    document.getElementById('confirmPassword').value = '';
+                } else {
+                    throw new Error(result.error || 'Failed to change password');
+                }
+            } catch (error) {
+                console.error('Error changing password:', error);
+                showMessage('Failed to change password: ' + error.message, 'error');
+            }
+        });
         
         // Logout functionality
         document.getElementById('logoutButton').addEventListener('click', async () => {
             const token = localStorage.getItem('rec_auth_token');
             const deviceId = localStorage.getItem('rec_device_id');
-            
             if (token && deviceId) {
                 try {
                     await fetch('/api/auth/logout', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ token, deviceId })
                     });
                 } catch (e) {
                     console.log('Logout request failed:', e);
                 }
             }
-            
-            // Clear local storage
-            localStorage.removeItem('rec_auth_token');
-            localStorage.removeItem('rec_device_id');
-            localStorage.removeItem('rec_local_bypass');
-            
-            // Redirect to login page
-            window.location.href = '/login';
+            localStorage.clear();
+            sessionStorage.clear();
+            // Redirect to login page in the main window
+            window.top.location.href = '/login';
         });
         
         // Load user info when page loads

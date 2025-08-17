@@ -1,5 +1,7 @@
 import SwiftUI
 import WebKit
+import SafariServices
+import SafariServices
 
 struct WebView: UIViewRepresentable {
     let url: URL
@@ -8,6 +10,11 @@ struct WebView: UIViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.allowsInlineMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
+        
+        // Configure for HTTP access
+        configuration.websiteDataStore = WKWebsiteDataStore.default()
+        configuration.preferences.javaScriptEnabled = true
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         
         let webView = WKWebView(frame: .zero, configuration: configuration)
         let dataStore = WKWebsiteDataStore.default()
@@ -21,10 +28,6 @@ struct WebView: UIViewRepresentable {
         webView.scrollView.bounces = false
         webView.scrollView.isScrollEnabled = false
         webView.translatesAutoresizingMaskIntoConstraints = false
-        
-        // Force allow HTTP connections
-        webView.configuration.preferences.javaScriptEnabled = true
-        webView.configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         
         print("🔧 WebView configured for URL: \(url.absoluteString)")
         return webView
@@ -55,7 +58,8 @@ struct WebView: UIViewRepresentable {
             // Try to handle ATS errors specifically
             let nsError = error as NSError
             if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorAppTransportSecurityRequiresSecureConnection {
-                print("🔧 ATS Error detected - trying alternative approach")
+                print("🔧 ATS Error detected - showing error message")
+                // Don't retry automatically to avoid infinite loop
             }
         }
 
@@ -80,13 +84,14 @@ struct ContentView: View {
         let urlString: String
         switch UIDevice.current.userInterfaceIdiom {
         case .pad:
-            urlString = "https://macbook-pro.tail30eef4.ts.net/"
+            urlString = "http://137.184.224.94:3000/"
         case .phone:
-            urlString = "https://macbook-pro.tail30eef4.ts.net/mobile/index.html"
+            urlString = "http://137.184.224.94:3000/mobile/index.html"
         default:
-            urlString = "https://macbook-pro.tail30eef4.ts.net/"
+            urlString = "http://137.184.224.94:3000/"
         }
         print("🔧 Attempting to load URL: \(urlString)")
         return URL(string: urlString)!
     }
 }
+

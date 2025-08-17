@@ -4,7 +4,7 @@ Uses the single centralized port configuration system.
 """
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -444,7 +444,10 @@ AUTH_TOKENS_FILE = os.path.join(get_data_dir(), "users", "user_0001", "auth_toke
 DEVICE_TOKENS_FILE = os.path.join(get_data_dir(), "users", "user_0001", "device_tokens.json")
 
 # Authentication settings - can be overridden for local development
-AUTH_ENABLED = os.environ.get("AUTH_ENABLED", "false").lower() == "true"
+AUTH_ENABLED = True  # Force authentication enabled
+# Force authentication in production
+if os.environ.get("REC_ENVIRONMENT") == "production":
+    AUTH_ENABLED = True
 
 def load_auth_tokens():
     """Load authentication tokens from file"""
@@ -516,18 +519,19 @@ def get_user_credentials():
         )
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT user_id, first_name, last_name, email, phone, account_type
+                SELECT user_id, first_name, last_name, email, phone, account_type, password_hash
                 FROM users.user_info_0001 WHERE user_no = '0001'
             """)
             result = cursor.fetchone()
             if result:
-                user_id, first_name, last_name, email, phone, account_type = result
+                user_id, first_name, last_name, email, phone, account_type, password_hash = result
                 return {
                     "username": user_id,
                     "name": f"{first_name} {last_name}" if first_name and last_name else user_id,
                     "email": email,
                     "phone": phone,
-                    "account_type": account_type
+                    "account_type": account_type,
+                    "password_hash": password_hash
                 }
     except Exception as e:
         print(f"[AUTH] Error loading user credentials from PostgreSQL: {e}")
@@ -556,11 +560,31 @@ def get_user_credentials():
 def verify_password(password, hashed_password):
     """Verify a password against its hash"""
     try:
+        # Check if it's a fallback hash (starts with 'fallback_hash_')
+        if hashed_password.startswith('fallback_hash_'):
+            # Extract the actual password from the fallback hash
+            actual_password = hashed_password.replace('fallback_hash_', '')
+            return password == actual_password
+        
+        # Try bcrypt verification
         import bcrypt
         return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
     except Exception as e:
         print(f"[AUTH] Password verification error: {e}")
         return False
+
+def change_password_hash(password):
+    """Hash a password for storage"""
+    try:
+        import bcrypt
+        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    except ImportError:
+        # Fallback to simple hash if bcrypt is not available
+        print(f"[AUTH] bcrypt not available, using fallback password hashing")
+        return f"fallback_hash_{password}"
+    except Exception as e:
+        print(f"[AUTH] Password hashing error: {e}")
+        return f"fallback_hash_{password}"
 
 def load_preferences():
     global _preferences_cache, _cache_timestamp
@@ -876,22 +900,54 @@ async def websocket_db_changes(websocket: WebSocket):
 @app.get("/", response_class=HTMLResponse)
 async def read_root():
     """Serve the main application or login page based on authentication."""
-    # For now, always serve the main app
-    # In production, this would check authentication
-    with open(f"{frontend_dir}/index.html", "r") as f:
-        content = f.read()
-        return HTMLResponse(
-            content=content,
-            headers={
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache",
-                "Expires": "0"
-            }
-        )
+    print(f"[AUTH] AUTH_ENABLED = {AUTH_ENABLED}")
+    if AUTH_ENABLED:
+        # Always redirect to login - no direct access to main app
+        print(f"[AUTH] Redirecting to login page")
+        return RedirectResponse(url="/login")
+    else:
+        # Local development mode - serve main app directly
+        print(f"[AUTH] Serving main app directly (local development)")
+        with open(f"{frontend_dir}/index.html", "r") as f:
+            content = f.read()
+            return HTMLResponse(
+                content=content,
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+            )
 
 @app.get("/app", response_class=HTMLResponse)
-async def serve_main_app():
+async def serve_main_app(request: Request):
     """Serve the main application (protected route)."""
+    # Check if user is authenticated
+    if AUTH_ENABLED:
+        # Get token from query parameters (sent by login page)
+        token = request.query_params.get("token", "")
+        device_id = request.query_params.get("deviceId", "")
+        
+        if not token or not device_id:
+            return RedirectResponse(url="/login")
+        
+        # Verify the token
+        try:
+            auth_tokens = load_auth_tokens()
+            if token not in auth_tokens:
+                return RedirectResponse(url="/login")
+            
+            token_data = auth_tokens[token]
+            expires = datetime.fromisoformat(token_data["expires"])
+            
+            if datetime.now() >= expires:
+                return RedirectResponse(url="/login")
+                
+        except Exception as e:
+            print(f"[AUTH] Error verifying token: {e}")
+            return RedirectResponse(url="/login")
+    
+    # Serve the main app
     with open(f"{frontend_dir}/index.html", "r") as f:
         content = f.read()
         return HTMLResponse(
@@ -3283,6 +3339,42 @@ async def get_user_info():
     except Exception as e:
         print(f"[USER INFO] Error getting user info: {e}")
         return {"error": "Failed to get user information"}
+
+@app.post("/api/user/change-password")
+async def change_password(request: Request):
+    """Change user password"""
+    try:
+        data = await request.json()
+        current_password = data.get("currentPassword", "")
+        new_password = data.get("newPassword", "")
+        
+        # Get current password hash
+        credentials = get_user_credentials()
+        if not credentials or not credentials.get("password_hash"):
+            return {"success": False, "error": "User not found"}
+        
+        # Verify current password
+        if not verify_password(current_password, credentials["password_hash"]):
+            return {"success": False, "error": "Current password is incorrect"}
+        
+        # Hash new password
+        new_hash = change_password_hash(new_password)
+        
+        # Update in PostgreSQL
+        import psycopg2
+        conn = psycopg2.connect(host="localhost", database="rec_io_db", user="rec_io_user", password="rec_io_password")
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE users.user_info_0001 
+                SET password_hash = %s
+                WHERE user_no = '0001'
+            """, (new_hash,))
+            conn.commit()
+        
+        return {"success": True, "message": "Password updated successfully"}
+    except Exception as e:
+        print(f"[AUTH] Error changing password: {e}")
+        return {"success": False, "error": str(e)}
 
 @app.get("/api/system/health")
 async def get_system_health():

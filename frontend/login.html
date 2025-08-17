@@ -226,7 +226,7 @@
         .then(response => response.json())
         .then(data => {
                   if (data.authenticated) {
-          window.location.href = '/app';
+          window.location.href = `/app?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`;
         }
         })
         .catch(() => {
@@ -279,7 +279,7 @@
           
           // Redirect to main app
           setTimeout(() => {
-            window.location.href = '/app';
+            window.location.href = `/app?token=${encodeURIComponent(data.token)}&deviceId=${encodeURIComponent(data.deviceId)}`;
           }, 1000);
         } else {
           errorMessage.textContent = data.error || 'Authentication failed';
@@ -302,7 +302,7 @@
       localStorage.setItem('rec_device_id', 'local_development');
       localStorage.setItem('rec_local_bypass', 'true');
       
-      window.location.href = '/app';
+      window.location.href = `/app?token=${encodeURIComponent(localToken)}&deviceId=${encodeURIComponent('local_development')}`;
     }
     
     // Check auth status on page load
