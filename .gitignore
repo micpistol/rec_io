@@ -141,3 +141,8 @@ rec_io_db_backup.sql
 # Large historical data files (excluded from git due to size)
 backend/data/historical_data/eth_historical/eth_1m_master_5y.csv
 backend/data/historical_data/btc_historical/btc_1m_master_5y.csv
+
+# macOS metadata
+.DS_Store
+._*
+

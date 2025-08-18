@@ -1232,7 +1232,7 @@ def check_auto_entry_conditions():
                 
                 # STEP 6: Prepare strike data for trade trigger
                 strike_data = {
-                    'strike': f"${strike.get('strike'):,}",
+                    'strike': f"${int(strike.get('strike')):,}",
                     'side': side,
                     'ticker': strike.get('ticker'),
                     'buy_price': buy_price,

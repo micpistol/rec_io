@@ -313,10 +313,12 @@
                 `$${Number(balanceInDollars).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 
             const settlementsBody = document.getElementById("settlements-body");
-            settlementsBody.innerHTML = settlements.map(s => {
-                // Convert revenue from cents to dollars
-                const revenueInDollars = s.revenue / 100;
-                const formattedRevenue = revenueInDollars.toLocaleString(undefined, { 
+            // Sort settlements by settled_time in descending order (newest first)
+            const sortedSettlements = settlements.sort((a, b) => new Date(b.settled_time) - new Date(a.settled_time));
+            
+            settlementsBody.innerHTML = sortedSettlements.map(s => {
+                // Revenue is already in whole dollars, display as is
+                const formattedRevenue = s.revenue.toLocaleString(undefined, { 
                     minimumFractionDigits: 0, 
                     maximumFractionDigits: 0 
                 });
@@ -328,20 +330,15 @@
                         <td>${s.yes_count}</td>
                         <td>${s.no_count}</td>
                         <td>$${formattedRevenue}</td>
-                        <td>${new Date(s.settled_time).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour12: false })}</td>
+                        <td>${new Date(s.settled_time).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
                     </tr>
                 `;
             }).join("");
 
             const fillsBody = document.getElementById("fills-body");
             fillsBody.innerHTML = fills.map(f => {
-                // Convert price from cents to dollars
+                // Get price based on side with no formatting
                 const price = f.side === "yes" ? f.yes_price : f.no_price;
-                const priceInDollars = price / 100;
-                const formattedPrice = priceInDollars.toLocaleString(undefined, { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
-                });
                 
                 return `
                     <tr>
@@ -349,7 +346,7 @@
                         <td>${f.side === "yes" ? "Y" : "N"}</td>
                         <td>${f.action.toUpperCase()}</td>
                         <td>${f.count}</td>
-                        <td>${formattedPrice}</td>
+                        <td>${price}</td>
                         <td>${new Date(f.created_time).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
                     </tr>
                 `;
@@ -361,9 +358,9 @@
                 .map(p => `
                     <tr>
                         <td>${p.ticker}</td>
-                        <td>${p.market_exposure && p.position !== 0 ? (p.market_exposure / p.position / 100).toFixed(2) : "0.00"}</td>
+                        <td>${p.market_exposure && p.position !== 0 ? (p.market_exposure / p.position / 10000).toFixed(2) : "0.00"}</td>
                         <td>${p.position}</td>
-                        <td>${(p.fees_paid / 100).toFixed(2)}</td>
+                        <td>${(p.fees_paid / 10000).toFixed(2)}</td>
                         <td>${new Date(p.last_updated_ts).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
                     </tr>
                 `).join("");

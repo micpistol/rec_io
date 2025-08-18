@@ -10,7 +10,7 @@
 ## 🖥️ **SERVER INFORMATION**
 
 ### **Primary Server**
-- **IP Address**: `143.198.55.163`
+- **IP Address**: `137.184.224.94`
 - **Hostname**: `reci-io-trading-server`
 - **Region**: New York (NYC1)
 - **Droplet Size**: 2GB RAM, 1 vCPU, 50GB SSD
@@ -19,7 +19,7 @@
 
 ### **SSH Access**
 - **SSH Key Fingerprint**: `60:c5:3a:ab:1c:75:52:6e:09:bf:4c:f1:96:81:bf:6c`
-- **SSH Command**: `ssh root@143.198.55.163`
+- **SSH Command**: `ssh root@137.184.224.94`
 - **SSH Key Location**: `~/.ssh/id_rsa` (local machine)
 - **Access Level**: Root access
 
@@ -28,7 +28,7 @@
 ## 🗄️ **DATABASE INFORMATION**
 
 ### **PostgreSQL Database**
-- **Host**: `143.198.55.163`
+- **Host**: `137.184.224.94`
 - **Port**: `5432`
 - **Database Name**: `rec_io_db`
 - **Username**: `rec_io_user`
@@ -38,7 +38,7 @@
 
 ### **Connection Strings**
 - **Local Connection**: `psql -h localhost -U rec_io_user -d rec_io_db`
-- **External Connection**: `psql -h 143.198.55.163 -U rec_io_user -d rec_io_db`
+- **External Connection**: `psql -h 137.184.224.94 -U rec_io_user -d rec_io_db`
 - **TablePlus**: Use external connection details above
 
 ### **Database Schemas**
@@ -53,7 +53,7 @@
 ## 🌐 **SERVICE PORTS & ENDPOINTS**
 
 ### **Main Application**
-- **Frontend URL**: `http://143.198.55.163:3000`
+- **Frontend URL**: `http://137.184.224.94:3000`
 - **Main App Port**: `3000`
 - **Trade Manager Port**: `4000`
 - **Trade Executor Port**: `8001`
@@ -107,37 +107,37 @@ POSTGRES_PORT=5432
 ### **System Management**
 ```bash
 # Restart all services
-ssh root@143.198.55.163 "cd /root/rec_io_20 && ./scripts/MASTER_RESTART.sh"
+ssh root@137.184.224.94 "cd /root/rec_io_20 && ./scripts/MASTER_RESTART.sh"
 
 # Check service status
-ssh root@143.198.55.163 "cd /root/rec_io_20 && supervisorctl -c backend/supervisord.conf status"
+ssh root@137.184.224.94 "cd /root/rec_io_20 && supervisorctl -c backend/supervisord.conf status"
 
 # View logs
-ssh root@143.198.55.163 "cd /root/rec_io_20 && tail -f logs/main_app.out.log"
+ssh root@137.184.224.94 "cd /root/rec_io_20 && tail -f logs/main_app.out.log"
 ```
 
 ### **Database Management**
 ```bash
 # Connect to database
-PGPASSWORD=rec_io_password psql -h 143.198.55.163 -U rec_io_user -d rec_io_db
+PGPASSWORD=rec_io_password psql -h 137.184.224.94 -U rec_io_user -d rec_io_db
 
 # Backup database
-ssh root@143.198.55.163 "cd /root/rec_io_20 && PGPASSWORD=rec_io_password pg_dump -h localhost -U rec_io_user rec_io_db > backup_$(date +%Y%m%d_%H%M%S).sql"
+ssh root@137.184.224.94 "cd /root/rec_io_20 && PGPASSWORD=rec_io_password pg_dump -h localhost -U rec_io_user rec_io_db > backup_$(date +%Y%m%d_%H%M%S).sql"
 
 # Restore database
-ssh root@143.198.55.163 "cd /root/rec_io_20 && PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db < backup_file.sql"
+ssh root@137.184.224.94 "cd /root/rec_io_20 && PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db < backup_file.sql"
 ```
 
 ### **Performance Monitoring**
 ```bash
 # System performance
-ssh root@143.198.55.163 "uptime && free -h && df -h"
+ssh root@137.184.224.94 "uptime && free -h && df -h"
 
 # Process monitoring
-ssh root@143.198.55.163 "ps aux --sort=-%cpu | head -10"
+ssh root@137.184.224.94 "ps aux --sort=-%cpu | head -10"
 
 # Port monitoring
-ssh root@143.198.55.163 "ss -tlnp | grep -E ':(3000|4000|800[1-9]|5432)'"
+ssh root@137.184.224.94 "ss -tlnp | grep -E ':(3000|4000|800[1-9]|5432)'"
 ```
 
 ---
