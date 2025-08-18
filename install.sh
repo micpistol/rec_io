@@ -249,6 +249,38 @@ create_user_profile_and_data() {
     chmod 700 backend/data/users/user_0001/credentials/kalshi-credentials/prod
     chmod 700 backend/data/users/user_0001/credentials/kalshi-credentials/demo
     
+    # Prompt for Kalshi credentials
+    echo
+    echo "=== Kalshi Credentials Setup ==="
+    echo "You need Kalshi credentials to trade. You can:"
+    echo "1) Enter them now"
+    echo "2) Skip and add them later"
+    echo
+    read -p "Do you want to set up Kalshi credentials now? (y/n): " SETUP_CREDENTIALS
+    
+    if [[ $SETUP_CREDENTIALS =~ ^[Yy]$ ]]; then
+        echo
+        echo "Please enter your Kalshi credentials:"
+        read -p "Kalshi Email: " KALSHI_EMAIL
+        read -s -p "Kalshi API Key: " KALSHI_API_KEY
+        echo
+        read -s -p "Kalshi API Secret: " KALSHI_API_SECRET
+        echo
+        
+        # Create credentials file
+        cat > backend/data/users/user_0001/credentials/kalshi-credentials/prod/credentials.json << EOF
+{
+    "email": "$KALSHI_EMAIL",
+    "api_key": "$KALSHI_API_KEY",
+    "api_secret": "$KALSHI_API_SECRET"
+}
+EOF
+        
+        log_success "Kalshi credentials saved"
+    else
+        log_info "Skipping Kalshi credentials setup - you can add them later"
+    fi
+    
     # Create user_info.json
     cat > backend/data/users/user_0001/user_info.json << EOF
 {
@@ -481,24 +513,88 @@ EOF
     log_deployment "Supervisor configuration generation completed"
 }
 
-# Function to start services
-start_services() {
-    log_info "Starting REC.IO services..."
-    log_deployment "Starting services"
+# Function to verify database and credentials before starting services
+verify_database_and_credentials() {
+    log_info "Verifying database and credentials before starting services..."
+    log_deployment "Starting database and credentials verification"
     
     cd "$INSTALL_DIR"
     
-    # Start supervisor
-    supervisord -c backend/supervisord.conf
+    # Test database connectivity
+    log_info "Testing database connectivity..."
+    source venv/bin/activate
     
-    # Wait for services to start
-    sleep 5
+    python3 -c "
+import psycopg2
+import os
+try:
+    conn = psycopg2.connect(
+        host='localhost',
+        database='rec_io_db',
+        user='rec_io_user',
+        password='rec_io_password',
+        port='5432'
+    )
+    print('Database connectivity: OK')
+    conn.close()
+except Exception as e:
+    print(f'Database connectivity: FAILED - {e}')
+    exit(1)
+"
+    
+    # Verify user directory structure exists
+    log_info "Verifying user directory structure..."
+    if [[ ! -d "backend/data/users/user_0001" ]]; then
+        log_error "User directory structure not found"
+        exit 1
+    fi
+    
+    if [[ ! -f "backend/data/users/user_0001/user_info.json" ]]; then
+        log_error "User info file not found"
+        exit 1
+    fi
+    
+    # Verify .env file exists
+    if [[ ! -f ".env" ]]; then
+        log_error ".env file not found"
+        exit 1
+    fi
+    
+    # Check if Kalshi credentials exist (warn if not, but don't fail)
+    if [[ ! -f "backend/data/users/user_0001/credentials/kalshi-credentials/prod/credentials.json" ]]; then
+        log_warning "Kalshi credentials not found - trading will be limited to demo mode"
+        log_warning "You can add credentials later by editing: backend/data/users/user_0001/credentials/kalshi-credentials/prod/credentials.json"
+    else
+        log_success "Kalshi credentials found"
+    fi
+    
+    log_success "Database and credentials verification completed"
+    log_deployment "Database and credentials verification completed"
+}
+
+# Function to start services using MASTER_RESTART
+start_services_with_master_restart() {
+    log_info "Starting services using MASTER_RESTART..."
+    log_deployment "Starting services with MASTER_RESTART"
+    
+    cd "$INSTALL_DIR"
+    
+    # Make sure MASTER_RESTART is executable
+    chmod +x scripts/MASTER_RESTART.sh
+    
+    # Run MASTER_RESTART to start all services properly
+    log_info "Running MASTER_RESTART.sh..."
+    ./scripts/MASTER_RESTART.sh
+    
+    # Wait for services to fully start
+    sleep 10
     
     # Check service status
+    log_info "Checking service status..."
     supervisorctl status
     
-    log_success "Services started successfully"
-    log_deployment "Services started"
+    log_success "Services started successfully using MASTER_RESTART"
+    log_deployment "Services started with MASTER_RESTART"
 }
 
 # Function to verify system operation
@@ -657,15 +753,16 @@ main() {
     # Handle user type selection
     handle_user_type
     
-    # Run deployment phases
+    # Run deployment phases in correct order
     install_system_dependencies
     setup_postgresql
     clone_repository
     setup_python_environment
     initialize_database
     create_user_profile_and_data
+    verify_database_and_credentials
     generate_supervisor_config
-    start_services
+    start_services_with_master_restart
     verify_system_operation
     display_final_information
     
