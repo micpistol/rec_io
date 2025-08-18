@@ -361,19 +361,19 @@ if not success:
     log_deployment "Database schema setup completed and verified"
 }
 
-# STEP 7: DOWNLOAD HISTORICAL DATA INTO DATABASE
-download_historical_data() {
+# STEP 7: COPY SYSTEM DATA FROM MASTER DATABASE
+copy_system_data() {
     echo
     echo "============================================================================="
-    echo "                    STEP 7: DOWNLOAD HISTORICAL DATA"
+    echo "                    STEP 7: COPY SYSTEM DATA FROM MASTER"
     echo "============================================================================="
     echo
     
-    log_info "Downloading historical data into PostgreSQL database..."
-    log_deployment "Starting historical data download"
+    log_info "Copying system data from master database..."
+    log_deployment "Starting system data copy"
     
-    cd "$INSTALL_DIR" || handle_error "Historical Data" "Failed to change to installation directory"
-    source venv/bin/activate || handle_error "Historical Data" "Failed to activate virtual environment"
+    cd "$INSTALL_DIR" || handle_error "System Data Copy" "Failed to change to installation directory"
+    source venv/bin/activate || handle_error "System Data Copy" "Failed to activate virtual environment"
     
     # Set environment variables
     export DB_HOST=localhost
@@ -382,66 +382,55 @@ download_historical_data() {
     export DB_PASSWORD=rec_io_password
     export DB_PORT=5432
     
-    # Create historical_data schema if it doesn't exist
-    log_info "Creating historical_data schema..."
-    PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "CREATE SCHEMA IF NOT EXISTS historical_data;" || handle_error "Historical Data" "Failed to create historical_data schema"
+    # Check if system data archive exists
+    log_info "Looking for system data archive..."
+    SYSTEM_DATA_ARCHIVE=$(find . -name "system_data_export_*.tar.gz" | head -1)
     
-    # Download BTC data
-    log_info "Downloading BTC historical data (this may take several minutes)..."
-    python3 -c "
-import sys
-sys.path.append('backend')
-from util.symbol_data_fetch_pg import fetch_full_5year_data_pg
-try:
-    table_name, rows = fetch_full_5year_data_pg('BTC/USD')
-    print(f'BTC data download completed: {rows} rows to table {table_name}')
-    if rows == 0:
-        exit(1)
-except Exception as e:
-    print(f'BTC data download failed: {e}')
-    exit(1)
-" || handle_error "Historical Data" "BTC historical data download failed"
+    if [[ -z "$SYSTEM_DATA_ARCHIVE" ]]; then
+        log_warning "No system data archive found in installation directory"
+        log_info "You need to copy a system_data_export_*.tar.gz file to this directory"
+        log_info "This file should contain the historical data and other system data from your master database"
+        handle_error "System Data Copy" "System data archive not found - please copy system_data_export_*.tar.gz to $INSTALL_DIR"
+    fi
     
-    # Download ETH data
-    log_info "Downloading ETH historical data (this may take several minutes)..."
-    python3 -c "
-import sys
-sys.path.append('backend')
-from util.symbol_data_fetch_pg import fetch_full_5year_data_pg
-try:
-    table_name, rows = fetch_full_5year_data_pg('ETH/USD')
-    print(f'ETH data download completed: {rows} rows to table {table_name}')
-    if rows == 0:
-        exit(1)
-except Exception as e:
-    print(f'ETH data download failed: {e}')
-    exit(1)
-" || handle_error "Historical Data" "ETH historical data download failed"
+    log_success "Found system data archive: $SYSTEM_DATA_ARCHIVE"
     
-    # VERIFY DATA WAS DOWNLOADED
-    log_info "VERIFYING HISTORICAL DATA WAS DOWNLOADED..."
+    # Run the unpack script
+    log_info "Unpacking system data..."
+    python3 scripts/archive_old/unpack_system_data.py "$SYSTEM_DATA_ARCHIVE" || handle_error "System Data Copy" "Failed to unpack system data"
     
-    # Check BTC data
+    # VERIFY DATA WAS COPIED
+    log_info "VERIFYING SYSTEM DATA WAS COPIED..."
+    
+    # Check historical data
     BTC_ROWS=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM historical_data.btc_price_history;" | tr -d ' ')
     if [[ "$BTC_ROWS" == "0" ]]; then
-        handle_error "Historical Data" "BTC historical data table is empty - download failed"
+        handle_error "System Data Copy" "BTC historical data table is empty - copy failed"
     fi
     log_success "BTC historical data: $BTC_ROWS rows"
     
-    # Check ETH data
     ETH_ROWS=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM historical_data.eth_price_history;" | tr -d ' ')
     if [[ "$ETH_ROWS" == "0" ]]; then
-        handle_error "Historical Data" "ETH historical data table is empty - download failed"
+        handle_error "System Data Copy" "ETH historical data table is empty - copy failed"
     fi
     log_success "ETH historical data: $ETH_ROWS rows"
     
+    # Check analytics data
+    ANALYTICS_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'analytics';" | tr -d ' ')
+    if [[ "$ANALYTICS_TABLES" == "0" ]]; then
+        log_warning "Analytics tables not found - this may be expected for new installations"
+    else
+        log_success "Analytics tables: $ANALYTICS_TABLES tables"
+    fi
+    
     # Show data summary
-    log_info "Historical data summary:"
+    log_info "System data summary:"
     echo "  BTC price history: $BTC_ROWS rows"
     echo "  ETH price history: $ETH_ROWS rows"
+    echo "  Analytics tables: $ANALYTICS_TABLES tables"
     
-    log_success "Historical data download completed and VERIFIED"
-    log_deployment "Historical data download completed and verified"
+    log_success "System data copy completed and VERIFIED"
+    log_deployment "System data copy completed and verified"
 }
 
 # STEP 8: CREATE USER PROFILE AND SAVE CREDENTIALS
@@ -629,7 +618,7 @@ main() {
     clone_repository
     setup_python_environment
     setup_database_schema
-    download_historical_data
+    copy_system_data
     create_user_profile
     verify_installation
     
@@ -653,7 +642,7 @@ main() {
     echo "=========================================="
     echo
     echo "✅ Database setup completed and verified"
-    echo "✅ Historical data downloaded and verified"
+    echo "✅ System data copied from master database"
     echo "✅ User profile created"
     echo "✅ Kalshi credentials saved"
     echo
