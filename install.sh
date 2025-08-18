@@ -81,11 +81,10 @@ setup_kalshi_credentials() {
         echo
         echo "Kalshi Email:"
         read KALSHI_EMAIL
-        echo "Kalshi API Key (will be hidden):"
-        read -s KALSHI_API_KEY
-        echo
-        echo "Kalshi API Secret (will be hidden):"
-        read -s KALSHI_API_SECRET
+        echo "Kalshi API Key:"
+        read KALSHI_API_KEY
+        echo "Kalshi API Secret:"
+        read KALSHI_API_SECRET
         echo
         
         # Validate credentials are not empty
@@ -282,19 +281,12 @@ if not success:
     log_info "VERIFYING DATABASE SCHEMA WAS CREATED..."
     
     # Check for specific tables that should exist
-    log_info "Checking for analytics schema tables..."
-    ANALYTICS_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'analytics';" | tr -d ' ')
-    if [[ "$ANALYTICS_TABLES" == "0" ]]; then
-        handle_error "Database Schema" "Analytics schema has no tables - schema creation failed"
+    log_info "Checking for users schema tables..."
+    USERS_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'users';" | tr -d ' ')
+    if [[ "$USERS_TABLES" == "0" ]]; then
+        handle_error "Database Schema" "Users schema has no tables - schema creation failed"
     fi
-    log_success "Found $ANALYTICS_TABLES tables in analytics schema"
-    
-    log_info "Checking for historical_data schema tables..."
-    HISTORICAL_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'historical_data';" | tr -d ' ')
-    if [[ "$HISTORICAL_TABLES" == "0" ]]; then
-        handle_error "Database Schema" "Historical_data schema has no tables - schema creation failed"
-    fi
-    log_success "Found $HISTORICAL_TABLES tables in historical_data schema"
+    log_success "Found $USERS_TABLES tables in users schema"
     
     log_info "Checking for live_data schema tables..."
     LIVE_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'live_data';" | tr -d ' ')
@@ -303,8 +295,15 @@ if not success:
     fi
     log_success "Found $LIVE_TABLES tables in live_data schema"
     
+    log_info "Checking for system schema tables..."
+    SYSTEM_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'system';" | tr -d ' ')
+    if [[ "$SYSTEM_TABLES" == "0" ]]; then
+        handle_error "Database Schema" "System schema has no tables - schema creation failed"
+    fi
+    log_success "Found $SYSTEM_TABLES tables in system schema"
+    
     # Show total table count
-    TOTAL_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema IN ('analytics', 'historical_data', 'live_data');" | tr -d ' ')
+    TOTAL_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema IN ('users', 'live_data', 'system');" | tr -d ' ')
     log_success "Total database tables created: $TOTAL_TABLES"
     
     # Verify database is working
@@ -315,11 +314,94 @@ if not success:
     log_deployment "Database schema setup completed and verified"
 }
 
-# STEP 7: CREATE USER PROFILE AND SAVE CREDENTIALS
+# STEP 7: DOWNLOAD HISTORICAL DATA INTO DATABASE
+download_historical_data() {
+    echo
+    echo "============================================================================="
+    echo "                    STEP 7: DOWNLOAD HISTORICAL DATA"
+    echo "============================================================================="
+    echo
+    
+    log_info "Downloading historical data into PostgreSQL database..."
+    log_deployment "Starting historical data download"
+    
+    cd "$INSTALL_DIR" || handle_error "Historical Data" "Failed to change to installation directory"
+    source venv/bin/activate || handle_error "Historical Data" "Failed to activate virtual environment"
+    
+    # Set environment variables
+    export DB_HOST=localhost
+    export DB_NAME=rec_io_db
+    export DB_USER=rec_io_user
+    export DB_PASSWORD=rec_io_password
+    export DB_PORT=5432
+    
+    # Create historical_data schema if it doesn't exist
+    log_info "Creating historical_data schema..."
+    PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "CREATE SCHEMA IF NOT EXISTS historical_data;" || handle_error "Historical Data" "Failed to create historical_data schema"
+    
+    # Download BTC data
+    log_info "Downloading BTC historical data (this may take several minutes)..."
+    python3 -c "
+import sys
+sys.path.append('backend')
+from util.symbol_data_fetch_pg import fetch_full_5year_data_pg
+try:
+    table_name, rows = fetch_full_5year_data_pg('BTC/USD')
+    print(f'BTC data download completed: {rows} rows to table {table_name}')
+    if rows == 0:
+        exit(1)
+except Exception as e:
+    print(f'BTC data download failed: {e}')
+    exit(1)
+" || handle_error "Historical Data" "BTC historical data download failed"
+    
+    # Download ETH data
+    log_info "Downloading ETH historical data (this may take several minutes)..."
+    python3 -c "
+import sys
+sys.path.append('backend')
+from util.symbol_data_fetch_pg import fetch_full_5year_data_pg
+try:
+    table_name, rows = fetch_full_5year_data_pg('ETH/USD')
+    print(f'ETH data download completed: {rows} rows to table {table_name}')
+    if rows == 0:
+        exit(1)
+except Exception as e:
+    print(f'ETH data download failed: {e}')
+    exit(1)
+" || handle_error "Historical Data" "ETH historical data download failed"
+    
+    # VERIFY DATA WAS DOWNLOADED
+    log_info "VERIFYING HISTORICAL DATA WAS DOWNLOADED..."
+    
+    # Check BTC data
+    BTC_ROWS=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM historical_data.btc_price_history;" | tr -d ' ')
+    if [[ "$BTC_ROWS" == "0" ]]; then
+        handle_error "Historical Data" "BTC historical data table is empty - download failed"
+    fi
+    log_success "BTC historical data: $BTC_ROWS rows"
+    
+    # Check ETH data
+    ETH_ROWS=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM historical_data.eth_price_history;" | tr -d ' ')
+    if [[ "$ETH_ROWS" == "0" ]]; then
+        handle_error "Historical Data" "ETH historical data table is empty - download failed"
+    fi
+    log_success "ETH historical data: $ETH_ROWS rows"
+    
+    # Show data summary
+    log_info "Historical data summary:"
+    echo "  BTC price history: $BTC_ROWS rows"
+    echo "  ETH price history: $ETH_ROWS rows"
+    
+    log_success "Historical data download completed and VERIFIED"
+    log_deployment "Historical data download completed and verified"
+}
+
+# STEP 8: CREATE USER PROFILE AND SAVE CREDENTIALS
 create_user_profile() {
     echo
     echo "============================================================================="
-    echo "                    STEP 7: USER PROFILE SETUP"
+    echo "                    STEP 8: USER PROFILE SETUP"
     echo "============================================================================="
     echo
     
@@ -406,19 +488,19 @@ EOF
     log_deployment "User profile setup completed"
 }
 
-# STEP 8: VERIFY EVERYTHING BEFORE STARTING SERVICES
+# STEP 9: FINAL VERIFICATION
 verify_installation() {
     echo
     echo "============================================================================="
-    echo "                    STEP 8: VERIFICATION"
+    echo "                    STEP 9: FINAL VERIFICATION"
     echo "============================================================================="
     echo
     
-    log_info "Verifying installation before starting services..."
-    log_deployment "Starting installation verification"
+    log_info "Performing final verification..."
+    log_deployment "Starting final verification"
     
-    cd "$INSTALL_DIR" || handle_error "Verification" "Failed to change to installation directory"
-    source venv/bin/activate || handle_error "Verification" "Failed to activate virtual environment"
+    cd "$INSTALL_DIR" || handle_error "Final Verification" "Failed to change to installation directory"
+    source venv/bin/activate || handle_error "Final Verification" "Failed to activate virtual environment"
     
     # Test database connectivity
     log_info "Testing database connectivity..."
@@ -438,21 +520,21 @@ try:
 except Exception as e:
     print(f'Database connectivity: FAILED - {e}')
     exit(1)
-" || handle_error "Verification" "Database connectivity test failed"
+" || handle_error "Final Verification" "Database connectivity test failed"
     
     # Verify user directory structure exists
     log_info "Verifying user directory structure..."
     if [[ ! -d "backend/data/users/user_0001" ]]; then
-        handle_error "Verification" "User directory structure not found"
+        handle_error "Final Verification" "User directory structure not found"
     fi
     
     if [[ ! -f "backend/data/users/user_0001/user_info.json" ]]; then
-        handle_error "Verification" "User info file not found"
+        handle_error "Final Verification" "User info file not found"
     fi
     
     # Verify .env file exists
     if [[ ! -f ".env" ]]; then
-        handle_error "Verification" ".env file not found"
+        handle_error "Final Verification" ".env file not found"
     fi
     
     # Check if Kalshi credentials exist (warn if not, but don't fail)
@@ -463,121 +545,23 @@ except Exception as e:
         log_success "Kalshi credentials found"
     fi
     
-    log_success "Installation verification completed"
-    log_deployment "Installation verification completed"
-}
-
-# STEP 9: GENERATE SUPERVISOR CONFIG
-generate_supervisor_config() {
-    echo
-    echo "============================================================================="
-    echo "                    STEP 9: SUPERVISOR CONFIGURATION"
-    echo "============================================================================="
-    echo
+    # Verify historical data exists
+    log_info "Verifying historical data..."
+    BTC_ROWS=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM historical_data.btc_price_history;" | tr -d ' ')
+    ETH_ROWS=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM historical_data.eth_price_history;" | tr -d ' ')
     
-    log_info "Generating supervisor configuration..."
-    log_deployment "Starting supervisor configuration generation"
-    
-    cd "$INSTALL_DIR" || handle_error "Supervisor Config" "Failed to change to installation directory"
-    source venv/bin/activate || handle_error "Supervisor Config" "Failed to activate virtual environment"
-    
-    # Generate supervisor configuration
-    python3 scripts/generate_unified_supervisor_config.py || handle_error "Supervisor Config" "Failed to generate supervisor configuration"
-    
-    log_success "Supervisor configuration generated successfully"
-    log_deployment "Supervisor configuration generation completed"
-}
-
-# STEP 10: START SERVICES WITH MASTER_RESTART (LAST STEP)
-start_services() {
-    echo
-    echo "============================================================================="
-    echo "                    STEP 10: START SERVICES (FINAL STEP)"
-    echo "============================================================================="
-    echo
-    
-    log_info "Starting services using MASTER_RESTART..."
-    log_deployment "Starting services with MASTER_RESTART"
-    
-    cd "$INSTALL_DIR" || handle_error "Service Start" "Failed to change to installation directory"
-    
-    # Make sure MASTER_RESTART is executable
-    chmod +x scripts/MASTER_RESTART.sh || handle_error "Service Start" "Failed to make MASTER_RESTART executable"
-    
-    # Run MASTER_RESTART to start all services properly
-    log_info "Running MASTER_RESTART.sh..."
-    ./scripts/MASTER_RESTART.sh || handle_error "Service Start" "MASTER_RESTART failed"
-    
-    # Wait for services to fully start
-    sleep 10
-    
-    # Check service status
-    log_info "Checking service status..."
-    supervisorctl status || handle_error "Service Start" "Failed to check service status"
-    
-    log_success "Services started successfully using MASTER_RESTART"
-    log_deployment "Services started with MASTER_RESTART"
-}
-
-# STEP 11: FINAL VERIFICATION AND DISPLAY
-final_verification_and_display() {
-    echo
-    echo "============================================================================="
-    echo "                    INSTALLATION COMPLETE"
-    echo "============================================================================="
-    echo
-    
-    log_info "Performing final verification..."
-    log_deployment "Starting final verification"
-    
-    cd "$INSTALL_DIR" || handle_error "Final Verification" "Failed to change to installation directory"
-    
-    # Test database connectivity one more time
-    log_info "Final database connectivity test..."
-    PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT 1;" || handle_error "Final Verification" "Final database test failed"
-    
-    # Check if services are running
-    log_info "Checking if services are running..."
-    if supervisorctl status | grep -q "RUNNING"; then
-        log_success "Services are running"
-    else
-        handle_error "Final Verification" "Some services are not running"
+    if [[ "$BTC_ROWS" == "0" ]]; then
+        handle_error "Final Verification" "BTC historical data is missing"
     fi
     
-    # Get server IP
-    SERVER_IP=$(curl -s https://api.ipify.org 2>/dev/null || echo "localhost")
+    if [[ "$ETH_ROWS" == "0" ]]; then
+        handle_error "Final Verification" "ETH historical data is missing"
+    fi
     
-    echo
-    echo "=========================================="
-    echo "        REC.IO INSTALLATION COMPLETE"
-    echo "=========================================="
-    echo
-    echo "System Information:"
-    echo "  Installation Directory: $INSTALL_DIR"
-    echo "  Database: localhost:5432 (rec_io_db)"
-    echo "  Server IP: $SERVER_IP"
-    echo
-    echo "System Access:"
-    echo "  Web Interface: http://$SERVER_IP:3000"
-    echo "  Local Access: http://localhost:3000"
-    echo
-    echo "Service Status:"
-    supervisorctl status
-    echo
-    echo "Next Steps:"
-    echo "  1. Access your system: http://$SERVER_IP:3000"
-    echo "  2. Start trading!"
-    echo
-    echo "System Management:"
-    echo "  Start services: cd $INSTALL_DIR && ./scripts/MASTER_RESTART.sh"
-    echo "  Stop services: supervisorctl stop all"
-    echo "  View logs: tail -f $INSTALL_DIR/logs/*.out.log"
-    echo
-    echo "Installation log: $DEPLOYMENT_LOG"
-    echo "=========================================="
+    log_success "Historical data verified: BTC ($BTC_ROWS rows), ETH ($ETH_ROWS rows)"
     
-    log_success "Installation completed successfully!"
-    log_deployment "Installation completed successfully at $(date)"
+    log_success "Final verification completed"
+    log_deployment "Final verification completed"
 }
 
 # MAIN INSTALLATION FUNCTION
@@ -591,53 +575,38 @@ main() {
         handle_error "Prerequisites" "This script must be run as root"
     fi
     
-    # Run installation steps in correct order - STOP AFTER DATABASE SETUP
+    # Run installation steps in correct order
     setup_kalshi_credentials
     install_system_dependencies
     setup_postgresql_database
     clone_repository
     setup_python_environment
     setup_database_schema
+    download_historical_data
     create_user_profile
+    verify_installation
     
-    # FINAL VERIFICATION - STOP HERE
+    # FINAL SUCCESS MESSAGE
     echo
     echo "============================================================================="
-    echo "                    INSTALLATION COMPLETE - VERIFICATION"
+    echo "                    INSTALLATION COMPLETE"
     echo "============================================================================="
     echo
-    
-    log_info "Performing final verification..."
-    
-    cd "$INSTALL_DIR" || handle_error "Final Verification" "Failed to change to installation directory"
-    
-    # Test database connectivity
-    log_info "Final database connectivity test..."
-    PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT 1;" || handle_error "Final Verification" "Final database test failed"
-    
-    # Show database summary
-    log_info "Database summary:"
-    TOTAL_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema IN ('analytics', 'historical_data', 'live_data');" | tr -d ' ')
-    echo "  Total tables: $TOTAL_TABLES"
-    
-    ANALYTICS_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'analytics';" | tr -d ' ')
-    echo "  Analytics tables: $ANALYTICS_TABLES"
-    
-    HISTORICAL_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'historical_data';" | tr -d ' ')
-    echo "  Historical tables: $HISTORICAL_TABLES"
-    
-    LIVE_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'live_data';" | tr -d ' ')
-    echo "  Live data tables: $LIVE_TABLES"
     
     # Get server IP
     SERVER_IP=$(curl -s https://api.ipify.org 2>/dev/null || echo "localhost")
     
-    echo
+    # Show database summary
+    TOTAL_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema IN ('users', 'live_data', 'system', 'historical_data');" | tr -d ' ')
+    BTC_ROWS=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM historical_data.btc_price_history;" | tr -d ' ')
+    ETH_ROWS=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM historical_data.eth_price_history;" | tr -d ' ')
+    
     echo "=========================================="
     echo "        REC.IO INSTALLATION COMPLETE"
     echo "=========================================="
     echo
     echo "✅ Database setup completed and verified"
+    echo "✅ Historical data downloaded and verified"
     echo "✅ User profile created"
     echo "✅ Kalshi credentials saved"
     echo
@@ -646,6 +615,8 @@ main() {
     echo "  Database: localhost:5432 (rec_io_db)"
     echo "  Server IP: $SERVER_IP"
     echo "  Total Database Tables: $TOTAL_TABLES"
+    echo "  BTC Historical Data: $BTC_ROWS rows"
+    echo "  ETH Historical Data: $ETH_ROWS rows"
     echo
     echo "Next Steps:"
     echo "  1. Verify the database is working correctly"
