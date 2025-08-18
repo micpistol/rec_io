@@ -1,34 +1,10 @@
 #!/bin/bash
 
-# REC.IO One-Click Deployment Script
-# Complete automated deployment for new users on fresh servers
-# 
-# Usage: curl -sSL https://raw.githubusercontent.com/betaclone1/rec_io/main/scripts/one_click_deploy.sh | bash
-# 
-# This script will:
-# 1. Install all system dependencies
-# 2. Clone the repository
-# 3. Set up PostgreSQL database
-# 4. Create Python virtual environment
-# 5. Install all dependencies
-# 6. Set up basic user structure
-# 7. Configure the system
-# 8. Start all services
+# REC.IO Installation Script
+# Correct order: Credentials -> Database -> System -> Services
+# Usage: curl -sSL https://raw.githubusercontent.com/betaclone1/rec_io/main/install.sh | bash
 
 set -e  # Exit on any error
-
-# Function to handle errors
-handle_error() {
-    log_error "Installation failed at step: $1"
-    log_error "Error details: $2"
-    echo
-    echo "Installation failed. Please check the error above and try again."
-    echo "You can also check the deployment log: $DEPLOYMENT_LOG"
-    exit 1
-}
-
-# Set up error handling
-trap 'handle_error "Unknown" "Script terminated unexpectedly"' ERR
 
 # Colors for output
 RED='\033[0;31m'
@@ -40,244 +16,244 @@ NC='\033[0m' # No Color
 
 # Logging functions
 log_info() {
-    echo -e "${BLUE}[DEPLOY]${NC} $1"
+    echo -e "${BLUE}[INSTALL]${NC} $1"
 }
 
 log_success() {
-    echo -e "${GREEN}[DEPLOY] ✅${NC} $1"
+    echo -e "${GREEN}[INSTALL] ✅${NC} $1"
 }
 
 log_warning() {
-    echo -e "${YELLOW}[DEPLOY] ⚠️${NC} $1"
+    echo -e "${YELLOW}[INSTALL] ⚠️${NC} $1"
 }
 
 log_error() {
-    echo -e "${RED}[DEPLOY] ❌${NC} $1"
+    echo -e "${RED}[INSTALL] ❌${NC} $1"
 }
 
 print_header() {
     echo -e "${PURPLE}=============================================================================${NC}"
-    echo -e "${PURPLE}                    REC.IO ONE-CLICK DEPLOYMENT${NC}"
+    echo -e "${PURPLE}                    REC.IO INSTALLATION${NC}"
     echo -e "${PURPLE}=============================================================================${NC}"
 }
 
 # Configuration
-REPO_URL="https://github.com/betaclone1/rec_io.git"
 INSTALL_DIR="/opt/rec_io"
-DEPLOYMENT_LOG="/tmp/rec_io_deployment.log"
+DEPLOYMENT_LOG="/tmp/rec_io_installation.log"
 
-# Function to log deployment progress
+# Function to log installation progress
 log_deployment() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$DEPLOYMENT_LOG"
 }
 
-# Function to setup Kalshi credentials FIRST (before anything else)
-setup_kalshi_credentials_first() {
+# Function to handle errors and exit
+handle_error() {
+    log_error "Installation FAILED at step: $1"
+    log_error "Error: $2"
     echo
-    echo "============================================================================="
-    echo "                    KALSHI CREDENTIALS SETUP (STEP 1)"
-    echo "============================================================================="
-    echo
-    echo "Kalshi credentials will be set up after installation."
-    echo "You can add them manually by editing:"
-    echo "  backend/data/users/user_0001/credentials/kalshi-credentials/prod/credentials.json"
-    echo
-    echo "For now, proceeding with demo mode installation..."
-    echo
-    
-    # Set empty credentials for now
-    export KALSHI_EMAIL=""
-    export KALSHI_API_KEY=""
-    export KALSHI_API_SECRET=""
-    
-    echo "✅ Proceeding with installation (credentials can be added later)"
-    echo
+    echo "Installation failed. Please check the error above and try again."
+    echo "Log file: $DEPLOYMENT_LOG"
+    exit 1
 }
 
-# Function to detect operating system
-detect_os() {
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        if command -v apt-get >/dev/null 2>&1; then
-            echo "ubuntu"
-        elif command -v yum >/dev/null 2>&1; then
-            echo "centos"
-        else
-            echo "linux"
+# Set up error handling
+trap 'handle_error "Unknown" "Script terminated unexpectedly"' ERR
+
+# STEP 1: INTERACTIVE KALSHI CREDENTIALS SETUP
+setup_kalshi_credentials() {
+    echo
+    echo "============================================================================="
+    echo "                    STEP 1: KALSHI CREDENTIALS SETUP"
+    echo "============================================================================="
+    echo
+    echo "You need Kalshi credentials to trade. This must be set up FIRST."
+    echo
+    echo "Do you want to set up Kalshi credentials now?"
+    echo "1) Yes - I have my Kalshi credentials ready"
+    echo "2) No - I'll add them later (system will be limited to demo mode)"
+    echo
+    echo "Enter 1 or 2:"
+    read -p "Choice: " CREDENTIAL_CHOICE
+    
+    if [[ $CREDENTIAL_CHOICE == "1" ]]; then
+        echo
+        echo "Please enter your Kalshi credentials:"
+        echo
+        echo "Kalshi Email:"
+        read KALSHI_EMAIL
+        echo "Kalshi API Key (will be hidden):"
+        read -s KALSHI_API_KEY
+        echo
+        echo "Kalshi API Secret (will be hidden):"
+        read -s KALSHI_API_SECRET
+        echo
+        
+        # Validate credentials are not empty
+        if [[ -z "$KALSHI_EMAIL" || -z "$KALSHI_API_KEY" || -z "$KALSHI_API_SECRET" ]]; then
+            handle_error "Credential Setup" "One or more credentials are empty"
         fi
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "macos"
+        
+        # Store credentials in environment variables for later use
+        export KALSHI_EMAIL="$KALSHI_EMAIL"
+        export KALSHI_API_KEY="$KALSHI_API_KEY"
+        export KALSHI_API_SECRET="$KALSHI_API_SECRET"
+        
+        echo
+        echo "✅ Kalshi credentials captured and stored"
+        echo "They will be saved to the system during installation."
+        echo
     else
-        echo "unknown"
+        echo
+        echo "⚠️  Skipping Kalshi credentials setup."
+        echo "System will be limited to demo mode until credentials are added."
+        echo
+        # Set empty credentials
+        export KALSHI_EMAIL=""
+        export KALSHI_API_KEY=""
+        export KALSHI_API_SECRET=""
     fi
+    
+    log_deployment "Kalshi credentials setup completed"
 }
 
-# Function to check if command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
-}
-
-# Function to install system dependencies
+# STEP 2: INSTALL SYSTEM DEPENDENCIES
 install_system_dependencies() {
+    echo
+    echo "============================================================================="
+    echo "                    STEP 2: SYSTEM DEPENDENCIES"
+    echo "============================================================================="
+    echo
+    
     log_info "Installing system dependencies..."
     log_deployment "Starting system dependencies installation"
     
-    OS=$(detect_os)
+    # Update package lists
+    apt-get update || handle_error "System Dependencies" "Failed to update package lists"
     
-    case $OS in
-        "ubuntu")
-            log_info "Installing dependencies on Ubuntu/Debian..."
-            apt-get update
-            apt-get install -y python3 python3-pip python3-venv git curl wget
-            
-            # Check available PostgreSQL packages
-            log_info "Checking available PostgreSQL packages..."
-            apt-cache search postgresql | grep -E "postgresql-[0-9]+" | head -5
-            
-            # Install PostgreSQL (try different versions)
-            log_info "Installing PostgreSQL..."
-            if apt-get install -y postgresql postgresql-contrib postgresql-client; then
-                log_success "PostgreSQL installed successfully"
-            elif apt-get install -y postgresql-14 postgresql-contrib-14 postgresql-client-14; then
-                log_success "PostgreSQL 14 installed successfully"
-            elif apt-get install -y postgresql-15 postgresql-contrib-15 postgresql-client-15; then
-                log_success "PostgreSQL 15 installed successfully"
-            elif apt-get install -y postgresql-13 postgresql-contrib-13 postgresql-client-13; then
-                log_success "PostgreSQL 13 installed successfully"
-            else
-                log_error "Failed to install PostgreSQL - no compatible version found"
-                log_error "Available packages:"
-                apt-cache search postgresql | grep -E "postgresql-[0-9]+"
-                exit 1
-            fi
-            
-            # Install supervisor
-            log_info "Installing supervisor..."
-            apt-get install -y supervisor
-            
-            # Start and enable PostgreSQL
-            log_info "Starting PostgreSQL service..."
-            systemctl start postgresql
-            systemctl enable postgresql
-            ;;
-        "centos")
-            log_info "Installing dependencies on CentOS/RHEL..."
-            yum update -y
-            yum install -y python3 python3-pip postgresql postgresql-server postgresql-contrib supervisor git curl wget
-            postgresql-setup initdb
-            ;;
-        "macos")
-            log_info "Installing dependencies on macOS..."
-            if ! command_exists brew; then
-                log_info "Installing Homebrew..."
-                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            fi
-            brew install python3 postgresql supervisor git
-            ;;
-        *)
-            log_error "Unsupported operating system: $OS"
-            exit 1
-            ;;
-    esac
+    # Install basic dependencies
+    apt-get install -y python3 python3-pip python3-venv git curl wget || handle_error "System Dependencies" "Failed to install basic packages"
+    
+    # Install PostgreSQL
+    log_info "Installing PostgreSQL..."
+    if apt-get install -y postgresql postgresql-contrib postgresql-client; then
+        log_success "PostgreSQL installed successfully"
+    elif apt-get install -y postgresql-14 postgresql-contrib-14 postgresql-client-14; then
+        log_success "PostgreSQL 14 installed successfully"
+    elif apt-get install -y postgresql-15 postgresql-contrib-15 postgresql-client-15; then
+        log_success "PostgreSQL 15 installed successfully"
+    else
+        handle_error "System Dependencies" "Failed to install PostgreSQL"
+    fi
+    
+    # Install supervisor
+    log_info "Installing supervisor..."
+    apt-get install -y supervisor || handle_error "System Dependencies" "Failed to install supervisor"
+    
+    # Start and enable PostgreSQL
+    log_info "Starting PostgreSQL service..."
+    systemctl start postgresql || handle_error "System Dependencies" "Failed to start PostgreSQL"
+    systemctl enable postgresql || handle_error "System Dependencies" "Failed to enable PostgreSQL"
     
     log_success "System dependencies installed successfully"
     log_deployment "System dependencies installation completed"
 }
 
-# Function to setup PostgreSQL
-setup_postgresql() {
+# STEP 3: SETUP POSTGRESQL DATABASE
+setup_postgresql_database() {
+    echo
+    echo "============================================================================="
+    echo "                    STEP 3: POSTGRESQL DATABASE SETUP"
+    echo "============================================================================="
+    echo
+    
     log_info "Setting up PostgreSQL database..."
-    log_deployment "Starting PostgreSQL setup"
+    log_deployment "Starting PostgreSQL database setup"
     
-    OS=$(detect_os)
+    # Create database user
+    log_info "Creating database user..."
+    sudo -u postgres psql -c "CREATE USER rec_io_user WITH PASSWORD 'rec_io_password';" 2>/dev/null || true
     
-    # Start PostgreSQL service
-    case $OS in
-        "ubuntu"|"centos")
-            systemctl start postgresql
-            systemctl enable postgresql
-            ;;
-        "macos")
-            brew services start postgresql
-            ;;
-    esac
+    # Create database
+    log_info "Creating database..."
+    sudo -u postgres psql -c "CREATE DATABASE rec_io_db OWNER rec_io_user;" 2>/dev/null || true
     
-    # Create database user and database
-    if [[ $OS == "macos" ]]; then
-        # macOS PostgreSQL setup
-        createdb rec_io_db 2>/dev/null || true
-        createuser -s rec_io_user 2>/dev/null || true
-        psql -d rec_io_db -c "ALTER USER rec_io_user WITH PASSWORD 'rec_io_password';"
-    else
-        # Linux PostgreSQL setup
-        sudo -u postgres psql -c "CREATE USER rec_io_user WITH PASSWORD 'rec_io_password';" 2>/dev/null || true
-        sudo -u postgres psql -c "CREATE DATABASE rec_io_db OWNER rec_io_user;" 2>/dev/null || true
-        sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE rec_io_db TO rec_io_user;"
-    fi
+    # Grant privileges
+    log_info "Granting database privileges..."
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE rec_io_db TO rec_io_user;" 2>/dev/null || true
+    
+    # Test database connection
+    log_info "Testing database connection..."
+    PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT 1;" || handle_error "Database Setup" "Database connection test failed"
     
     log_success "PostgreSQL database setup completed"
-    log_deployment "PostgreSQL setup completed"
+    log_deployment "PostgreSQL database setup completed"
 }
 
-# Function to clone repository
+# STEP 4: CLONE REPOSITORY
 clone_repository() {
+    echo
+    echo "============================================================================="
+    echo "                    STEP 4: CLONE REPOSITORY"
+    echo "============================================================================="
+    echo
+    
     log_info "Cloning REC.IO repository..."
-    log_deployment "Starting repository clone"
+    log_deployment "Starting repository cloning"
     
     # Create installation directory
-    mkdir -p "$INSTALL_DIR"
-    cd "$INSTALL_DIR"
+    mkdir -p "$INSTALL_DIR" || handle_error "Repository Clone" "Failed to create installation directory"
+    cd "$INSTALL_DIR" || handle_error "Repository Clone" "Failed to change to installation directory"
     
     # Clone repository
-    if [[ -d ".git" ]]; then
-        log_warning "Repository already exists, updating..."
-        git pull origin main
-    else
-        git clone "$REPO_URL" .
-    fi
-    
-    # Make scripts executable
-    chmod +x scripts/*.sh
+    git clone https://github.com/betaclone1/rec_io.git . || handle_error "Repository Clone" "Failed to clone repository"
     
     log_success "Repository cloned successfully"
-    log_deployment "Repository clone completed"
+    log_deployment "Repository cloning completed"
 }
 
-# Function to setup Python environment
+# STEP 5: SETUP PYTHON ENVIRONMENT
 setup_python_environment() {
+    echo
+    echo "============================================================================="
+    echo "                    STEP 5: PYTHON ENVIRONMENT"
+    echo "============================================================================="
+    echo
+    
     log_info "Setting up Python virtual environment..."
     log_deployment "Starting Python environment setup"
     
-    cd "$INSTALL_DIR"
+    cd "$INSTALL_DIR" || handle_error "Python Environment" "Failed to change to installation directory"
     
     # Create virtual environment
-    python3 -m venv venv
+    python3 -m venv venv || handle_error "Python Environment" "Failed to create virtual environment"
     
     # Activate virtual environment
-    source venv/bin/activate
+    source venv/bin/activate || handle_error "Python Environment" "Failed to activate virtual environment"
     
     # Upgrade pip
-    pip install --upgrade pip
+    pip install --upgrade pip || handle_error "Python Environment" "Failed to upgrade pip"
     
-    # Install Python dependencies
-    if [[ -f "requirements.txt" ]]; then
-        pip install -r requirements.txt
-        log_success "Python dependencies installed from requirements.txt"
-    else
-        log_warning "requirements.txt not found, installing basic dependencies"
-        pip install psycopg2-binary requests tabulate
-    fi
+    # Install dependencies
+    log_info "Installing Python dependencies..."
+    pip install -r requirements.txt || handle_error "Python Environment" "Failed to install Python dependencies"
     
     log_success "Python environment setup completed"
     log_deployment "Python environment setup completed"
 }
 
-# Function to setup database schema (after repository is cloned)
+# STEP 6: SETUP DATABASE SCHEMA
 setup_database_schema() {
+    echo
+    echo "============================================================================="
+    echo "                    STEP 6: DATABASE SCHEMA SETUP"
+    echo "============================================================================="
+    echo
+    
     log_info "Setting up database schema..."
     log_deployment "Starting database schema setup"
     
-    cd "$INSTALL_DIR"
-    source venv/bin/activate
+    cd "$INSTALL_DIR" || handle_error "Database Schema" "Failed to change to installation directory"
+    source venv/bin/activate || handle_error "Database Schema" "Failed to activate virtual environment"
     
     # Set environment variables
     export DB_HOST=localhost
@@ -286,18 +262,9 @@ setup_database_schema() {
     export DB_PASSWORD=rec_io_password
     export DB_PORT=5432
     
-    # Create database and user if they don't exist
-    log_info "Creating database and user..."
-    sudo -u postgres psql -c "CREATE USER rec_io_user WITH PASSWORD 'rec_io_password';" 2>/dev/null || true
-    sudo -u postgres psql -c "CREATE DATABASE rec_io_db OWNER rec_io_user;" 2>/dev/null || true
-    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE rec_io_db TO rec_io_user;" 2>/dev/null || true
-    
-    # Test database connection
+    # Test database connection again
     log_info "Testing database connection..."
-    PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT 1;" || {
-        log_error "Database connection failed"
-        exit 1
-    }
+    PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT 1;" || handle_error "Database Schema" "Database connection failed"
     
     # Initialize database schema using the backend code
     log_info "Initializing database schema..."
@@ -309,29 +276,31 @@ success, message = init_database()
 print(f'Database initialization: {message}')
 if not success:
     exit(1)
-"
-    
-    log_success "Database schema setup completed successfully"
-    log_deployment "Database schema setup completed"
+" || handle_error "Database Schema" "Database schema initialization failed"
     
     # Verify database is working
     log_info "Verifying database is working..."
-    PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT version();" || {
-        log_error "Database verification failed"
-        exit 1
-    }
-    log_success "Database verification passed"
+    PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT version();" || handle_error "Database Schema" "Database verification failed"
+    
+    log_success "Database schema setup completed"
+    log_deployment "Database schema setup completed"
 }
 
-# Function to create user profile and clone historical data
-create_user_profile_and_data() {
-    log_info "Creating user profile and cloning historical data..."
-    log_deployment "Starting user profile and data setup"
+# STEP 7: CREATE USER PROFILE AND SAVE CREDENTIALS
+create_user_profile() {
+    echo
+    echo "============================================================================="
+    echo "                    STEP 7: USER PROFILE SETUP"
+    echo "============================================================================="
+    echo
     
-    cd "$INSTALL_DIR"
+    log_info "Creating user profile and saving credentials..."
+    log_deployment "Starting user profile setup"
+    
+    cd "$INSTALL_DIR" || handle_error "User Profile" "Failed to change to installation directory"
     
     # Create user directory structure
-    mkdir -p backend/data/users/user_0001/{credentials/kalshi-credentials/{prod,demo},preferences,trade_history,active_trades,accounts}
+    mkdir -p backend/data/users/user_0001/{credentials/kalshi-credentials/{prod,demo},preferences,trade_history,active_trades,accounts} || handle_error "User Profile" "Failed to create user directories"
     
     # Set secure permissions
     chmod 700 backend/data/users/user_0001/credentials
@@ -339,7 +308,7 @@ create_user_profile_and_data() {
     chmod 700 backend/data/users/user_0001/credentials/kalshi-credentials/prod
     chmod 700 backend/data/users/user_0001/credentials/kalshi-credentials/demo
     
-    # Use the Kalshi credentials that were captured earlier
+    # Save Kalshi credentials
     echo
     echo "=== Saving Kalshi Credentials ==="
     
@@ -404,218 +373,26 @@ SYSTEM_PORT=3000
 ENVIRONMENT=production
 EOF
     
-    # Clone historical data from main system
-    log_info "Cloning historical data from main system..."
-    
-    # Set environment variables for database access
-    export DB_HOST=localhost
-    export DB_NAME=rec_io_db
-    export DB_USER=rec_io_user
-    export DB_PASSWORD=rec_io_password
-    export DB_PORT=5432
-    
-    # Create Python script to clone data
-    cat > clone_data.py << 'EOF'
-#!/usr/bin/env python3
-import psycopg2
-import os
-import time
-from datetime import datetime
-
-# Remote database configuration
-REMOTE_CONFIG = {
-    'host': '137.184.224.94',
-    'port': 5432,
-    'database': 'rec_io_db',
-    'user': 'rec_io_installer',
-    'password': 'secure_installer_password_2025'
+    log_success "User profile setup completed"
+    log_deployment "User profile setup completed"
 }
 
-# Local database configuration
-LOCAL_CONFIG = {
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'port': int(os.getenv('DB_PORT', '5432')),
-    'database': os.getenv('DB_NAME', 'rec_io_db'),
-    'user': os.getenv('DB_USER', 'rec_io_user'),
-    'password': os.getenv('DB_PASSWORD', 'rec_io_password')
-}
-
-def clone_schema_data(schema_name):
-    """Clone data from a specific schema"""
-    print(f"Cloning {schema_name} schema...")
+# STEP 8: VERIFY EVERYTHING BEFORE STARTING SERVICES
+verify_installation() {
+    echo
+    echo "============================================================================="
+    echo "                    STEP 8: VERIFICATION"
+    echo "============================================================================="
+    echo
     
-    try:
-        # Connect to remote database
-        remote_conn = psycopg2.connect(**REMOTE_CONFIG)
-        remote_cursor = remote_conn.cursor()
-        
-        # Connect to local database
-        local_conn = psycopg2.connect(**LOCAL_CONFIG)
-        local_cursor = local_conn.cursor()
-        
-        # Get all tables in the schema
-        remote_cursor.execute("""
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = %s AND table_type = 'BASE TABLE'
-        """, (schema_name,))
-        
-        tables = remote_cursor.fetchall()
-        total_tables = len(tables)
-        total_rows = 0
-        
-        print(f"  Found {total_tables} tables in {schema_name} schema")
-        
-        for i, (table_name,) in enumerate(tables, 1):
-            print(f"  Cloning table {i}/{total_tables}: {table_name}")
-            
-            # Get table structure
-            remote_cursor.execute(f"SELECT * FROM {schema_name}.{table_name} LIMIT 0")
-            columns = [desc[0] for desc in remote_cursor.description]
-            
-            # Get all data
-            remote_cursor.execute(f"SELECT * FROM {schema_name}.{table_name}")
-            rows = remote_cursor.fetchall()
-            
-            if rows:
-                # Create table if it doesn't exist
-                local_cursor.execute(f"DROP TABLE IF EXISTS {schema_name}.{table_name} CASCADE")
-                
-                # Get CREATE TABLE statement
-                remote_cursor.execute(f"""
-                    SELECT column_name, data_type, is_nullable, column_default 
-                    FROM information_schema.columns 
-                    WHERE table_schema = %s AND table_name = %s 
-                    ORDER BY ordinal_position
-                """, (schema_name, table_name))
-                
-                columns_info = remote_cursor.fetchall()
-                create_table_sql = f"CREATE TABLE {schema_name}.{table_name} ("
-                create_table_sql += ", ".join([f"{col[0]} {col[1]}" for col in columns_info])
-                create_table_sql += ")"
-                
-                local_cursor.execute(create_table_sql)
-                
-                # Insert data
-                if len(rows) > 0:
-                    placeholders = ", ".join(["%s"] * len(columns))
-                    insert_sql = f"INSERT INTO {schema_name}.{table_name} VALUES ({placeholders})"
-                    local_cursor.executemany(insert_sql, rows)
-                
-                total_rows += len(rows)
-                print(f"    Cloned {len(rows)} rows")
-            
-            local_conn.commit()
-        
-        remote_conn.close()
-        local_conn.close()
-        
-        print(f"Completed cloning {schema_name} schema: {total_tables} tables, {total_rows} rows")
-        return total_tables, total_rows
-        
-    except Exception as e:
-        print(f"Error cloning {schema_name} schema: {e}")
-        return 0, 0
-
-def main():
-    print("Starting historical data cloning...")
+    log_info "Verifying installation before starting services..."
+    log_deployment "Starting installation verification"
     
-    total_tables = 0
-    total_rows = 0
-    
-    # Clone each schema
-    schemas = ['analytics', 'historical_data', 'live_data']
-    for schema in schemas:
-        tables, rows = clone_schema_data(schema)
-        total_tables += tables
-        total_rows += rows
-    
-    print(f"Historical data cloning completed:")
-    print(f"  Total tables cloned: {total_tables}")
-    print(f"  Total rows cloned: {total_rows}")
-
-if __name__ == "__main__":
-    main()
-EOF
-    
-    # Run the cloning script
-    source venv/bin/activate
-    python3 clone_data.py
-    
-    # Clean up
-    rm clone_data.py
-    
-    log_success "User profile and historical data setup completed"
-    log_deployment "User profile and data setup completed"
-}
-
-# Function to generate supervisor configuration
-generate_supervisor_config() {
-    log_info "Generating supervisor configuration..."
-    log_deployment "Starting supervisor configuration generation"
-    
-    cd "$INSTALL_DIR"
-    
-    # Generate supervisor configuration
-    if [[ -f "scripts/generate_unified_supervisor_config.py" ]]; then
-        source venv/bin/activate
-        python3 scripts/generate_unified_supervisor_config.py
-    else
-        log_warning "Supervisor config generator not found, using fallback"
-        # Create basic supervisor config
-        cat > backend/supervisord.conf << EOF
-[unix_http_server]
-file=/tmp/supervisor.sock
-
-[supervisord]
-logfile=/tmp/supervisord.log
-logfile_maxbytes=50MB
-logfile_backups=10
-loglevel=info
-pidfile=/tmp/supervisord.pid
-
-[rpcinterface:supervisor]
-supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
-
-[supervisorctl]
-serverurl=unix:///tmp/supervisor.sock
-
-[program:rec_io_main]
-command=$INSTALL_DIR/venv/bin/python backend/main.py
-directory=$INSTALL_DIR
-autostart=true
-autorestart=true
-stderr_logfile=$INSTALL_DIR/logs/main_app.err.log
-stdout_logfile=$INSTALL_DIR/logs/main_app.out.log
-
-[program:rec_io_trade_manager]
-command=$INSTALL_DIR/venv/bin/python backend/trade_manager.py
-directory=$INSTALL_DIR
-autostart=true
-autorestart=true
-stderr_logfile=$INSTALL_DIR/logs/trade_manager.err.log
-stdout_logfile=$INSTALL_DIR/logs/trade_manager.out.log
-EOF
-    fi
-    
-    # Create logs directory
-    mkdir -p logs
-    
-    log_success "Supervisor configuration generated successfully"
-    log_deployment "Supervisor configuration generation completed"
-}
-
-# Function to verify database and credentials before starting services
-verify_database_and_credentials() {
-    log_info "Verifying database and credentials before starting services..."
-    log_deployment "Starting database and credentials verification"
-    
-    cd "$INSTALL_DIR"
+    cd "$INSTALL_DIR" || handle_error "Verification" "Failed to change to installation directory"
+    source venv/bin/activate || handle_error "Verification" "Failed to activate virtual environment"
     
     # Test database connectivity
     log_info "Testing database connectivity..."
-    source venv/bin/activate
-    
     python3 -c "
 import psycopg2
 import os
@@ -632,24 +409,21 @@ try:
 except Exception as e:
     print(f'Database connectivity: FAILED - {e}')
     exit(1)
-"
+" || handle_error "Verification" "Database connectivity test failed"
     
     # Verify user directory structure exists
     log_info "Verifying user directory structure..."
     if [[ ! -d "backend/data/users/user_0001" ]]; then
-        log_error "User directory structure not found"
-        exit 1
+        handle_error "Verification" "User directory structure not found"
     fi
     
     if [[ ! -f "backend/data/users/user_0001/user_info.json" ]]; then
-        log_error "User info file not found"
-        exit 1
+        handle_error "Verification" "User info file not found"
     fi
     
     # Verify .env file exists
     if [[ ! -f ".env" ]]; then
-        log_error ".env file not found"
-        exit 1
+        handle_error "Verification" ".env file not found"
     fi
     
     # Check if Kalshi credentials exist (warn if not, but don't fail)
@@ -660,86 +434,93 @@ except Exception as e:
         log_success "Kalshi credentials found"
     fi
     
-    log_success "Database and credentials verification completed"
-    log_deployment "Database and credentials verification completed"
+    log_success "Installation verification completed"
+    log_deployment "Installation verification completed"
 }
 
-# Function to start services using MASTER_RESTART
-start_services_with_master_restart() {
+# STEP 9: GENERATE SUPERVISOR CONFIG
+generate_supervisor_config() {
+    echo
+    echo "============================================================================="
+    echo "                    STEP 9: SUPERVISOR CONFIGURATION"
+    echo "============================================================================="
+    echo
+    
+    log_info "Generating supervisor configuration..."
+    log_deployment "Starting supervisor configuration generation"
+    
+    cd "$INSTALL_DIR" || handle_error "Supervisor Config" "Failed to change to installation directory"
+    source venv/bin/activate || handle_error "Supervisor Config" "Failed to activate virtual environment"
+    
+    # Generate supervisor configuration
+    python3 scripts/generate_unified_supervisor_config.py || handle_error "Supervisor Config" "Failed to generate supervisor configuration"
+    
+    log_success "Supervisor configuration generated successfully"
+    log_deployment "Supervisor configuration generation completed"
+}
+
+# STEP 10: START SERVICES WITH MASTER_RESTART (LAST STEP)
+start_services() {
+    echo
+    echo "============================================================================="
+    echo "                    STEP 10: START SERVICES (FINAL STEP)"
+    echo "============================================================================="
+    echo
+    
     log_info "Starting services using MASTER_RESTART..."
     log_deployment "Starting services with MASTER_RESTART"
     
-    cd "$INSTALL_DIR"
+    cd "$INSTALL_DIR" || handle_error "Service Start" "Failed to change to installation directory"
     
     # Make sure MASTER_RESTART is executable
-    chmod +x scripts/MASTER_RESTART.sh
+    chmod +x scripts/MASTER_RESTART.sh || handle_error "Service Start" "Failed to make MASTER_RESTART executable"
     
     # Run MASTER_RESTART to start all services properly
     log_info "Running MASTER_RESTART.sh..."
-    ./scripts/MASTER_RESTART.sh
+    ./scripts/MASTER_RESTART.sh || handle_error "Service Start" "MASTER_RESTART failed"
     
     # Wait for services to fully start
     sleep 10
     
     # Check service status
     log_info "Checking service status..."
-    supervisorctl status
+    supervisorctl status || handle_error "Service Start" "Failed to check service status"
     
     log_success "Services started successfully using MASTER_RESTART"
     log_deployment "Services started with MASTER_RESTART"
 }
 
-# Function to verify system operation
-verify_system_operation() {
-    log_info "Verifying system operation..."
-    log_deployment "Starting system verification"
+# STEP 11: FINAL VERIFICATION AND DISPLAY
+final_verification_and_display() {
+    echo
+    echo "============================================================================="
+    echo "                    INSTALLATION COMPLETE"
+    echo "============================================================================="
+    echo
     
-    cd "$INSTALL_DIR"
+    log_info "Performing final verification..."
+    log_deployment "Starting final verification"
     
-    # Test database connectivity
-    source venv/bin/activate
-    python3 -c "
-import psycopg2
-import os
-try:
-    conn = psycopg2.connect(
-        host=os.getenv('DB_HOST'),
-        database=os.getenv('DB_NAME'),
-        user=os.getenv('DB_USER'),
-        password=os.getenv('DB_PASSWORD'),
-        port=os.getenv('DB_PORT')
-    )
-    print('Database connectivity: OK')
-    conn.close()
-except Exception as e:
-    print(f'Database connectivity: FAILED - {e}')
-    exit(1)
-"
+    cd "$INSTALL_DIR" || handle_error "Final Verification" "Failed to change to installation directory"
+    
+    # Test database connectivity one more time
+    log_info "Final database connectivity test..."
+    PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT 1;" || handle_error "Final Verification" "Final database test failed"
     
     # Check if services are running
+    log_info "Checking if services are running..."
     if supervisorctl status | grep -q "RUNNING"; then
         log_success "Services are running"
     else
-        log_error "Some services are not running"
-        supervisorctl status
-        exit 1
+        handle_error "Final Verification" "Some services are not running"
     fi
-    
-    log_success "System verification completed successfully"
-    log_deployment "System verification completed"
-}
-
-# Function to display final information
-display_final_information() {
-    log_info "Deployment completed successfully!"
-    log_deployment "Deployment completed successfully"
     
     # Get server IP
     SERVER_IP=$(curl -s https://api.ipify.org 2>/dev/null || echo "localhost")
     
     echo
     echo "=========================================="
-    echo "        REC.IO DEPLOYMENT COMPLETE"
+    echo "        REC.IO INSTALLATION COMPLETE"
     echo "=========================================="
     echo
     echo "System Information:"
@@ -763,107 +544,38 @@ display_final_information() {
     echo "  Stop services: supervisorctl stop all"
     echo "  View logs: tail -f $INSTALL_DIR/logs/*.out.log"
     echo
-    echo "Deployment log: $DEPLOYMENT_LOG"
+    echo "Installation log: $DEPLOYMENT_LOG"
     echo "=========================================="
+    
+    log_success "Installation completed successfully!"
+    log_deployment "Installation completed successfully at $(date)"
 }
 
-# Function to handle user type selection
-handle_user_type() {
-    echo
-    echo "=== REC.IO Deployment - User Type Selection ==="
-    echo
-    echo "Are you a new user or existing user?"
-    echo "1) New User (fresh installation)"
-    echo "2) Existing User (restore from backup)"
-    echo
-    echo "Defaulting to New User installation..."
-    USER_TYPE_CHOICE="1"
-    
-    # Uncomment the lines below if you want interactive selection
-    # read -p "Enter choice (1 or 2): " USER_TYPE_CHOICE
-    
-    if [[ $USER_TYPE_CHOICE == "2" ]]; then
-        echo
-        echo "=== Existing User Data Restoration ==="
-        echo "Please provide the path to your user data package:"
-        read -p "Package path: " USER_DATA_PACKAGE
-        
-        if [[ -n "$USER_DATA_PACKAGE" && -d "$USER_DATA_PACKAGE" ]]; then
-            log_info "Restoring user data from: $USER_DATA_PACKAGE"
-            restore_user_data "$USER_DATA_PACKAGE"
-        else
-            log_error "Invalid package path: $USER_DATA_PACKAGE"
-            exit 1
-        fi
-    else
-        log_info "Proceeding with new user installation"
-    fi
-}
-
-# Function to restore user data
-restore_user_data() {
-    local package_path="$1"
-    log_info "Restoring user data from package..."
-    log_deployment "Starting user data restoration"
-    
-    cd "$INSTALL_DIR"
-    
-    # Restore database backup
-    if [[ -f "$package_path/database_backup.sql" ]]; then
-        log_info "Restoring database backup..."
-        PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db < "$package_path/database_backup.sql"
-        log_success "Database backup restored"
-    fi
-    
-    # Restore user data
-    if [[ -d "$package_path/user_data" ]]; then
-        log_info "Restoring user data..."
-        cp -r "$package_path/user_data"/* backend/data/users/
-        chmod -R 700 backend/data/users/user_0001/credentials
-        log_success "User data restored"
-    fi
-    
-    # Restore environment file
-    if [[ -f "$package_path/.env" ]]; then
-        log_info "Restoring environment configuration..."
-        cp "$package_path/.env" .
-        log_success "Environment configuration restored"
-    fi
-    
-    log_success "User data restoration completed"
-    log_deployment "User data restoration completed"
-}
-
-# Main deployment function
+# MAIN INSTALLATION FUNCTION
 main() {
     print_header
-    log_info "Starting REC.IO one-click deployment..."
-    log_deployment "Deployment started at $(date)"
+    log_info "Starting REC.IO installation..."
+    log_deployment "Installation started at $(date)"
     
     # Check if running as root
     if [[ $EUID -ne 0 ]]; then
-        log_error "This script must be run as root"
-        exit 1
+        handle_error "Prerequisites" "This script must be run as root"
     fi
     
-    # Handle user type selection
-    handle_user_type
-    
-    # Run deployment phases in correct order
-    setup_kalshi_credentials_first
+    # Run installation steps in correct order
+    setup_kalshi_credentials
     install_system_dependencies
-    setup_postgresql
+    setup_postgresql_database
     clone_repository
     setup_python_environment
     setup_database_schema
-    create_user_profile_and_data
-    verify_database_and_credentials
+    create_user_profile
+    verify_installation
     generate_supervisor_config
-    start_services_with_master_restart
-    verify_system_operation
-    display_final_information
+    start_services
+    final_verification_and_display
     
-    log_deployment "Deployment completed successfully at $(date)"
+    log_deployment "Installation completed successfully at $(date)"
 }
 
 # Run main function
