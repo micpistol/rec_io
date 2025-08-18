@@ -249,22 +249,26 @@ create_user_profile_and_data() {
     chmod 700 backend/data/users/user_0001/credentials/kalshi-credentials/prod
     chmod 700 backend/data/users/user_0001/credentials/kalshi-credentials/demo
     
-    # Prompt for Kalshi credentials
+    # Kalshi credentials setup
     echo
     echo "=== Kalshi Credentials Setup ==="
     echo "You need Kalshi credentials to trade. You can:"
     echo "1) Enter them now"
     echo "2) Skip and add them later"
     echo
+    echo "Enter 'y' for yes or 'n' for no:"
     read -p "Do you want to set up Kalshi credentials now? (y/n): " SETUP_CREDENTIALS
     
     if [[ $SETUP_CREDENTIALS =~ ^[Yy]$ ]]; then
         echo
         echo "Please enter your Kalshi credentials:"
-        read -p "Kalshi Email: " KALSHI_EMAIL
-        read -s -p "Kalshi API Key: " KALSHI_API_KEY
+        echo "Kalshi Email:"
+        read KALSHI_EMAIL
+        echo "Kalshi API Key (will be hidden):"
+        read -s KALSHI_API_KEY
         echo
-        read -s -p "Kalshi API Secret: " KALSHI_API_SECRET
+        echo "Kalshi API Secret (will be hidden):"
+        read -s KALSHI_API_SECRET
         echo
         
         # Create credentials file
@@ -278,7 +282,22 @@ EOF
         
         log_success "Kalshi credentials saved"
     else
-        log_info "Skipping Kalshi credentials setup - you can add them later"
+        echo
+        echo "Skipping Kalshi credentials setup."
+        echo "You can add them later by editing:"
+        echo "  backend/data/users/user_0001/credentials/kalshi-credentials/prod/credentials.json"
+        echo
+        
+        # Create empty credentials file for now
+        cat > backend/data/users/user_0001/credentials/kalshi-credentials/prod/credentials.json << EOF
+{
+    "email": "",
+    "api_key": "",
+    "api_secret": ""
+}
+EOF
+        
+        log_info "Kalshi credentials placeholder created - add your credentials later"
     fi
     
     # Create user_info.json
@@ -684,7 +703,11 @@ handle_user_type() {
     echo "1) New User (fresh installation)"
     echo "2) Existing User (restore from backup)"
     echo
-    read -p "Enter choice (1 or 2): " USER_TYPE_CHOICE
+    echo "Defaulting to New User installation..."
+    USER_TYPE_CHOICE="1"
+    
+    # Uncomment the lines below if you want interactive selection
+    # read -p "Enter choice (1 or 2): " USER_TYPE_CHOICE
     
     if [[ $USER_TYPE_CHOICE == "2" ]]; then
         echo
