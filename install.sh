@@ -56,6 +56,38 @@ handle_error() {
     exit 1
 }
 
+# Function to ensure package manager is available
+ensure_package_manager_available() {
+    log_info "Ensuring package manager is available..."
+    
+    # Wait for any running apt processes to complete
+    local max_wait=300  # 5 minutes max wait
+    local waited=0
+    
+    while fuser /var/lib/dpkg/lock >/dev/null 2>&1 || fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || fuser /var/cache/apt/archives/lock >/dev/null 2>&1; do
+        if [[ $waited -ge $max_wait ]]; then
+            log_warning "Package manager still locked after 5 minutes, attempting to force unlock..."
+            rm -f /var/lib/apt/lists/lock /var/cache/apt/archives/lock /var/lib/dpkg/lock
+            dpkg --configure -a
+            break
+        fi
+        
+        log_warning "Package manager is running, waiting... ($waited/$max_wait seconds)"
+        sleep 10
+        waited=$((waited + 10))
+    done
+    
+    # Kill any stuck processes
+    if pgrep -f "apt-get\|dpkg" >/dev/null; then
+        log_warning "Killing stuck package manager processes..."
+        pkill -f "apt-get" || true
+        pkill -f "dpkg" || true
+        sleep 5
+    fi
+    
+    log_success "Package manager is available"
+}
+
 # Set up error handling
 trap 'handle_error "Unknown" "Script terminated unexpectedly"' ERR
 
@@ -126,7 +158,11 @@ install_system_dependencies() {
     log_info "Installing system dependencies..."
     log_deployment "Starting system dependencies installation"
     
+    # Ensure package manager is available
+    ensure_package_manager_available
+    
     # Update package lists
+    log_info "Updating package lists..."
     apt-get update || handle_error "System Dependencies" "Failed to update package lists"
     
     # Install basic dependencies
