@@ -322,10 +322,10 @@ def update_cooldown_timer_in_db(seconds):
     try:
         import psycopg2
         conn = psycopg2.connect(
-            host="localhost",
-            database="rec_io_db",
-            user="rec_io_user",
-            password="rec_io_password"
+            host=os.getenv('POSTGRES_HOST', 'localhost'),
+            database=os.getenv('POSTGRES_DB', 'rec_io_db'),
+            user=os.getenv('POSTGRES_USER', 'rec_io_user'),
+            password=os.getenv('POSTGRES_PASSWORD', 'rec_io_password')
         )
         with conn.cursor() as cursor:
             cursor.execute(
@@ -343,10 +343,10 @@ def update_auto_entry_status_in_db(status):
     try:
         import psycopg2
         conn = psycopg2.connect(
-            host="localhost",
-            database="rec_io_db",
-            user="rec_io_user",
-            password="rec_io_password"
+            host=os.getenv('POSTGRES_HOST', 'localhost'),
+            database=os.getenv('POSTGRES_DB', 'rec_io_db'),
+            user=os.getenv('POSTGRES_USER', 'rec_io_user'),
+            password=os.getenv('POSTGRES_PASSWORD', 'rec_io_password')
         )
         with conn.cursor() as cursor:
             cursor.execute(
@@ -417,10 +417,10 @@ def broadcast_auto_entry_indicator_change():
         try:
             import psycopg2
             conn = psycopg2.connect(
-                host="localhost",
-                database="rec_io_db",
-                user="rec_io_user",
-                password="rec_io_password"
+                host=os.getenv('POSTGRES_HOST', 'localhost'),
+                database=os.getenv('POSTGRES_DB', 'rec_io_db'),
+                user=os.getenv('POSTGRES_USER', 'rec_io_user'),
+                password=os.getenv('POSTGRES_PASSWORD', 'rec_io_password')
             )
             with conn.cursor() as cursor:
                 cursor.execute("SELECT cooldown_timer FROM users.auto_trade_settings_0001 WHERE id = 1")
@@ -479,10 +479,10 @@ def is_auto_entry_enabled():
     try:
         import psycopg2
         conn = psycopg2.connect(
-            host="localhost",
-            database="rec_io_db", 
-            user="rec_io_user",
-            password="rec_io_password"
+            host=os.getenv('POSTGRES_HOST', 'localhost'),
+            database=os.getenv('POSTGRES_DB', 'rec_io_db'), 
+            user=os.getenv('POSTGRES_USER', 'rec_io_user'),
+            password=os.getenv('POSTGRES_PASSWORD', 'rec_io_password')
         )
         with conn.cursor() as cursor:
             cursor.execute("SELECT auto_entry FROM users.auto_trade_settings_0001 WHERE id = 1")
@@ -497,10 +497,10 @@ def get_auto_entry_settings():
     try:
         import psycopg2
         conn = psycopg2.connect(
-            host="localhost",
-            database="rec_io_db", 
-            user="rec_io_user",
-            password="rec_io_password"
+            host=os.getenv('POSTGRES_HOST', 'localhost'),
+            database=os.getenv('POSTGRES_DB', 'rec_io_db'), 
+            user=os.getenv('POSTGRES_USER', 'rec_io_user'),
+            password=os.getenv('POSTGRES_PASSWORD', 'rec_io_password')
         )
         with conn.cursor() as cursor:
             cursor.execute("""
@@ -562,10 +562,10 @@ def get_master_strike_table_data():
     try:
         import psycopg2
         conn = psycopg2.connect(
-            host="localhost",
-            database="rec_io_db",
-            user="rec_io_user",
-            password="rec_io_password"
+            host=os.getenv('POSTGRES_HOST', 'localhost'),
+            database=os.getenv('POSTGRES_DB', 'rec_io_db'),
+            user=os.getenv('POSTGRES_USER', 'rec_io_user'),
+            password=os.getenv('POSTGRES_PASSWORD', 'rec_io_password')
         )
         with conn.cursor() as cursor:
             cursor.execute("""
@@ -722,10 +722,10 @@ def generate_watchlist_from_strike_table():
         try:
             import psycopg2
             conn = psycopg2.connect(
-                host="localhost",
-                database="rec_io_db",
-                user="rec_io_user",
-                password="rec_io_password"
+                host=os.getenv('POSTGRES_HOST', 'localhost'),
+                database=os.getenv('POSTGRES_DB', 'rec_io_db'),
+                user=os.getenv('POSTGRES_USER', 'rec_io_user'),
+                password=os.getenv('POSTGRES_PASSWORD', 'rec_io_password')
             )
             with conn.cursor() as cursor:
                 # Clear existing watchlist data
@@ -764,10 +764,10 @@ def get_watchlist_data():
     try:
         import psycopg2
         conn = psycopg2.connect(
-            host="localhost",
-            database="rec_io_db",
-            user="rec_io_user",
-            password="rec_io_password"
+            host=os.getenv('POSTGRES_HOST', 'localhost'),
+            database=os.getenv('POSTGRES_DB', 'rec_io_db'),
+            user=os.getenv('POSTGRES_USER', 'rec_io_user'),
+            password=os.getenv('POSTGRES_PASSWORD', 'rec_io_password')
         )
         with conn.cursor() as cursor:
             cursor.execute("""
@@ -841,10 +841,10 @@ def get_position_size():
     try:
         import psycopg2
         conn = psycopg2.connect(
-            host="localhost",
-            database="rec_io_db",
-            user="rec_io_user",
-            password="rec_io_password"
+            host=os.getenv('POSTGRES_HOST', 'localhost'),
+            database=os.getenv('POSTGRES_DB', 'rec_io_db'),
+            user=os.getenv('POSTGRES_USER', 'rec_io_user'),
+            password=os.getenv('POSTGRES_PASSWORD', 'rec_io_password')
         )
         with conn.cursor() as cursor:
             cursor.execute("SELECT position_size, multiplier FROM users.trade_preferences_0001 WHERE id = 1")
@@ -870,10 +870,10 @@ def get_trade_strategy():
     try:
         import psycopg2
         conn = psycopg2.connect(
-            host="localhost",
-            database="rec_io_db",
-            user="rec_io_user",
-            password="rec_io_password"
+            host=os.getenv('POSTGRES_HOST', 'localhost'),
+            database=os.getenv('POSTGRES_DB', 'rec_io_db'),
+            user=os.getenv('POSTGRES_USER', 'rec_io_user'),
+            password=os.getenv('POSTGRES_PASSWORD', 'rec_io_password')
         )
         with conn.cursor() as cursor:
             cursor.execute("SELECT trade_strategy FROM users.trade_preferences_0001 WHERE id = 1")
@@ -1033,35 +1033,34 @@ def can_trade_strike(strike_key):
     return True
 
 def is_strike_already_traded(strike_data):
-    """Check if we already have an active or pending trade on this strike"""
+    """Check if we already have an open or pending trade on this strike by querying trades_0001 table directly"""
     try:
-        # Get active trades from the active_trade_supervisor
-        port = get_port("active_trade_supervisor")
-        url = f"http://localhost:{port}/api/active_trades"
-        response = requests.get(url, timeout=2)
+        import psycopg2
+        conn = psycopg2.connect(
+            host=os.getenv('POSTGRES_HOST', 'localhost'),
+            database=os.getenv('POSTGRES_DB', 'rec_io_db'),
+            user=os.getenv('POSTGRES_USER', 'rec_io_user'),
+            password=os.getenv('POSTGRES_PASSWORD', 'rec_io_password')
+        )
+        cursor = conn.cursor()
         
-        if not response.ok:
-            log(f"[AUTO ENTRY] ⚠️ Failed to get active trades: {response.status_code}")
-            return False
-            
-        response_data = response.json()
-        active_trades = response_data.get('active_trades', [])
-        log(f"[AUTO ENTRY DEBUG] 🔍 Checking {len(active_trades)} trades (active/pending) for strike {strike_data.get('strike')} {strike_data.get('side')}")
+        # Query trades_0001 table directly for open/pending trades with ticker
+        cursor.execute("""
+            SELECT id, ticker, side, status 
+            FROM users.trades_0001 
+            WHERE status IN ('open', 'pending')
+        """)
         
-        for trade in active_trades:
-            # Check if this trade is for the same strike
-            trade_strike = trade.get('strike', '')
-            trade_side = trade.get('side', '')
-            trade_status = trade.get('status', 'active')  # Default to 'active' for backward compatibility
-            
-            # Extract strike number from trade_strike (e.g., "$117,500" -> "117500")
-            if trade_strike.startswith('$'):
-                trade_strike_num = trade_strike.replace('$', '').replace(',', '')
-            else:
-                trade_strike_num = trade_strike
+        trades = cursor.fetchall()
+        conn.close()
+        
+        log(f"[AUTO ENTRY DEBUG] 🔍 Checking {len(trades)} trades (open/pending) for ticker {strike_data.get('ticker')} {strike_data.get('side')}")
+        
+        for trade in trades:
+            trade_id, trade_ticker, trade_side, trade_status = trade
             
             # Normalize side comparison (Y = yes, N = no)
-            normalized_trade_side = trade_side.upper()
+            normalized_trade_side = str(trade_side).upper()
             normalized_strike_side = strike_data.get('side', '').upper()
             
             # Handle Y/YES and N/NO mapping
@@ -1070,16 +1069,16 @@ def is_strike_already_traded(strike_data):
             elif normalized_trade_side == 'N' and normalized_strike_side == 'NO':
                 normalized_trade_side = 'NO'
             
-            # Compare strike numbers and sides
-            if (trade_strike_num == str(strike_data.get('strike')) and 
+            # Compare ticker and side
+            if (trade_ticker == strike_data.get('ticker') and 
                 normalized_trade_side == normalized_strike_side):
-                log(f"[AUTO ENTRY] ⚠️ Found {trade_status} trade on {strike_data.get('strike')} {strike_data.get('side')}")
+                log(f"[AUTO ENTRY] ⚠️ Found {trade_status} trade (ID: {trade_id}) on {strike_data.get('strike')} {strike_data.get('side')}")
                 return True
         
-        log(f"[AUTO ENTRY DEBUG] ✅ No active or pending trades found for {strike_data.get('strike')} {strike_data.get('side')}")
+        log(f"[AUTO ENTRY DEBUG] ✅ No open or pending trades found for {strike_data.get('strike')} {strike_data.get('side')}")
         return False
     except Exception as e:
-        log(f"[AUTO ENTRY] Error checking active trades: {e}")
+        log(f"[AUTO ENTRY] Error checking trades_0001 table: {e}")
         return False
 
 def check_auto_entry_conditions():
@@ -1239,7 +1238,12 @@ def check_auto_entry_conditions():
                     'probability': prob
                 }
                 
-                # STEP 7: Trigger the trade
+                # STEP 7: Check if strike is already traded
+                if is_strike_already_traded(strike_data):
+                    log(f"[AUTO ENTRY] ⏸️ Skipping {strike_key} - already has open/pending trade")
+                    continue
+                
+                # STEP 8: Trigger the trade
                 if trigger_auto_entry_trade(strike_data):
                     log(f"[AUTO ENTRY] ✅ Trade triggered for {strike_key}")
                 else:

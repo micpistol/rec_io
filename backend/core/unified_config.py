@@ -193,7 +193,7 @@ class UnifiedConfigManager:
             if 'database' not in config:
                 config['database'] = {}
             
-            config['database']['host'] = os.getenv('REC_DB_HOST', config['database'].get('host', 'localhost'))
+            config['database']['host'] = os.getenv('REC_DB_HOST', config['database'].get('host', self.system_host))
             config['database']['port'] = int(os.getenv('REC_DB_PORT', str(config['database'].get('port', 5432))))
             config['database']['name'] = os.getenv('REC_DB_NAME', config['database'].get('name', 'rec_io_db'))
             config['database']['user'] = os.getenv('REC_DB_USER', config['database'].get('user', 'rec_io_user'))
