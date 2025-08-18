@@ -361,57 +361,82 @@ if not success:
     log_deployment "Database schema setup completed and verified"
 }
 
-# STEP 7: COPY SYSTEM DATA FROM MASTER DATABASE
-copy_system_data() {
+# STEP 7: CLONE DATA FROM MASTER DATABASE
+clone_data_from_master() {
     echo
     echo "============================================================================="
-    echo "                    STEP 7: COPY SYSTEM DATA FROM MASTER"
+    echo "                    STEP 7: CLONE DATA FROM MASTER DATABASE"
     echo "============================================================================="
     echo
     
-    log_info "Copying system data from master database..."
-    log_deployment "Starting system data copy"
+    log_info "Cloning data from master database..."
+    log_deployment "Starting data clone from master"
     
-    cd "$INSTALL_DIR" || handle_error "System Data Copy" "Failed to change to installation directory"
-    source venv/bin/activate || handle_error "System Data Copy" "Failed to activate virtual environment"
+    cd "$INSTALL_DIR" || handle_error "Data Clone" "Failed to change to installation directory"
+    source venv/bin/activate || handle_error "Data Clone" "Failed to activate virtual environment"
     
-    # Set environment variables
+    # Set environment variables for local database
     export DB_HOST=localhost
     export DB_NAME=rec_io_db
     export DB_USER=rec_io_user
     export DB_PASSWORD=rec_io_password
     export DB_PORT=5432
     
-    # Check if system data archive exists
-    log_info "Looking for system data archive..."
-    SYSTEM_DATA_ARCHIVE=$(find . -name "system_data_export_*.tar.gz" | head -1)
+    # Get master database connection details
+    echo
+    echo "Please provide the master database connection details:"
+    echo
+    echo "Master Database Host (IP address):"
+    read MASTER_DB_HOST
+    echo "Master Database Name:"
+    read MASTER_DB_NAME
+    echo "Master Database User:"
+    read MASTER_DB_USER
+    echo "Master Database Password:"
+    read MASTER_DB_PASSWORD
+    echo "Master Database Port (default 5432):"
+    read MASTER_DB_PORT
+    MASTER_DB_PORT=${MASTER_DB_PORT:-5432}
     
-    if [[ -z "$SYSTEM_DATA_ARCHIVE" ]]; then
-        log_warning "No system data archive found in installation directory"
-        log_info "You need to copy a system_data_export_*.tar.gz file to this directory"
-        log_info "This file should contain the historical data and other system data from your master database"
-        handle_error "System Data Copy" "System data archive not found - please copy system_data_export_*.tar.gz to $INSTALL_DIR"
+    # Validate connection details
+    if [[ -z "$MASTER_DB_HOST" || -z "$MASTER_DB_NAME" || -z "$MASTER_DB_USER" || -z "$MASTER_DB_PASSWORD" ]]; then
+        handle_error "Data Clone" "Master database connection details are incomplete"
     fi
     
-    log_success "Found system data archive: $SYSTEM_DATA_ARCHIVE"
+    # Test connection to master database
+    log_info "Testing connection to master database..."
+    PGPASSWORD="$MASTER_DB_PASSWORD" psql -h "$MASTER_DB_HOST" -U "$MASTER_DB_USER" -d "$MASTER_DB_NAME" -p "$MASTER_DB_PORT" -c "SELECT 1;" || handle_error "Data Clone" "Cannot connect to master database"
+    log_success "Connected to master database"
     
-    # Run the unpack script
-    log_info "Unpacking system data..."
-    python3 scripts/archive_old/unpack_system_data.py "$SYSTEM_DATA_ARCHIVE" || handle_error "System Data Copy" "Failed to unpack system data"
+    # Clone historical data
+    log_info "Cloning historical data from master..."
+    PGPASSWORD="$MASTER_DB_PASSWORD" pg_dump -h "$MASTER_DB_HOST" -U "$MASTER_DB_USER" -d "$MASTER_DB_NAME" -p "$MASTER_DB_PORT" --schema=historical_data --data-only --no-owner --no-privileges | PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db || handle_error "Data Clone" "Failed to clone historical data"
     
-    # VERIFY DATA WAS COPIED
-    log_info "VERIFYING SYSTEM DATA WAS COPIED..."
+    # Clone analytics data
+    log_info "Cloning analytics data from master..."
+    PGPASSWORD="$MASTER_DB_PASSWORD" pg_dump -h "$MASTER_DB_HOST" -U "$MASTER_DB_USER" -d "$MASTER_DB_NAME" -p "$MASTER_DB_PORT" --schema=analytics --data-only --no-owner --no-privileges | PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db || handle_error "Data Clone" "Failed to clone analytics data"
+    
+    # Clone live_data (structure only, not the live data itself)
+    log_info "Cloning live_data structure from master..."
+    PGPASSWORD="$MASTER_DB_PASSWORD" pg_dump -h "$MASTER_DB_HOST" -U "$MASTER_DB_USER" -d "$MASTER_DB_NAME" -p "$MASTER_DB_PORT" --schema=live_data --schema-only --no-owner --no-privileges | PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db || handle_error "Data Clone" "Failed to clone live_data structure"
+    
+    # Clone system data
+    log_info "Cloning system data from master..."
+    PGPASSWORD="$MASTER_DB_PASSWORD" pg_dump -h "$MASTER_DB_HOST" -U "$MASTER_DB_USER" -d "$MASTER_DB_NAME" -p "$MASTER_DB_PORT" --schema=system --data-only --no-owner --no-privileges | PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db || handle_error "Data Clone" "Failed to clone system data"
+    
+    # VERIFY DATA WAS CLONED
+    log_info "VERIFYING DATA WAS CLONED FROM MASTER..."
     
     # Check historical data
     BTC_ROWS=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM historical_data.btc_price_history;" | tr -d ' ')
     if [[ "$BTC_ROWS" == "0" ]]; then
-        handle_error "System Data Copy" "BTC historical data table is empty - copy failed"
+        handle_error "Data Clone" "BTC historical data table is empty - clone failed"
     fi
     log_success "BTC historical data: $BTC_ROWS rows"
     
     ETH_ROWS=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM historical_data.eth_price_history;" | tr -d ' ')
     if [[ "$ETH_ROWS" == "0" ]]; then
-        handle_error "System Data Copy" "ETH historical data table is empty - copy failed"
+        handle_error "Data Clone" "ETH historical data table is empty - clone failed"
     fi
     log_success "ETH historical data: $ETH_ROWS rows"
     
@@ -424,13 +449,13 @@ copy_system_data() {
     fi
     
     # Show data summary
-    log_info "System data summary:"
+    log_info "Cloned data summary:"
     echo "  BTC price history: $BTC_ROWS rows"
     echo "  ETH price history: $ETH_ROWS rows"
     echo "  Analytics tables: $ANALYTICS_TABLES tables"
     
-    log_success "System data copy completed and VERIFIED"
-    log_deployment "System data copy completed and verified"
+    log_success "Data clone from master database completed and VERIFIED"
+    log_deployment "Data clone from master database completed and verified"
 }
 
 # STEP 8: CREATE USER PROFILE AND SAVE CREDENTIALS
@@ -618,7 +643,7 @@ main() {
     clone_repository
     setup_python_environment
     setup_database_schema
-    copy_system_data
+    clone_data_from_master
     create_user_profile
     verify_installation
     
@@ -642,7 +667,7 @@ main() {
     echo "=========================================="
     echo
     echo "✅ Database setup completed and verified"
-    echo "✅ System data copied from master database"
+    echo "✅ Data cloned from master database"
     echo "✅ User profile created"
     echo "✅ Kalshi credentials saved"
     echo
