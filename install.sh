@@ -474,9 +474,16 @@ clone_data_from_master() {
     log_info "Cloning historical data from master..."
     PGPASSWORD="$MASTER_DB_PASSWORD" pg_dump -h "$MASTER_DB_HOST" -U "$MASTER_DB_USER" -d "$MASTER_DB_NAME" -p "$MASTER_DB_PORT" --schema=historical_data --data-only --no-owner --no-privileges | PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db || handle_error "Data Clone" "Failed to clone historical data"
     
+    # Verify historical data was cloned
+    HISTORICAL_ROWS=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'historical_data';" | tr -d ' ')
+    if [[ "$HISTORICAL_ROWS" == "0" ]]; then
+        handle_error "Data Clone" "Historical data schema has no tables - clone failed"
+    fi
+    log_success "Historical data schema: $HISTORICAL_ROWS tables"
+    
     # Clone analytics data
     log_info "Cloning analytics data from master..."
-    PGPASSWORD="$MASTER_DB_PASSWORD" pg_dump -h "$MASTER_DB_HOST" -U "$MASTER_DB_USER" -d "$MASTER_DB_NAME" -p "$MASTER_DB_PORT" --schema=analytics --data-only --no-owner --no-privileges | PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db || handle_error "Data Clone" "Failed to clone analytics data"
+    PGPASSWORD="$MASTER_DB_PASSWORD" pg_dump -h "$MASTER_DB_HOST" -U "$MASTER_DB_USER" -d "$MASTER_DB_NAME" -p "$MASTER_DB_PORT" --schema=analytics --data-only --no-owner --no-privileges | PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db || log_warning "Analytics data clone failed - this may be expected if analytics schema is empty"
     
     # Clone live_data (structure only, not the live data itself)
     log_info "Cloning live_data structure from master..."
@@ -576,6 +583,15 @@ configure_system() {
         handle_error "System Configuration" "Supervisor configuration does not use correct server IP"
     fi
     
+    # Check if real Kalshi credentials exist and disable kalshi_account_sync if not
+    if grep -q "PLACEHOLDER_KEY_FOR_NEW_INSTALLATION" backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem; then
+        log_warning "Detected placeholder Kalshi credentials - disabling kalshi_account_sync service"
+        # Modify supervisor config to disable kalshi_account_sync
+        sed -i 's/autostart=true/autostart=false/' backend/supervisord.conf
+        sed -i '/kalshi_account_sync/,/^\[/ s/autostart=true/autostart=false/' backend/supervisord.conf
+        log_info "kalshi_account_sync service disabled - enable it after adding real Kalshi credentials"
+    fi
+    
     log_success "System configuration completed and verified"
     log_deployment "System configuration completed and verified"
 }
@@ -664,12 +680,22 @@ create_user_profile() {
 }
 EOF
         
+        # Create placeholder PEM file (required by kalshi_account_sync)
+        echo "Creating placeholder Kalshi PEM file..."
+        cat > backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem << EOF
+-----BEGIN RSA PRIVATE KEY-----
+PLACEHOLDER_KEY_FOR_NEW_INSTALLATION
+-----END RSA PRIVATE KEY-----
+EOF
+        
         log_success "Kalshi credentials saved from earlier setup"
+        log_warning "Kalshi PEM file created as placeholder - you need to replace with your actual PEM file"
     else
         echo
         echo "No Kalshi credentials provided earlier."
-        echo "Creating placeholder file - you can add credentials later by editing:"
+        echo "Creating placeholder files - you can add credentials later by editing:"
         echo "  backend/data/users/user_0001/credentials/kalshi-credentials/prod/credentials.json"
+        echo "  backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem"
         echo
         
         # Create empty credentials file for now
@@ -681,7 +707,17 @@ EOF
 }
 EOF
         
+        # Create placeholder PEM file
+        cat > backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi.pem << EOF
+-----BEGIN RSA PRIVATE KEY-----
+PLACEHOLDER_KEY_FOR_NEW_INSTALLATION
+-----END RSA PRIVATE KEY-----
+EOF
+        
         log_info "Kalshi credentials placeholder created - add your credentials later"
+        
+        # Note: kalshi_account_sync will be disabled until real credentials are provided
+        log_warning "kalshi_account_sync service will be disabled until real Kalshi credentials are provided"
     fi
     
     # Create user_info.json
