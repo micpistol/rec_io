@@ -60,6 +60,10 @@ auto_entry_indicator_state = {
 # Track previous state to detect changes
 previous_indicator_state = None
 
+# State tracking for logging reduction
+previous_watchlist_settings = None
+previous_auto_entry_status = None
+
 # SPIKE ALERT constants - NO DEFAULTS, must get from settings
 # These will be loaded from auto_entry_settings.json
 
@@ -79,43 +83,7 @@ def log(message: str):
     except Exception as e:
         print(f"Error writing to log file: {e}")
 
-def get_auto_entry_state_path():
-    """Get the path to the monitor-specific auto entry state file"""
-    return os.path.join(get_data_dir(), "users", "user_0001", "monitors", "auto_entry_state.json")
-
-def load_auto_entry_state():
-    """Load monitor-specific auto entry state from JSON file"""
-    try:
-        state_path = get_auto_entry_state_path()
-        if os.path.exists(state_path):
-            with open(state_path, "r") as f:
-                state = json.load(f)
-                log(f"[AUTO ENTRY STATE] Loaded state from {state_path}")
-                return state
-        else:
-            log(f"[AUTO ENTRY STATE] State file not found at {state_path}, using defaults")
-            return None
-    except Exception as e:
-        log(f"[AUTO ENTRY STATE] Error loading state: {e}")
-        return None
-
-def save_auto_entry_state(state):
-    """Save monitor-specific auto entry state to JSON file"""
-    try:
-        state_path = get_auto_entry_state_path()
-        os.makedirs(os.path.dirname(state_path), exist_ok=True)
-        
-        # Ensure timestamp is updated
-        state["last_updated"] = datetime.now(ZoneInfo("America/New_York")).isoformat()
-        
-        with open(state_path, "w") as f:
-            json.dump(state, f, indent=2)
-        
-        log(f"[AUTO ENTRY STATE] Saved state to {state_path}")
-        return True
-    except Exception as e:
-        log(f"[AUTO ENTRY STATE] Error saving state: {e}")
-        return False
+# Legacy auto_entry_state.json functionality removed - now using PostgreSQL for all state management
 
 def get_current_momentum():
     """Get current BTC momentum directly from PostgreSQL"""
@@ -145,10 +113,8 @@ def get_current_momentum():
         
         if result and result[0] is not None:
             momentum_score = float(result[0])
-            log(f"[AUTO ENTRY MOMENTUM] Current momentum: {momentum_score:.2f}")
             return momentum_score
         else:
-            log(f"[AUTO ENTRY MOMENTUM] No momentum data available")
             return None
     except Exception as e:
         log(f"[AUTO ENTRY MOMENTUM] Error getting momentum: {e}")
@@ -167,28 +133,22 @@ def check_spike_alert_conditions():
         # Update current momentum in state
         auto_entry_indicator_state["current_momentum"] = current_momentum
         
-        # Load current state from file
-        state = load_auto_entry_state()
-        if state is None:
-            # Initialize default state
-            state = {
-                "user_id": "user_0001",
-                "monitor_id": "default",
-                "enabled": False,
-                "scanning_active": False,
-                "spike_alert_active": False,
-                "spike_alert_start_time": None,
-                "spike_alert_momentum_value": None,
-                "spike_alert_recovery_countdown": None,
-                "current_momentum": current_momentum,
-                "current_ttc": 0,
-                "min_time": 0,
-                "max_time": 3600,
-                "last_updated": None
-            }
-        
-        # Update current momentum in loaded state
-        state["current_momentum"] = current_momentum
+        # Initialize state (no longer using legacy JSON file)
+        state = {
+            "user_id": "user_0001",
+            "monitor_id": "default",
+            "enabled": False,
+            "scanning_active": False,
+            "spike_alert_active": False,
+            "spike_alert_start_time": None,
+            "spike_alert_momentum_value": None,
+            "spike_alert_recovery_countdown": None,
+            "current_momentum": current_momentum,
+            "current_ttc": 0,
+            "min_time": 0,
+            "max_time": 3600,
+            "last_updated": None
+        }
         
         # Get spike alert settings from auto entry settings - NO DEFAULTS
         settings = get_auto_entry_settings()
@@ -311,8 +271,7 @@ def check_spike_alert_conditions():
             "current_momentum": state["current_momentum"]
         })
         
-        # Save updated state
-        save_auto_entry_state(state)
+        # State updated in memory (no longer saving to legacy JSON file)
         
     except Exception as e:
         log(f"[SPIKE ALERT] Error checking spike conditions: {e}")
@@ -355,7 +314,10 @@ def update_auto_entry_status_in_db(status):
             )
             conn.commit()
         conn.close()
-        log(f"[AUTO ENTRY] ✅ Updated auto_entry_status to '{status}' in database")
+        global previous_auto_entry_status
+        if previous_auto_entry_status != status:
+            log(f"[AUTO ENTRY] ✅ Updated auto_entry_status to '{status}' in database")
+            previous_auto_entry_status = status
     except Exception as e:
         log(f"[AUTO ENTRY] ❌ Error updating auto_entry_status: {e}")
 
@@ -445,14 +407,9 @@ def broadcast_auto_entry_indicator_change():
             "current_momentum": auto_entry_indicator_state["current_momentum"]
         }
         
-        log(f"[AUTO ENTRY DEBUG] 🔍 Checking indicator state change:")
-        log(f"[AUTO ENTRY DEBUG]   Current status: {new_status}, cooldown: {cooldown_timer}")
-        log(f"[AUTO ENTRY DEBUG]   Previous: {previous_indicator_state}")
-        
         # Check if state has actually changed (compare with previous)
         current_state_key = (new_status, cooldown_timer)
         if previous_indicator_state == current_state_key:
-            log(f"[AUTO ENTRY DEBUG]   No change detected, skipping broadcast")
             return  # No change, don't broadcast
         
         # Update previous state
@@ -524,7 +481,7 @@ def get_auto_entry_settings():
                     "watchlist_min_volume": 1000,  # Default value
                     "watchlist_max_ask": 98  # Default value
                 }
-                log(f"[AUTO ENTRY] Loaded settings from PostgreSQL")
+                # Settings loaded from PostgreSQL successfully
                 return settings
             else:
                 log(f"[AUTO ENTRY] No settings found in PostgreSQL")
@@ -662,7 +619,12 @@ def generate_watchlist_from_strike_table():
         min_probability = settings.get("min_probability", 0) - 5  # Subtract 5 from min_probability
         min_differential = settings.get("min_differential", 0) - 3  # Subtract 3 from min_differential
         
-        log(f"[WATCHLIST] Filtering with settings: min_prob={min_probability}, min_diff={min_differential}, min_vol={min_volume}, max_ask={max_ask}")
+        # Check if settings have changed
+        current_settings = f"min_prob={min_probability}, min_diff={min_differential}, min_vol={min_volume}, max_ask={max_ask}"
+        global previous_watchlist_settings
+        if previous_watchlist_settings != current_settings:
+            log(f"[WATCHLIST] Filtering with settings: {current_settings}")
+            previous_watchlist_settings = current_settings
         
         # Filter strikes for watchlist
         filtered_strikes = []
@@ -749,7 +711,7 @@ def generate_watchlist_from_strike_table():
                     ))
                 conn.commit()
                 conn.close()
-                log(f"[WATCHLIST] Generated watchlist with {len(filtered_strikes)} filtered strikes in PostgreSQL")
+                # Generated watchlist with {len(filtered_strikes)} filtered strikes in PostgreSQL
                 return True
         except Exception as e:
             log(f"[WATCHLIST] Error writing to PostgreSQL: {e}")
@@ -785,7 +747,7 @@ def get_watchlist_data():
             """)
             header_data = cursor.fetchone()
             if not header_data:
-                log(f"[AUTO ENTRY] No watchlist data found in PostgreSQL")
+                # No watchlist data - this is normal when no strikes meet filter criteria
                 return None
             cursor.execute("""
                 SELECT
@@ -853,7 +815,7 @@ def get_position_size():
                 position_size = result[0]
                 multiplier = result[1]
                 total_position = position_size * multiplier
-                log(f"[AUTO ENTRY] Loaded position size from PostgreSQL: {position_size} * {multiplier} = {total_position}")
+                # Position size loaded from PostgreSQL: {position_size} * {multiplier} = {total_position}
                 return total_position
             else:
                 log(f"[AUTO ENTRY] No trade preferences found in PostgreSQL")
@@ -880,7 +842,7 @@ def get_trade_strategy():
             result = cursor.fetchone()
             if result:
                 trade_strategy = result[0]
-                log(f"[AUTO ENTRY] Loaded trade strategy from PostgreSQL: {trade_strategy}")
+                # Trade strategy loaded from PostgreSQL: {trade_strategy}
                 return trade_strategy
             else:
                 log(f"[AUTO ENTRY] No trade preferences found in PostgreSQL")
@@ -1024,12 +986,12 @@ def can_trade_strike(strike_key):
     if strike_key in last_trade_times:
         time_since_last_trade = current_time - last_trade_times[strike_key]
         if time_since_last_trade < TRADE_COOLDOWN:
-            log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - traded {time_since_last_trade:.1f}s ago (cooldown: {TRADE_COOLDOWN}s)")
+            # Skipping {strike_key} - traded {time_since_last_trade:.1f}s ago (cooldown: {TRADE_COOLDOWN}s)
             return False
     
     # ATOMIC: Add to cooldown immediately
     last_trade_times[strike_key] = current_time
-    log(f"[AUTO ENTRY DEBUG] ✅ {strike_key} passed cooldown check - added to cooldown")
+            # {strike_key} passed cooldown check - added to cooldown
     return True
 
 def is_strike_already_traded(strike_data):
@@ -1054,7 +1016,7 @@ def is_strike_already_traded(strike_data):
         trades = cursor.fetchall()
         conn.close()
         
-        log(f"[AUTO ENTRY DEBUG] 🔍 Checking {len(trades)} trades (open/pending) for ticker {strike_data.get('ticker')} {strike_data.get('side')}")
+        # Checking {len(trades)} trades (open/pending) for ticker {strike_data.get('ticker')} {strike_data.get('side')}
         
         for trade in trades:
             trade_id, trade_ticker, trade_side, trade_status = trade
@@ -1075,7 +1037,7 @@ def is_strike_already_traded(strike_data):
                 log(f"[AUTO ENTRY] ⚠️ Found {trade_status} trade (ID: {trade_id}) on {strike_data.get('strike')} {strike_data.get('side')}")
                 return True
         
-        log(f"[AUTO ENTRY DEBUG] ✅ No open or pending trades found for {strike_data.get('strike')} {strike_data.get('side')}")
+        # No open or pending trades found for {strike_data.get('strike')} {strike_data.get('side')}
         return False
     except Exception as e:
         log(f"[AUTO ENTRY] Error checking trades_0001 table: {e}")
@@ -1214,9 +1176,9 @@ def check_auto_entry_conditions():
                 # STEP 4: Check differential threshold (if applicable)
                 if min_differential is not None:
                     diff = strike.get('yes_diff') if active_side == 'yes' else strike.get('no_diff')
-                    log(f"[AUTO ENTRY DEBUG] 📈 Strike differential: {diff} (min required: {min_differential})")
+                    # Strike differential: {diff} (min required: {min_differential})
                     if diff is None or diff < (min_differential - 0.5):
-                        log(f"[AUTO ENTRY DEBUG] ⏸️ Skipping {strike_key} - differential {diff} below threshold {min_differential}")
+                        # Skipping {strike_key} - differential {diff} below threshold {min_differential}
                         continue
                 
                 # STEP 5: Determine buy price based on active_side
@@ -1269,9 +1231,9 @@ def cleanup_old_cooldowns():
     for key in keys_to_remove:
         del last_trade_times[key]
     
-    # Only log if we actually cleaned up something
-    if keys_to_remove:
-        log(f"[AUTO ENTRY] Cleaned up {len(keys_to_remove)} old cooldowns")
+            # Only log if we actually cleaned up something (and only if significant)
+        if len(keys_to_remove) > 5:
+            log(f"[AUTO ENTRY] Cleaned up {len(keys_to_remove)} old cooldowns")
 
 def start_monitoring_loop():
     """Start the monitoring loop for auto entry conditions"""
@@ -1286,12 +1248,24 @@ def start_monitoring_loop():
         check_auto_entry_conditions()
         
         check_count = 0
+        last_heartbeat = time.time()
         while True:
             try:
                 check_count += 1
+                current_time = time.time()
                 
-                # Only log every 100 checks (reduces logging by 99%)
-                if check_count % 100 == 0:
+                # Heartbeat every 60 seconds
+                if current_time - last_heartbeat >= 60:
+                    # Get current status for heartbeat
+                    current_status = determine_auto_entry_status()
+                    settings = get_auto_entry_settings()
+                    enabled = is_auto_entry_enabled()
+                    
+                    log(f"[AUTO ENTRY HEARTBEAT] Check #{check_count} - Status: {current_status}, Enabled: {enabled}, Settings: {len(settings)} loaded")
+                    last_heartbeat = current_time
+                
+                # Only log every 1000 checks (reduces logging by 99.9%)
+                if check_count % 1000 == 0:
                     log(f"[AUTO ENTRY] Check #{check_count} - continuing monitoring...")
                 
                 # Clean up old cooldowns first

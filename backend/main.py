@@ -1582,6 +1582,42 @@ async def get_account_mode_endpoint():
     """Get current account mode."""
     return {"mode": get_account_mode()}
 
+@app.get("/api/get_kalshi_email")
+async def get_kalshi_email_endpoint():
+    """Get Kalshi email from credentials file for current account mode."""
+    try:
+        from backend.account_mode import get_account_mode
+        from backend.util.paths import get_kalshi_credentials_dir
+        import os
+        
+        mode = get_account_mode()
+        cred_dir = os.path.join(get_kalshi_credentials_dir(), mode)
+        auth_file = os.path.join(cred_dir, "kalshi-auth.txt")
+        
+        if os.path.exists(auth_file):
+            # Read the credentials file directly
+            with open(auth_file, "r") as f:
+                lines = f.readlines()
+            
+            email = None
+            for line in lines:
+                if line.startswith("email:"):
+                    email = line.split("email:")[1].strip()
+                    break
+            
+            if email:
+                # Add "DEMO" suffix for demo mode
+                display_email = email if mode == "prod" else f"{email} DEMO"
+                return {"email": display_email}
+            else:
+                return {"email": "No email found in credentials"}
+        else:
+            return {"email": "No credentials found"}
+            
+    except Exception as e:
+        print(f"Error reading Kalshi credentials: {e}")
+        return {"email": "Error reading credentials"}
+
 @app.post("/api/set_account_mode")
 async def set_account_mode(mode_data: dict):
     """Set account mode."""
@@ -3882,6 +3918,12 @@ async def get_log_stream(request: dict):
         if not os.path.exists(os.path.join(project_dir, log_file)):
             # Fallback to .log if specific type doesn't exist
             log_file = f"logs/{script_name}.log"
+        
+        # For auto_entry_supervisor, prioritize the dedicated .log file over .out.log
+        if script_name == "auto_entry_supervisor" and log_type == "out":
+            dedicated_log = f"logs/{script_name}.log"
+            if os.path.exists(os.path.join(project_dir, dedicated_log)):
+                log_file = dedicated_log
     
     if not os.path.exists(os.path.join(project_dir, log_file)):
         return {"success": False, "error": f"Log file not found: {log_file}"}
@@ -3911,22 +3953,27 @@ async def get_log_stream(request: dict):
                 yield f"Warning: Could not read existing log content: {str(e)}\n"
                 yield "=== Starting live tail ===\n"
             
-            # Start tail -f process with full path for live streaming
+            # Start tail -f process with unbuffered output for real-time streaming
             process = subprocess.Popen(
-                ["/usr/bin/tail", "-f", log_file],
+                ["stdbuf", "-oL", "/usr/bin/tail", "-f", log_file],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 cwd=project_dir,
-                env=env
+                env=env,
+                bufsize=0  # Unbuffered
             )
             
-            # Stream live output
+            # Stream live output with immediate flushing
             while True:
                 line = process.stdout.readline()
                 if not line:
                     break
                 yield line
+                # Force flush to ensure immediate transmission
+                import sys
+                if hasattr(sys.stdout, 'flush'):
+                    sys.stdout.flush()
             
         except Exception as e:
             yield f"Error: {str(e)}\n"
