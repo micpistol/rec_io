@@ -58,6 +58,56 @@ log_deployment() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$DEPLOYMENT_LOG"
 }
 
+# Function to setup Kalshi credentials FIRST (before anything else)
+setup_kalshi_credentials_first() {
+    echo
+    echo "============================================================================="
+    echo "                    KALSHI CREDENTIALS SETUP (STEP 1)"
+    echo "============================================================================="
+    echo
+    echo "You need Kalshi credentials to trade. This must be set up FIRST."
+    echo
+    echo "Do you want to set up Kalshi credentials now?"
+    echo "1) Yes - I have my Kalshi credentials ready"
+    echo "2) No - I'll add them later (system will be limited to demo mode)"
+    echo
+    echo "Enter 1 or 2:"
+    read -p "Choice: " CREDENTIAL_CHOICE
+    
+    if [[ $CREDENTIAL_CHOICE == "1" ]]; then
+        echo
+        echo "Please enter your Kalshi credentials:"
+        echo
+        echo "Kalshi Email:"
+        read KALSHI_EMAIL
+        echo "Kalshi API Key (will be hidden):"
+        read -s KALSHI_API_KEY
+        echo
+        echo "Kalshi API Secret (will be hidden):"
+        read -s KALSHI_API_SECRET
+        echo
+        
+        # Store credentials in environment variables for later use
+        export KALSHI_EMAIL="$KALSHI_EMAIL"
+        export KALSHI_API_KEY="$KALSHI_API_KEY"
+        export KALSHI_API_SECRET="$KALSHI_API_SECRET"
+        
+        echo
+        echo "✅ Kalshi credentials captured and stored"
+        echo "They will be saved to the system during installation."
+        echo
+    else
+        echo
+        echo "⚠️  Skipping Kalshi credentials setup."
+        echo "System will be limited to demo mode until credentials are added."
+        echo
+        # Set empty credentials
+        export KALSHI_EMAIL=""
+        export KALSHI_API_KEY=""
+        export KALSHI_API_SECRET=""
+    fi
+}
+
 # Function to detect operating system
 detect_os() {
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -249,29 +299,12 @@ create_user_profile_and_data() {
     chmod 700 backend/data/users/user_0001/credentials/kalshi-credentials/prod
     chmod 700 backend/data/users/user_0001/credentials/kalshi-credentials/demo
     
-    # Kalshi credentials setup
+    # Use the Kalshi credentials that were captured earlier
     echo
-    echo "=== Kalshi Credentials Setup ==="
-    echo "You need Kalshi credentials to trade. You can:"
-    echo "1) Enter them now"
-    echo "2) Skip and add them later"
-    echo
-    echo "Enter 'y' for yes or 'n' for no:"
-    read -p "Do you want to set up Kalshi credentials now? (y/n): " SETUP_CREDENTIALS
+    echo "=== Saving Kalshi Credentials ==="
     
-    if [[ $SETUP_CREDENTIALS =~ ^[Yy]$ ]]; then
-        echo
-        echo "Please enter your Kalshi credentials:"
-        echo "Kalshi Email:"
-        read KALSHI_EMAIL
-        echo "Kalshi API Key (will be hidden):"
-        read -s KALSHI_API_KEY
-        echo
-        echo "Kalshi API Secret (will be hidden):"
-        read -s KALSHI_API_SECRET
-        echo
-        
-        # Create credentials file
+    if [[ -n "$KALSHI_EMAIL" && -n "$KALSHI_API_KEY" && -n "$KALSHI_API_SECRET" ]]; then
+        # Create credentials file with captured credentials
         cat > backend/data/users/user_0001/credentials/kalshi-credentials/prod/credentials.json << EOF
 {
     "email": "$KALSHI_EMAIL",
@@ -280,11 +313,11 @@ create_user_profile_and_data() {
 }
 EOF
         
-        log_success "Kalshi credentials saved"
+        log_success "Kalshi credentials saved from earlier setup"
     else
         echo
-        echo "Skipping Kalshi credentials setup."
-        echo "You can add them later by editing:"
+        echo "No Kalshi credentials provided earlier."
+        echo "Creating placeholder file - you can add credentials later by editing:"
         echo "  backend/data/users/user_0001/credentials/kalshi-credentials/prod/credentials.json"
         echo
         
@@ -777,6 +810,7 @@ main() {
     handle_user_type
     
     # Run deployment phases in correct order
+    setup_kalshi_credentials_first
     install_system_dependencies
     setup_postgresql
     clone_repository
