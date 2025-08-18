@@ -278,12 +278,41 @@ if not success:
     exit(1)
 " || handle_error "Database Schema" "Database schema initialization failed"
     
+    # VERIFY DATABASE SCHEMA WAS ACTUALLY CREATED
+    log_info "VERIFYING DATABASE SCHEMA WAS CREATED..."
+    
+    # Check for specific tables that should exist
+    log_info "Checking for analytics schema tables..."
+    ANALYTICS_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'analytics';" | tr -d ' ')
+    if [[ "$ANALYTICS_TABLES" == "0" ]]; then
+        handle_error "Database Schema" "Analytics schema has no tables - schema creation failed"
+    fi
+    log_success "Found $ANALYTICS_TABLES tables in analytics schema"
+    
+    log_info "Checking for historical_data schema tables..."
+    HISTORICAL_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'historical_data';" | tr -d ' ')
+    if [[ "$HISTORICAL_TABLES" == "0" ]]; then
+        handle_error "Database Schema" "Historical_data schema has no tables - schema creation failed"
+    fi
+    log_success "Found $HISTORICAL_TABLES tables in historical_data schema"
+    
+    log_info "Checking for live_data schema tables..."
+    LIVE_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'live_data';" | tr -d ' ')
+    if [[ "$LIVE_TABLES" == "0" ]]; then
+        handle_error "Database Schema" "Live_data schema has no tables - schema creation failed"
+    fi
+    log_success "Found $LIVE_TABLES tables in live_data schema"
+    
+    # Show total table count
+    TOTAL_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema IN ('analytics', 'historical_data', 'live_data');" | tr -d ' ')
+    log_success "Total database tables created: $TOTAL_TABLES"
+    
     # Verify database is working
     log_info "Verifying database is working..."
     PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT version();" || handle_error "Database Schema" "Database verification failed"
     
-    log_success "Database schema setup completed"
-    log_deployment "Database schema setup completed"
+    log_success "Database schema setup completed and VERIFIED"
+    log_deployment "Database schema setup completed and verified"
 }
 
 # STEP 7: CREATE USER PROFILE AND SAVE CREDENTIALS
@@ -562,7 +591,7 @@ main() {
         handle_error "Prerequisites" "This script must be run as root"
     fi
     
-    # Run installation steps in correct order
+    # Run installation steps in correct order - STOP AFTER DATABASE SETUP
     setup_kalshi_credentials
     install_system_dependencies
     setup_postgresql_database
@@ -570,11 +599,63 @@ main() {
     setup_python_environment
     setup_database_schema
     create_user_profile
-    verify_installation
-    generate_supervisor_config
-    start_services
-    final_verification_and_display
     
+    # FINAL VERIFICATION - STOP HERE
+    echo
+    echo "============================================================================="
+    echo "                    INSTALLATION COMPLETE - VERIFICATION"
+    echo "============================================================================="
+    echo
+    
+    log_info "Performing final verification..."
+    
+    cd "$INSTALL_DIR" || handle_error "Final Verification" "Failed to change to installation directory"
+    
+    # Test database connectivity
+    log_info "Final database connectivity test..."
+    PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT 1;" || handle_error "Final Verification" "Final database test failed"
+    
+    # Show database summary
+    log_info "Database summary:"
+    TOTAL_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema IN ('analytics', 'historical_data', 'live_data');" | tr -d ' ')
+    echo "  Total tables: $TOTAL_TABLES"
+    
+    ANALYTICS_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'analytics';" | tr -d ' ')
+    echo "  Analytics tables: $ANALYTICS_TABLES"
+    
+    HISTORICAL_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'historical_data';" | tr -d ' ')
+    echo "  Historical tables: $HISTORICAL_TABLES"
+    
+    LIVE_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'live_data';" | tr -d ' ')
+    echo "  Live data tables: $LIVE_TABLES"
+    
+    # Get server IP
+    SERVER_IP=$(curl -s https://api.ipify.org 2>/dev/null || echo "localhost")
+    
+    echo
+    echo "=========================================="
+    echo "        REC.IO INSTALLATION COMPLETE"
+    echo "=========================================="
+    echo
+    echo "✅ Database setup completed and verified"
+    echo "✅ User profile created"
+    echo "✅ Kalshi credentials saved"
+    echo
+    echo "System Information:"
+    echo "  Installation Directory: $INSTALL_DIR"
+    echo "  Database: localhost:5432 (rec_io_db)"
+    echo "  Server IP: $SERVER_IP"
+    echo "  Total Database Tables: $TOTAL_TABLES"
+    echo
+    echo "Next Steps:"
+    echo "  1. Verify the database is working correctly"
+    echo "  2. If everything looks good, run: cd $INSTALL_DIR && ./scripts/MASTER_RESTART.sh"
+    echo "  3. Access your system: http://$SERVER_IP:3000"
+    echo
+    echo "Installation log: $DEPLOYMENT_LOG"
+    echo "=========================================="
+    
+    log_success "Installation completed successfully!"
     log_deployment "Installation completed successfully at $(date)"
 }
 
