@@ -78,47 +78,20 @@ setup_kalshi_credentials_first() {
     echo "                    KALSHI CREDENTIALS SETUP (STEP 1)"
     echo "============================================================================="
     echo
-    echo "You need Kalshi credentials to trade. This must be set up FIRST."
+    echo "Kalshi credentials will be set up after installation."
+    echo "You can add them manually by editing:"
+    echo "  backend/data/users/user_0001/credentials/kalshi-credentials/prod/credentials.json"
     echo
-    echo "Do you want to set up Kalshi credentials now?"
-    echo "1) Yes - I have my Kalshi credentials ready"
-    echo "2) No - I'll add them later (system will be limited to demo mode)"
+    echo "For now, proceeding with demo mode installation..."
     echo
-    echo "Enter 1 or 2:"
-    read -p "Choice: " CREDENTIAL_CHOICE
     
-    if [[ $CREDENTIAL_CHOICE == "1" ]]; then
-        echo
-        echo "Please enter your Kalshi credentials:"
-        echo
-        echo "Kalshi Email:"
-        read KALSHI_EMAIL
-        echo "Kalshi API Key (will be hidden):"
-        read -s KALSHI_API_KEY
-        echo
-        echo "Kalshi API Secret (will be hidden):"
-        read -s KALSHI_API_SECRET
-        echo
-        
-        # Store credentials in environment variables for later use
-        export KALSHI_EMAIL="$KALSHI_EMAIL"
-        export KALSHI_API_KEY="$KALSHI_API_KEY"
-        export KALSHI_API_SECRET="$KALSHI_API_SECRET"
-        
-        echo
-        echo "✅ Kalshi credentials captured and stored"
-        echo "They will be saved to the system during installation."
-        echo
-    else
-        echo
-        echo "⚠️  Skipping Kalshi credentials setup."
-        echo "System will be limited to demo mode until credentials are added."
-        echo
-        # Set empty credentials
-        export KALSHI_EMAIL=""
-        export KALSHI_API_KEY=""
-        export KALSHI_API_SECRET=""
-    fi
+    # Set empty credentials for now
+    export KALSHI_EMAIL=""
+    export KALSHI_API_KEY=""
+    export KALSHI_API_SECRET=""
+    
+    echo "✅ Proceeding with installation (credentials can be added later)"
+    echo
 }
 
 # Function to detect operating system
@@ -298,10 +271,10 @@ setup_python_environment() {
     log_deployment "Python environment setup completed"
 }
 
-# Function to initialize database schema
-initialize_database() {
-    log_info "Initializing database schema..."
-    log_deployment "Starting database schema initialization"
+# Function to setup database schema (after repository is cloned)
+setup_database_schema() {
+    log_info "Setting up database schema..."
+    log_deployment "Starting database schema setup"
     
     cd "$INSTALL_DIR"
     source venv/bin/activate
@@ -313,17 +286,41 @@ initialize_database() {
     export DB_PASSWORD=rec_io_password
     export DB_PORT=5432
     
-    # Initialize database schema
+    # Create database and user if they don't exist
+    log_info "Creating database and user..."
+    sudo -u postgres psql -c "CREATE USER rec_io_user WITH PASSWORD 'rec_io_password';" 2>/dev/null || true
+    sudo -u postgres psql -c "CREATE DATABASE rec_io_db OWNER rec_io_user;" 2>/dev/null || true
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE rec_io_db TO rec_io_user;" 2>/dev/null || true
+    
+    # Test database connection
+    log_info "Testing database connection..."
+    PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT 1;" || {
+        log_error "Database connection failed"
+        exit 1
+    }
+    
+    # Initialize database schema using the backend code
+    log_info "Initializing database schema..."
     python3 -c "
-from backend.core.config.database import init_database
+import sys
+sys.path.append('backend')
+from core.config.database import init_database
 success, message = init_database()
 print(f'Database initialization: {message}')
 if not success:
     exit(1)
 "
     
-    log_success "Database schema initialized successfully"
-    log_deployment "Database schema initialization completed"
+    log_success "Database schema setup completed successfully"
+    log_deployment "Database schema setup completed"
+    
+    # Verify database is working
+    log_info "Verifying database is working..."
+    PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT version();" || {
+        log_error "Database verification failed"
+        exit 1
+    }
+    log_success "Database verification passed"
 }
 
 # Function to create user profile and clone historical data
@@ -858,7 +855,7 @@ main() {
     setup_postgresql
     clone_repository
     setup_python_environment
-    initialize_database
+    setup_database_schema
     create_user_profile_and_data
     verify_database_and_credentials
     generate_supervisor_config
