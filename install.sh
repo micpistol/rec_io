@@ -216,12 +216,74 @@ setup_postgresql_database() {
     log_info "Granting database privileges..."
     sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE rec_io_db TO rec_io_user;" 2>/dev/null || true
     
-    # Test database connection
-    log_info "Testing database connection..."
-    PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT 1;" || handle_error "Database Setup" "Database connection test failed"
+    # CONFIGURE POSTGRESQL FOR REMOTE ACCESS
+    log_info "Configuring PostgreSQL for remote access..."
     
-    log_success "PostgreSQL database setup completed"
-    log_deployment "PostgreSQL database setup completed"
+    # Get PostgreSQL version and config directory
+    PG_VERSION=$(sudo -u postgres psql -c "SHOW server_version;" | grep -E '[0-9]+\.[0-9]+' | head -1 | tr -d ' ')
+    PG_CONFIG_DIR="/etc/postgresql/${PG_VERSION}/main"
+    
+    if [[ ! -d "$PG_CONFIG_DIR" ]]; then
+        # Try alternative locations
+        PG_CONFIG_DIR="/etc/postgresql/*/main"
+        PG_CONFIG_DIR=$(find /etc/postgresql -name "main" -type d | head -1)
+    fi
+    
+    if [[ -z "$PG_CONFIG_DIR" || ! -d "$PG_CONFIG_DIR" ]]; then
+        handle_error "Database Setup" "Could not find PostgreSQL configuration directory"
+    fi
+    
+    log_info "PostgreSQL config directory: $PG_CONFIG_DIR"
+    
+    # Configure postgresql.conf to listen on all interfaces
+    log_info "Configuring postgresql.conf..."
+    sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" "$PG_CONFIG_DIR/postgresql.conf" || handle_error "Database Setup" "Failed to configure listen_addresses"
+    
+    # Configure pg_hba.conf to allow remote connections
+    log_info "Configuring pg_hba.conf..."
+    
+    # Backup original pg_hba.conf
+    sudo cp "$PG_CONFIG_DIR/pg_hba.conf" "$PG_CONFIG_DIR/pg_hba.conf.backup"
+    
+    # Add remote access rules
+    sudo tee -a "$PG_CONFIG_DIR/pg_hba.conf" > /dev/null << EOF
+
+# REC.IO Remote Access Configuration
+host    rec_io_db       rec_io_user       0.0.0.0/0               md5
+host    rec_io_db       rec_io_user       ::/0                    md5
+EOF
+    
+    # Restart PostgreSQL to apply changes
+    log_info "Restarting PostgreSQL to apply remote access configuration..."
+    sudo systemctl restart postgresql || handle_error "Database Setup" "Failed to restart PostgreSQL"
+    
+    # Wait for PostgreSQL to fully start
+    sleep 5
+    
+    # Test local database connection
+    log_info "Testing local database connection..."
+    PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT 1;" || handle_error "Database Setup" "Local database connection test failed"
+    
+    # Test remote database connection (from localhost to localhost, but using external IP)
+    log_info "Testing remote database connection..."
+    SERVER_IP=$(curl -s https://api.ipify.org 2>/dev/null || echo "localhost")
+    PGPASSWORD=rec_io_password psql -h "$SERVER_IP" -U rec_io_user -d rec_io_db -c "SELECT 1;" || handle_error "Database Setup" "Remote database connection test failed"
+    
+    # Configure firewall to allow PostgreSQL connections
+    log_info "Configuring firewall for PostgreSQL..."
+    sudo ufw allow 5432/tcp || log_warning "Failed to configure UFW firewall (may not be installed)"
+    
+    # Show connection information
+    log_info "PostgreSQL remote access configured successfully"
+    echo "  Database Host: $SERVER_IP"
+    echo "  Database Port: 5432"
+    echo "  Database Name: rec_io_db"
+    echo "  Database User: rec_io_user"
+    echo "  Database Password: rec_io_password"
+    echo "  Connection String: postgresql://rec_io_user:rec_io_password@$SERVER_IP:5432/rec_io_db"
+    
+    log_success "PostgreSQL database setup completed with remote access"
+    log_deployment "PostgreSQL database setup completed with remote access"
 }
 
 # STEP 4: CLONE REPOSITORY
@@ -458,6 +520,114 @@ clone_data_from_master() {
     log_deployment "Data clone from master database completed and verified"
 }
 
+# STEP 8: CONFIGURE SYSTEM FOR CURRENT ENVIRONMENT
+configure_system() {
+    echo
+    echo "============================================================================="
+    echo "                    STEP 8: CONFIGURE SYSTEM"
+    echo "============================================================================="
+    echo
+    
+    log_info "Configuring system for current environment..."
+    log_deployment "Starting system configuration"
+    
+    cd "$INSTALL_DIR" || handle_error "System Configuration" "Failed to change to installation directory"
+    source venv/bin/activate || handle_error "System Configuration" "Failed to activate virtual environment"
+    
+    # Get current server IP
+    SERVER_IP=$(curl -s https://api.ipify.org 2>/dev/null || echo "localhost")
+    
+    # Update environment variables
+    export REC_SYSTEM_HOST="$SERVER_IP"
+    export REC_PROJECT_ROOT="$INSTALL_DIR"
+    export REC_ENVIRONMENT="production"
+    export DB_HOST="localhost"
+    export DB_NAME="rec_io_db"
+    export DB_USER="rec_io_user"
+    export DB_PASSWORD="rec_io_password"
+    export DB_PORT="5432"
+    
+    # Clear any cached environment variables that might interfere
+    log_info "Clearing cached configuration..."
+    unset REC_SYSTEM_HOST
+    unset TRADING_SYSTEM_HOST
+    unset REC_TARGET_HOST
+    
+    # Set environment variables for current server
+    export REC_SYSTEM_HOST="$SERVER_IP"
+    export REC_PROJECT_ROOT="$INSTALL_DIR"
+    export REC_ENVIRONMENT="production"
+    
+    # Generate proper supervisor configuration
+    log_info "Generating supervisor configuration for current environment..."
+    python3 scripts/generate_unified_supervisor_config.py || handle_error "System Configuration" "Failed to generate supervisor configuration"
+    
+    # Verify supervisor configuration was created correctly
+    if [[ ! -f "backend/supervisord.conf" ]]; then
+        handle_error "System Configuration" "Supervisor configuration file not created"
+    fi
+    
+    # Check that the configuration uses the correct paths
+    if ! grep -q "$INSTALL_DIR" backend/supervisord.conf; then
+        handle_error "System Configuration" "Supervisor configuration does not use correct installation directory"
+    fi
+    
+    if ! grep -q "$SERVER_IP" backend/supervisord.conf; then
+        handle_error "System Configuration" "Supervisor configuration does not use correct server IP"
+    fi
+    
+    log_success "System configuration completed and verified"
+    log_deployment "System configuration completed and verified"
+}
+
+# STEP 9: TEST SERVICE STARTUP
+test_service_startup() {
+    echo
+    echo "============================================================================="
+    echo "                    STEP 9: TEST SERVICE STARTUP"
+    echo "============================================================================="
+    echo
+    
+    log_info "Testing service startup to ensure MASTER_RESTART will work..."
+    log_deployment "Starting service startup test"
+    
+    cd "$INSTALL_DIR" || handle_error "Service Test" "Failed to change to installation directory"
+    
+    # Test that supervisor configuration is valid
+    log_info "Testing supervisor configuration..."
+    supervisord -c backend/supervisord.conf -t || handle_error "Service Test" "Supervisor configuration is invalid"
+    
+    # Start supervisor in test mode
+    log_info "Starting supervisor in test mode..."
+    supervisord -c backend/supervisord.conf -n &
+    SUPERVISOR_PID=$!
+    
+    # Wait for supervisor to start
+    sleep 3
+    
+    # Test starting a few key services
+    log_info "Testing key service startup..."
+    
+    # Test main_app
+    supervisorctl -c backend/supervisord.conf start main_app || handle_error "Service Test" "main_app failed to start"
+    sleep 2
+    supervisorctl -c backend/supervisord.conf status main_app | grep -q "RUNNING" || handle_error "Service Test" "main_app is not running"
+    supervisorctl -c backend/supervisord.conf stop main_app
+    
+    # Test trade_manager
+    supervisorctl -c backend/supervisord.conf start trade_manager || handle_error "Service Test" "trade_manager failed to start"
+    sleep 2
+    supervisorctl -c backend/supervisord.conf status trade_manager | grep -q "RUNNING" || handle_error "Service Test" "trade_manager is not running"
+    supervisorctl -c backend/supervisord.conf stop trade_manager
+    
+    # Stop supervisor
+    kill $SUPERVISOR_PID
+    wait $SUPERVISOR_PID 2>/dev/null
+    
+    log_success "Service startup test completed successfully"
+    log_deployment "Service startup test completed successfully"
+}
+
 # STEP 8: CREATE USER PROFILE AND SAVE CREDENTIALS
 create_user_profile() {
     echo
@@ -644,6 +814,8 @@ main() {
     setup_python_environment
     setup_database_schema
     clone_data_from_master
+    configure_system
+    test_service_startup
     create_user_profile
     verify_installation
     
