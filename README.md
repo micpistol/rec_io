@@ -1,77 +1,47 @@
 # REC.IO Trading System
 
-A comprehensive trading system with real-time market data, trade execution, and portfolio management.
+A comprehensive automated trading platform for prediction markets, built with Python and PostgreSQL.
 
 ## 🚀 Quick Start
 
-### **New Users - 3 Steps to Get Started**
+### **ONE COMMAND INSTALLATION**
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/betaclone1/rec_io.git
-   cd rec_io
-   ```
+**Copy and paste this command on your Digital Ocean droplet:**
 
-2. **Run the installation script:**
-   ```bash
-   python3 install.py
-   ```
+```bash
+curl -sSL https://raw.githubusercontent.com/betaclone1/rec_io/main/install.sh | bash
+```
 
-3. **Start the system:**
-   ```bash
-   ./scripts/MASTER_RESTART.sh
-   ```
+**That's it!** Your complete trading system will be ready at `http://YOUR_DROPLET_IP:3000`
 
-**That's it!** Your complete trading system will be ready to use at http://localhost:3000
+## 📋 System Overview
 
-## 📋 What's Included
+### Core Features
+- **Automated Trading**: Execute trades based on market conditions
+- **Real-time Monitoring**: Live market data and trade tracking
+- **Risk Management**: Automated stop-loss and position sizing
+- **Backtesting**: Historical strategy testing with real data
+- **Web Interface**: Modern dashboard for system management
 
-### **Core Features**
-- **Real-time market data** from multiple sources
-- **Automated trading** with configurable strategies
-- **Portfolio management** with comprehensive tracking
-- **Risk management** with automatic stop-losses
-- **Web-based interface** for easy monitoring
-- **Mobile-responsive** design for on-the-go access
+### Trading Platforms
+- **Kalshi**: Primary prediction market platform
+- **Demo Mode**: Paper trading for testing strategies
+- **Production Mode**: Live trading with real money
 
-### **Supported Platforms**
-- **Kalshi** - Prediction markets trading
-- **Coinbase** - Cryptocurrency price data
-- **PostgreSQL** - Robust data storage
-- **Supervisor** - Process management
-
-## 🔒 Security Features
-
-- ✅ **No personal data in repository** - All user files excluded from git
-- ✅ **Secure credential storage** - Proper file permissions and isolation
-- ✅ **User data protection** - Complete separation between users
-- ✅ **Environment variables** - No hardcoded credentials
-
-## 📚 Documentation
-
-### **Installation & Setup**
-- **[Quick Install Guide](QUICK_INSTALL_GUIDE.md)** - Get started in 3 steps
-- **[New User Setup](docs/NEW_USER_SETUP_GUIDE.md)** - Detailed setup instructions
-- **[Security Overview](docs/SECURITY_OVERVIEW.md)** - Security features and best practices
-
-### **System Management**
-- **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md)** - Production deployment instructions
-- **[Service Management](docs/SERVICE_MANAGEMENT.md)** - Managing system services
+### System Architecture
+- **Backend**: Python with FastAPI and PostgreSQL
+- **Frontend**: Modern web interface with real-time updates
+- **Process Management**: Supervisor for reliable service management
+- **Data Storage**: PostgreSQL with optimized schemas
+- **Monitoring**: Comprehensive logging and health checks
 
 ## 🛠️ System Requirements
 
 ### **Minimum Requirements**
-- **Operating System**: Linux (Ubuntu 20.04+), macOS (10.15+), or Windows with WSL
-- **Python**: 3.8 or higher
-- **Memory**: 4GB RAM (8GB recommended)
+- **Operating System**: Ubuntu 22.04 LTS
+- **Memory**: 2GB RAM minimum
 - **Storage**: 10GB free space
 - **Network**: Internet connection for dependencies
-
-### **Supported Platforms**
-- ✅ **macOS**: Full support with Homebrew
-- ✅ **Ubuntu/Debian**: Full support with apt
-- ✅ **CentOS/RHEL**: Full support with yum
-- ⚠️ **Windows**: Limited support (WSL recommended)
 
 ## 🔧 System Management
 
@@ -99,10 +69,10 @@ tail -f logs/main_app.out.log
 ### **Database Management**
 ```bash
 # Test database connection
-./scripts/test_database.sh
+PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db
 
 # Create backup
-./scripts/backup_database.sh backup
+PGPASSWORD=rec_io_password pg_dump -h localhost -U rec_io_user rec_io_db > backup_$(date +%Y%m%d_%H%M%S).sql
 ```
 
 ## 🌐 Access Your System
@@ -114,59 +84,96 @@ After installation, access the system at:
 
 ## 🔑 Adding Trading Credentials
 
-### **During Installation**
-The installation script will ask if you want to set up Kalshi credentials. If you choose yes:
-1. Get your API credentials from [Kalshi Trading Platform](https://trading.kalshi.com/settings/api)
-2. Enter your email, API key, and private key when prompted
-3. Credentials will be securely stored with proper permissions
-
 ### **After Installation**
-If you skipped credential setup, you can add them later:
+To add Kalshi credentials for trading:
 ```bash
-# Run the user setup script
-python3 scripts/setup_new_user.py
-
-# Or manually create credential files
+# Create credentials file
 mkdir -p backend/data/users/user_0001/credentials/kalshi-credentials/prod
-echo "your_email@example.com" > backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
-echo "your_api_key" >> backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
-chmod 600 backend/data/users/user_0001/credentials/kalshi-credentials/prod/kalshi-auth.txt
+echo "your_email@example.com" > backend/data/users/user_0001/credentials/kalshi-credentials/prod/credentials.json
+echo "your_api_key" >> backend/data/users/user_0001/credentials/kalshi-credentials/prod/credentials.json
 ```
+
+## 📚 Documentation
+
+### **Installation**
+- [Installation Guide](INSTALL.md) - Complete setup instructions
+- [Detailed Documentation](docs/) - Comprehensive guides and references
+
+### **System Management**
+- [Master Restart Script](scripts/MASTER_RESTART.sh) - Primary system control
+- [Package User Data](scripts/package_user_data.sh) - Backup and migration
+
+## 🔒 Security Features
+
+### **Credential Management**
+- Secure credential storage with restricted permissions
+- User-specific credential isolation
+- Support for demo and production environments
+
+### **System Security**
+- Localhost-only by default
+- Configurable firewall rules
+- Process isolation with supervisor
+- Database user permissions
+
+### **Network Security**
+- Optional external access with proper configuration
+- HTTPS recommendations for production
+- Access logging and monitoring
 
 ## 🚨 Troubleshooting
 
 ### **Common Issues**
-1. **Check the logs**: `tail -f logs/*.out.log`
-2. **Test database**: `./scripts/test_database.sh`
-3. **Restart services**: `./scripts/MASTER_RESTART.sh`
-4. **Review documentation**: Check the docs/ directory
+
+#### Services Not Starting
+```bash
+# Check supervisor status
+supervisorctl -c backend/supervisord.conf status
+
+# Check logs for errors
+tail -f logs/*.err.log
+
+# Restart supervisor
+pkill supervisord
+supervisord -c backend/supervisord.conf
+```
+
+#### Database Connection Issues
+```bash
+# Check PostgreSQL status
+systemctl status postgresql
+
+# Test connection
+PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT 1;"
+```
+
+#### Port Conflicts
+```bash
+# Check what's using the ports
+lsof -i :3000
+lsof -i :4000
+
+# Kill conflicting processes
+pkill -f "python.*main.py"
+pkill -f "python.*trade_manager.py"
+```
 
 ### **Getting Help**
-- Review the [Quick Install Guide](QUICK_INSTALL_GUIDE.md)
-- Check the troubleshooting section in the documentation
-- Verify system requirements
-- Test with the provided verification commands
 
-## 📈 Recent Updates
+If you encounter issues:
 
-### **PostgreSQL Migration Complete**
-- **✅ Migrated:** All BTC price data from legacy SQLite to PostgreSQL
-- **✅ Retired:** Legacy services (archived to `archive/deprecated_services/`)
-- **✅ Enhanced:** Centralized data architecture with PostgreSQL
+1. **Check the logs**: `tail -f logs/*.out.log`
+2. **Verify system status**: `supervisorctl -c backend/supervisord.conf status`
+3. **Test database**: `PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT 1;"`
+4. **Check ports**: `netstat -tlnp | grep -E ':(3000|4000|5432)'`
 
-### **Security Enhancements**
-- **✅ User data protection:** Complete exclusion from git repository
-- **✅ Credential security:** Proper file permissions and isolation
-- **✅ Archive protection:** All backup and archive folders excluded
+## 📞 Support
 
-### **Simplified Installation**
-- **✅ One-command installation:** `python3 install.py`
-- **✅ Guided setup:** Step-by-step user configuration
-- **✅ Cross-platform support:** macOS, Linux, and Windows (WSL)
-
-## 🤝 Contributing
-
-This is a private trading system. For questions or support, please refer to the documentation or contact the development team.
+For installation issues or questions:
+- Check the installation log: `installation.log`
+- Review system logs: `logs/*.out.log`
+- Consult the documentation in `docs/`
+- Verify system requirements are met
 
 ## 📄 License
 
@@ -174,6 +181,4 @@ This project is proprietary software. All rights reserved.
 
 ---
 
-**🎉 Ready to start trading?**
-
-Follow the [Quick Install Guide](QUICK_INSTALL_GUIDE.md) to get started in just 3 steps! 
+**Ready to start trading?** Just run the one command above! 🚀 
