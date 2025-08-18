@@ -5,6 +5,7 @@ aiofiles==24.1.0
 apscheduler==3.10.4
 certifi==2025.6.15
 cffi==1.17.1
+ccxt==4.4.15
 charset-normalizer==3.4.2
 click==8.2.1
 cryptography==45.0.4
