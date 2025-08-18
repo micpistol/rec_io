@@ -39,6 +39,10 @@ from backend.util.paths import get_project_root
 # Use relative imports to avoid ModuleNotFoundError
 from backend.core.port_config import get_port, get_port_info
 
+# Import unified configuration system for database connections
+from backend.core.unified_config import UnifiedConfigManager
+unified_config = UnifiedConfigManager()
+
 # Get port from centralized system
 MAIN_APP_PORT = get_port("main_app")
 ACTIVE_TRADE_SUPERVISOR_PORT = get_port("active_trade_supervisor")
@@ -3080,12 +3084,13 @@ async def get_watchlist(symbol: str):
         # Convert symbol to lowercase for consistency
         symbol_lower = symbol.lower()
         
-        # Connect to PostgreSQL
+        # Connect to PostgreSQL using unified configuration
+        db_config = unified_config.get_database_config()
         conn = psycopg2.connect(
-            host="localhost",
-            database="rec_io_db",
-            user="rec_io_user",
-            password="rec_io_password"
+            host=db_config.get('host', 'localhost'),
+            database=db_config.get('name', 'rec_io_db'),
+            user=db_config.get('user', 'rec_io_user'),
+            password=db_config.get('password', 'rec_io_password')
         )
         
         with conn.cursor() as cursor:

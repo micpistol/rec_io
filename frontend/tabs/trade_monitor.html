@@ -4123,11 +4123,156 @@ if (typeof window.liveData !== 'undefined') {
               console.error('API error:', error);
             });
         }, 500);
+        
+        // Test watchlist API and populate table
+        function updateWatchlist() {
+          console.log('[WATCHLIST TEST] Fetching watchlist data...');
+          fetch('/api/watchlist/btc')
+            .then(response => response.json())
+            .then(data => {
+              if (data && data.strikes && data.strikes.length > 0) {
+                console.log('[WATCHLIST TEST] Found', data.strikes.length, 'strikes, populating table...');
+                populateWatchlistTable(data.strikes);
+              } else {
+                console.log('[WATCHLIST TEST] No strikes found in response');
+              }
+            })
+            .catch(error => {
+              console.error('[WATCHLIST TEST] API error:', error);
+            });
+        }
+        
+        // Initial load
+        setTimeout(updateWatchlist, 1000);
+        
+        // Set up auto-refresh every 2 seconds
+        setInterval(updateWatchlist, 2000);
       }, 100);
     });
   </script>
   
   <script>
+    // Proper watchlist table population function with color coding and buy buttons
+    function populateWatchlistTable(strikes) {
+      const tbody = document.querySelector('#watchlist-table tbody');
+      if (!tbody) {
+        console.error('[WATCHLIST TEST] Could not find watchlist table body');
+        return;
+      }
+      
+      tbody.innerHTML = '';
+      
+      // Sort strikes by probability (highest to lowest)
+      const sortedStrikes = strikes.sort((a, b) => b.probability - a.probability);
+      
+      sortedStrikes.forEach(strikeData => {
+        const row = document.createElement('tr');
+        const strike = strikeData.strike;
+        const prob = strikeData.probability;
+        
+        // Strike cell
+        const strikeTd = document.createElement('td');
+        strikeTd.textContent = '$' + strike.toLocaleString();
+        strikeTd.classList.add('center');
+        row.appendChild(strikeTd);
+        
+        // Buffer cell
+        const bufferTd = document.createElement('td');
+        bufferTd.textContent = strikeData.buffer.toLocaleString(undefined, {maximumFractionDigits: 0});
+        bufferTd.classList.add('center');
+        row.appendChild(bufferTd);
+        
+        // B/M cell
+        const bmTd = document.createElement('td');
+        bmTd.textContent = strikeData.buffer_pct.toFixed(2);
+        bmTd.classList.add('center');
+        row.appendChild(bmTd);
+        
+        // Probability cell
+        const probTd = document.createElement('td');
+        probTd.textContent = prob.toFixed(1);
+        probTd.classList.add('center');
+        row.appendChild(probTd);
+        
+        // Side cell
+        const sideTd = document.createElement('td');
+        const activeSide = strikeData.active_side;
+        sideTd.textContent = activeSide ? activeSide.toUpperCase() : '—';
+        sideTd.classList.add('center');
+        row.appendChild(sideTd);
+        
+        // Buy button cell
+        const buyTd = document.createElement('td');
+        buyTd.setAttribute('data-ticker', strikeData.ticker || '');
+        buyTd.classList.add('center');
+        const buySpan = document.createElement('span');
+        buyTd.appendChild(buySpan);
+        row.appendChild(buyTd);
+        
+        // Risk color coding
+        row.classList.remove('ultra-safe', 'safe', 'caution', 'high-risk', 'danger-stop');
+        let riskClass = '';
+        if (prob >= 98) riskClass = 'ultra-safe';
+        else if (prob >= 95) riskClass = 'safe';
+        else if (prob >= 80) riskClass = 'caution';
+        else riskClass = 'high-risk';
+        row.classList.add(riskClass);
+        
+        // Update buy button
+        const yesAsk = strikeData.yes_ask;
+        const noAsk = strikeData.no_ask;
+        const yesDiff = strikeData.yes_diff;
+        const noDiff = strikeData.no_diff;
+        const volume = strikeData.volume;
+        const ticker = strikeData.ticker;
+        const diffMode = window.diffMode || false;
+        
+        let activeAsk = null;
+        let activeDiff = null;
+        let activeEnabled = false;
+        
+        if (activeSide === 'yes') {
+          activeAsk = yesAsk;
+          activeDiff = yesDiff;
+          activeEnabled = yesAsk <= 98 && parseInt(volume) >= 1000;
+        } else if (activeSide === 'no') {
+          activeAsk = noAsk;
+          activeDiff = noDiff;
+          activeEnabled = noAsk <= 98 && parseInt(volume) >= 1000;
+        }
+        
+        // Set buy button display based on mode
+        let displayValue = '—';
+        if (activeAsk && activeAsk !== '—' && activeAsk !== 0) {
+          if (diffMode && activeDiff !== null) {
+            // DIFF MODE: Show pre-calculated diff value (no decimals)
+            displayValue = activeDiff > 0 ? `+${Math.round(activeDiff)}` : `${Math.round(activeDiff)}`;
+          } else {
+            // PRICE MODE: Show actual ask price
+            displayValue = activeAsk;
+          }
+        }
+        
+        buySpan.textContent = displayValue;
+        buySpan.className = activeEnabled ? 'price-box' : 'price-box disabled';
+        buySpan.style.cursor = activeEnabled ? 'pointer' : 'default';
+        
+        // Set data attributes
+        if (ticker) {
+          buySpan.setAttribute('data-ticker', ticker);
+        }
+        buySpan.setAttribute('data-strike', strike);
+        buySpan.setAttribute('data-side', activeSide);
+        if (activeAsk && activeAsk !== '—' && activeAsk !== 0) {
+          buySpan.setAttribute('data-ask-price', activeAsk);
+        }
+        
+        tbody.appendChild(row);
+      });
+      
+      console.log('[WATCHLIST TEST] Table populated with', strikes.length, 'rows');
+    }
+    
     // Expose trade refresh functions to global scope
     window.fetchAndRenderTrades = fetchAndRenderTrades;
     window.fetchAndRenderRecentTrades = fetchAndRenderRecentTrades;
