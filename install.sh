@@ -17,6 +17,19 @@
 
 set -e  # Exit on any error
 
+# Function to handle errors
+handle_error() {
+    log_error "Installation failed at step: $1"
+    log_error "Error details: $2"
+    echo
+    echo "Installation failed. Please check the error above and try again."
+    echo "You can also check the deployment log: $DEPLOYMENT_LOG"
+    exit 1
+}
+
+# Set up error handling
+trap 'handle_error "Unknown" "Script terminated unexpectedly"' ERR
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -141,7 +154,37 @@ install_system_dependencies() {
         "ubuntu")
             log_info "Installing dependencies on Ubuntu/Debian..."
             apt-get update
-            apt-get install -y python3 python3-pip python3-venv postgresql postgresql-contrib supervisor git curl wget
+            apt-get install -y python3 python3-pip python3-venv git curl wget
+            
+            # Check available PostgreSQL packages
+            log_info "Checking available PostgreSQL packages..."
+            apt-cache search postgresql | grep -E "postgresql-[0-9]+" | head -5
+            
+            # Install PostgreSQL (try different versions)
+            log_info "Installing PostgreSQL..."
+            if apt-get install -y postgresql postgresql-contrib postgresql-client; then
+                log_success "PostgreSQL installed successfully"
+            elif apt-get install -y postgresql-14 postgresql-contrib-14 postgresql-client-14; then
+                log_success "PostgreSQL 14 installed successfully"
+            elif apt-get install -y postgresql-15 postgresql-contrib-15 postgresql-client-15; then
+                log_success "PostgreSQL 15 installed successfully"
+            elif apt-get install -y postgresql-13 postgresql-contrib-13 postgresql-client-13; then
+                log_success "PostgreSQL 13 installed successfully"
+            else
+                log_error "Failed to install PostgreSQL - no compatible version found"
+                log_error "Available packages:"
+                apt-cache search postgresql | grep -E "postgresql-[0-9]+"
+                exit 1
+            fi
+            
+            # Install supervisor
+            log_info "Installing supervisor..."
+            apt-get install -y supervisor
+            
+            # Start and enable PostgreSQL
+            log_info "Starting PostgreSQL service..."
+            systemctl start postgresql
+            systemctl enable postgresql
             ;;
         "centos")
             log_info "Installing dependencies on CentOS/RHEL..."
