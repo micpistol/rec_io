@@ -342,8 +342,15 @@ if not success:
     fi
     log_success "Found $SYSTEM_TABLES tables in system schema"
     
+    log_info "Checking for historical_data schema tables..."
+    HISTORICAL_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'historical_data';" | tr -d ' ')
+    if [[ "$HISTORICAL_TABLES" == "0" ]]; then
+        handle_error "Database Schema" "Historical_data schema has no tables - schema creation failed"
+    fi
+    log_success "Found $HISTORICAL_TABLES tables in historical_data schema"
+    
     # Show total table count
-    TOTAL_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema IN ('users', 'live_data', 'system');" | tr -d ' ')
+    TOTAL_TABLES=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema IN ('users', 'live_data', 'system', 'historical_data');" | tr -d ' ')
     log_success "Total database tables created: $TOTAL_TABLES"
     
     # Verify database is working
@@ -389,15 +396,11 @@ try:
     table_name, rows = fetch_full_5year_data_pg('BTC/USD')
     print(f'BTC data download completed: {rows} rows to table {table_name}')
     if rows == 0:
-        print('Warning: BTC download returned 0 rows - this may indicate a network issue')
-        print('Continuing with installation - you can download data manually later')
-    else:
-        print(f'Successfully downloaded {rows} BTC price records')
+        exit(1)
 except Exception as e:
     print(f'BTC data download failed: {e}')
-    print('This may be due to network connectivity issues')
-    print('Continuing with installation - you can download data manually later')
-" || log_warning "BTC historical data download failed - continuing with installation"
+    exit(1)
+" || handle_error "Historical Data" "BTC historical data download failed"
     
     # Download ETH data
     log_info "Downloading ETH historical data (this may take several minutes)..."
@@ -409,15 +412,11 @@ try:
     table_name, rows = fetch_full_5year_data_pg('ETH/USD')
     print(f'ETH data download completed: {rows} rows to table {table_name}')
     if rows == 0:
-        print('Warning: ETH download returned 0 rows - this may indicate a network issue')
-        print('Continuing with installation - you can download data manually later')
-    else:
-        print(f'Successfully downloaded {rows} ETH price records')
+        exit(1)
 except Exception as e:
     print(f'ETH data download failed: {e}')
-    print('This may be due to network connectivity issues')
-    print('Continuing with installation - you can download data manually later')
-" || log_warning "ETH historical data download failed - continuing with installation"
+    exit(1)
+" || handle_error "Historical Data" "ETH historical data download failed"
     
     # VERIFY DATA WAS DOWNLOADED
     log_info "VERIFYING HISTORICAL DATA WAS DOWNLOADED..."
@@ -425,20 +424,16 @@ except Exception as e:
     # Check BTC data
     BTC_ROWS=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM historical_data.btc_price_history;" | tr -d ' ')
     if [[ "$BTC_ROWS" == "0" ]]; then
-        log_warning "BTC historical data table is empty - download may have failed"
-        log_warning "You can download data manually later using: cd $INSTALL_DIR && source venv/bin/activate && python3 -c \"import sys; sys.path.append('backend'); from util.symbol_data_fetch_pg import fetch_full_5year_data_pg; fetch_full_5year_data_pg('BTC/USD')\""
-    else
-        log_success "BTC historical data: $BTC_ROWS rows"
+        handle_error "Historical Data" "BTC historical data table is empty - download failed"
     fi
+    log_success "BTC historical data: $BTC_ROWS rows"
     
     # Check ETH data
     ETH_ROWS=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM historical_data.eth_price_history;" | tr -d ' ')
     if [[ "$ETH_ROWS" == "0" ]]; then
-        log_warning "ETH historical data table is empty - download may have failed"
-        log_warning "You can download data manually later using: cd $INSTALL_DIR && source venv/bin/activate && python3 -c \"import sys; sys.path.append('backend'); from util.symbol_data_fetch_pg import fetch_full_5year_data_pg; fetch_full_5year_data_pg('ETH/USD')\""
-    else
-        log_success "ETH historical data: $ETH_ROWS rows"
+        handle_error "Historical Data" "ETH historical data table is empty - download failed"
     fi
+    log_success "ETH historical data: $ETH_ROWS rows"
     
     # Show data summary
     log_info "Historical data summary:"
@@ -603,18 +598,14 @@ except Exception as e:
     ETH_ROWS=$(PGPASSWORD=rec_io_password psql -h localhost -U rec_io_user -d rec_io_db -t -c "SELECT COUNT(*) FROM historical_data.eth_price_history;" | tr -d ' ')
     
     if [[ "$BTC_ROWS" == "0" ]]; then
-        log_warning "BTC historical data is missing - you can download it manually later"
+        handle_error "Final Verification" "BTC historical data is missing"
     fi
     
     if [[ "$ETH_ROWS" == "0" ]]; then
-        log_warning "ETH historical data is missing - you can download it manually later"
+        handle_error "Final Verification" "ETH historical data is missing"
     fi
     
-    if [[ "$BTC_ROWS" != "0" && "$ETH_ROWS" != "0" ]]; then
-        log_success "Historical data verified: BTC ($BTC_ROWS rows), ETH ($ETH_ROWS rows)"
-    else
-        log_warning "Some historical data is missing - system will work but may have limited functionality"
-    fi
+    log_success "Historical data verified: BTC ($BTC_ROWS rows), ETH ($ETH_ROWS rows)"
     
     log_success "Final verification completed"
     log_deployment "Final verification completed"

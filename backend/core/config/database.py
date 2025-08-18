@@ -241,16 +241,50 @@ def init_database():
             );
         """)
         
+        # Create historical_data schema and tables
+        cursor.execute("CREATE SCHEMA IF NOT EXISTS historical_data;")
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS historical_data.btc_price_history (
+                id SERIAL PRIMARY KEY,
+                timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+                open DECIMAL(15,2),
+                high DECIMAL(15,2),
+                low DECIMAL(15,2),
+                close DECIMAL(15,2),
+                volume DECIMAL(20,8),
+                momentum DECIMAL(10,4),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS historical_data.eth_price_history (
+                id SERIAL PRIMARY KEY,
+                timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+                open DECIMAL(15,2),
+                high DECIMAL(15,2),
+                low DECIMAL(15,2),
+                close DECIMAL(15,2),
+                volume DECIMAL(20,8),
+                momentum DECIMAL(10,4),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
+        """)
+        
         # Grant privileges
         cursor.execute("GRANT ALL PRIVILEGES ON SCHEMA users TO rec_io_user;")
         cursor.execute("GRANT ALL PRIVILEGES ON SCHEMA live_data TO rec_io_user;")
         cursor.execute("GRANT ALL PRIVILEGES ON SCHEMA system TO rec_io_user;")
+        cursor.execute("GRANT ALL PRIVILEGES ON SCHEMA historical_data TO rec_io_user;")
         cursor.execute("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA users TO rec_io_user;")
         cursor.execute("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA live_data TO rec_io_user;")
         cursor.execute("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA system TO rec_io_user;")
+        cursor.execute("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA historical_data TO rec_io_user;")
         cursor.execute("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA users TO rec_io_user;")
         cursor.execute("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA live_data TO rec_io_user;")
         cursor.execute("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA system TO rec_io_user;")
+        cursor.execute("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA historical_data TO rec_io_user;")
         
         conn.commit()
         cursor.close()
