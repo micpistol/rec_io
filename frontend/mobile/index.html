@@ -235,7 +235,7 @@
         let lastFrontendChange = null;
         async function checkFrontendChanges() {
             try {
-                const res = await fetch('/frontend-changes');
+                const res = await fetch(window.location.origin + '/frontend-changes');
                 const data = await res.json();
                 if (lastFrontendChange && data.last_modified > lastFrontendChange) {
                     location.reload();
@@ -292,7 +292,7 @@
         
         async function updateSystemIcon() {
             try {
-                const response = await fetch('/api/db/system_health');
+                const response = await fetch(window.location.origin + '/api/db/system_health');
                 if (response.ok) {
                     const healthData = await response.json();
                     const status = healthData.overall_status || 'offline';

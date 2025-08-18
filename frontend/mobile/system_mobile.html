@@ -458,7 +458,7 @@
             content.innerHTML = '<div class="loading">Loading system health data...</div>';
             
             try {
-                const response = await fetch('/api/db/system_health');
+                const response = await fetch(window.location.origin + '/api/db/system_health');
                 if (response.ok) {
                     const data = await response.json();
                     displayHealthData(data);
@@ -520,7 +520,7 @@
         
         async function checkAdminPermissions() {
             try {
-                const response = await fetch('/api/user/info');
+                const response = await fetch(window.location.origin + '/api/user/info');
                 if (response.ok) {
                     const userInfo = await response.json();
                     if (userInfo.account_type === 'master_admin') {
@@ -539,7 +539,7 @@
             scriptsList.innerHTML = '<div class="loading">Loading supervisor status...</div>';
             
             try {
-                const response = await fetch('/api/admin/supervisor-status', { method: 'POST' });
+                const response = await fetch(window.location.origin + '/api/admin/supervisor-status', { method: 'POST' });
                 if (response.ok) {
                     const result = await response.json();
                     if (result.success) {
@@ -638,7 +638,7 @@
             }
             
             try {
-                const response = await fetch('/api/admin/execute-command', {
+                const response = await fetch(window.location.origin + '/api/admin/execute-command', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -713,7 +713,7 @@
             buttons.style.display = 'none';
             
             try {
-                const response = await fetch('/api/admin/execute-restart', { method: 'POST' });
+                const response = await fetch(window.location.origin + '/api/admin/execute-restart', { method: 'POST' });
                 if (response.ok) {
                     const result = await response.json();
                     if (result.success) {

@@ -627,7 +627,7 @@
     async function loadUserDisplay() {
       try {
         // Try to get user info directly from database first
-        const userResponse = await fetch('/api/user/info');
+        const userResponse = await fetch(window.location.origin + '/api/user/info');
         if (userResponse.ok) {
           const userInfo = await userResponse.json();
           const userDisplay = document.getElementById('userDisplay');
@@ -646,7 +646,7 @@
           return;
         }
         
-        const response = await fetch('/api/auth/verify', {
+        const response = await fetch(window.location.origin + '/api/auth/verify', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -658,7 +658,7 @@
           const data = await response.json();
           if (data.authenticated) {
             // Get user info from database
-            const userResponse = await fetch('/api/user/info');
+            const userResponse = await fetch(window.location.origin + '/api/user/info');
             if (userResponse.ok) {
               const userInfo = await userResponse.json();
               const userDisplay = document.getElementById('userDisplay');
@@ -686,7 +686,7 @@
     
     async function loadSystemHealth() {
       try {
-        const response = await fetch('/api/db/system_health');
+        const response = await fetch(window.location.origin + '/api/db/system_health');
         if (response.ok) {
           const healthData = await response.json();
           updateSystemHealthTooltip(healthData);
@@ -740,7 +740,7 @@
     
     async function updateSystemIcon() {
       try {
-        const response = await fetch('/api/db/system_health');
+        const response = await fetch(window.location.origin + '/api/db/system_health');
         if (response.ok) {
           const healthData = await response.json();
           const status = healthData.overall_status || 'offline';
@@ -793,7 +793,7 @@
   let lastFrontendChange = null;
   async function checkFrontendChanges() {
     try {
-      const res = await fetch('/frontend-changes');
+      const res = await fetch(window.location.origin + '/frontend-changes');
       const data = await res.json();
       if (lastFrontendChange && data.last_modified > lastFrontendChange) {
         location.reload();

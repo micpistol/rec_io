@@ -750,7 +750,7 @@ function hideAutoEntrySettingsModal() {
   <script>
     // Sync the mode picker with the global mode on load
     async function syncModePickerWithGlobal() {
-        const res = await fetch("/api/get_account_mode");
+        const res = await fetch(window.location.origin + "/api/get_account_mode");
         const data = await res.json();
         const modePicker = document.getElementById("accountModePicker");
         if (modePicker) {
@@ -766,7 +766,7 @@ function hideAutoEntrySettingsModal() {
       if (modePicker) {
         modePicker.addEventListener("change", function() {
           const mode = modePicker.value;
-          fetch('/api/set_account_mode', {
+          fetch(window.location.origin + '/api/set_account_mode', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ mode })
@@ -789,7 +789,7 @@ function hideAutoEntrySettingsModal() {
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       // Fetch account mode and update selector
-      fetch('/api/get_account_mode')
+      fetch(window.location.origin + '/api/get_account_mode')
         .then(res => res.json())
         .then(data => {
           const mode = data.mode;
@@ -807,7 +807,7 @@ function hideAutoEntrySettingsModal() {
       async function updateEmailDisplay() {
         try {
           // Fetch email for current mode
-          const response = await fetch('/api/get_kalshi_email');
+          const response = await fetch(window.location.origin + '/api/get_kalshi_email');
           const data = await response.json();
           
           const prodOption = document.getElementById("prod-option");
@@ -834,7 +834,7 @@ function hideAutoEntrySettingsModal() {
       document.getElementById("account-selector").addEventListener("change", () => {
         const selected = document.getElementById("account-selector").value;
         const mode = selected === "live" ? "prod" : "demo";
-        fetch('/api/set_account_mode', {
+        fetch(window.location.origin + '/api/set_account_mode', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mode })
@@ -851,7 +851,7 @@ function hideAutoEntrySettingsModal() {
     // Function to fetch and update account balance
     async function updateAccountBalance(mode) {
       try {
-        const response = await fetch(`/api/account/balance?mode=${mode}`);
+        const response = await fetch(`${window.location.origin}/api/account/balance?mode=${mode}`);
         const data = await response.json();
         const balanceEl = document.getElementById("account-balance");
         if (balanceEl) {
@@ -877,7 +877,6 @@ function hideAutoEntrySettingsModal() {
       }
     }, 30000);
   </script>
-</body>
   <div id="errorTooltip" class="error-tooltip"></div>
 <script>
 // === Unified Preferences: AUTO STOP, Position Size, Multiplier with WebSocket sync (improved) ===
@@ -966,8 +965,9 @@ document.addEventListener('DOMContentLoaded', () => {
       updatePositionDisplay();
     });
 
-  // WebSocket setup
-  const ws = new WebSocket(`ws://${window.location.host}/ws/preferences`);
+  // WebSocket setup - use secure WebSocket for HTTPS
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${protocol}//${window.location.host}/ws/preferences`);
 
   ws.onmessage = (event) => {
     try {
@@ -1108,12 +1108,16 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: value })
       }).then(response => {
-        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         return response.json();
       }).then(data => {
-        
+        console.log('Auto stop updated successfully:', data);
       }).catch(error => {
         console.error('Auto stop backend error:', error);
+        // Show user-friendly error message
+        alert(`Failed to update auto stop setting: ${error.message}`);
       });
     });
   }
@@ -1168,12 +1172,15 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: value })
       }).then(response => {
-        // Removed console.log
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         return response.json();
       }).then(data => {
-        // Removed console.log
+        console.log('Auto entry updated successfully:', data);
       }).catch(error => {
         console.error('AUTO ENTRY backend error:', error);
+        alert(`Failed to update auto entry setting: ${error.message}`);
       });
     });
   }
@@ -1202,11 +1209,15 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ trade_strategy: value })
       }).then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         return response.json();
       }).then(data => {
         console.log('Trade strategy updated:', data);
       }).catch(error => {
         console.error('Trade strategy backend error:', error);
+        alert(`Failed to update trade strategy: ${error.message}`);
       });
     });
   }
@@ -1227,12 +1238,15 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ position_size: value })
       }).then(response => {
-        // Removed console.log
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         return response.json();
       }).then(data => {
-        // Removed console.log
+        console.log('Position size updated successfully:', data);
       }).catch(error => {
         console.error('Position size backend error:', error);
+        alert(`Failed to update position size: ${error.message}`);
       });
       updatePositionDisplay();
     });
@@ -1257,12 +1271,15 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ multiplier: currentMultiplier })
       }).then(response => {
-        // Removed console.log
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         return response.json();
       }).then(data => {
-        // Removed console.log
+        console.log('Multiplier updated successfully:', data);
       }).catch(error => {
         console.error('Multiplier backend error:', error);
+        alert(`Failed to update multiplier: ${error.message}`);
       });
     });
   });
@@ -2146,7 +2163,7 @@ async function showPopup(strike, side, price) {
 // === Active Trades Panel ===
 async function fetchAndRenderTrades() {
   try {
-    const res = await fetch('/trades?status=open', { cache: 'no-store' });
+    const res = await fetch(window.location.origin + '/trades?status=open', { cache: 'no-store' });
     if (!res.ok) throw new Error("Failed to fetch open trades");
     const trades = await res.json();
     
@@ -2200,7 +2217,7 @@ async function fetchAndRenderTrades() {
 async function fetchAndRenderRecentTrades() {
   try {
     // Fetch fills data from PostgreSQL
-    const res = await fetch('/api/db/fills', { cache: 'no-store' });
+    const res = await fetch(window.location.origin + '/api/db/fills', { cache: 'no-store' });
     if (!res.ok) throw new Error("Failed to fetch recent fills");
     const data = await res.json();
     const fills = data.fills || [];
@@ -2293,7 +2310,7 @@ async function fetchAndRenderRecentTrades() {
 async function fetchAndRenderTradeHistory() {
   try {
     // Use PostgreSQL endpoint instead of legacy SQLite
-    const res = await fetch('/trades', { cache: 'no-store' });
+    const res = await fetch(window.location.origin + '/trades', { cache: 'no-store' });
     if (!res.ok) throw new Error("Failed to fetch trade history from PostgreSQL");
     const trades = await res.json();
     
@@ -2400,7 +2417,7 @@ async function fetchAndRenderTradeHistory() {
 async function fetchAndRenderRecentTrades() {
   try {
     // Fetch fills data from PostgreSQL
-    const res = await fetch('/api/db/fills', { cache: 'no-store' });
+    const res = await fetch(window.location.origin + '/api/db/fills', { cache: 'no-store' });
     if (!res.ok) throw new Error("Failed to fetch recent fills from PostgreSQL");
     const data = await res.json();
     const fills = data.fills || [];
@@ -2480,7 +2497,7 @@ async function fetchAndRenderRecentTrades() {
 async function closeExpiredTrades() {
   try {
     // Fetch all open trades
-    const res = await fetch('/trades?status=open', { cache: 'no-store' });
+    const res = await fetch(window.location.origin + '/trades?status=open', { cache: 'no-store' });
     if (!res.ok) throw new Error("Failed to fetch open trades");
     const openTrades = await res.json();
 
@@ -2677,7 +2694,7 @@ window.previousPositionsCount = window.previousPositionsCount || 0;
 
 async function fetchAndRenderPositions() {
   try {
-    const response = await fetch('/api/db/positions', { cache: 'no-store' });
+    const response = await fetch(window.location.origin + '/api/db/positions', { cache: 'no-store' });
     if (!response.ok) {
       throw new Error('Failed to fetch positions data from PostgreSQL');
     }
@@ -2839,7 +2856,7 @@ async function fetchAndRenderPositions() {
 // === Settlements Data Fetching and Rendering ===
 async function fetchAndRenderSettlements() {
   try {
-    const response = await fetch('/api/db/settlements', { cache: 'no-store' });
+    const response = await fetch(window.location.origin + '/api/db/settlements', { cache: 'no-store' });
     if (!response.ok) {
       throw new Error('Failed to fetch settlements data from PostgreSQL');
     }
@@ -2945,7 +2962,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // WebSocket connection for database change notifications
 function setupDatabaseChangeListener() {
-  const ws = new WebSocket(`ws://${window.location.host}/ws/db_changes`);
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${protocol}//${window.location.host}/ws/db_changes`);
   
   ws.onopen = function() {
     // Removed console.log
@@ -3137,7 +3155,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   async function fetchAutoStopSettings() {
     try {
-      const resp = await fetch('/api/get_auto_stop_settings');
+      const resp = await fetch(window.location.origin + '/api/get_auto_stop_settings');
       if (resp.ok) {
         const data = await resp.json();
         return data;
@@ -3291,7 +3309,7 @@ document.addEventListener('DOMContentLoaded', function() {
       
       if (!isNaN(newProb)) {
         try {
-          const response = await fetch('/api/set_auto_stop_settings', {
+          const response = await fetch(window.location.origin + '/api/set_auto_stop_settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -3498,7 +3516,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   async function fetchAutoEntrySettings() {
     try {
-      const resp = await fetch('/api/get_auto_entry_settings');
+      const resp = await fetch(window.location.origin + '/api/get_auto_entry_settings');
       if (resp.ok) {
         const data = await resp.json();
         return {
@@ -3537,7 +3555,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       });
       // Fetch all settings
-      fetch('/api/get_auto_entry_settings').then(r => r.json()).then(data => {
+      fetch(window.location.origin + '/api/get_auto_entry_settings').then(r => r.json()).then(data => {
         const minTTC = data.min_ttc_seconds !== undefined ? data.min_ttc_seconds : 60;
         const minTime = data.min_time !== undefined ? data.min_time : 0;
         const maxTime = data.max_time !== undefined ? data.max_time : 3600;
@@ -3676,7 +3694,7 @@ document.addEventListener('DOMContentLoaded', function() {
           const spikeAlertCooldown = spikeAlertCooldownSlider ? parseInt(spikeAlertCooldownSlider.value) : 30;
           const spikeAlertTime = spikeAlertTimeSlider ? parseInt(spikeAlertTimeSlider.value) : 15;
           
-          const response = await fetch('/api/set_auto_entry_settings', {
+          const response = await fetch(window.location.origin + '/api/set_auto_entry_settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -3954,7 +3972,7 @@ function connectAutoEntryWebSocket() {
 async function fetchInitialAutoEntryIndicator() {
     try {
         console.log('🔄 Fetching initial auto entry status...');
-        const response = await fetch('/api/get_auto_entry_status');
+        const response = await fetch(window.location.origin + '/api/get_auto_entry_status');
         if (!response.ok) throw new Error('Failed to fetch auto entry status');
         const data = await response.json();
         
@@ -4113,7 +4131,7 @@ if (typeof window.liveData !== 'undefined') {
         // Test API call directly
         setTimeout(function() {
           // Removed console.log
-          fetch('/api/strike_tables/btc')
+          fetch(window.location.origin + '/api/strike_tables/btc')
             .then(response => response.json())
             .then(data => {
               // Removed console.log
@@ -4127,7 +4145,7 @@ if (typeof window.liveData !== 'undefined') {
         // Test watchlist API and populate table
         function updateWatchlist() {
           console.log('[WATCHLIST TEST] Fetching watchlist data...');
-          fetch('/api/watchlist/btc')
+          fetch(window.location.origin + '/api/watchlist/btc')
             .then(response => response.json())
             .then(data => {
               if (data && data.strikes && data.strikes.length > 0) {

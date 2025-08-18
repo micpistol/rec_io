@@ -147,7 +147,7 @@
         async function loadUserInfo() {
             try {
                 // First try to get user info directly from database
-                const userResponse = await fetch('/api/user/info');
+                const userResponse = await fetch(window.location.origin + '/api/user/info');
                 let userInfo = {};
                 
                 if (userResponse.ok) {
@@ -164,7 +164,7 @@
                     throw new Error('No authentication token found');
                 }
                 
-                const response = await fetch('/api/auth/verify', {
+                const response = await fetch(window.location.origin + '/api/auth/verify', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -231,15 +231,21 @@
             
             if (token && deviceId) {
                 try {
-                    await fetch('/api/auth/logout', {
+                    const response = await fetch(window.location.origin + '/api/auth/logout', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({ token, deviceId })
                     });
+                    
+                    if (!response.ok) {
+                        console.error('Logout failed:', response.status, response.statusText);
+                    } else {
+                        console.log('Logout successful');
+                    }
                 } catch (e) {
-                    console.log('Logout request failed:', e);
+                    console.error('Logout request failed:', e);
                 }
             }
             

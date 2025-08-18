@@ -171,7 +171,7 @@
         async function loadUserInfo() {
             try {
                 // First try to get user info directly from database
-                const userResponse = await fetch('/api/user/info');
+                const userResponse = await fetch(window.location.origin + '/api/user/info');
                 let userInfo = {};
                 
                 if (userResponse.ok) {
@@ -189,7 +189,7 @@
                     throw new Error('No authentication token found');
                 }
                 
-                const response = await fetch('/api/auth/verify', {
+                const response = await fetch(window.location.origin + '/api/auth/verify', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -279,7 +279,7 @@
             if (phoneValue) updateData.phone = phoneValue.textContent.trim();
             
             try {
-                const response = await fetch('/api/user/info', {
+                const response = await fetch(window.location.origin + '/api/user/info', {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -383,7 +383,7 @@
                     newPassword: newPassword
                 });
                 
-                const response = await fetch('/api/user/change-password', {
+                const response = await fetch(window.location.origin + '/api/user/change-password', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -419,7 +419,7 @@
             const deviceId = localStorage.getItem('rec_device_id');
             if (token && deviceId) {
                 try {
-                    await fetch('/api/auth/logout', {
+                    await fetch(window.location.origin + '/api/auth/logout', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ token, deviceId })

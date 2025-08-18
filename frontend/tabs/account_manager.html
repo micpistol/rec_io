@@ -119,7 +119,7 @@
   <script>
     let GLOBAL_ACCOUNT_MODE = "prod";  // Will be updated by backend
 
-    fetch('/api/get_account_mode')
+    fetch(window.location.origin + '/api/get_account_mode')
       .then(res => res.json())
       .then(data => {
         GLOBAL_ACCOUNT_MODE = data.mode;
@@ -149,10 +149,10 @@
 
     async function loadAccountData() {
       const [balanceRes, settlementsRes, fillsRes, positionsRes] = await Promise.all([
-        fetch(`/api/account/balance?mode=${GLOBAL_ACCOUNT_MODE}`),
-        fetch("/api/db/settlements"),
-        fetch("/api/db/fills"),
-        fetch("/api/db/positions"),
+        fetch(`${window.location.origin}/api/account/balance?mode=${GLOBAL_ACCOUNT_MODE}`),
+        fetch(window.location.origin + "/api/db/settlements"),
+        fetch(window.location.origin + "/api/db/fills"),
+        fetch(window.location.origin + "/api/db/positions"),
       ]);
 
       const settlementsJson = await settlementsRes.json();
@@ -166,8 +166,8 @@
       window.fills = fills;
 
       const [prodBalRes, demoBalRes] = await Promise.all([
-        fetch("/api/account/balance?mode=prod"),
-        fetch("/api/account/balance?mode=demo"),
+        fetch(window.location.origin + "/api/account/balance?mode=prod"),
+        fetch(window.location.origin + "/api/account/balance?mode=demo"),
       ]);
 
       const prodBalJson = await prodBalRes.json();

@@ -194,7 +194,7 @@
         
         async function detectCurrentDirectory() {
             try {
-                const response = await fetch('/api/admin/execute-command', {
+                const response = await fetch(window.location.origin + '/api/admin/execute-command', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -285,7 +285,7 @@
             const outputElement = document.querySelector(`#${outputId}`);
             
             try {
-                const response = await fetch('/api/admin/execute-command', {
+                const response = await fetch(window.location.origin + '/api/admin/execute-command', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

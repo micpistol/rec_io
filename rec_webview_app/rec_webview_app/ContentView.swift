@@ -84,11 +84,11 @@ struct ContentView: View {
         let urlString: String
         switch UIDevice.current.userInterfaceIdiom {
         case .pad:
-            urlString = "http://137.184.224.94:3000/"
+            urlString = "https://rec-io.com/"
         case .phone:
-            urlString = "http://137.184.224.94:3000/mobile/index.html"
+            urlString = "https://rec-io.com/"
         default:
-            urlString = "http://137.184.224.94:3000/"
+            urlString = "https://rec-io.com/"
         }
         print("🔧 Attempting to load URL: \(urlString)")
         return URL(string: urlString)!

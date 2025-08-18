@@ -161,7 +161,7 @@
           document.getElementById('results-box').style.display = 'none';
           return;
         }
-        fetch("/search-history", {
+        fetch(window.location.origin + "/search-history", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ start: startTime, end: endTime })
@@ -284,7 +284,7 @@
           return;
         }
         try {
-          const response = await fetch("/search-history", {
+          const response = await fetch(window.location.origin + "/search-history", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ start: startTime, end: endTime })

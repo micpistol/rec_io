@@ -33,7 +33,7 @@ window.strikeRowsMap = new Map();
 // Fetch unified TTC data
 async function fetchUnifiedTTC() {
   try {
-    const response = await fetch('/api/unified_ttc/btc');
+    const response = await fetch(window.location.origin + '/api/unified_ttc/btc');
     const data = await response.json();
     return data.ttc_seconds || 0;
   } catch (error) {
@@ -45,7 +45,7 @@ async function fetchUnifiedTTC() {
 // Fetch strike table data from PostgreSQL endpoint
 async function fetchStrikeTableData() {
   try {
-    const response = await fetch('/api/postgresql/strike_table/btc');
+    const response = await fetch(window.location.origin + '/api/postgresql/strike_table/btc');
     const data = await response.json();
     return data;
   } catch (error) {
@@ -593,7 +593,7 @@ async function updateStrikeTable() {
 window.testActiveTrades = async function() {
   try {
 
-    const tradesRes = await fetch('/api/active_trades', { cache: 'no-store' });
+    const tradesRes = await fetch(window.location.origin + '/api/active_trades', { cache: 'no-store' });
     if (!tradesRes.ok) {
       console.error('[TEST] API request failed:', tradesRes.status);
       return;
@@ -626,7 +626,7 @@ window.testActiveTrades = async function() {
 async function updatePositionIndicator(strikeCell, strike) {
   try {
     // Fetch active trades from the active_trade_supervisor API endpoint
-    const tradesRes = await fetch('/api/active_trades', { cache: 'no-store' });
+    const tradesRes = await fetch(window.location.origin + '/api/active_trades', { cache: 'no-store' });
     if (!tradesRes.ok) return;
     
     const data = await tradesRes.json();
@@ -748,7 +748,7 @@ function updateYesNoButton(spanEl, strike, side, askPrice, isActive, ticker = nu
         }
         
         // Call the new trade_manager endpoint with complete data
-        const response = await fetch('/api/trigger_open_trade', {
+        const response = await fetch(window.location.origin + '/api/trigger_open_trade', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

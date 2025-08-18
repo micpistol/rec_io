@@ -39,7 +39,7 @@ function decorateChange(el, val) {
 
 // Fetch core data (momentum score only - BTC price now handled by strike table)
 function fetchCore() {
-  fetch('/core')
+  fetch(window.location.origin + '/core')
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -71,7 +71,7 @@ function fetchCore() {
 // Fetch BTC price changes from backend API and update ticker panel
 async function fetchBTCPriceChanges() {
   try {
-    const res = await fetch('/btc_price_changes');
+    const res = await fetch(window.location.origin + '/btc_price_changes');
     if (!res.ok) throw new Error('Failed to fetch BTC price changes');
     const data = await res.json();
     

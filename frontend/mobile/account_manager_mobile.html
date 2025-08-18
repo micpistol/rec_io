@@ -270,23 +270,38 @@
             event.target.classList.add('active');
         }
 
-        fetch('/api/get_account_mode')
-            .then(res => res.json())
+        fetch(window.location.origin + '/api/get_account_mode')
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
+                return res.json();
+            })
             .then(data => {
                 GLOBAL_ACCOUNT_MODE = data.mode;
                 window.GLOBAL_ACCOUNT_MODE = GLOBAL_ACCOUNT_MODE;
 
                 loadAccountData();
             })
-            .catch(console.error);
+            .catch(error => {
+                console.error('Failed to get account mode:', error);
+                alert(`Failed to get account mode: ${error.message}`);
+            });
 
         async function loadAccountData() {
-            const [balanceRes, settlementsRes, fillsRes, positionsRes] = await Promise.all([
-                fetch(`/api/account/balance?mode=${GLOBAL_ACCOUNT_MODE}`),
-                fetch("/api/db/settlements"),
-                fetch("/api/db/fills"),
-                fetch("/api/db/positions"),
-            ]);
+            try {
+                const [balanceRes, settlementsRes, fillsRes, positionsRes] = await Promise.all([
+                    fetch(`${window.location.origin}/api/account/balance?mode=${GLOBAL_ACCOUNT_MODE}`),
+                    fetch(window.location.origin + "/api/db/settlements"),
+                    fetch(window.location.origin + "/api/db/fills"),
+                    fetch(window.location.origin + "/api/db/positions"),
+                ]);
+
+                // Check for errors
+                if (!balanceRes.ok) throw new Error(`Balance API: ${balanceRes.status} ${balanceRes.statusText}`);
+                if (!settlementsRes.ok) throw new Error(`Settlements API: ${settlementsRes.status} ${settlementsRes.statusText}`);
+                if (!fillsRes.ok) throw new Error(`Fills API: ${fillsRes.status} ${fillsRes.statusText}`);
+                if (!positionsRes.ok) throw new Error(`Positions API: ${positionsRes.status} ${positionsRes.statusText}`);
 
             const settlementsJson = await settlementsRes.json();
             const fillsJson = await fillsRes.json();
@@ -298,10 +313,14 @@
 
             window.fills = fills;
 
-            const [prodBalRes, demoBalRes] = await Promise.all([
-                fetch("/api/account/balance?mode=prod"),
-                fetch("/api/account/balance?mode=demo"),
-            ]);
+                const [prodBalRes, demoBalRes] = await Promise.all([
+                    fetch(window.location.origin + "/api/account/balance?mode=prod"),
+                    fetch(window.location.origin + "/api/account/balance?mode=demo"),
+                ]);
+
+                // Check for errors
+                if (!prodBalRes.ok) throw new Error(`Prod Balance API: ${prodBalRes.status} ${prodBalRes.statusText}`);
+                if (!demoBalRes.ok) throw new Error(`Demo Balance API: ${demoBalRes.status} ${demoBalRes.statusText}`);
 
             const prodBalJson = await prodBalRes.json();
             const demoBalJson = await demoBalRes.json();
@@ -364,6 +383,10 @@
                         <td>${new Date(p.last_updated_ts).toLocaleString("en-US", { timeZone: "America/New_York" })}</td>
                     </tr>
                 `).join("");
+            } catch (error) {
+                console.error('Failed to load account data:', error);
+                alert(`Failed to load account data: ${error.message}`);
+            }
         }
 
         // Respect backend-set mode only
@@ -377,7 +400,8 @@
         
         // WebSocket connection for database change notifications
         function setupDatabaseChangeListener() {
-            const ws = new WebSocket(`ws://${window.location.host}/ws/db_changes`);
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}/ws/db_changes`);
             
             ws.onopen = function() {
                 console.log('🔗 Connected to database change notifications (account manager mobile)');

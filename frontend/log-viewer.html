@@ -215,7 +215,7 @@
         function startLogStream() {
             updateConnectionStatus('connecting');
             
-            fetch('/api/admin/get-log-stream', {
+            fetch(window.location.origin + '/api/admin/get-log-stream', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

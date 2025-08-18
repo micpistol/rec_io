@@ -192,7 +192,7 @@ class SystemLoader {
         const maxAttempts = 10;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                const response = await fetch('/api/ports', { timeout: 5000 });
+                const response = await fetch(window.location.origin + '/api/ports', { timeout: 5000 });
                 if (response.ok) {
                     const config = await response.json();
                     console.log('[SYSTEM LOADER] Port configuration loaded:', config);
@@ -250,7 +250,7 @@ class SystemLoader {
     async testDatabaseConnections() {
         try {
             // Test main database
-            const response = await fetch('/api/db/health', { timeout: 5000 });
+            const response = await fetch(window.location.origin + '/api/db/health', { timeout: 5000 });
             if (!response.ok) {
                 throw new Error('Database health check failed');
             }

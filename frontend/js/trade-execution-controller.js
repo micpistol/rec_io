@@ -44,7 +44,7 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
 
   try {
     // Fetch trade details to construct the close ticket
-    const tradeRes = await fetch('/trades');
+    const tradeRes = await fetch(window.location.origin + '/trades');
     if (!tradeRes.ok) {
       throw new Error('Failed to fetch trades for closing');
     }
@@ -104,7 +104,7 @@ window.closeTrade = async function(tradeId, sellPrice, event) {
     }
 
     // Execute the actual close trade
-    const response = await fetch('/trades', {
+    const response = await fetch(window.location.origin + '/trades', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -211,7 +211,7 @@ window.prepareTradeData = async function(target) {
   // Get momentum from API instead of DOM element
   let momentum = null;
   try {
-    const momentumResponse = await fetch('/api/momentum');
+    const momentumResponse = await fetch(window.location.origin + '/api/momentum');
     if (momentumResponse.ok) {
       const momentumData = await momentumResponse.json();
       momentum = momentumData.momentum_score;

@@ -813,7 +813,7 @@
             
             // Initial data fetches (BTC price and TTC now come from strike table data)
             // Momentum score still fetched from core data initially
-            fetch('/core').then(response => response.json()).then(data => {
+            fetch(window.location.origin + '/core').then(response => response.json()).then(data => {
                 // Update momentum score
                 if (data.weighted_momentum_score !== undefined) {
                     const momentumEl = document.getElementById('momentum-score-display');
@@ -828,7 +828,7 @@
 
             
             // Initial BTC price changes fetch
-            fetch('/btc_price_changes').then(response => response.json()).then(data => {
+            fetch(window.location.origin + '/btc_price_changes').then(response => response.json()).then(data => {
                 // Update price change displays
                 if ('change1h' in data) {
                     const el = document.getElementById('change-1h');
@@ -902,7 +902,7 @@
                     this.classList.toggle('active');
                     
                     try {
-                        const response = await fetch('/api/set_auto_entry', {
+                        const response = await fetch(window.location.origin + '/api/set_auto_entry', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ enabled })
@@ -911,7 +911,9 @@
                         if (!response.ok) {
                             // Revert if failed
                             this.classList.toggle('active');
-                            console.error('Failed to update auto entry setting');
+                            const errorText = await response.text();
+                            console.error('Failed to update auto entry setting:', errorText);
+                            alert(`Failed to update auto entry setting: ${response.status} ${response.statusText}`);
                         }
                     } catch (error) {
                         // Revert if failed
@@ -940,7 +942,7 @@
                     this.classList.toggle('active');
                     
                     try {
-                        const response = await fetch('/api/set_auto_stop', {
+                        const response = await fetch(window.location.origin + '/api/set_auto_stop', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ enabled })
@@ -949,7 +951,9 @@
                         if (!response.ok) {
                             // Revert if failed
                             this.classList.toggle('active');
-                            console.error('Failed to update auto stop setting');
+                            const errorText = await response.text();
+                            console.error('Failed to update auto stop setting:', errorText);
+                            alert(`Failed to update auto stop setting: ${response.status} ${response.statusText}`);
                         }
                     } catch (error) {
                         // Revert if failed
@@ -984,7 +988,8 @@
 
         // WebSocket connection for real-time updates
         function initializeWebSocket() {
-            const ws = new WebSocket(`ws://${window.location.host}/ws/preferences`);
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}/ws/preferences`);
             
             ws.onopen = function() {
                 console.log('WebSocket connected for preferences');
@@ -1068,7 +1073,7 @@
 
         async function loadToggleStates() {
             try {
-                const response = await fetch('/api/get_preferences');
+                const response = await fetch(window.location.origin + '/api/get_preferences');
                 const data = await response.json();
                 
                 // Set Auto Entry toggle
@@ -1145,7 +1150,7 @@
                     console.log('Position size changed to:', value);
                     
                     try {
-                        const response = await fetch('/api/set_position_size', {
+                        const response = await fetch(window.location.origin + '/api/set_position_size', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ position_size: value })
@@ -1153,8 +1158,11 @@
                         
                         if (response.ok) {
                             updatePositionDisplay();
+                            console.log('Position size updated successfully');
                         } else {
-                            console.error('Failed to update position size');
+                            const errorText = await response.text();
+                            console.error('Failed to update position size:', errorText);
+                            alert(`Failed to update position size: ${response.status} ${response.statusText}`);
                         }
                     } catch (error) {
                         console.error('Error updating position size:', error);
@@ -1174,14 +1182,18 @@
                     updatePositionDisplay();
                     
                     try {
-                        const response = await fetch('/api/set_multiplier', {
+                        const response = await fetch(window.location.origin + '/api/set_multiplier', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ multiplier })
                         });
                         
                         if (!response.ok) {
-                            console.error('Failed to update multiplier');
+                            const errorText = await response.text();
+                            console.error('Failed to update multiplier:', errorText);
+                            alert(`Failed to update multiplier: ${response.status} ${response.statusText}`);
+                        } else {
+                            console.log('Multiplier updated successfully');
                         }
                     } catch (error) {
                         console.error('Error updating multiplier:', error);
@@ -1195,7 +1207,7 @@
             setInterval(async () => {
                 try {
                     // Fetch strike table data (includes BTC price, TTC, and market title)
-                    const strikeResponse = await fetch('/api/strike_tables/btc');
+                    const strikeResponse = await fetch(window.location.origin + '/api/strike_tables/btc');
                     if (strikeResponse.ok) {
                         const strikeData = await strikeResponse.json();
                         
@@ -1419,7 +1431,7 @@
         // Update mobile strike table efficiently (like desktop)
         async function updateMobileStrikeTable() {
             try {
-                const response = await fetch('/api/strike_tables/btc');
+                const response = await fetch(window.location.origin + '/api/strike_tables/btc');
                 if (!response.ok) return;
                 
                 const data = await response.json();
@@ -1675,7 +1687,7 @@
             }, 500);
             
             // Execute trade
-            fetch('/api/trigger_trade', {
+            fetch(window.location.origin + '/api/trigger_trade', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1807,7 +1819,7 @@
             // Get momentum from consolidated strike table data
             let momentum = null;
             try {
-                const strikeResponse = await fetch('/api/strike_tables/btc');
+                const strikeResponse = await fetch(window.location.origin + '/api/strike_tables/btc');
                 if (strikeResponse.ok) {
                     const strikeData = await strikeResponse.json();
                     if (strikeData.momentum && strikeData.momentum.weighted_score !== undefined) {
@@ -1876,7 +1888,7 @@
                 }
                 
                 // Call the EXACT SAME endpoint as desktop
-                const response = await fetch('/api/trigger_open_trade', {
+                const response = await fetch(window.location.origin + '/api/trigger_open_trade', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1922,7 +1934,7 @@
                 console.log('[ACTIVE TRADE SUPERVISOR] Current price for close:', currentPrice);
                 
                 // Use the EXACT SAME endpoint as desktop
-                const response = await fetch('/api/trigger_close_trade', {
+                const response = await fetch(window.location.origin + '/api/trigger_close_trade', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1957,7 +1969,7 @@
         async function updatePositionIndicatorsOnly() {
             try {
                 // Fetch active trades from the active_trade_supervisor API endpoint
-                const tradesRes = await fetch('/api/active_trades', { cache: 'no-store' });
+                const tradesRes = await fetch(window.location.origin + '/api/active_trades', { cache: 'no-store' });
                 if (!tradesRes.ok) return;
                 
                 const data = await tradesRes.json();
@@ -2012,7 +2024,7 @@
         async function updatePositionIndicator(strikeCell, strike) {
             try {
                 // Fetch active trades from the active_trade_supervisor API endpoint
-                const tradesRes = await fetch('/api/active_trades', { cache: 'no-store' });
+                const tradesRes = await fetch(window.location.origin + '/api/active_trades', { cache: 'no-store' });
                 if (!tradesRes.ok) return;
                 
                 const data = await tradesRes.json();
@@ -2472,7 +2484,7 @@
         async function fetchInitialAutoEntryIndicator() {
             try {
                 console.log('🔄 Fetching initial auto entry status (mobile)...');
-                const response = await fetch('/api/get_auto_entry_status');
+                const response = await fetch(window.location.origin + '/api/get_auto_entry_status');
                 if (!response.ok) throw new Error('Failed to fetch auto entry status');
                 const data = await response.json();
                 
@@ -2639,7 +2651,7 @@
         // Fetch initial active trades state
         async function fetchInitialActiveTrades() {
             try {
-                const response = await fetch('/trades', { cache: 'no-store' });
+                const response = await fetch(window.location.origin + '/trades', { cache: 'no-store' });
                 if (!response.ok) throw new Error('Failed to fetch active trades');
                 const trades = await response.json();
                 const activeTrades = trades.filter(trade => 
@@ -2810,7 +2822,7 @@
         async function loadMobileSettings() {
             try {
                 // Load main preferences (auto_entry, auto_stop, etc.)
-                const preferencesResponse = await fetch('/api/get_preferences');
+                const preferencesResponse = await fetch(window.location.origin + '/api/get_preferences');
                 if (preferencesResponse.ok) {
                     const preferences = await preferencesResponse.json();
                     
@@ -2827,7 +2839,7 @@
                 }
                 
                 // Load Auto Entry Settings
-                const autoEntryResponse = await fetch('/api/get_auto_entry_settings');
+                const autoEntryResponse = await fetch(window.location.origin + '/api/get_auto_entry_settings');
                 if (autoEntryResponse.ok) {
                     const autoEntryData = await autoEntryResponse.json();
                     
@@ -2862,7 +2874,7 @@
                 }
                 
                 // Load Auto Stop Settings
-                const autoStopResponse = await fetch('/api/get_auto_stop_settings');
+                const autoStopResponse = await fetch(window.location.origin + '/api/get_auto_stop_settings');
                 if (autoStopResponse.ok) {
                     const autoStopData = await autoStopResponse.json();
                     
@@ -2918,7 +2930,7 @@
                 }
                 
                 // Load Spike Alert Settings (from auto entry settings)
-                const spikeAlertResponse = await fetch('/api/get_auto_entry_settings');
+                const spikeAlertResponse = await fetch(window.location.origin + '/api/get_auto_entry_settings');
                 if (spikeAlertResponse.ok) {
                     const spikeAlertData = await spikeAlertResponse.json();
                     
@@ -2994,7 +3006,7 @@
                 
                 if (!isNaN(newProb) && !isNaN(newDifferential) && !isNaN(newStopProb) && !isNaN(newMinTTC)) {
                     // Save Auto Entry Settings
-                    const autoEntryResponse = await fetch('/api/set_auto_entry_settings', {
+                    const autoEntryResponse = await fetch(window.location.origin + '/api/set_auto_entry_settings', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -3012,7 +3024,7 @@
                     });
                     
                     // Save Auto Stop Settings
-                    const autoStopResponse = await fetch('/api/set_auto_stop_settings', {
+                    const autoStopResponse = await fetch(window.location.origin + '/api/set_auto_stop_settings', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({

@@ -6,10 +6,11 @@ let serviceConfig = {};
 // Load port configuration from centralized system
 async function loadPortConfig() {
     try {
-        const response = await fetch('/api/ports');
+        const response = await fetch(window.location.origin + '/api/ports');
         if (response.ok) {
             const config = await response.json();
-            const host = config.host || window.location.hostname;
+            // Always use the browser's hostname to ensure domain access works correctly
+            const host = window.location.hostname;
             serviceConfig = {
                 mainApp: { port: config.ports.main_app, host: host },
                 tradeManager: { port: config.ports.trade_manager, host: host },

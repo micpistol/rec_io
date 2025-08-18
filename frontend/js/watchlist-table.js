@@ -6,7 +6,7 @@
 // Fetch watchlist data from the PostgreSQL endpoint
 async function fetchWatchlistData() {
   try {
-    const response = await fetch('/api/watchlist/btc');
+    const response = await fetch(window.location.origin + '/api/watchlist/btc');
     const data = await response.json();
     return data;
   } catch (error) {
@@ -168,7 +168,7 @@ function updateWatchlistBuyButton(spanEl, strike, side, askPrice, isActive, tick
           return;
         }
         
-        const response = await fetch('/api/trigger_open_trade', {
+        const response = await fetch(window.location.origin + '/api/trigger_open_trade', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -212,7 +212,7 @@ function updateWatchlistBuyButton(spanEl, strike, side, askPrice, isActive, tick
 
 async function updateWatchlistPositionIndicator(strikeCell, strike) {
   try {
-    const tradesRes = await fetch('/api/active_trades', { cache: 'no-store' });
+    const tradesRes = await fetch(window.location.origin + '/api/active_trades', { cache: 'no-store' });
     if (!tradesRes.ok) return;
     
     const data = await tradesRes.json();
