@@ -2,13 +2,13 @@
 
 # COMPREHENSIVE DIGITAL OCEAN DEPLOYMENT SCRIPT
 # Based on verified system specifications
-# Target: 146.190.155.233
-# SSH Key: 60:c5:3a:ab:1c:75:52:6e:09:bf:4c:f1:96:81:bf:6c
+# Target: YOUR_DROPLET_IP
+# SSH Key: YOUR_SSH_KEY_FINGERPRINT
 
 set -e  # Exit on any error
 
 # Configuration
-SERVER_IP="146.190.155.233"
+SERVER_IP="YOUR_DROPLET_IP"
 SERVER_USER="root"
 PROJECT_ROOT="/Users/ericwais1/rec_io_20"
 DEPLOY_DIR="/opt/trading_system"
@@ -265,7 +265,7 @@ POSTGRES_USER=rec_io_user
 POSTGRES_PASSWORD=rec_io_password
 
 # System Configuration
-TRADING_SYSTEM_HOST=146.190.155.233
+TRADING_SYSTEM_HOST=YOUR_DROPLET_IP
 AUTH_ENABLED=false
 ENVEOF
         
@@ -379,7 +379,7 @@ create_deployment_summary() {
         cat > DEPLOYMENT_SUMMARY.md << 'SUMMARYEOF'
 # Deployment Summary
 Date: $(date)
-Server: 146.190.155.233
+Server: YOUR_DROPLET_IP
 Status: SUCCESS
 
 ## Services Deployed: 12
@@ -402,9 +402,9 @@ Status: SUCCESS
 - Fills: $(psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT COUNT(*) FROM users.fills_0001;" | tail -1)
 
 ## Access
-- Frontend: http://146.190.155.233:3000
-- Health Check: http://146.190.155.233:3000/health
-- SSH: ssh root@146.190.155.233
+- Frontend: http://YOUR_DROPLET_IP:3000
+- Health Check: http://YOUR_DROPLET_IP:3000/health
+- SSH: ssh root@YOUR_DROPLET_IP
 
 ## Verification Commands
 ```bash
@@ -412,7 +412,7 @@ Status: SUCCESS
 supervisorctl status
 
 # Test main app
-curl http://146.190.155.233:3000/health
+curl http://YOUR_DROPLET_IP:3000/health
 
 # Check database
 psql -h localhost -U rec_io_user -d rec_io_db -c "SELECT COUNT(*) FROM users.trades_0001;"

@@ -7,6 +7,12 @@ This directory contains comprehensive documentation for the REC.IO trading syste
 
 ## 🔄 **RECENT MAJOR UPDATES (Latest)**
 
+### **🛡️ Automatic Maintenance Protection Added**
+- **✅ CRITICAL FIX:** Installation script now automatically disables Ubuntu's automatic maintenance services
+- **✅ PROTECTED:** Prevents automatic deletion of virtual environment binaries and critical system files
+- **✅ PRODUCTION SAFE:** Eliminates risk of automatic system maintenance causing trading system failures
+- **✅ BUILT-IN:** All new installations are automatically protected from Digital Ocean's default cleanup operations
+
 ### **PostgreSQL Migration Complete**
 - **✅ Migrated:** All BTC price data from legacy SQLite to PostgreSQL `live_data.btc_price_log`
 - **✅ Retired:** `btc_price_watchdog` service (archived to `archive/deprecated_services/`)
@@ -28,6 +34,7 @@ This directory contains comprehensive documentation for the REC.IO trading syste
 - **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Comprehensive deployment procedures
 - **[AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md)** - Authentication and security setup
 - **[README_FIREWALL.md](README_FIREWALL.md)** - Firewall configuration and network security
+- **[AUTOMATIC_MAINTENANCE_PROTECTION.md](AUTOMATIC_MAINTENANCE_PROTECTION.md)** - Critical protection against automatic system maintenance failures
 
 ### **Migration & Architecture**
 - **[POSTGRESQL_MIGRATION_PLAN.md](POSTGRESQL_MIGRATION_PLAN.md)** - PostgreSQL migration strategy (COMPLETED)

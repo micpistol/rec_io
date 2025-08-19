@@ -596,6 +596,81 @@ configure_system() {
     log_deployment "System configuration completed and verified"
 }
 
+# STEP 8.5: DISABLE AUTOMATIC MAINTENANCE (CRITICAL FOR PRODUCTION)
+disable_automatic_maintenance() {
+    echo
+    echo "============================================================================="
+    echo "              STEP 8.5: DISABLE AUTOMATIC MAINTENANCE"
+    echo "============================================================================="
+    echo
+    
+    log_info "Disabling automatic system maintenance to prevent production failures..."
+    log_deployment "Starting automatic maintenance disable"
+    
+    # Disable APT automatic services
+    log_info "Disabling APT automatic services..."
+    systemctl disable apt-daily-upgrade.service 2>/dev/null || true
+    systemctl disable apt-daily-upgrade.timer 2>/dev/null || true
+    systemctl disable apt-daily.service 2>/dev/null || true
+    systemctl disable apt-daily.timer 2>/dev/null || true
+    systemctl disable apt-daily-weekly.service 2>/dev/null || true
+    systemctl disable apt-daily-weekly.timer 2>/dev/null || true
+    
+    # Disable update-notifier services
+    log_info "Disabling update-notifier services..."
+    systemctl disable update-notifier-download.service 2>/dev/null || true
+    systemctl disable update-notifier-motd.service 2>/dev/null || true
+    
+    # Disable snap automatic updates
+    log_info "Disabling snap automatic updates..."
+    systemctl disable snapd.service 2>/dev/null || true
+    systemctl disable snapd.socket 2>/dev/null || true
+    
+    # Disable unattended upgrades
+    log_info "Disabling unattended upgrades..."
+    systemctl disable unattended-upgrades.service 2>/dev/null || true
+    systemctl disable unattended-upgrades.timer 2>/dev/null || true
+    
+    # Create APT configuration to prevent automatic operations
+    log_info "Creating APT configuration to prevent automatic operations..."
+    cat > /etc/apt/apt.conf.d/99disable-auto-updates << 'EOF'
+# Disable all automatic APT operations
+APT::Get::Automatic "false";
+APT::Get::AutomaticRemove "false";
+APT::Get::AutomaticRemove::Kernels "false";
+APT::Get::AutomaticRemove::UnusedKernels "false";
+APT::Get::AutomaticRemove::UnusedDependencies "false";
+
+# Disable unattended upgrades
+Unattended-Upgrade::Automatic-Reboot "false";
+Unattended-Upgrade::Remove-Unused-Dependencies "false";
+Unattended-Upgrade::Remove-New-Unused-Dependencies "false";
+Unattended-Upgrade::Automatic-Reboot-Time "02:00";
+Unattended-Upgrade::Mail "false";
+
+# Disable automatic package downloads
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Download-Upgradeable-Packages "0";
+APT::Periodic::AutocleanInterval "0";
+APT::Periodic::Unattended-Upgrade "0";
+EOF
+
+    # Verify services are disabled
+    log_info "Verifying automatic maintenance is disabled..."
+    local enabled_services=$(systemctl list-unit-files | grep -E "(apt|unattended)" | grep enabled | grep -v snap || true)
+    
+    if [[ -n "$enabled_services" ]]; then
+        log_warning "Some automatic services are still enabled:"
+        echo "$enabled_services"
+        log_warning "Manual intervention may be required"
+    else
+        log_success "All automatic maintenance services successfully disabled"
+    fi
+    
+    log_success "Automatic maintenance disabled - production system is now protected"
+    log_deployment "Automatic maintenance disabled successfully"
+}
+
 # STEP 9: TEST SERVICE STARTUP
 test_service_startup() {
     echo
@@ -851,6 +926,7 @@ main() {
     setup_database_schema
     clone_data_from_master
     configure_system
+    disable_automatic_maintenance
     test_service_startup
     create_user_profile
     verify_installation

@@ -113,16 +113,28 @@ class UnifiedConfigManager:
             ]
             
             for venv_path in venv_locations:
-                if venv_path.exists() and (venv_path / "bin" / "python").exists():
-                    logger.info(f"Found virtual environment: {venv_path}")
-                    return str(venv_path)
+                python_executable = venv_path / "bin" / "python"
+                if venv_path.exists() and python_executable.exists():
+                    # Test if the Python executable can actually run
+                    try:
+                        import subprocess
+                        result = subprocess.run([str(python_executable), "--version"], 
+                                              capture_output=True, text=True, timeout=5)
+                        if result.returncode == 0:
+                            logger.info(f"Found working virtual environment: {venv_path}")
+                            return str(venv_path)
+                        else:
+                            logger.warning(f"Virtual environment Python failed to run: {venv_path}")
+                    except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError) as e:
+                        logger.warning(f"Virtual environment Python incompatible: {venv_path} - {e}")
+                        continue
             
             # Check if we're already in a virtual environment
             if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
                 logger.info(f"Using current virtual environment: {sys.prefix}")
                 return sys.prefix
             
-            logger.warning("No virtual environment detected")
+            logger.warning("No compatible virtual environment detected")
             return ""
             
         except Exception as e:
