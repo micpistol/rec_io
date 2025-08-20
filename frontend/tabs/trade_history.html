@@ -76,42 +76,181 @@
       <div class="panel-header">Search</div>
       <div style="margin-top: 10px; display: flex; gap: 20px; align-items: flex-start;">
         <div>
-          <select id="date-filter-picker" class="dropdown-picker" style="width: 180px;">
-            <option value="ALL">All</option>
-            <option value="TODAY">Today</option>
-            <option value="THIS_WEEK">This Week</option>
-            <option value="SUNDAY">- Sunday</option>
-            <option value="MONDAY">- Monday</option>
-            <option value="TUESDAY">- Tuesday</option>
-            <option value="WEDNESDAY">- Wednesday</option>
-            <option value="THURSDAY">- Thursday</option>
-            <option value="FRIDAY">- Friday</option>
-            <option value="SATURDAY">- Saturday</option>
-            <option value="LAST_WEEK">Last Week</option>
-            <option value="MONTH">This Month</option>
-            <option value="PREV_30">Prev 30</option>
-            <option value="YTD">YTD</option>
-            <option value="PREV_YEAR">Prev Year</option>
-            <option value="CUSTOM">Custom</option>
-          </select>
-          <div id="date-range-display" style="margin-top: 10px; margin-left: 10px;font-size: 12px; color: #ccc;"></div>
-        </div>
-        <div>
-          <div style="display: flex; gap: 15px;">
-            <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;  cursor: pointer;">
-              <input type="checkbox" id="filter-win" checked style="width: 14px; height: 14px;">
-              Win
-            </label>
-            <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
-              <input type="checkbox" id="filter-loss" checked style="width: 14px; height: 14px;">
-              Loss
-            </label>
+          <div style="display: flex; gap: 15px; align-items: center;">
+            <select id="date-filter-picker" class="dropdown-picker" style="width: 100px;">
+              <option value="ALL">All</option>
+              <option value="TODAY">Today</option>
+              <option value="THIS_WEEK">This Week</option>
+              <option value="SUNDAY">- Sunday</option>
+              <option value="MONDAY">- Monday</option>
+              <option value="TUESDAY">- Tuesday</option>
+              <option value="WEDNESDAY">- Wednesday</option>
+              <option value="THURSDAY">- Thursday</option>
+              <option value="FRIDAY">- Friday</option>
+              <option value="SATURDAY">- Saturday</option>
+              <option value="LAST_WEEK">Last Week</option>
+              <option value="MONTH">This Month</option>
+              <option value="PREV_30">Prev 30</option>
+              <option value="YTD">YTD</option>
+              <option value="PREV_YEAR">Prev Year</option>
+              <option value="CUSTOM">Custom</option>
+            </select>
+            <div style="display: flex; gap: 15px;">
+              <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
+                <input type="checkbox" id="filter-win" checked style="width: 14px; height: 14px;">
+                Win
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
+                <input type="checkbox" id="filter-loss" checked style="width: 14px; height: 14px;">
+                Loss
+              </label>
+            </div>
+          </div>
+          <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 5px;">
+              <input type="date" id="start-date" style="width: 100px; padding: 4px; font-size: 12px; background: #2a3441; border: 1px solid #4a5568; color: white; border-radius: 3px; font-family: inherit;">
+            </div>
+            <div style="display: flex; align-items: center; gap: 5px;">
+              <label style="font-size: 12px; color: #ccc; align: center;"> to </label>
+              <input type="date" id="end-date" style="width: 100px; padding: 4px; font-size: 12px; background: #2a3441; border: 1px solid #4a5568; color: white; border-radius: 3px; font-family: inherit;">
+            </div>
           </div>
         </div>
         <div>
-          <div style="margin-bottom: 5px; font-size: 12px; color: #ccc;">TTC Filter (minutes)</div>
-          <input type="number" id="ttc-filter" min="0" max="60" value="60" style="width: 80px; padding: 4px; font-size: 12px; background: #2a3441; border: 1px solid #4a5568; color: white; border-radius: 3px;">
+          <div style="margin-bottom: 5px; font-size: 12px; color: #ccc;">Contract</div>
+          <div class="multi-select-dropdown" style="position: relative; width: 100px;">
+            <button id="contract-dropdown-btn" style="width: 100%; padding: 4px 8px; font-size: 12px; background: #2a3441; border: 1px solid #4a5568; color: white; border-radius: 3px; text-align: left; cursor: pointer;">
+              Select Contracts
+            </button>
+            <div id="contract-dropdown-content" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; background: #2a3441; border: 1px solid #4a5568; border-radius: 3px; z-index: 1000; max-height: 200px; overflow-y: auto;">
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="contract-all" style="width: 14px; height: 14px;">
+                Select All
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="contract-9am" checked style="width: 14px; height: 14px;">
+                9am
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="contract-10am" checked style="width: 14px; height: 14px;">
+                10am
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="contract-11am" checked style="width: 14px; height: 14px;">
+                11am
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="contract-12am" checked style="width: 14px; height: 14px;">
+                12am
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="contract-1pm" checked style="width: 14px; height: 14px;">
+                1pm
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="contract-2pm" checked style="width: 14px; height: 14px;">
+                2pm
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="contract-3pm" checked style="width: 14px; height: 14px;">
+                3pm
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="contract-4pm" checked style="width: 14px; height: 14px;">
+                4pm
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="contract-5pm" checked style="width: 14px; height: 14px;">
+                5pm
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="contract-6pm" checked style="width: 14px; height: 14px;">
+                6pm
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="contract-7pm" checked style="width: 14px; height: 14px;">
+                7pm
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="contract-8pm" checked style="width: 14px; height: 14px;">
+                8pm
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="contract-9pm" checked style="width: 14px; height: 14px;">
+                9pm
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="contract-10pm" checked style="width: 14px; height: 14px;">
+                10pm
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer;">
+                <input type="checkbox" id="contract-11pm" checked style="width: 14px; height: 14px;">
+                11pm
+              </label>
+            </div>
+          </div>
         </div>
+        <div>
+          <div style="margin-bottom: 5px; font-size: 12px; color: #ccc;">Symbol</div>
+          <div class="multi-select-dropdown" style="position: relative; width: 100px;">
+            <button id="symbol-dropdown-btn" style="width: 100%; padding: 4px 8px; font-size: 12px; background: #2a3441; border: 1px solid #4a5568; color: white; border-radius: 3px; text-align: left; cursor: pointer;">
+              Select Symbols
+            </button>
+            <div id="symbol-dropdown-content" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; background: #2a3441; border: 1px solid #4a5568; border-radius: 3px; z-index: 1000; max-height: 150px; overflow-y: auto;">
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="symbol-all" style="width: 14px; height: 14px;">
+                Select All
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="symbol-btc" checked style="width: 14px; height: 14px;">
+                BTC
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="symbol-eth" checked style="width: 14px; height: 14px;">
+                ETH
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="symbol-spy" checked style="width: 14px; height: 14px;">
+                SPY
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="symbol-ndx" checked style="width: 14px; height: 14px;">
+                NDX
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer;">
+                <input type="checkbox" id="symbol-usd-eur" checked style="width: 14px; height: 14px;">
+                USD/EUR
+              </label>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div style="margin-bottom: 5px; font-size: 12px; color: #ccc;">Strategy</div>
+          <div class="multi-select-dropdown" style="position: relative; width: 150px;">
+            <button id="strategy-dropdown-btn" style="width: 100%; padding: 4px 8px; font-size: 12px; background: #2a3441; border: 1px solid #4a5568; color: white; border-radius: 3px; text-align: left; cursor: pointer;">
+              Select Strategies
+            </button>
+            <div id="strategy-dropdown-content" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; background: #2a3441; border: 1px solid #4a5568; border-radius: 3px; z-index: 1000; max-height: 150px; overflow-y: auto;">
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="strategy-all" style="width: 14px; height: 14px;">
+                Select All
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="strategy-hourly-htc" checked style="width: 14px; height: 14px;">
+                Hourly HTC
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #4a5568;">
+                <input type="checkbox" id="strategy-momentum-scalp" checked style="width: 14px; height: 14px;">
+                Momentum Scalp
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer;">
+                <input type="checkbox" id="strategy-test" checked style="width: 14px; height: 14px;">
+                *** TEST ***
+              </label>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -204,6 +343,21 @@
       const month = String(now.getMonth() + 1).padStart(2, '0');
       const day = String(now.getDate()).padStart(2, '0');
       const today = `${year}-${month}-${day}`;
+      
+      // Check for custom date inputs
+      const startDateInput = document.getElementById('start-date');
+      const endDateInput = document.getElementById('end-date');
+      const customStartDate = startDateInput ? startDateInput.value : null;
+      const customEndDate = endDateInput ? endDateInput.value : null;
+      
+      // If custom dates are set and filter is not 'ALL', use them
+      if (customStartDate && customEndDate && filter !== 'ALL') {
+        return trades.filter(trade => {
+          if (!trade.date) return false;
+          return trade.date >= customStartDate && trade.date <= customEndDate;
+        });
+      }
+      
       // Helper to get the date string for a given day of week in this week
       function getDateOfThisWeek(dayOfWeek) {
         const curr = new Date(now);
@@ -241,6 +395,8 @@
       return trades.filter(trade => {
         if (!trade.date) return false;
         switch (filter) {
+          case 'ALL':
+            return true; // Show all trades regardless of date
           case 'TODAY':
             return trade.date === today;
           case 'THIS_WEEK': {
@@ -312,56 +468,121 @@
       });
     }
     
-    // === TTC FILTER LOGIC ===
-    function filterTradesByTTC(trades) {
-      const ttcFilter = document.getElementById('ttc-filter');
-      if (!ttcFilter) return trades;
+    // === CONTRACT FILTER LOGIC ===
+    function filterTradesByContract(trades) {
+      const contract9amChecked = document.getElementById('contract-9am').checked;
+      const contract10amChecked = document.getElementById('contract-10am').checked;
+      const contract11amChecked = document.getElementById('contract-11am').checked;
+      const contract12amChecked = document.getElementById('contract-12am').checked;
+      const contract1pmChecked = document.getElementById('contract-1pm').checked;
+      const contract2pmChecked = document.getElementById('contract-2pm').checked;
+      const contract3pmChecked = document.getElementById('contract-3pm').checked;
+      const contract4pmChecked = document.getElementById('contract-4pm').checked;
+      const contract5pmChecked = document.getElementById('contract-5pm').checked;
+      const contract6pmChecked = document.getElementById('contract-6pm').checked;
+      const contract7pmChecked = document.getElementById('contract-7pm').checked;
+      const contract8pmChecked = document.getElementById('contract-8pm').checked;
+      const contract9pmChecked = document.getElementById('contract-9pm').checked;
+      const contract10pmChecked = document.getElementById('contract-10pm').checked;
+      const contract11pmChecked = document.getElementById('contract-11pm').checked;
       
-      const maxTTC = parseInt(ttcFilter.value);
-      if (isNaN(maxTTC) || maxTTC < 0 || maxTTC > 60) return trades;
+      // If no contracts are selected, show no trades
+      if (!contract9amChecked && !contract10amChecked && !contract11amChecked && !contract12amChecked && 
+          !contract1pmChecked && !contract2pmChecked && !contract3pmChecked && !contract4pmChecked && 
+          !contract5pmChecked && !contract6pmChecked && !contract7pmChecked && !contract8pmChecked && 
+          !contract9pmChecked && !contract10pmChecked && !contract11pmChecked) {
+        return [];
+      }
       
       return trades.filter(trade => {
-        // Check if trade has required data for TTC calculation
-        if (!trade.time) {
-          return true; // Show trades without time data
-        }
+        const contract = trade.contract;
+        if (!contract) return true; // Show trades without contract
         
-        try {
-          // Parse the trade time (format like "12:50:07")
-          const timeParts = trade.time.split(':');
-          if (timeParts.length !== 3) return true;
-          
-          const tradeHour = parseInt(timeParts[0]);
-          const tradeMinute = parseInt(timeParts[1]);
-          const tradeSecond = parseInt(timeParts[2]);
-          
-          if (isNaN(tradeHour) || isNaN(tradeMinute) || isNaN(tradeSecond)) {
-            return true; // Show trades with invalid time format
-          }
-          
-          // Calculate total minutes from trade time
-          const tradeTimeMinutes = tradeHour * 60 + tradeMinute + tradeSecond / 60;
-          
-          // For hourly contracts, closing time is the next hour
-          // So if trade is at 12:50:07, TTC is 9 minutes and 53 seconds
-          const nextHour = tradeHour + 1;
-          const closeTimeMinutes = nextHour * 60; // Next hour at :00
-          
-          let ttcMinutes = closeTimeMinutes - tradeTimeMinutes;
-          
-          // Handle edge case where trade is at 23:xx (next hour would be 0)
-          if (nextHour >= 24) {
-            ttcMinutes = (24 * 60) - tradeTimeMinutes;
-          }
-          
-          // Convert to total minutes for comparison
-          return ttcMinutes <= maxTTC;
-        } catch (error) {
-          console.warn('Error calculating TTC for trade:', trade.id, error);
-          return true; // Show trades with calculation errors
-        }
+        // Check if contract contains any of the selected times
+        if (contract9amChecked && contract.includes('9am')) return true;
+        if (contract10amChecked && contract.includes('10am')) return true;
+        if (contract11amChecked && contract.includes('11am')) return true;
+        if (contract12amChecked && contract.includes('12am')) return true;
+        if (contract1pmChecked && contract.includes('1pm')) return true;
+        if (contract2pmChecked && contract.includes('2pm')) return true;
+        if (contract3pmChecked && contract.includes('3pm')) return true;
+        if (contract4pmChecked && contract.includes('4pm')) return true;
+        if (contract5pmChecked && contract.includes('5pm')) return true;
+        if (contract6pmChecked && contract.includes('6pm')) return true;
+        if (contract7pmChecked && contract.includes('7pm')) return true;
+        if (contract8pmChecked && contract.includes('8pm')) return true;
+        if (contract9pmChecked && contract.includes('9pm')) return true;
+        if (contract10pmChecked && contract.includes('10pm')) return true;
+        if (contract11pmChecked && contract.includes('11pm')) return true;
+        
+        // If no matches found, don't show this trade
+        return false;
       });
     }
+    
+    // === SYMBOL FILTER LOGIC ===
+    function filterTradesBySymbol(trades) {
+      const btcChecked = document.getElementById('symbol-btc').checked;
+      const ethChecked = document.getElementById('symbol-eth').checked;
+      const spyChecked = document.getElementById('symbol-spy').checked;
+      const ndxChecked = document.getElementById('symbol-ndx').checked;
+      const usdEurChecked = document.getElementById('symbol-usd-eur').checked;
+      
+      // If no symbols are selected, show all trades
+      if (!btcChecked && !ethChecked && !spyChecked && !ndxChecked && !usdEurChecked) {
+        return trades;
+      }
+      
+      return trades.filter(trade => {
+        const symbol = trade.symbol;
+        if (!symbol) return true; // Show trades without symbol
+        
+        if (symbol === 'BTC') {
+          return btcChecked;
+        } else if (symbol === 'ETH') {
+          return ethChecked;
+        } else if (symbol === 'SPY') {
+          return spyChecked;
+        } else if (symbol === 'NDX') {
+          return ndxChecked;
+        } else if (symbol === 'USD/EUR') {
+          return usdEurChecked;
+        }
+        
+        // For any other symbols, show them
+        return true;
+      });
+    }
+    
+    // === STRATEGY FILTER LOGIC ===
+    function filterTradesByStrategy(trades) {
+      const hourlyHtcChecked = document.getElementById('strategy-hourly-htc').checked;
+      const momentumScalpChecked = document.getElementById('strategy-momentum-scalp').checked;
+      const testChecked = document.getElementById('strategy-test').checked;
+      
+      // If no strategies are selected, show all trades
+      if (!hourlyHtcChecked && !momentumScalpChecked && !testChecked) {
+        return trades;
+      }
+      
+      return trades.filter(trade => {
+        const strategy = trade.trade_strategy;
+        if (!strategy) return true; // Show trades without strategy
+        
+        if (strategy === 'Hourly HTC') {
+          return hourlyHtcChecked;
+        } else if (strategy === 'Momentum Scalp') {
+          return momentumScalpChecked;
+        } else if (strategy === '*** TEST ***') {
+          return testChecked;
+        }
+        
+        // For any other strategies, show them
+        return true;
+      });
+    }
+    
+
     
     // Helper function to format date as YYYY-MM-DD
     function formatDate(date) {
@@ -503,7 +724,7 @@
       });
       const avgBuy = buyCount > 0 ? (totalBuy / buyCount) : 0;
       
-      // Calculate Ret %: total PNL + FEES PAID, display as percent (e.g., $5.00 is 5.00%)
+      // Calculate Ret %: total PNL + FEES PAID, display as 10% of the value (e.g., $5.00 is 0.50%)
       let totalPnl = 0;
       let totalFees = 0;
       trades.forEach(trade => {
@@ -520,7 +741,7 @@
           }
         }
       });
-      const retValue = totalPnl + totalFees;
+      const retValue = (totalPnl + totalFees) * 0.1;
       const retPercentage = retValue.toFixed(2) + '%';
       
       // Calculate total PnL and total investment (for display only)
@@ -628,7 +849,9 @@
       
       filtered = filterTradesByDate(filtered, dateFilterPicker ? dateFilterPicker.value : 'TODAY');
       filtered = filterTradesByWinLoss(filtered);
-      filtered = filterTradesByTTC(filtered);
+      filtered = filterTradesByContract(filtered);
+      filtered = filterTradesBySymbol(filtered);
+      filtered = filterTradesByStrategy(filtered);
       
       filteredTrades = [...filtered];
       applyCurrentSort();
@@ -649,14 +872,18 @@
       }
     }
 
-    // Update date range display
+    // Update date range display and populate date inputs
     async function updateDateRangeDisplay() {
       const filterPicker = document.getElementById('date-filter-picker');
-      const display = document.getElementById('date-range-display');
-      if (!filterPicker || !display) return;
+      const startDateInput = document.getElementById('start-date');
+      const endDateInput = document.getElementById('end-date');
+      if (!filterPicker || !startDateInput || !endDateInput) return;
+      
       const selectedValue = filterPicker.value;
       const now = new Date();
-      let rangeText = '';
+      let startDate = '';
+      let endDate = '';
+      
       function getDateOfThisWeek(dayOfWeek) {
         const curr = new Date(now);
         const currDay = curr.getDay();
@@ -685,98 +912,116 @@
         curr.setDate(curr.getDate() - curr.getDay() - 1);
         return formatDate(curr);
       }
+      
       switch (selectedValue) {
         case 'ALL':
-          try {
-            const response = await fetch(window.location.origin + '/api/earliest_trade_date');
-            if (response.ok) {
-              const data = await response.json();
-              if (data.earliest_date) {
-                const todayStr = formatDate(now);
-                rangeText = `${data.earliest_date} to ${todayStr}`;
-              } else {
-                rangeText = '';
-              }
+          // Calculate date range from actual trade data
+          if (trades && trades.length > 0) {
+            const dates = trades
+              .filter(trade => trade.date)
+              .map(trade => trade.date)
+              .sort();
+            
+            if (dates.length > 0) {
+              startDate = dates[0]; // Earliest date
+              endDate = dates[dates.length - 1]; // Latest date
             } else {
-              rangeText = '';
+              startDate = formatDate(now);
+              endDate = formatDate(now);
             }
-          } catch (error) {
-            console.error('Error fetching earliest trade date:', error);
-            rangeText = '';
+          } else {
+            // Fallback to API call if no trades loaded yet
+            try {
+              const response = await fetch(window.location.origin + '/api/earliest_trade_date');
+              if (response.ok) {
+                const data = await response.json();
+                if (data.earliest_date) {
+                  startDate = data.earliest_date;
+                  endDate = formatDate(now);
+                }
+              }
+            } catch (error) {
+              console.error('Error fetching earliest trade date:', error);
+            }
           }
           break;
         case 'TODAY':
-          rangeText = formatDate(now);
+          startDate = formatDate(now);
+          endDate = formatDate(now);
           break;
         case 'THIS_WEEK': {
-          const sunday = getLatestSunday();
-          const todayStr = formatDate(now);
-          rangeText = `${sunday} to ${todayStr}`;
+          startDate = getLatestSunday();
+          endDate = formatDate(now);
           break;
         }
         case 'SUNDAY':
-          rangeText = getDateOfThisWeek(0);
+          startDate = getDateOfThisWeek(0);
+          endDate = getDateOfThisWeek(0);
           break;
         case 'MONDAY':
-          rangeText = getDateOfThisWeek(1);
+          startDate = getDateOfThisWeek(1);
+          endDate = getDateOfThisWeek(1);
           break;
         case 'TUESDAY':
-          rangeText = getDateOfThisWeek(2);
+          startDate = getDateOfThisWeek(2);
+          endDate = getDateOfThisWeek(2);
           break;
         case 'WEDNESDAY':
-          rangeText = getDateOfThisWeek(3);
+          startDate = getDateOfThisWeek(3);
+          endDate = getDateOfThisWeek(3);
           break;
         case 'THURSDAY':
-          rangeText = getDateOfThisWeek(4);
+          startDate = getDateOfThisWeek(4);
+          endDate = getDateOfThisWeek(4);
           break;
         case 'FRIDAY':
-          rangeText = getDateOfThisWeek(5);
+          startDate = getDateOfThisWeek(5);
+          endDate = getDateOfThisWeek(5);
           break;
         case 'SATURDAY':
-          rangeText = getDateOfThisWeek(6);
+          startDate = getDateOfThisWeek(6);
+          endDate = getDateOfThisWeek(6);
           break;
         case 'LAST_WEEK': {
-          const prevSunday = getPrevSunday();
-          const nextSaturday = getNextSaturdayOfPrevWeek();
-          rangeText = `${prevSunday} to ${nextSaturday}`;
+          startDate = getPrevSunday();
+          endDate = getNextSaturdayOfPrevWeek();
           break;
         }
         case 'MONTH': {
           const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-          const monthStartStr = formatDate(monthStart);
-          const todayStr2 = formatDate(now);
-          rangeText = `${monthStartStr} to ${todayStr2}`;
+          startDate = formatDate(monthStart);
+          endDate = formatDate(now);
           break;
         }
         case 'PREV_30': {
           const prev30 = new Date(now);
           prev30.setDate(now.getDate() - 30);
-          const prev30Str = formatDate(prev30);
-          const todayStr3 = formatDate(now);
-          rangeText = `${prev30Str} to ${todayStr3}`;
+          startDate = formatDate(prev30);
+          endDate = formatDate(now);
           break;
         }
         case 'YTD': {
-          const ytdStart = `${now.getFullYear()}-01-01`;
-          const todayStr4 = formatDate(now);
-          rangeText = `${ytdStart} to ${todayStr4}`;
+          startDate = `${now.getFullYear()}-01-01`;
+          endDate = formatDate(now);
           break;
         }
         case 'PREV_YEAR': {
           const prevYear = new Date(now);
           prevYear.setFullYear(now.getFullYear() - 1);
-          const prevYearStr = formatDate(prevYear);
-          const todayStr5 = formatDate(now);
-          rangeText = `${prevYearStr} to ${todayStr5}`;
+          startDate = formatDate(prevYear);
+          endDate = formatDate(now);
           break;
         }
         case 'CUSTOM':
-          rangeText = '';
-          break;
+          // Don't change the date inputs for custom selection
+          return;
         default:
-          rangeText = '';
+          break;
       }
-      display.textContent = rangeText;
+      
+      // Update the date input fields
+      if (startDate) startDateInput.value = startDate;
+      if (endDate) endDateInput.value = endDate;
     }
 
     // WebSocket connection for database change notifications
@@ -842,6 +1087,16 @@
           dateFilterPicker.value = data.date_filter;
         }
         
+        // Apply custom date inputs
+        const startDateInput = document.getElementById('start-date');
+        const endDateInput = document.getElementById('end-date');
+        if (startDateInput && data.start_date) {
+          startDateInput.value = data.start_date;
+        }
+        if (endDateInput && data.end_date) {
+          endDateInput.value = data.end_date;
+        }
+        
         // Apply win/loss filters
         const filterWin = document.getElementById('filter-win');
         const filterLoss = document.getElementById('filter-loss');
@@ -852,11 +1107,105 @@
           filterLoss.checked = data.loss_filter;
         }
         
-        // Apply TTC filter
-        const ttcFilter = document.getElementById('ttc-filter');
-        if (ttcFilter && data.ttc_filter !== undefined) {
-          ttcFilter.value = data.ttc_filter;
+        // Apply contract filters
+                    const contract9am = document.getElementById('contract-9am');
+      const contract10am = document.getElementById('contract-10am');
+      const contract11am = document.getElementById('contract-11am');
+      const contract12am = document.getElementById('contract-12am');
+      const contract1pm = document.getElementById('contract-1pm');
+      const contract2pm = document.getElementById('contract-2pm');
+      const contract3pm = document.getElementById('contract-3pm');
+      const contract4pm = document.getElementById('contract-4pm');
+      const contract5pm = document.getElementById('contract-5pm');
+      const contract6pm = document.getElementById('contract-6pm');
+      const contract7pm = document.getElementById('contract-7pm');
+      const contract8pm = document.getElementById('contract-8pm');
+      const contract9pm = document.getElementById('contract-9pm');
+      const contract10pm = document.getElementById('contract-10pm');
+      const contract11pm = document.getElementById('contract-11pm');
+        if (contract9am && data.contract_9am !== undefined) {
+          contract9am.checked = data.contract_9am;
         }
+        if (contract10am && data.contract_10am !== undefined) {
+          contract10am.checked = data.contract_10am;
+        }
+        if (contract11am && data.contract_11am !== undefined) {
+          contract11am.checked = data.contract_11am;
+        }
+        if (contract12am && data.contract_12am !== undefined) {
+          contract12am.checked = data.contract_12am;
+        }
+        if (contract1pm && data.contract_1pm !== undefined) {
+          contract1pm.checked = data.contract_1pm;
+        }
+        if (contract2pm && data.contract_2pm !== undefined) {
+          contract2pm.checked = data.contract_2pm;
+        }
+        if (contract3pm && data.contract_3pm !== undefined) {
+          contract3pm.checked = data.contract_3pm;
+        }
+        if (contract4pm && data.contract_4pm !== undefined) {
+          contract4pm.checked = data.contract_4pm;
+        }
+        if (contract5pm && data.contract_5pm !== undefined) {
+          contract5pm.checked = data.contract_5pm;
+        }
+        if (contract6pm && data.contract_6pm !== undefined) {
+          contract6pm.checked = data.contract_6pm;
+        }
+        if (contract7pm && data.contract_7pm !== undefined) {
+          contract7pm.checked = data.contract_7pm;
+        }
+        if (contract8pm && data.contract_8pm !== undefined) {
+          contract8pm.checked = data.contract_8pm;
+        }
+        if (contract9pm && data.contract_9pm !== undefined) {
+          contract9pm.checked = data.contract_9pm;
+        }
+        if (contract10pm && data.contract_10pm !== undefined) {
+          contract10pm.checked = data.contract_10pm;
+        }
+        if (contract11pm && data.contract_11pm !== undefined) {
+          contract11pm.checked = data.contract_11pm;
+        }
+        
+        // Apply symbol filters
+        const symbolBtc = document.getElementById('symbol-btc');
+        const symbolEth = document.getElementById('symbol-eth');
+        const symbolSpy = document.getElementById('symbol-spy');
+        const symbolNdx = document.getElementById('symbol-ndx');
+        const symbolUsdEur = document.getElementById('symbol-usd-eur');
+        if (symbolBtc && data.symbol_btc !== undefined) {
+          symbolBtc.checked = data.symbol_btc;
+        }
+        if (symbolEth && data.symbol_eth !== undefined) {
+          symbolEth.checked = data.symbol_eth;
+        }
+        if (symbolSpy && data.symbol_spy !== undefined) {
+          symbolSpy.checked = data.symbol_spy;
+        }
+        if (symbolNdx && data.symbol_ndx !== undefined) {
+          symbolNdx.checked = data.symbol_ndx;
+        }
+        if (symbolUsdEur && data.symbol_usd_eur !== undefined) {
+          symbolUsdEur.checked = data.symbol_usd_eur;
+        }
+        
+        // Apply strategy filters
+        const strategyHourlyHtc = document.getElementById('strategy-hourly-htc');
+        const strategyMomentumScalp = document.getElementById('strategy-momentum-scalp');
+        const strategyTest = document.getElementById('strategy-test');
+        if (strategyHourlyHtc && data.strategy_hourly_htc !== undefined) {
+          strategyHourlyHtc.checked = data.strategy_hourly_htc;
+        }
+        if (strategyMomentumScalp && data.strategy_momentum_scalp !== undefined) {
+          strategyMomentumScalp.checked = data.strategy_momentum_scalp;
+        }
+        if (strategyTest && data.strategy_test !== undefined) {
+          strategyTest.checked = data.strategy_test;
+        }
+        
+
         
         // Apply sort settings
         if (data.sort_key) {
@@ -911,14 +1260,304 @@
         });
       }
 
-      // Hook up TTC filter
-      const ttcFilter = document.getElementById('ttc-filter');
-      if (ttcFilter) {
-        ttcFilter.addEventListener('input', () => {
+
+
+      // Hook up date input fields
+      const startDateInput = document.getElementById('start-date');
+      const endDateInput = document.getElementById('end-date');
+      if (startDateInput) {
+        startDateInput.addEventListener('change', () => {
           applyFilters();
           savePreferences();
         });
       }
+      if (endDateInput) {
+        endDateInput.addEventListener('change', () => {
+          applyFilters();
+          savePreferences();
+        });
+      }
+
+      // Hook up strategy filter dropdown
+      const strategyDropdownBtn = document.getElementById('strategy-dropdown-btn');
+      const strategyDropdownContent = document.getElementById('strategy-dropdown-content');
+      const strategyAllCheckbox = document.getElementById('strategy-all');
+      const strategyCheckboxes = [
+        document.getElementById('strategy-hourly-htc'),
+        document.getElementById('strategy-momentum-scalp'),
+        document.getElementById('strategy-test')
+      ];
+
+      // Toggle dropdown
+      if (strategyDropdownBtn && strategyDropdownContent) {
+        strategyDropdownBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          strategyDropdownContent.style.display = strategyDropdownContent.style.display === 'none' ? 'block' : 'none';
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', () => {
+          strategyDropdownContent.style.display = 'none';
+        });
+
+        // Prevent dropdown from closing when clicking inside
+        strategyDropdownContent.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
+      }
+
+      // Handle "Select All" checkbox
+      if (strategyAllCheckbox) {
+        strategyAllCheckbox.addEventListener('change', () => {
+          const isChecked = strategyAllCheckbox.checked;
+          strategyCheckboxes.forEach(checkbox => {
+            if (checkbox) checkbox.checked = isChecked;
+          });
+          updateStrategyButtonText();
+          applyFilters();
+          savePreferences();
+        });
+      }
+
+      // Handle individual strategy checkboxes
+      strategyCheckboxes.forEach(checkbox => {
+        if (checkbox) {
+          checkbox.addEventListener('change', () => {
+            updateStrategyAllCheckbox();
+            updateStrategyButtonText();
+            applyFilters();
+            savePreferences();
+          });
+        }
+      });
+
+      // Function to update "Select All" checkbox state
+      function updateStrategyAllCheckbox() {
+        if (strategyAllCheckbox) {
+          const allChecked = strategyCheckboxes.every(checkbox => checkbox && checkbox.checked);
+          const someChecked = strategyCheckboxes.some(checkbox => checkbox && checkbox.checked);
+          strategyAllCheckbox.checked = allChecked;
+          strategyAllCheckbox.indeterminate = someChecked && !allChecked;
+        }
+      }
+
+      // Function to update button text
+      function updateStrategyButtonText() {
+        if (strategyDropdownBtn) {
+          const checkedStrategies = strategyCheckboxes.filter(checkbox => checkbox && checkbox.checked);
+          if (checkedStrategies.length === 0) {
+            strategyDropdownBtn.textContent = 'Select Strategies';
+          } else if (checkedStrategies.length === strategyCheckboxes.length) {
+            strategyDropdownBtn.textContent = 'All Strategies';
+          } else if (checkedStrategies.length === 1) {
+            // Show the specific strategy name when only one is selected
+            const strategyName = checkedStrategies[0].id.replace('strategy-', '').replace('-', ' ');
+            if (strategyName === 'hourly htc') {
+              strategyDropdownBtn.textContent = 'Hourly HTC';
+            } else if (strategyName === 'momentum scalp') {
+              strategyDropdownBtn.textContent = 'Momentum Scalp';
+            } else if (strategyName === 'test') {
+              strategyDropdownBtn.textContent = '*** TEST ***';
+            } else {
+              strategyDropdownBtn.textContent = strategyName;
+            }
+          } else {
+            strategyDropdownBtn.textContent = 'Multiple';
+          }
+        }
+      }
+
+      // Initialize button text
+      updateStrategyButtonText();
+      updateStrategyAllCheckbox();
+
+      // Hook up symbol filter dropdown
+      const symbolDropdownBtn = document.getElementById('symbol-dropdown-btn');
+      const symbolDropdownContent = document.getElementById('symbol-dropdown-content');
+      const symbolAllCheckbox = document.getElementById('symbol-all');
+      const symbolCheckboxes = [
+        document.getElementById('symbol-btc'),
+        document.getElementById('symbol-eth'),
+        document.getElementById('symbol-spy'),
+        document.getElementById('symbol-ndx'),
+        document.getElementById('symbol-usd-eur')
+      ];
+
+      // Toggle dropdown
+      if (symbolDropdownBtn && symbolDropdownContent) {
+        symbolDropdownBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          symbolDropdownContent.style.display = symbolDropdownContent.style.display === 'none' ? 'block' : 'none';
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', () => {
+          symbolDropdownContent.style.display = 'none';
+        });
+
+        // Prevent dropdown from closing when clicking inside
+        symbolDropdownContent.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
+      }
+
+      // Handle "Select All" checkbox for symbols
+      if (symbolAllCheckbox) {
+        symbolAllCheckbox.addEventListener('change', () => {
+          const isChecked = symbolAllCheckbox.checked;
+          symbolCheckboxes.forEach(checkbox => {
+            if (checkbox) checkbox.checked = isChecked;
+          });
+          updateSymbolButtonText();
+          applyFilters();
+          savePreferences();
+        });
+      }
+
+      // Handle individual symbol checkboxes
+      symbolCheckboxes.forEach(checkbox => {
+        if (checkbox) {
+          checkbox.addEventListener('change', () => {
+            updateSymbolAllCheckbox();
+            updateSymbolButtonText();
+            applyFilters();
+            savePreferences();
+          });
+        }
+      });
+
+      // Function to update "Select All" checkbox state for symbols
+      function updateSymbolAllCheckbox() {
+        if (symbolAllCheckbox) {
+          const allChecked = symbolCheckboxes.every(checkbox => checkbox && checkbox.checked);
+          const someChecked = symbolCheckboxes.some(checkbox => checkbox && checkbox.checked);
+          symbolAllCheckbox.checked = allChecked;
+          symbolAllCheckbox.indeterminate = someChecked && !allChecked;
+        }
+      }
+
+      // Function to update symbol button text
+      function updateSymbolButtonText() {
+        if (symbolDropdownBtn) {
+          const checkedSymbols = symbolCheckboxes.filter(checkbox => checkbox && checkbox.checked);
+          if (checkedSymbols.length === 0) {
+            symbolDropdownBtn.textContent = 'Select Symbols';
+          } else if (checkedSymbols.length === symbolCheckboxes.length) {
+            symbolDropdownBtn.textContent = 'All Symbols';
+          } else if (checkedSymbols.length === 1) {
+            // Show the specific symbol name when only one is selected
+            const symbolName = checkedSymbols[0].id.replace('symbol-', '').toUpperCase();
+            if (symbolName === 'USD-EUR') {
+              symbolDropdownBtn.textContent = 'USD/EUR';
+            } else {
+              symbolDropdownBtn.textContent = symbolName;
+            }
+          } else {
+            symbolDropdownBtn.textContent = 'Multiple';
+          }
+        }
+      }
+
+      // Initialize symbol button text
+      updateSymbolButtonText();
+      updateSymbolAllCheckbox();
+
+      // Hook up contract filter dropdown
+      const contractDropdownBtn = document.getElementById('contract-dropdown-btn');
+      const contractDropdownContent = document.getElementById('contract-dropdown-content');
+      const contractAllCheckbox = document.getElementById('contract-all');
+      const contractCheckboxes = [
+        document.getElementById('contract-9am'),
+        document.getElementById('contract-10am'),
+        document.getElementById('contract-11am'),
+        document.getElementById('contract-12am'),
+        document.getElementById('contract-1pm'),
+        document.getElementById('contract-2pm'),
+        document.getElementById('contract-3pm'),
+        document.getElementById('contract-4pm'),
+        document.getElementById('contract-5pm'),
+        document.getElementById('contract-6pm'),
+        document.getElementById('contract-7pm'),
+        document.getElementById('contract-8pm'),
+        document.getElementById('contract-9pm'),
+        document.getElementById('contract-10pm'),
+        document.getElementById('contract-11pm')
+      ];
+
+      // Toggle dropdown
+      if (contractDropdownBtn && contractDropdownContent) {
+        contractDropdownBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          contractDropdownContent.style.display = contractDropdownContent.style.display === 'none' ? 'block' : 'none';
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', () => {
+          contractDropdownContent.style.display = 'none';
+        });
+
+        // Prevent dropdown from closing when clicking inside
+        contractDropdownContent.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
+      }
+
+      // Handle "Select All" checkbox for contracts
+      if (contractAllCheckbox) {
+        contractAllCheckbox.addEventListener('change', () => {
+          const isChecked = contractAllCheckbox.checked;
+          contractCheckboxes.forEach(checkbox => {
+            if (checkbox) checkbox.checked = isChecked;
+          });
+          updateContractButtonText();
+          applyFilters();
+          savePreferences();
+        });
+      }
+
+      // Handle individual contract checkboxes
+      contractCheckboxes.forEach(checkbox => {
+        if (checkbox) {
+          checkbox.addEventListener('change', () => {
+            updateContractAllCheckbox();
+            updateContractButtonText();
+            applyFilters();
+            savePreferences();
+          });
+        }
+      });
+
+      // Function to update "Select All" checkbox state for contracts
+      function updateContractAllCheckbox() {
+        if (contractAllCheckbox) {
+          const allChecked = contractCheckboxes.every(checkbox => checkbox && checkbox.checked);
+          const someChecked = contractCheckboxes.some(checkbox => checkbox && checkbox.checked);
+          contractAllCheckbox.checked = allChecked;
+          contractAllCheckbox.indeterminate = someChecked && !allChecked;
+        }
+      }
+
+      // Function to update contract button text
+      function updateContractButtonText() {
+        if (contractDropdownBtn) {
+          const checkedContracts = contractCheckboxes.filter(checkbox => checkbox && checkbox.checked);
+          if (checkedContracts.length === 0) {
+            contractDropdownBtn.textContent = 'Select';
+          } else if (checkedContracts.length === contractCheckboxes.length) {
+            contractDropdownBtn.textContent = 'All Contracts';
+          } else if (checkedContracts.length === 1) {
+            // Show the specific contract name when only one is selected
+            const contractName = checkedContracts[0].id.replace('contract-', '');
+            contractDropdownBtn.textContent = contractName;
+          } else {
+            contractDropdownBtn.textContent = 'Multiple';
+          }
+        }
+      }
+
+      // Initialize contract button text
+      updateContractButtonText();
+      updateContractAllCheckbox();
 
 
       
@@ -934,13 +1573,50 @@
       const dateFilterPicker = document.getElementById('date-filter-picker');
       const filterWin = document.getElementById('filter-win');
       const filterLoss = document.getElementById('filter-loss');
-      const ttcFilter = document.getElementById('ttc-filter');
+      const startDateInput = document.getElementById('start-date');
+      const endDateInput = document.getElementById('end-date');
+      const contract9am = document.getElementById('contract-9am');
+      const contract10am = document.getElementById('contract-10am');
+      const contract11am = document.getElementById('contract-11am');
+      const contract12am = document.getElementById('contract-12am');
+      const symbolBtc = document.getElementById('symbol-btc');
+      const symbolEth = document.getElementById('symbol-eth');
+      const symbolSpy = document.getElementById('symbol-spy');
+      const symbolNdx = document.getElementById('symbol-ndx');
+      const symbolUsdEur = document.getElementById('symbol-usd-eur');
+      const strategyHourlyHtc = document.getElementById('strategy-hourly-htc');
+      const strategyMomentumScalp = document.getElementById('strategy-momentum-scalp');
+      const strategyTest = document.getElementById('strategy-test');
       
       const preferences = {
         date_filter: dateFilterPicker ? dateFilterPicker.value : 'ALL',
+        start_date: startDateInput ? startDateInput.value : '',
+        end_date: endDateInput ? endDateInput.value : '',
         win_filter: filterWin ? filterWin.checked : true,
         loss_filter: filterLoss ? filterLoss.checked : true,
-        ttc_filter: ttcFilter ? parseInt(ttcFilter.value) : 60,
+        contract_9am: contract9am ? contract9am.checked : true,
+        contract_10am: contract10am ? contract10am.checked : true,
+        contract_11am: contract11am ? contract11am.checked : true,
+        contract_12am: contract12am ? contract12am.checked : true,
+        contract_1pm: contract1pm ? contract1pm.checked : true,
+        contract_2pm: contract2pm ? contract2pm.checked : true,
+        contract_3pm: contract3pm ? contract3pm.checked : true,
+        contract_4pm: contract4pm ? contract4pm.checked : true,
+        contract_5pm: contract5pm ? contract5pm.checked : true,
+        contract_6pm: contract6pm ? contract6pm.checked : true,
+        contract_7pm: contract7pm ? contract7pm.checked : true,
+        contract_8pm: contract8pm ? contract8pm.checked : true,
+        contract_9pm: contract9pm ? contract9pm.checked : true,
+        contract_10pm: contract10pm ? contract10pm.checked : true,
+        contract_11pm: contract11pm ? contract11pm.checked : true,
+        symbol_btc: symbolBtc ? symbolBtc.checked : true,
+        symbol_eth: symbolEth ? symbolEth.checked : true,
+        symbol_spy: symbolSpy ? symbolSpy.checked : true,
+        symbol_ndx: symbolNdx ? symbolNdx.checked : true,
+        symbol_usd_eur: symbolUsdEur ? symbolUsdEur.checked : true,
+        strategy_hourly_htc: strategyHourlyHtc ? strategyHourlyHtc.checked : true,
+        strategy_momentum_scalp: strategyMomentumScalp ? strategyMomentumScalp.checked : true,
+        strategy_test: strategyTest ? strategyTest.checked : true,
         sort_key: currentSort.key,
         sort_asc: currentSort.asc,
         page_size: 50,

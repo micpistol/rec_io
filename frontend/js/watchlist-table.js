@@ -44,8 +44,11 @@ async function updateWatchlistTable() {
     // Sort strikes by probability (highest to lowest)
     const sortedStrikes = data.strikes.sort((a, b) => b.probability - a.probability);
     
-    // Show only the strikes that are in the database
-    sortedStrikes.forEach((strikeData) => {
+    // Limit to only the top 5 strikes
+    const top5Strikes = sortedStrikes.slice(0, 5);
+    
+    // Show only the top 5 strikes
+    top5Strikes.forEach((strikeData) => {
       const row = document.createElement('tr');
       const strike = strikeData.strike;
       
