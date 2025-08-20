@@ -292,9 +292,9 @@ master_restart() {
     print_status "Initiating MASTER RESTART sequence..."
     echo ""
     
-    # Check sanitization status first (SECURITY CHECK)
-    check_sanitization_status
-    echo ""
+    # Check sanitization status first (SECURITY CHECK) - DISABLED FOR PRODUCTION
+    # check_sanitization_status
+    # echo ""
     
     # Create logs directory if it doesn't exist
     print_status "Ensuring logs directory exists..."

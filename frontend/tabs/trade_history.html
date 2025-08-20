@@ -97,10 +97,6 @@
           <div id="date-range-display" style="margin-top: 10px; margin-left: 10px;font-size: 12px; color: #ccc;"></div>
         </div>
         <div>
-          <div style="margin-bottom: 5px;">
-            <span id="select-all-filters" style="font-size: 12px; color: #ccc; cursor: pointer;  margin-right: 15px;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#ccc'">All</span>
-            <span id="select-none-filters" style="font-size: 12px; color: #ccc; cursor: pointer;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#ccc'">None</span>
-          </div>
           <div style="display: flex; gap: 15px;">
             <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;  cursor: pointer;">
               <input type="checkbox" id="filter-win" checked style="width: 14px; height: 14px;">
@@ -785,7 +781,8 @@
 
     // WebSocket connection for database change notifications
     function setupDatabaseChangeListener() {
-      const ws = new WebSocket(`ws://${window.location.host}/ws/db_changes`);
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(`${protocol}//${window.location.host}/ws/db_changes`);
       
       ws.onopen = function() {
         console.log('🔗 Connected to database change notifications (trade history)');
@@ -923,27 +920,7 @@
         });
       }
 
-      // Hook up All/None buttons
-      const selectAllBtn = document.getElementById('select-all-filters');
-      const selectNoneBtn = document.getElementById('select-none-filters');
-      
-      if (selectAllBtn) {
-        selectAllBtn.addEventListener('click', () => {
-          if (filterWin) filterWin.checked = true;
-          if (filterLoss) filterLoss.checked = true;
-          applyFilters();
-          savePreferences();
-        });
-      }
-      
-      if (selectNoneBtn) {
-        selectNoneBtn.addEventListener('click', () => {
-          if (filterWin) filterWin.checked = false;
-          if (filterLoss) filterLoss.checked = false;
-          applyFilters();
-          savePreferences();
-        });
-      }
+
       
       // Set up WebSocket connection for database change notifications
       setupDatabaseChangeListener();

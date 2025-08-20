@@ -2376,6 +2376,9 @@ async function fetchAndRenderTradeHistory() {
       const buyPrice = trade.buy_price !== null && trade.buy_price !== undefined ? Number(trade.buy_price).toFixed(2) : '';
       const sellPrice = trade.sell_price !== null && trade.sell_price !== undefined ? Number(trade.sell_price).toFixed(2) : '';
       
+      // Format fees to always show 2 decimal places
+      const fees = trade.fees !== null && trade.fees !== undefined ? Number(trade.fees).toFixed(2) : '';
+      
       // Format probability
       const prob = trade.prob !== null && trade.prob !== undefined ? Number(trade.prob).toFixed(1) : '';
       
@@ -2394,7 +2397,7 @@ async function fetchAndRenderTradeHistory() {
         <td>${buyPrice}</td>
         <td>${sellPrice}</td>
         <td>${trade.position || ''}</td>
-        <td>${trade.fees || ''}</td>
+        <td>${fees}</td>
         <td>${pnl}</td>
         <td>${trade.closed_at || ''}</td>
         <td>${symbolOpen}</td>
